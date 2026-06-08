@@ -15,6 +15,10 @@
 //   6. Après un basculement réussi, le nouveau serveur peut fournir
 //      une nouvelle adresse cryptée de backup, qu'on insère en
 //      queue de chaîne. La liste reste ainsi auto-entretenue.
+//
+// Le logger `ClientDebugLogger` (lib/debug/client_debug_logger.dart)
+// est notifié à chaque étape clé pour produire un fichier
+// `CLIENT_DEBUG.md` (cf. mode kDebugMode).
 
 import 'dart:async';
 import 'dart:convert';
@@ -24,6 +28,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 
 import '../database/crypto_utils.dart';
+import '../debug/client_debug_logger.dart';
 
 /// Statut d'un serveur connu du FailoverManager.
 enum ServerStatus { active, failed, standby }
@@ -161,6 +166,7 @@ class FailoverManager {
 
     // Pré-décrypte et charge la chaîne de secours en mémoire
     // (mais reste en standby tant qu'on n'en a pas besoin).
+    final decryptedAddrs = <String>[];
     for (final cipher in config.encryptedBackupChain) {
       try {
         final clear = await CryptoUtils.instance
@@ -173,12 +179,24 @@ class FailoverManager {
           lastChecked: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
           markedFailedAt: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
         ));
+        decryptedAddrs.add(clear);
+        ClientDebugLogger.instance.backupDecrypted(
+          cipher: cipher,
+          clear: clear,
+        );
       } catch (e) {
         if (kDebugMode) {
           debugPrint('[FailoverManager] déchiffrement backup échoué: $e');
         }
       }
     }
+
+    // Notifie le logger client : bootstrap terminé, on connaît
+    // le principal et la chaîne de secours déchiffrée.
+    ClientDebugLogger.instance.bootstrapReady(
+      primaryAddress: config.primaryAddress,
+      decryptedBackupChain: decryptedAddrs,
+    );
 
     if (kDebugMode) {
       debugPrint(
@@ -217,6 +235,10 @@ class FailoverManager {
       lastChecked: DateTime.now().toUtc(),
       consecutiveFailures: ok ? 0 : _current!.consecutiveFailures + 1,
     );
+    ClientDebugLogger.instance.heartbeat(
+      address: _current!.address,
+      ok: ok,
+    );
     if (ok) return true;
 
     if (kDebugMode) {
@@ -245,6 +267,7 @@ class FailoverManager {
     if (kDebugMode) {
       debugPrint('[FailoverManager] serveur $dying marqué DÉFAILLANT');
     }
+    ClientDebugLogger.instance.serverMarkedDead(dying);
 
     while (_standbys.isNotEmpty) {
       final next = _standbys.removeAt(0);
@@ -261,9 +284,14 @@ class FailoverManager {
             '[FailoverManager] basculé vers ${_current!.address}',
           );
         }
+        ClientDebugLogger.instance.failoverSucceeded(
+          fromAddress: dying,
+          toAddress: _current!.address,
+        );
         return;
       } else {
         _deadForSession.add(next.address);
+        ClientDebugLogger.instance.serverMarkedDead(next.address);
         if (kDebugMode) {
           debugPrint(
             '[FailoverManager] standby ${next.address} injoignable, '
@@ -276,6 +304,7 @@ class FailoverManager {
     if (kDebugMode) {
       debugPrint('[FailoverManager] AUCUN serveur de secours disponible !');
     }
+    ClientDebugLogger.instance.failoverFailed(fromAddress: dying);
     _current = _current!.copyWith(
       status: ServerStatus.failed,
       markedFailedAt: DateTime.now().toUtc(),
@@ -304,10 +333,19 @@ class FailoverManager {
   /// backup chiffré qu'il nous renvoie pour la chaîne suivante.
   Future<bool> uploadAlerts(List<dynamic> alerts) async {
     if (_current == null) return false;
+    final targetAddress = _current!.address;
     if (_current!.status != ServerStatus.active) {
       // Tente un heartbeat frais avant d'envoyer.
       final ok = await heartbeat();
-      if (!ok || _current!.status != ServerStatus.active) return false;
+      if (!ok || _current!.status != ServerStatus.active) {
+        ClientDebugLogger.instance.uploadAttempted(
+          address: targetAddress,
+          alertCount: alerts.length,
+          success: false,
+          error: 'serveur inactif',
+        );
+        return false;
+      }
     }
 
     try {
@@ -328,12 +366,29 @@ class FailoverManager {
             await _enqueueNextBackup(next.nextBackupCipher);
           }
         } catch (_) {}
+        ClientDebugLogger.instance.uploadAttempted(
+          address: targetAddress,
+          alertCount: alerts.length,
+          success: true,
+        );
         return true;
       }
+      ClientDebugLogger.instance.uploadAttempted(
+        address: targetAddress,
+        alertCount: alerts.length,
+        success: false,
+        error: 'HTTP ${resp.statusCode}',
+      );
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[FailoverManager] upload échoué: $e');
       }
+      ClientDebugLogger.instance.uploadAttempted(
+        address: targetAddress,
+        alertCount: alerts.length,
+        success: false,
+        error: e.toString(),
+      );
     }
     return false;
   }
@@ -360,6 +415,7 @@ class FailoverManager {
           '(total=${_standbys.length})',
         );
       }
+      ClientDebugLogger.instance.backupEnqueued(cipher: cipher, clear: clear);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[FailoverManager] backup reçu invalide: $e');

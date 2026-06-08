@@ -1,46 +1,70 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+// lib/features/map/presentation/map_screen.dart
+//
+// Écran principal de StreetPhare.
 
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../core/network/peer_counter_service.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../reports/presentation/report_bottom_sheet.dart';
+import '../../settings/data/panic_contact_store.dart';
+import '../../settings/presentation/settings_screen.dart';
 
-/// Écran principal de StreetPhare : carte plein écran OpenStreetMap
-/// avec trois boutons d'action flottants (FAB) :
-///   1. **SIGNALEMENT** : ouvre la feuille d'ancrage des signalements
-///   2. **ROUTE SAFE**  : affiche un snackbar (calcul d'itinéraire à venir)
-///   3. **PANIC**       : alerte système d'urgence
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
-
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
 
 class _MapScreenState extends State<MapScreen> {
-  // Contrôleur de la carte
   final MapController _mapController = MapController();
-
-  // Position centrée par défaut (coordonnées fictives : Paris).
-  // Sera remplacée par la position GPS de l'utilisateur dans une
-  // version ultérieure (avec demande de permission).
   static const LatLng _defaultCenter = LatLng(48.8566, 2.3522);
   static const double _defaultZoom = 13.0;
 
+  Timer? _demoPeerTimer;
+  final int _rng = DateTime.now().microsecondsSinceEpoch;
+
+  @override
+  void initState() {
+    super.initState();
+    PeerCounterService.instance.start();
+    _demoPeerTimer = Timer.periodic(
+      const Duration(seconds: 10),
+      (_) => _injectDemoPeer(),
+    );
+  }
+
   @override
   void dispose() {
+    _demoPeerTimer?.cancel();
     _mapController.dispose();
     super.dispose();
   }
 
-  // -------- Actions des boutons flottants --------
-
-  /// Ouvre la feuille d'ancrage des signalements
-  void _openReportSheet() {
-    ReportBottomSheet.show(context);
+  void _injectDemoPeer() {
+    final hit = (_rng + DateTime.now().second) % 2 == 0;
+    if (hit) {
+      PeerCounterService.instance.recordPeer(
+        'demo_${DateTime.now().millisecondsSinceEpoch}',
+      );
+    }
   }
 
-  /// Déclenche la recherche d'un itinéraire sécurisé (MVP : placeholder)
+  void _openReportSheet() => ReportBottomSheet.show(context);
+
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+  }
+
   void _triggerRouteSafe() {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -48,8 +72,8 @@ class _MapScreenState extends State<MapScreen> {
         backgroundColor: StreetPhareTheme.surface,
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
-        content: Row(
-          children: const [
+        content: const Row(
+          children: [
             SizedBox(
               width: 20,
               height: 20,
@@ -73,9 +97,46 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  /// Active le mode panique (alerte système)
   Future<void> _triggerPanic() async {
-    // Confirmation rapide avant d'envoyer l'alerte
+    final contacts = PanicContactStore.instance.value;
+    if (contacts.isEmpty) {
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: StreetPhareTheme.surface,
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber, color: StreetPhareTheme.danger),
+              SizedBox(width: 12),
+              Text('Aucun contact d\'urgence',
+                  style: TextStyle(color: StreetPhareTheme.textPrimary)),
+            ],
+          ),
+          content: const Text(
+            'Vous devez d\'abord configurer au moins un contact dans '
+            'les Paramètres pour pouvoir utiliser le bouton PANIC.',
+            style: TextStyle(color: StreetPhareTheme.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Ouvrir les Paramètres'),
+            ),
+          ],
+        ),
+      );
+      if (go == true && mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+        );
+      }
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       barrierColor: Colors.black87,
@@ -85,20 +146,20 @@ class _MapScreenState extends State<MapScreen> {
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: StreetPhareTheme.danger, width: 2),
         ),
-        title: Row(
-          children: const [
+        title: const Row(
+          children: [
             Icon(Icons.emergency, color: StreetPhareTheme.danger),
             SizedBox(width: 12),
-            Text(
-              'Mode Panique',
-              style: TextStyle(color: StreetPhareTheme.textPrimary),
-            ),
+            Text('Mode Panique',
+                style: TextStyle(color: StreetPhareTheme.textPrimary)),
           ],
         ),
-        content: const Text(
-          'Activer le mode panique enverra votre position actuelle '
-          'à vos contacts de confiance.\n\nContinuer ?',
-          style: TextStyle(color: StreetPhareTheme.textSecondary),
+        content: Text(
+          'Activer le mode panique enverra un SMS d\'alerte avec votre '
+          'position GPS à ${contacts.length} contact(s) :\n\n'
+          '${contacts.map((c) => '• ${c.name} (${c.phoneNumber})').join('\n')}\n\n'
+          'Continuer ?',
+          style: const TextStyle(color: StreetPhareTheme.textSecondary),
         ),
         actions: [
           TextButton(
@@ -116,33 +177,45 @@ class _MapScreenState extends State<MapScreen> {
       ),
     );
 
-    if (confirmed == true && mounted) {
-      // Log : aucune donnée nominative n'est collectée à ce stade.
-      // L'envoi réel se fera dans une version ultérieure via un
-      // service de notifications sécurisé.
-      debugPrint('[Panic] Mode Panique Activé - Envoi de la position de secours.');
+    if (confirmed != true || !mounted) return;
 
+    final position = await _getCurrentPositionSafe();
+    final message = _buildPanicMessage(position);
+
+    final phones = contacts.map((c) => c.phoneNumber).join(',');
+    final uri = Uri(
+      scheme: 'sms',
+      path: phones,
+      queryParameters: {'body': message},
+    );
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) throw Exception('launchUrl returned false');
+    } catch (e) {
+      debugPrint('[Panic] impossible d\'ouvrir l\'app SMS : $e');
+      if (!mounted) return;
+      await Clipboard.setData(ClipboardData(text: message));
       if (!mounted) return;
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: StreetPhareTheme.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: const [
-              Icon(Icons.check_circle, color: StreetPhareTheme.primary),
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: StreetPhareTheme.primary),
               SizedBox(width: 12),
-              Text(
-                'Alerte envoyée',
-                style: TextStyle(color: StreetPhareTheme.textPrimary),
-              ),
+              Text('SMS préparé',
+                  style: TextStyle(color: StreetPhareTheme.textPrimary)),
             ],
           ),
-          content: const Text(
-            'Mode Panique Activé - Envoi de la position de secours.',
-            style: TextStyle(color: StreetPhareTheme.textSecondary),
+          content: Text(
+            'Impossible d\'ouvrir l\'app SMS automatiquement.\n'
+            'Le message a été copié dans le presse-papier :\n\n$message',
+            style: const TextStyle(color: StreetPhareTheme.textSecondary),
           ),
           actions: [
             TextButton(
@@ -152,7 +225,69 @@ class _MapScreenState extends State<MapScreen> {
           ],
         ),
       );
+      return;
     }
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: StreetPhareTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: StreetPhareTheme.primary),
+            SizedBox(width: 12),
+            Text('Alerte prête',
+                style: TextStyle(color: StreetPhareTheme.textPrimary)),
+          ],
+        ),
+        content: Text(
+          'Un SMS d\'urgence va être envoyé à ${contacts.length} '
+          'contact(s) avec votre position GPS.',
+          style: const TextStyle(color: StreetPhareTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<Position?> _getCurrentPositionSafe() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return null;
+      }
+      if (permission == LocationPermission.deniedForever) return null;
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+    } catch (e) {
+      debugPrint('[Panic] erreur GPS : $e');
+      return null;
+    }
+  }
+
+  String _buildPanicMessage(Position? p) {
+    final stamp = DateTime.now().toUtc().toIso8601String();
+    final coords = p == null
+        ? 'position GPS indisponible'
+        : 'https://maps.google.com/?q=${p.latitude},${p.longitude} '
+            '(${p.latitude.toStringAsFixed(5)}, ${p.longitude.toStringAsFixed(5)})';
+    return '[STREETPHARE] Alerte d\'urgence envoyée le $stamp UTC.\n'
+        'Position : $coords\n'
+        'Merci de me contacter ou de prévenir les secours.';
   }
 
   @override
@@ -160,7 +295,6 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // --- Carte OpenStreetMap plein écran ---
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -173,15 +307,12 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
             children: [
-              // Tuiles OpenStreetMap (avec cache via flutter_map_cache)
               TileLayer(
                 urlTemplate:
                     'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.streetphare.app',
                 maxNativeZoom: 19,
               ),
-
-              // Attribution OpenStreetMap (obligatoire)
               const RichAttributionWidget(
                 alignment: AttributionAlignment.bottomLeft,
                 attributions: [
@@ -190,8 +321,6 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ],
           ),
-
-          // --- Barre supérieure discrète (titre + bouton d'info) ---
           Positioned(
             top: 0,
             left: 0,
@@ -207,19 +336,14 @@ class _MapScreenState extends State<MapScreen> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: StreetPhareTheme.surface.withValues(
-                          alpha: 0.85,
-                        ),
+                        color: StreetPhareTheme.surface.withValues(alpha: 0.85),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(
-                            Icons.lightbulb,
-                            color: StreetPhareTheme.primary,
-                            size: 18,
-                          ),
+                        children: [
+                          Icon(Icons.lightbulb,
+                              color: StreetPhareTheme.primary, size: 18),
                           SizedBox(width: 8),
                           Text(
                             'StreetPhare',
@@ -232,7 +356,14 @@ class _MapScreenState extends State<MapScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    const _PeerCounterBadge(),
                     const Spacer(),
+                    _CircleIconButton(
+                      icon: Icons.settings_outlined,
+                      onTap: _openSettings,
+                    ),
+                    const SizedBox(width: 8),
                     _CircleIconButton(
                       icon: Icons.info_outline,
                       onTap: () => _showInfoDialog(context),
@@ -242,15 +373,12 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
           ),
-
-          // --- Boutons d'action flottants (FAB) ---
           Positioned(
             right: 16,
             bottom: 32,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // 1) SIGNALEMENT
                 _ActionFab(
                   icon: Icons.add_alert,
                   label: 'Signalement',
@@ -259,8 +387,6 @@ class _MapScreenState extends State<MapScreen> {
                   onPressed: _openReportSheet,
                 ),
                 const SizedBox(height: 12),
-
-                // 2) ROUTE SAFE
                 _ActionFab(
                   icon: Icons.shield_outlined,
                   label: 'Route Safe',
@@ -270,8 +396,6 @@ class _MapScreenState extends State<MapScreen> {
                   onPressed: _triggerRouteSafe,
                 ),
                 const SizedBox(height: 12),
-
-                // 3) PANIC
                 _ActionFab(
                   icon: Icons.emergency,
                   label: 'PANIC',
@@ -293,10 +417,8 @@ class _MapScreenState extends State<MapScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: StreetPhareTheme.surface,
-        title: const Text(
-          'À propos de StreetPhare',
-          style: TextStyle(color: StreetPhareTheme.textPrimary),
-        ),
+        title: const Text('À propos de StreetPhare',
+            style: TextStyle(color: StreetPhareTheme.textPrimary)),
         content: const Text(
           'Application citoyenne de cartographie collaborative en temps réel.\n\n'
           'Aucune donnée personnelle n\'est collectée.\n'
@@ -314,7 +436,63 @@ class _MapScreenState extends State<MapScreen> {
   }
 }
 
-/// Bouton d'action flottant (FAB) étendu avec libellé
+// ============================================================================
+// Badge "Appareils proches : [X]"
+// ============================================================================
+
+class _PeerCounterBadge extends StatelessWidget {
+  const _PeerCounterBadge();
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: PeerCounterService.instance,
+      builder: (context, count, _) {
+        final isActive = count > 0;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: StreetPhareTheme.surface.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isActive
+                  ? StreetPhareTheme.primary.withValues(alpha: 0.6)
+                  : StreetPhareTheme.textSecondary.withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isActive ? Icons.bolt : Icons.bolt_outlined,
+                size: 14,
+                color: isActive
+                    ? StreetPhareTheme.primary
+                    : StreetPhareTheme.textSecondary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Appareils proches : $count',
+                style: TextStyle(
+                  color: isActive
+                      ? StreetPhareTheme.textPrimary
+                      : StreetPhareTheme.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ============================================================================
+// Bouton d'action FAB
+// ============================================================================
+
 class _ActionFab extends StatelessWidget {
   const _ActionFab({
     required this.icon,
@@ -354,7 +532,6 @@ class _ActionFab extends StatelessWidget {
             ],
           )
         : Icon(icon, color: foregroundColor, size: 24);
-
     return Material(
       elevation: 6,
       shadowColor: backgroundColor.withValues(alpha: 0.4),
@@ -381,13 +558,14 @@ class _ActionFab extends StatelessWidget {
   }
 }
 
-/// Petit bouton circulaire pour la barre supérieure
+// ============================================================================
+// Bouton circulaire de la barre supérieure
+// ============================================================================
+
 class _CircleIconButton extends StatelessWidget {
   const _CircleIconButton({required this.icon, required this.onTap});
-
   final IconData icon;
   final VoidCallback onTap;
-
   @override
   Widget build(BuildContext context) {
     return Material(

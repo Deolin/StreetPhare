@@ -19,6 +19,7 @@ permet de tester localement, sans déploiement cloud :
 | `server_primary.js`    | Serveur PRINCIPAL — port 3000                                |
 | `server_secondary.js`  | Serveur SECONDAIRE (backup #1) — port 3001                   |
 | `server_crypto.js`     | Module AES-CBC + HMAC-SHA256 partagé (miroir du client Dart)|
+| `logger.js`            | Module de log Markdown → produit `SERVER_STATUS.md`          |
 | `start_servers.js`     | Orchestrateur Node unique (`npm start`)                      |
 | `start_tests.bat`      | Lance les deux serveurs dans 2 fenêtres cmd (Windows)        |
 | `start_tests.sh`       | Équivalent Linux/macOS (bash)                                |
@@ -65,6 +66,8 @@ Les deux serveurs exposent **les mêmes routes** (pour pouvoir
 | POST    | `/v1/alerts/sync`    | Endpoint RÉEL appelé par `FailoverManager.uploadAlerts()`.     |
 | GET     | `/backup-route`      | Renvoie l'adresse **chiffrée** du prochain serveur de secours. |
 | GET     | `/_debug/store`      | Dump JSON de l'état interne (alertes validées, etc.).          |
+| POST    | `/_debug/demote`     | (Debug) Force le serveur à se démettre puis s'éteindre.        |
+| POST    | `/_debug/promote`    | (Debug, secondary) Propage ce backup au rang de principal.     |
 
 Le body accepté par `POST /alerts` (ou `/v1/alerts/sync`) peut
 prendre deux formes équivalentes :
@@ -75,6 +78,66 @@ prendre deux formes équivalentes :
 
 // 2) Format "réel" envoyé par FailoverManager
 { "alerts": [ { "id": "abc123", "confirmations": ["..."] } ] }
+```
+
+## Tableau de bord Markdown (`SERVER_STATUS.md`)
+
+Chaque serveur écrit, à chaque évènement (ping, alerte reçue,
+consensus atteint, promotion, démission, etc.), un fichier
+`SERVER_STATUS_<port>.md` à la racine du projet. Le format est
+conçu pour être lisible d'un seul coup d'œil grâce aux émojis
+et aux tableaux Markdown.
+
+Sections du fichier généré :
+
+1. **🖥️ Statut des Nœuds** — un tableau avec, pour chaque
+   serveur : URL, statut (`🟢 EN LIGNE` / `🔴 HORS LIGNE`) et
+   rôle actuel (`⭐ Actif` / `🟡 En veille` / `💀 Obsolète`).
+2. **⚡ Résumé Express** — compteurs globaux (pings reçus,
+   alertes connues, alertes validées par consensus).
+3. **🌐 Flux du Consensus (Dernières Alertes)** — pour chaque
+   alerte : ID, type (Nasse / Policiers / …), nombre de votes
+   (`n / 3`) et statut réseau (`✅ Validée et Propagée` /
+   `⏳ En attente de consensus (P2P)`).
+4. **📜 Journal d'Évènements (Flux Temps Réel)** — flux
+   horodaté des dernières actions (ping, sync, consensus,
+   promotion, démission, etc.).
+
+Exemple minimal :
+
+```markdown
+# 📡 Tableau de bord de Débogage - StreetPhare
+> Dernière mise à jour : **2026-06-08 22:45:00** (UTC serveur).
+
+## 🖥️ Statut des Nœuds
+| Serveur | URL | Statut | Rôle Actuel |
+| --- | --- | --- | --- |
+| Principal | http://localhost:3000 | 🟢 EN LIGNE | ⭐ Actif |
+| Backup 1  | http://localhost:3001 | ⚪ EN ATTENTE | 🟡 En veille |
+
+## 🌐 Flux du Consensus (Dernières Alertes)
+| ID Alerte | Type | Votes (Validations) | Statut Réseau |
+| --- | --- | --- | --- |
+| #001 | Nasse | 3 / 3 | ✅ Validée et Propagée |
+| #002 | Policiers | 1 / 3 | ⏳ En attente de consensus (P2P) |
+```
+
+Pour suivre en direct pendant un test :
+
+```bash
+# Sur Windows (PowerShell)
+Get-Content SERVER_STATUS_3000.md -Wait
+
+# Sur Linux / macOS
+tail -f SERVER_STATUS_3000.md
+```
+
+Vous pouvez aussi combiner les deux fichiers (`cat SERVER_STATUS_3000.md SERVER_STATUS_3001.md`).
+
+### Désactiver le logger
+
+```bash
+STREETPHARE_LOG=0 node server_primary.js
 ```
 
 ## Tests rapides (avec curl)
@@ -104,6 +167,11 @@ curl -X POST http://localhost:3000/v1/alerts/sync \
 
 # Backup route
 curl http://localhost:3000/backup-route
+
+# Forcer une démission (debug)
+curl -X POST http://localhost:3000/_debug/demote \
+  -H "Content-Type: application/json" \
+  -d "{\"reason\":\"test failover\"}"
 ```
 
 ## Tester le failover
@@ -115,12 +183,17 @@ curl http://localhost:3000/backup-route
    `http://localhost:3000`.
 3. Dans la console de l'app, observez les logs
    `[FailoverManager] heartbeat ok` toutes les 30 s.
-4. **Tuez le serveur principal** (Ctrl+C dans sa fenêtre).
-5. Attendez 3 heartbeats échoués (≈ 1 min 30 s) — ou
+4. Côté client, `CLIENT_DEBUG.md` est mis à jour en temps réel
+   à la racine du projet (cf. `lib/debug/client_debug_logger.dart`).
+5. **Tuez le serveur principal** (Ctrl+C dans sa fenêtre, OU
+   utilisez `curl -X POST http://localhost:3000/_debug/demote`).
+6. Attendez 3 heartbeats échoués (≈ 1 min 30 s) — ou
    réduisez `heartbeatInterval` à 5 s pour tester vite.
-6. Le `FailoverManager` bascule sur
+7. Le `FailoverManager` bascule sur
    `http://localhost:3001`, le déchiffre depuis la chaîne
    qu'il a reçue via `next_backup`, et l'upload reprend.
+   Le journal de `CLIENT_DEBUG.md` montrera exactement
+   l'étape "Déchiffrement du backup" puis "Basculement réussi".
 
 ## Configuration côté Flutter
 
@@ -130,10 +203,12 @@ Toute la résolution des URL est centralisée dans :
   `localhost` (ou `10.0.2.2` pour émulateur Android) en debug,
   et `https://api.streetphare.org` en prod.
 * `lib/main.dart` — appelle `NetworkConfig.*` au lieu de
-  hardcoder.
+  hardcoder, et initialise `ClientDebugLogger` très tôt.
 * `lib/network/bootstrap.dart` — chiffre en AES l'URL du
   secondaire local en mode debug, pour amorcer la chaîne de
   secours.
+* `lib/debug/client_debug_logger.dart` — produit le fichier
+  `CLIENT_DEBUG.md` (no-op total en `kReleaseMode`).
 
 Pour overrider en production :
 
@@ -148,5 +223,7 @@ flutter build apk \
 
 **Ces serveurs sont UNIQUEMENT pour le développement local.**
 La master-passphrase `streetphare-dev-key-CHANGE_ME_IN_PROD` est
-publique, les endpoints n'ont aucune auth, le store est en RAM.
-Ne JAMAIS déployer cette configuration telle quelle.
+publique, les endpoints n'ont aucune auth, le store est en RAM,
+et **les fichiers `SERVER_STATUS_*.md` exposent l'état détaillé
+du réseau en clair**. Ne JAMAIS déployer cette configuration
+telle quelle.

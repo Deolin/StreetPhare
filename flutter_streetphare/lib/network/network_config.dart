@@ -61,7 +61,7 @@ class NetworkConfig {
 
   /// URL du serveur PRINCIPAL courant.
   ///
-  /// Debug : http://<loopback>:3000  (test_servers/server_primary.js)
+  /// Debug : http://loopback:3000  (test_servers/server_primary.js)
   /// Prod  : https://api.streetphare.org
   static String get primaryServer {
     if (kDebugMode) {
@@ -93,7 +93,7 @@ class NetworkConfig {
 
   /// URL du relay WebSocket (utilisé par `RelayMeshTransport`).
   ///
-  /// Debug : ws://<loopback>:3000/mesh  (mêmes serveurs Node)
+  /// Debug : ws://loopback:3000/mesh  (mêmes serveurs Node)
   /// Prod  : wss://relay.streetphare.org/mesh
   static String get relayUrl {
     if (kDebugMode) {

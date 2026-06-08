@@ -78,7 +78,7 @@ class BleMeshTransport implements MeshTransport {
       // dépend d'un connectGatt + discoverServices (omis ici pour
       // concision — voir flutter_reactive_ble pour l'API complète).
       if (kDebugMode) {
-        debugPrint('[BLE] pair découvert: ${device.name ?? device.id}');
+        debugPrint('[BLE] pair découvert: ${device.name} (${device.id})');
       }
     }, onError: (Object e) {
       if (kDebugMode) debugPrint('[BLE] scan error: $e');

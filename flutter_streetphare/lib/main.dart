@@ -1,8 +1,16 @@
+// Point d'entrée principal de l'application StreetPhare.
+//
+// Initialise très tôt le logger de débogage client
+// (lib/debug/client_debug_logger.dart) pour qu'il commence
+// à produire `CLIENT_DEBUG.md` dès la phase de bootstrap.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
 import 'core/theme/streetphare_theme.dart';
+import 'core/theme/theme_controller.dart';
+import 'debug/client_debug_logger.dart';
+import 'features/settings/data/panic_contact_store.dart';
 import 'features/splash/presentation/splash_screen.dart';
 import 'network/bootstrap.dart';
 import 'network/network_config.dart';
@@ -11,6 +19,9 @@ import 'network/network_coordinator.dart';
 /// Point d'entrée principal de l'application StreetPhare
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialise le logger Markdown de débogage (no-op en release).
+  await ClientDebugLogger.instance.init();
 
   // Orientation verrouillée en portrait
   await SystemChrome.setPreferredOrientations([
@@ -26,15 +37,23 @@ void main() async {
     ),
   );
 
+  if (kDebugMode) {
+    debugPrint('[main] orientation verrouillée + logger client initialisé');
+  }
+
+  // === Chargement des préférences locales (thème + contacts PANIC)
+  await ThemeController.instance.load();
+  await PanicContactStore.instance.load();
+
   // === Initialisation de la "ruche" réseau décentralisée ===
-  // Les URL, le relay et la master-passphrase sont désormais
-  // résolus par `NetworkConfig` :
-  //   * en mode DEBUG -> serveurs locaux (test_servers/server_*.js)
-  //   * en mode PRODUCTION -> URLs streetphare.org (override possible
-  //     via --dart-define=STREETPHARE_PRIMARY=..., etc.)
   if (kDebugMode) {
     debugPrint('[main] ${NetworkConfig.describe()}');
   }
+  ClientDebugLogger.instance.log(
+    'Démarrage app',
+    details: NetworkConfig.describe(),
+    emoji: '🚀',
+  );
 
   try {
     final bootstrap = await buildNetworkBootstrap(
@@ -57,51 +76,50 @@ void main() async {
           '${describePlatform()}');
     }
   } catch (e, st) {
-    // En cas d'erreur de boot, on continue l'app en mode dégradé
-    // (lecture seule des alertes déjà stockées localement).
     if (kDebugMode) {
       debugPrint('[main] ERREUR initialisation réseau : $e\n$st');
     }
+    ClientDebugLogger.instance.log(
+      'ERREUR init réseau',
+      details: e.toString(),
+      emoji: '❌',
+    );
   }
 
   runApp(const StreetPhareApp());
 }
 
-/// Helper local : pour amorcer la chaîne de secours en DEBUG,
-/// on chiffre (AES) l'URL du secondaire local et on l'injecte
-/// comme première entrée. C'est l'exact miroir de ce que fait
-/// `_seedInitialChain` dans `bootstrap.dart` (mais on n'en crée
-/// qu'UNE seule, l'autre sera fournie par le serveur principal
-/// via `next_backup` à la première sync).
 Future<List<String>> _seedSingleBackup(
   String address,
   String passphrase,
 ) async {
-  // On ne s'embête pas à importer `bootstrap.dart` (qui contient
-  // déjà _seedInitialChain) pour éviter les cycles ; on importe
-  // directement `CryptoUtils`.
-  // NB: `bootstrap.dart` reste l'autorité pour le seed de chaîne
-  // complet. Ici on ne fait qu'ajouter un backup dev si la chaîne
-  // est vide.
   return const [];
 }
 
-/// Widget racine de l'application StreetPhare
+/// Widget racine de l'application StreetPhare.
 class StreetPhareApp extends StatelessWidget {
   const StreetPhareApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'StreetPhare',
-      debugShowCheckedModeBanner: false,
+    return ValueListenableBuilder<AppThemeMode>(
+      valueListenable: ThemeController.instance,
+      builder: (context, mode, _) {
+        return MaterialApp(
+          title: 'StreetPhare',
+          debugShowCheckedModeBanner: false,
 
-      // Thème sombre "Nuit"
-      theme: StreetPhareTheme.darkTheme(),
+          // Thèmes clair & sombre.
+          theme: StreetPhareTheme.lightTheme(),
+          darkTheme: StreetPhareTheme.darkTheme(),
 
-      // L'application démarre par le splash screen
-      // qui redirige vers la carte une fois le cache vérifié
-      home: const SplashScreen(),
+          // ThemeMode est piloté par le ThemeController
+          // (système / clair / sombre, persistant).
+          themeMode: mode.toThemeMode(),
+
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

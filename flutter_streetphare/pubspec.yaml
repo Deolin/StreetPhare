@@ -67,6 +67,11 @@ dependencies:
   # WebSocket pour le transport relay (3G/4G/5G)
   web_socket_channel: ^3.0.3
 
+  # Lancement d'URLs système (sms:, tel:, https://...) : utilisé
+  # par le bouton PANIC pour ouvrir l'app SMS native avec un
+  # message pré-rempli (numéros + GPS).
+  url_launcher: ^6.3.0
+
 
 dev_dependencies:
   flutter_test:
