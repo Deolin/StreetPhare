@@ -35,6 +35,39 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # Cartographie OpenStreetMap
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  # Cache des tuiles de la carte
+  flutter_map_cache: ^1.4.0
+
+  # Stockage local (SharedPreferences)
+  shared_preferences: ^2.3.2
+
+  # Géolocalisation GPS
+  geolocator: ^13.0.1
+
+  # === Architecture réseau StreetPhare (ruche décentralisée) ===
+
+  # Base de données locale éphémère (NoSQL, légère, sans SQL natif)
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # Cryptographie pure-Dart (Ed25519 pour signatures, AES-CBC pour
+  # chiffrer la chaîne de secours des serveurs secondaires)
+  cryptography: ^2.7.0
+
+  # Bluetooth Low Energy (mesh courte portée, hors-ligne)
+  flutter_reactive_ble: ^5.0.3
+
+  # Wi-Fi Direct / Nearby (Android principalement)
+  nearby_connections: ^4.1.0
+
+  # WebSocket pour le transport relay (3G/4G/5G)
+  web_socket_channel: ^3.0.3
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

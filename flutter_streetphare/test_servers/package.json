@@ -1,0 +1,16 @@
+{
+  "name": "streetphare-test-servers",
+  "version": "1.0.0",
+  "description": "Serveurs Node.js de test local pour StreetPhare (failover + consensus 3 validations)",
+  "private": true,
+  "main": "server_primary.js",
+  "scripts": {
+    "start": "node start_servers.js",
+    "start:primary": "node server_primary.js",
+    "start:secondary": "node server_secondary.js",
+    "test:ping": "curl http://localhost:3000/ping && curl http://localhost:3001/ping"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

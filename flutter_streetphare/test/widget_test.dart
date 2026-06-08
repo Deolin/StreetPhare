@@ -1,30 +1,30 @@
-// This is a basic Flutter widget test.
+// Test widget basique pour StreetPhare
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// Ce test vérifie simplement que l'application démarre correctement
+// (le splash screen s'affiche sans erreur).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter_streetphare/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  // Initialisation de SharedPreferences pour les tests
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+  testWidgets('L\'application StreetPhare démarre et affiche le splash',
+      (WidgetTester tester) async {
+    // Construction de l'application
+    await tester.pumpWidget(const StreetPhareApp());
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Vérification que le titre "StreetPhare" est présent dans le splash
+    expect(find.text('StreetPhare'), findsWidgets);
+
+    // Vérification qu'un indicateur de chargement est présent
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
   });
 }
