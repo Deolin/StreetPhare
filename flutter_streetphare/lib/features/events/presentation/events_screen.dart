@@ -73,9 +73,9 @@ class _EventsScreenState extends State<EventsScreen> {
 
     setState(() {
       _loading = false;
-      if (!ok) {
-        _error = 'Code inconnu ou événement introuvable.\n'
-            'Codes démo : MANIF-123, MANIF-456, MANIF-789.';
+            if (!ok) {
+                _error = 'Code inconnu ou événement introuvable.\n'
+                    'Codes Fleurus : FLEURUS-TOUR, FLEURUS-ECOLES, FLEURUS-CORTEGE.';
       } else {
         _codeController.clear();
       }
@@ -626,7 +626,7 @@ class _JoinCard extends StatelessWidget {
 
             const SizedBox(height: 8),
             const Text(
-              'Codes de démonstration : MANIF-123, MANIF-456, MANIF-789.',
+              'Codes Fleurus : FLEURUS-TOUR · FLEURUS-ECOLES · FLEURUS-CORTEGE',
               style: TextStyle(
                   color: StreetPhareTheme.textSecondary, fontSize: 11),
             ),

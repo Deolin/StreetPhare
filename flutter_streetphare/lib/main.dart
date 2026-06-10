@@ -17,6 +17,7 @@ import 'features/routing/data/avoidance_filter_store.dart';
 import 'features/settings/data/app_preferences_store.dart';
 import 'features/settings/data/panic_contact_store.dart';
 import 'features/splash/presentation/splash_screen.dart';
+import 'features/tutorial/data/tutorial_store.dart';
 import 'network/bootstrap.dart';
 import 'network/network_config.dart';
 import 'network/network_coordinator.dart';
@@ -47,11 +48,14 @@ void main() async {
   }
 
   // === Chargement des préférences locales (thème + contacts PANIC
-  //     + filtres d'évitement Safe Path)
+  //     + filtres d'évitement Safe Path + flag premier démarrage tutoriel)
   await ThemeController.instance.load();
   await PanicContactStore.instance.load();
   await AvoidanceFilterStore.instance.load();
   await AppPreferencesStore.instance.load();
+  // Charge le flag isFirstLaunch AVANT runApp pour que SplashScreen
+  // puisse décider d'afficher le tutoriel de manière synchrone.
+  await TutorialStore.instance.load();
 
   // === Initialisation de la "ruche" réseau décentralisée ===
   if (kDebugMode) {

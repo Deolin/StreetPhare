@@ -26,6 +26,7 @@ import '../../../core/theme/theme_controller.dart';
 import '../../events/presentation/events_screen.dart';
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/domain/models/avoidance_filters.dart';
+import '../../tutorial/presentation/tutorial_screen.dart';
 import '../data/app_preferences_store.dart';
 import '../data/panic_contact.dart';
 import '../data/panic_contact_store.dart';
@@ -58,6 +59,7 @@ class SettingsScreen extends StatelessWidget {
             _EventsSection(),
             _AvoidanceFiltersSection(),
             _PanicContactsSection(),
+            _TutorialSection(),
             _AboutSection(),
           ],
         ),
@@ -697,7 +699,8 @@ class _ContactFormDialogState extends State<_ContactFormDialog> {
               ],
               decoration: const InputDecoration(
                 labelText: 'Téléphone',
-                hintText: '+33 6 12 34 56 78',
+                // Indicatif belge (+32) — Belgique (6220 Fleurus, etc.)
+                hintText: '+32 4 XX XX XX XX',
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return 'Numéro requis';
@@ -727,6 +730,52 @@ class _ContactFormDialogState extends State<_ContactFormDialog> {
           child: Text(isEdit ? 'Enregistrer' : 'Ajouter'),
         ),
       ],
+    );
+  }
+}
+
+// ============================================================================
+// Section TUTORIEL (consultable à tout moment depuis les Paramètres)
+// ============================================================================
+
+/// Section "Guide de l'application" — permet à l'utilisateur de
+/// ré-ouvrir le tutoriel à tout moment, indépendamment du premier
+/// démarrage. Positionnée juste avant la section "À propos".
+class _TutorialSection extends StatelessWidget {
+  const _TutorialSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return _Card(
+      child: ListTile(
+        leading: const Icon(
+          Icons.help_outline,
+          color: StreetPhareTheme.primary,
+          size: 26,
+        ),
+        title: Text(
+          'Guide de l\'application',
+          style: TextStyle(color: onSurface, fontWeight: FontWeight.w500),
+        ),
+        subtitle: Text(
+          'Consultez les fonctionnalités de StreetPhare à tout moment.',
+          style: TextStyle(
+            color: onSurface.withValues(alpha: 0.65),
+            fontSize: 12,
+          ),
+        ),
+        trailing: Icon(
+          Icons.chevron_right,
+          color: onSurface.withValues(alpha: 0.4),
+        ),
+        // isFirstLaunch = false : mode consultation, sans bandeau ni bouton "Passer"
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const TutorialScreen(isFirstLaunch: false),
+          ),
+        ),
+      ),
     );
   }
 }

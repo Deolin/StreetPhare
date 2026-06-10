@@ -1,25 +1,31 @@
 // lib/features/routing/presentation/safe_path_engine.dart
 //
-// MOTEUR DE CHEMIN SÛR MULTI-CRITÈRES (Safe Path Engine).
+// MOTEUR DE CHEMIN PIÉTON SÛR MULTI-CRITÈRES (Safe Path Engine).
 //
-// Implémentation légère d'un algorithme de DIJKSTRA sur une grille
-// de coordonnées GPS, paramétrée par les signalements actifs de la
-// base locale (ceux affichés avec >3 votes) considérés comme des
-// obstacles à éviter selon les `AvoidanceFilters` de l'utilisateur.
+// Implémentation locale d'un algorithme de DIJKSTRA sur une grille
+// de coordonnées GPS, conçue pour calculer des itinéraires EXCLUSIVEMENT
+// PIÉTONS — sans jamais tracer de ligne droite à travers des bâtiments.
 //
-// Caractéristiques :
-//   * 100 % LOCAL (pas d'appel réseau) : on n'utilise pas OSRM ni
-//     OpenRouteService pour rester discret et fonctionnel en mode
-//     dégradé (offline / mesh).
-//   * GRILLE ADAPTATIVE : on échantillonne un BBox englobant les
-//     deux points A et B à un pas configurable (par défaut ~30 m).
-//   * POIDS INFINI sur les cellules qui intersectent un danger
-//     que l'utilisateur a marqué "à éviter".
-//   * POIDS AUGMENTÉ (mais non bloquant) sur les cellules proches
-//     d'un danger "accepté" (on n'évite pas mais on pénalise).
-//   * ALTERNATIVES : après le calcul Dijkstra principal, on
-//     génère jusqu'à 2 variantes en perturbant aléatoirement
-//     les poids d'arêtes (méthode "K-shortest paths" simplifiée).
+// ROUTAGE PIÉTON — PRINCIPES D'IMPLÉMENTATION :
+//   1. GRILLE À PAS RÉDUIT (20 m) : la résolution plus fine limite
+//      les sauts de cellules à travers les bâtiments.
+//   2. PÉNALITÉ DIAGONALE FORTE : les arêtes diagonales (NE, NW, SE, SW)
+//      sont multipliées par `PedestrianConstraints.diagonalPenaltyFactor`
+//      (défaut : 3.5 en zone urbaine). Cela force l'algorithme à préférer
+//      les connexions orthogonales (N, S, E, W), supposées suivre la voirie.
+//   3. POIDS INFINI sur les cellules qui intersectent un danger marqué
+//      "à éviter" par l'utilisateur (bloquant absolu).
+//   4. POIDS AUGMENTÉ (soft penalty) sur les cellules proches d'un danger
+//      "accepté" — l'algorithme les contourne si possible.
+//   5. ALTERNATIVES : 2 variantes supplémentaires avec bruit aléatoire
+//      sur les poids d'arêtes (méthode "K-shortest paths" simplifiée).
+//
+// LIMITATION DU MODE LOCAL :
+//   Sans réseau OSM réel (OSRM/GraphHopper profil "foot"), le moteur
+//   reste une approximation. Pour une précision maximale (garantie de
+//   suivre les trottoirs et passages piétons OSM), il faudra intégrer
+//   l'interface `IPedestrianRouteService` avec un backend réseau.
+//   Voir : lib/features/routing/domain/pedestrian_route_service.dart
 //
 // Le résultat est un ensemble de 1 à 3 `RouteResult` que l'UI
 // affiche côte à côte pour laisser l'utilisateur choisir.
@@ -35,13 +41,18 @@ import '../../../database/hive_alert_database.dart';
 import '../../geofencing/presentation/geofencing_service.dart';
 import '../domain/models/avoidance_filters.dart';
 import '../domain/models/route_result.dart';
+import '../domain/pedestrian_route_service.dart';
 
 /// Moteur de calcul d'itinéraires "safe path".
 class SafePathEngine {
   SafePathEngine._();
 
   /// Pas de la grille d'échantillonnage (en mètres).
-  static const double gridStepMeters = 30.0;
+  ///
+  /// Réduit à 20 m (au lieu de 30 m) pour limiter les sauts de cellules
+  /// à travers les bâtiments en zone urbaine dense (ex: Fleurus centre).
+  /// À ajuster via [PedestrianConstraints.gridStepMeters] si besoin.
+  static const double gridStepMeters = 20.0;
 
   /// Rayon d'influence (en mètres) d'un danger AUTOUR de son
   /// point central : le danger occupe un disque de ce rayon.
@@ -63,13 +74,20 @@ class SafePathEngine {
   /// Nombre maximum d'alternatives retournées.
   static const int maxAlternatives = 3;
 
-  /// Calcule 1 à 3 itinéraires "safe path" entre [start] et [end],
-  /// en évitant les signalements actifs de la base locale selon
-  /// les filtres de l'utilisateur.
+  /// Calcule 1 à 3 itinéraires PIÉTONS sûrs entre [start] et [end].
+  ///
+  /// Les itinéraires sont calculés en évitant :
+  ///   - les signalements actifs marqués "à éviter" par [filters] ;
+  ///   - les traversées diagonales (pénalisées pour limiter les coupes
+  ///     à travers les bâtiments — voir [PedestrianConstraints.urban]).
+  ///
+  /// [constraints] : paramètres piétons (pénalité diagonale, pas grille).
+  ///   Par défaut : [PedestrianConstraints.urban] (zone urbaine dense).
   static List<RouteResult> computeRoutes({
     required LatLng start,
     required LatLng end,
     required AvoidanceFilters filters,
+    PedestrianConstraints constraints = PedestrianConstraints.urban,
   }) {
     // 1) Récupère les signalements ACTIFS et VISIBLES (>3 votes).
     final alerts = AlertVisibilityPolicy.filterVisible(
@@ -77,11 +95,14 @@ class SafePathEngine {
     );
 
     // 2) Construit la grille de cellules + leurs poids.
+    //    La grille utilise les contraintes piétonnes pour pénaliser
+    //    les arêtes diagonales (anti-traversée de bâtiments).
     final grid = _Grid.build(
       start: start,
       end: end,
       alerts: alerts,
       filters: filters,
+      constraints: constraints,
     );
 
     // 3) Calcule l'itinéraire principal (Dijkstra).
@@ -97,7 +118,8 @@ class SafePathEngine {
         totalDistanceMeters: primary.distance,
         totalRiskScore: primary.risk,
         pois: const <RoutePoi>[],
-        label: 'Chemin sûr recommandé',
+        // Étiquette précisant le mode de routage piéton
+        label: 'Itinéraire piéton recommandé',
       ),
     ];
 
@@ -321,6 +343,7 @@ class _Grid {
     required LatLng end,
     required List<Alert> alerts,
     required AvoidanceFilters filters,
+    PedestrianConstraints constraints = PedestrianConstraints.urban,
   }) {
     // 1) Calcule la BBox englobante (avec padding).
     final pad = _bboxPaddingDeg(start, end);
@@ -330,13 +353,19 @@ class _Grid {
     final maxLng = math.max(start.longitude, end.longitude) + pad;
 
     // 2) Échantillonne à pas régulier (en mètres).
+    //    On utilise le pas défini dans [constraints] (défaut 20 m),
+    //    sauf si SafePathEngine.gridStepMeters est plus petit.
+    final effectiveStep = math.min(
+      SafePathEngine.gridStepMeters,
+      constraints.gridStepMeters,
+    );
     final midLat = (minLat + maxLat) / 2;
     final metersPerDegLat = 111320.0;
     final metersPerDegLng =
         111320.0 * math.cos(midLat * math.pi / 180.0);
 
-    final stepLat = SafePathEngine.gridStepMeters / metersPerDegLat;
-    final stepLng = SafePathEngine.gridStepMeters /
+    final stepLat = effectiveStep / metersPerDegLat;
+    final stepLng = effectiveStep /
         (metersPerDegLng.abs().clamp(1000, 1e9).toDouble());
 
     final latCount = ((maxLat - minLat) / stepLat).ceil().clamp(2, 200);
@@ -383,22 +412,40 @@ class _Grid {
       );
     }
 
-    // 3) Construit l'adjacence (8-voisinage).
+    // 3) Construit l'adjacence (8-voisinage) avec PÉNALITÉ PIÉTONNE.
+    //
+    //    ROUTAGE PIÉTON — ANTI-TRAVERSÉE DE BÂTIMENTS :
+    //    Les arêtes DIAGONALES (NE, NW, SE, SW) sont multipliées par
+    //    `constraints.diagonalPenaltyFactor` (défaut 3.5 en zone urbaine).
+    //    Cela force l'algorithme à préférer les connexions orthogonales
+    //    (N, S, E, W) qui suivent généralement la voirie.
+    //
+    //    Une arête diagonale coûte donc ~3.5× plus qu'une arête droite
+    //    de même distance, ce qui dissuade fortement les coupes en biais
+    //    à travers les pâtés de maisons.
+
     final adjacency = List<List<_Edge>>.generate(
       cells.length,
       (_) => <_Edge>[],
       growable: false,
     );
-    final neighbors = const [
-      [0, 1],
-      [1, 0],
-      [1, 1],
-      [1, -1],
-      [0, -1],
-      [-1, 0],
-      [-1, 1],
-      [-1, -1],
+
+    // Voisins orthogonaux (Cardinal : N, S, E, W) — pas de pénalité piétonne.
+    const cardinalNeighbors = [
+      [0, 1],   // Est
+      [1, 0],   // Sud
+      [0, -1],  // Ouest
+      [-1, 0],  // Nord
     ];
+
+    // Voisins diagonaux (NE, SE, SW, NW) — pénalisés × diagonalPenaltyFactor.
+    const diagonalNeighbors = [
+      [1, 1],   // Sud-Est
+      [1, -1],  // Sud-Ouest
+      [-1, 1],  // Nord-Est
+      [-1, -1], // Nord-Ouest
+    ];
+
     int edgeSeed = 0;
     for (int i = 0; i < latCount; i++) {
       for (int j = 0; j < lngCount; j++) {
@@ -406,17 +453,36 @@ class _Grid {
         // Si la cellule SOURCE est bloquante, on ignore ses arêtes.
         if (cells[from].riskWeight >= 1.0e10) continue;
         final cFrom = cells[from].point;
-        for (final d in neighbors) {
+
+        // ── Arêtes orthogonales (poids normal) ────────────────────────────
+        for (final d in cardinalNeighbors) {
           final ni = i + d[0];
           final nj = j + d[1];
           if (ni < 0 || ni >= latCount || nj < 0 || nj >= lngCount) continue;
           final to = idx(ni, nj);
-          // Si la cellule DESTINATION est bloquante, on ignore l'arête.
           if (cells[to].riskWeight >= 1.0e10) continue;
           final cTo = cells[to].point;
           final baseDist = GeofencingService.distanceBetween(cFrom, cTo);
           // Poids = distance (m) + risque cellule destination.
           final w = baseDist + cells[to].riskWeight;
+          adjacency[from].add(_Edge(to, w, edgeSeed++));
+        }
+
+        // ── Arêtes diagonales (pénalité piétonne × diagonalPenaltyFactor) ─
+        // Ces arêtes sont autorisées mais coûteuses pour que l'algorithme
+        // les évite sauf si aucune alternative orthogonale n'existe.
+        for (final d in diagonalNeighbors) {
+          final ni = i + d[0];
+          final nj = j + d[1];
+          if (ni < 0 || ni >= latCount || nj < 0 || nj >= lngCount) continue;
+          final to = idx(ni, nj);
+          if (cells[to].riskWeight >= 1.0e10) continue;
+          final cTo = cells[to].point;
+          final baseDist = GeofencingService.distanceBetween(cFrom, cTo);
+          // Poids diagonal = distance physique × facteur de pénalité piétonne
+          // + risque cellule destination.
+          final w = baseDist * constraints.diagonalPenaltyFactor
+              + cells[to].riskWeight;
           adjacency[from].add(_Edge(to, w, edgeSeed++));
         }
       }

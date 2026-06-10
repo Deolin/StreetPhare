@@ -32,6 +32,12 @@ import '../../settings/presentation/settings_screen.dart';
 import '../../../network/collective_panic_service.dart';
 import '../../../network/network_coordinator.dart';
 
+import '../../routing/data/avoidance_filter_store.dart';
+import '../../routing/presentation/route_result_sheet.dart';
+import '../../routing/presentation/safe_path_engine.dart';
+import 'widgets/safe_route_layer.dart';
+import 'widgets/user_heading_marker.dart';
+
 // ── Couleurs des 3 événements ─────────────────────────────────────────────────
 const _kEventColors = [
   Color(0xFFFFB300), // Ambre
@@ -70,6 +76,13 @@ class _MapScreenState extends State<MapScreen> {
 
   /// Marqueur du point utilisateur (appui long).
   LatLng? _userPointMarker;
+
+  /// Cap de déplacement de l'utilisateur en degrés (0 = Nord, sens horaire).
+  /// Alimenté par [Geolocator.getPositionStream] en temps réel.
+  double _userHeading = 0.0;
+
+  /// Points de la Route Safe active (null = aucune route affichée sur la carte).
+  List<LatLng>? _safeRoutePoints;
 
   @override
   void initState() {
@@ -150,7 +163,15 @@ class _MapScreenState extends State<MapScreen> {
           distanceFilter: 5,
         ),
       ).listen((p) {
-        if (mounted) setState(() => _userPosition = p);
+        if (mounted) {
+          setState(() {
+            _userPosition = p;
+            // Position.heading retourne -1 sur les appareils sans boussole
+            // (ou quand le cap n'est pas encore disponible). On ne met à
+            // jour _userHeading que si la valeur est positive (valide).
+            if (p.heading >= 0) _userHeading = p.heading;
+          });
+        }
       });
     } catch (e) {
       if (mounted) {
@@ -182,7 +203,10 @@ class _MapScreenState extends State<MapScreen> {
       point: LatLng(pos.latitude, pos.longitude),
       width: 56,
       height: 56,
-      child: _UserPhareMarker(accuracy: pos.accuracy),
+      child: UserHeadingMarker(
+        heading: _userHeading,
+        accuracy: pos.accuracy,
+      ),
     );
   }
 
@@ -304,8 +328,8 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    // Lance le calcul.
-    _showRouteSafeProgress('Calcul de la Route Safe vers $destinationLabel…');
+    // Lance le calcul et affiche le sélecteur d'itinéraires.
+    await _computeAndShowRoute(destination, destinationLabel);
   }
 
   /// Stratégie de repli : si la destination principale échoue,
@@ -328,18 +352,22 @@ class _MapScreenState extends State<MapScreen> {
     // Essai 1 : zone safe.
     final safeZone = event.nearestSafeZone(userLatLng);
     if (safeZone != null) {
-      _showRouteSafeProgress(
-          'Repli vers Zone Safe : ${safeZone.label}…',
-          isFailover: true);
+      await _computeAndShowRoute(
+        safeZone.position,
+        'Zone Safe : ${safeZone.label}',
+        isFailover: true,
+      );
       return;
     }
 
     // Essai 2 : centre de soins.
     final careCenter = event.nearestCareCenter(userLatLng);
     if (careCenter != null) {
-      _showRouteSafeProgress(
-          'Repli vers Centre de soins : ${careCenter.label}…',
-          isFailover: true);
+      await _computeAndShowRoute(
+        careCenter.position,
+        'Centre de soins : ${careCenter.label}',
+        isFailover: true,
+      );
       return;
     }
 
@@ -412,6 +440,90 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ),
       );
+  }
+
+  // --------------------------------------------------------------------------
+  // Calcul de route et affichage du résultat
+  // --------------------------------------------------------------------------
+
+  /// Calcule les itinéraires "safe path" de la position courante vers
+  /// [destination] et ouvre [RouteResultSheet] pour laisser l'utilisateur
+  /// choisir. Si un trajet est accepté, sa polyline et ses flèches
+  /// directionnelles sont affichées via [SafeRouteLayer].
+  Future<void> _computeAndShowRoute(
+    LatLng destination,
+    String destinationLabel, {
+    bool isFailover = false,
+  }) async {
+    final start = _userPosition != null
+        ? LatLng(_userPosition!.latitude, _userPosition!.longitude)
+        : null;
+
+    if (start == null) {
+      _showNoDestinationError();
+      return;
+    }
+
+    // Indicateur de progression (calcul local, pas de réseau).
+    _showRouteSafeProgress(
+      isFailover
+          ? 'Repli vers $destinationLabel…'
+          : 'Calcul de la Route Safe vers $destinationLabel…',
+      isFailover: isFailover,
+    );
+
+    // Calcul Dijkstra sur grille GPS locale.
+    final filters = AvoidanceFilterStore.instance.value;
+    final routes = SafePathEngine.computeRoutes(
+      start: start,
+      end: destination,
+      filters: filters,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    if (routes.isEmpty) {
+      _showNoDestinationError();
+      return;
+    }
+
+    // Ouvre le sélecteur d'itinéraires.
+    final selected = await RouteResultSheet.show(context, routes: routes);
+
+    if (!mounted || selected == null) return;
+
+    // Stocke la polyline et anime la carte pour l'afficher.
+    setState(() => _safeRoutePoints = selected.points);
+    _fitRouteBounds(selected.points);
+  }
+
+  /// Centre et zoome la carte pour englober l'itinéraire [points].
+  void _fitRouteBounds(List<LatLng> points) {
+    if (points.isEmpty) return;
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
+    for (final p in points) {
+      if (p.latitude < minLat) minLat = p.latitude;
+      if (p.latitude > maxLat) maxLat = p.latitude;
+      if (p.longitude < minLng) minLng = p.longitude;
+      if (p.longitude > maxLng) maxLng = p.longitude;
+    }
+    final center = LatLng(
+      (minLat + maxLat) / 2,
+      (minLng + maxLng) / 2,
+    );
+    try {
+      _mapController.move(center, 14.0);
+    } catch (_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        try {
+          _mapController.move(center, 14.0);
+        } catch (_) {}
+      });
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -903,6 +1015,10 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                       if (layers.polylines.isNotEmpty)
                         PolylineLayer(polylines: layers.polylines),
+                      // ── Route Safe active (polyline + flèches) ────────
+                      if (_safeRoutePoints != null &&
+                          _safeRoutePoints!.length >= 2)
+                        SafeRouteLayer(routePoints: _safeRoutePoints!),
                       if (hasMarkers)
                         MarkerLayer(
                           markers: [
@@ -1100,26 +1216,56 @@ class _MapScreenState extends State<MapScreen> {
                       },
                     ),
 
-                  // ── Bouton GPS Recentrer (gauche bas) ──────────────────
+                  // ── Bouton GPS Recentrer + effacer la Route Safe ────────
                   Positioned(
                     left: 16,
                     bottom: 120,
-                    child: Material(
-                      elevation: 4,
-                      shape: const CircleBorder(),
-                      color: StreetPhareTheme.surface.withValues(alpha: 0.9),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: _animateToUser,
-                        child: const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: Icon(
-                            Icons.gps_fixed,
-                            color: StreetPhareTheme.primary,
-                            size: 24,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Recentrer sur la position GPS
+                        Material(
+                          elevation: 4,
+                          shape: const CircleBorder(),
+                          color: StreetPhareTheme.surface
+                              .withValues(alpha: 0.9),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap: _animateToUser,
+                            child: const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: Icon(
+                                Icons.gps_fixed,
+                                color: StreetPhareTheme.primary,
+                                size: 24,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        // Effacer la Route Safe active
+                        if (_safeRoutePoints != null) ...[
+                          const SizedBox(height: 8),
+                          Material(
+                            elevation: 4,
+                            shape: const CircleBorder(),
+                            color: StreetPhareTheme.surface
+                                .withValues(alpha: 0.9),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: () =>
+                                  setState(() => _safeRoutePoints = null),
+                              child: const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: Icon(
+                                  Icons.clear,
+                                  color: StreetPhareTheme.danger,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
 
@@ -1437,54 +1583,6 @@ class _WaypointMarker extends StatelessWidget {
   }
 }
 
-class _UserPhareMarker extends StatelessWidget {
-  const _UserPhareMarker({required this.accuracy});
-  final double accuracy;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: StreetPhareTheme.primary.withValues(alpha: 0.15),
-            border: Border.all(
-              color: StreetPhareTheme.primary.withValues(alpha: 0.35),
-              width: 1,
-            ),
-          ),
-        ),
-        Container(
-          width: 18,
-          height: 18,
-          decoration: const BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-          ),
-        ),
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: StreetPhareTheme.primary,
-            boxShadow: [
-              BoxShadow(
-                color: StreetPhareTheme.primary.withValues(alpha: 0.6),
-                blurRadius: 6,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 /// Marqueur du point utilisateur (appui long).
 class _UserPointMarker extends StatelessWidget {

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/cache/cache_manager.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../map/presentation/map_screen.dart';
+import '../../tutorial/data/tutorial_store.dart';
+import '../../tutorial/presentation/tutorial_screen.dart';
 
 /// Écran de chargement (Splash Screen) de StreetPhare.
 ///
@@ -83,11 +85,24 @@ class _SplashScreenState extends State<SplashScreen>
       _updateProgress(1.0, 'Prêt !');
       await Future.delayed(const Duration(milliseconds: 400));
 
-      // Étape 4 : Redirection vers l'écran principal
+      // Étape 4 : Redirection vers l'écran principal.
+      // Si c'est le premier démarrage, on affiche d'abord le tutoriel,
+      // puis on navigue vers MapScreen quand l'utilisateur le ferme.
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MapScreen()),
-      );
+
+      if (TutorialStore.instance.isFirstLaunch) {
+        // Premier démarrage : on remplace le splash par le tutoriel,
+        // puis le tutoriel redirige vers MapScreen une fois fermé.
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const _TutorialThenMapBridge(),
+          ),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MapScreen()),
+        );
+      }
     } catch (e) {
       debugPrint('[Splash] Erreur de démarrage : $e');
       if (!mounted) return;
@@ -190,6 +205,65 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 }
+
+// ============================================================================
+// Bridge tutoriel → MapScreen (premier démarrage uniquement)
+// ============================================================================
+
+/// Widget intermédiaire affiché lors du premier démarrage.
+///
+/// Il affiche le [TutorialScreen] en mode `isFirstLaunch = true`.
+/// Lorsque l'utilisateur ferme le tutoriel ("Passer" ou "Terminer"),
+/// [TutorialStore.markTutorialSeen] est appelé et on redirige
+/// automatiquement vers [MapScreen].
+class _TutorialThenMapBridge extends StatefulWidget {
+  const _TutorialThenMapBridge();
+
+  @override
+  State<_TutorialThenMapBridge> createState() =>
+      _TutorialThenMapBridgeState();
+}
+
+class _TutorialThenMapBridgeState extends State<_TutorialThenMapBridge> {
+  @override
+  void initState() {
+    super.initState();
+    // On pousse le TutorialScreen immédiatement après le premier build.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showTutorial());
+  }
+
+  Future<void> _showTutorial() async {
+    if (!mounted) return;
+    // Attend que l'utilisateur ferme le tutoriel (pop).
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const TutorialScreen(isFirstLaunch: true),
+      ),
+    );
+    // Une fois le tutoriel fermé, on navigue vers MapScreen.
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const MapScreen()),
+    );
+  }
+
+  /// Fond neutre pendant la transition (pas de flash blanc/noir).
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: StreetPhareTheme.background,
+      body: Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(StreetPhareTheme.primary),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// Logo placeholder
+// ============================================================================
 
 /// Placeholder pour le logo de StreetPhare.
 ///
