@@ -1,15 +1,15 @@
 // lib/features/map/presentation/map_screen.dart
 //
-// Écran principal de StreetPhare.
+// Écran principal de StreetPhare — v2.
 //
-// Nouveautés :
-//   1. CORRECTION MODE SOMBRE : TileLayer réagit instantanément au
-//      changement de thème grâce à `key: ValueKey(isDark)` + surveillance
-//      de ThemeController. Tuiles CartoDB Dark Matter en mode sombre.
-//   2. MULTI-ÉVÉNEMENTS : Jusqu'à 3 tracés simultanés en couleurs distinctes
-//      (ambre, bleu, vert) avec chips d'identification en haut de la carte.
-//   3. ÉTAPES ÉPHÉMÈRES : Seul le segment de l'étape courante + le waypoint
-//      suivant sont affichés. Les étapes passées/futures restent masquées.
+// Nouvelles fonctionnalités :
+//   1. Bouton "Recentrer la carte" (GPS) flottant.
+//   2. Chips d'événements cliquables pour sélectionner l'événement actif.
+//   3. Sélecteur de destination (manif / soins / sortie / point utilisateur).
+//   4. Appui long (≥ 3 s) sur la carte → point utilisateur + Route Safe auto.
+//   5. Stratégie de repli (failover) si le premier calcul échoue.
+//   6. Diffusion du signal panic sur le maillage P2P lors de PANIC.
+//   7. Notification UI quand une alerte panic collective est créée.
 
 import 'dart:async';
 
@@ -26,10 +26,13 @@ import '../../../core/theme/theme_controller.dart';
 import '../../events/domain/models/event_model.dart';
 import '../../events/presentation/event_manager.dart';
 import '../../reports/presentation/report_bottom_sheet.dart';
+import '../../settings/data/app_preferences_store.dart';
 import '../../settings/data/panic_contact_store.dart';
 import '../../settings/presentation/settings_screen.dart';
+import '../../../network/collective_panic_service.dart';
+import '../../../network/network_coordinator.dart';
 
-// ── Couleurs des 3 événements (synchronisées avec events_screen) ─────────────
+// ── Couleurs des 3 événements ─────────────────────────────────────────────────
 const _kEventColors = [
   Color(0xFFFFB300), // Ambre
   Color(0xFF2196F3), // Bleu
@@ -63,6 +66,11 @@ class _MapScreenState extends State<MapScreen> {
   bool _locating = true;
   StreamSubscription<Position>? _positionSub;
 
+  StreamSubscription<CollectivePanicEvent>? _collectivePanicSub;
+
+  /// Marqueur du point utilisateur (appui long).
+  LatLng? _userPointMarker;
+
   @override
   void initState() {
     super.initState();
@@ -72,12 +80,18 @@ class _MapScreenState extends State<MapScreen> {
       (_) => _injectDemoPeer(),
     );
     _initUserLocation();
+    // Écoute les alertes panic collectives automatiques.
+    _collectivePanicSub =
+        CollectivePanicService.instance.collectivePanicEvents.listen(
+      _onCollectivePanicAlert,
+    );
   }
 
   @override
   void dispose() {
     _demoPeerTimer?.cancel();
     _positionSub?.cancel();
+    _collectivePanicSub?.cancel();
     _mapController.dispose();
     super.dispose();
   }
@@ -181,6 +195,305 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   // --------------------------------------------------------------------------
+  // Appui long sur la carte → point utilisateur + Route Safe
+  // --------------------------------------------------------------------------
+
+  void _onMapLongPress(TapPosition tapPos, LatLng latlng) {
+    // Feedback haptique
+    HapticFeedback.heavyImpact();
+
+    // Enregistre le point utilisateur.
+    AppPreferencesStore.instance.setUserPoint(
+      latlng.latitude,
+      latlng.longitude,
+    );
+
+    // Met à jour l'affichage.
+    setState(() {
+      _userPointMarker = latlng;
+    });
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          backgroundColor: StreetPhareTheme.surface,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          content: Row(
+            children: [
+              const Icon(Icons.location_on,
+                  color: StreetPhareTheme.primary, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Point utilisateur défini — Route Safe lancée…',
+                  style: const TextStyle(color: StreetPhareTheme.textPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+
+    // Déclenche la Route Safe vers ce point.
+    _triggerRouteSafe(overrideDestination: latlng);
+  }
+
+  // --------------------------------------------------------------------------
+  // Route Safe — calcul avec failover
+  // --------------------------------------------------------------------------
+
+  Future<void> _triggerRouteSafe({LatLng? overrideDestination}) async {
+    final prefs = AppPreferencesStore.instance.value;
+    final events = EventManager.instance.value;
+
+    LatLng? destination = overrideDestination;
+    String destinationLabel = 'Point utilisateur';
+
+    if (destination == null) {
+      // Résolution de la destination selon le sélecteur.
+      final userLatLng = _userPosition != null
+          ? LatLng(_userPosition!.latitude, _userPosition!.longitude)
+          : null;
+
+      switch (prefs.routeDestinationType) {
+        case RouteDestinationType.manifestPoint:
+          if (events.isNotEmpty) {
+            final idx = prefs.activeEventIndex.clamp(0, events.length - 1);
+            destination = events[idx].destination;
+            destinationLabel = 'Point de manif (${events[idx].title})';
+          }
+
+        case RouteDestinationType.careCenter:
+          if (userLatLng != null && events.isNotEmpty) {
+            final idx = prefs.activeEventIndex.clamp(0, events.length - 1);
+            final center = events[idx].nearestCareCenter(userLatLng);
+            if (center != null) {
+              destination = center.position;
+              destinationLabel = 'Centre de soins : ${center.label}';
+            }
+          }
+
+        case RouteDestinationType.exitPoint:
+          if (userLatLng != null && events.isNotEmpty) {
+            final idx = prefs.activeEventIndex.clamp(0, events.length - 1);
+            final exit = events[idx].nearestExitPoint(userLatLng);
+            if (exit != null) {
+              destination = exit.position;
+              destinationLabel = 'Sortie : ${exit.label}';
+            }
+          }
+
+        case RouteDestinationType.userPoint:
+          if (prefs.userPointLatitude != null &&
+              prefs.userPointLongitude != null) {
+            destination = LatLng(
+              prefs.userPointLatitude!,
+              prefs.userPointLongitude!,
+            );
+            destinationLabel = 'Point utilisateur';
+          }
+      }
+    }
+
+    // Aucune destination résolue → tentative de failover.
+    if (destination == null) {
+      await _triggerRouteSafeFailover();
+      return;
+    }
+
+    // Lance le calcul.
+    _showRouteSafeProgress('Calcul de la Route Safe vers $destinationLabel…');
+  }
+
+  /// Stratégie de repli : si la destination principale échoue,
+  /// on cherche une Zone Safe ou un Centre de soins dans l'événement actif.
+  Future<void> _triggerRouteSafeFailover() async {
+    final prefs = AppPreferencesStore.instance.value;
+    final events = EventManager.instance.value;
+    final userLatLng = _userPosition != null
+        ? LatLng(_userPosition!.latitude, _userPosition!.longitude)
+        : null;
+
+    if (userLatLng == null || events.isEmpty) {
+      _showNoDestinationError();
+      return;
+    }
+
+    final idx = prefs.activeEventIndex.clamp(0, events.length - 1);
+    final event = events[idx];
+
+    // Essai 1 : zone safe.
+    final safeZone = event.nearestSafeZone(userLatLng);
+    if (safeZone != null) {
+      _showRouteSafeProgress(
+          'Repli vers Zone Safe : ${safeZone.label}…',
+          isFailover: true);
+      return;
+    }
+
+    // Essai 2 : centre de soins.
+    final careCenter = event.nearestCareCenter(userLatLng);
+    if (careCenter != null) {
+      _showRouteSafeProgress(
+          'Repli vers Centre de soins : ${careCenter.label}…',
+          isFailover: true);
+      return;
+    }
+
+    // Aucun repli possible.
+    _showNoDestinationError();
+  }
+
+  void _showRouteSafeProgress(String message, {bool isFailover = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          backgroundColor: isFailover
+              ? const Color(0xFFFF6F00)
+              : StreetPhareTheme.surface,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isFailover ? Colors.white : StreetPhareTheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    color: isFailover
+                        ? Colors.white
+                        : StreetPhareTheme.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+  }
+
+  void _showNoDestinationError() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          backgroundColor: StreetPhareTheme.danger,
+          duration: Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          content: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Aucune destination disponible. '
+                  'Rejoignez un événement ou placez un point manuellement '
+                  '(appui long 3 s sur la carte).',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+  }
+
+  // --------------------------------------------------------------------------
+  // Sélecteur de destination
+  // --------------------------------------------------------------------------
+
+  void _openDestinationSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _DestinationSelectorSheet(
+        events: EventManager.instance.value,
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // Intelligence collective — Alerte Panic Réseau
+  // --------------------------------------------------------------------------
+
+  void _onCollectivePanicAlert(CollectivePanicEvent event) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: StreetPhareTheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: StreetPhareTheme.danger, width: 2),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.emergency, color: StreetPhareTheme.danger, size: 28),
+            SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                'Alerte Panic Collective',
+                style: TextStyle(
+                  color: StreetPhareTheme.textPrimary,
+                  fontSize: 17,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          '⚠️ ${event.peerCount} appareils proches ont déclenché une '
+          'alerte Panic simultanément.\n\n'
+          'Un point "Tension importante" a été créé automatiquement '
+          'au centre géographique de ces signaux.\n\n'
+          'Restez vigilant et consultez la carte.',
+          style: const TextStyle(
+            color: StreetPhareTheme.textSecondary,
+            fontSize: 14,
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: StreetPhareTheme.danger,
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              // Recentre la carte sur l'alerte.
+              try {
+                _mapController.move(event.center, 15.0);
+              } catch (_) {}
+            },
+            child: const Text('Voir sur la carte'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Ignorer',
+                style: TextStyle(color: StreetPhareTheme.textSecondary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
   // Actions
   // --------------------------------------------------------------------------
 
@@ -189,39 +502,6 @@ class _MapScreenState extends State<MapScreen> {
   void _openSettings() => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => const SettingsScreen()),
       );
-
-  void _triggerRouteSafe() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          backgroundColor: StreetPhareTheme.surface,
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-          content: const Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    StreetPhareTheme.primary,
-                  ),
-                ),
-              ),
-              SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  'Recherche d\'un chemin sûr…',
-                  style: TextStyle(color: StreetPhareTheme.textPrimary),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-  }
 
   Future<void> _triggerPanic() async {
     final contacts = PanicContactStore.instance.value;
@@ -305,6 +585,15 @@ class _MapScreenState extends State<MapScreen> {
     if (confirmed != true || !mounted) return;
 
     final position = await _getCurrentPositionSafe();
+
+    // Diffuse le signal panic local sur le maillage P2P.
+    if (position != null) {
+      unawaited(NetworkCoordinator.instance.broadcastLocalPanic(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      ));
+    }
+
     final message = _buildPanicMessage(position);
     final phones = contacts.map((c) => c.phoneNumber).join(',');
     final uri = Uri(
@@ -314,7 +603,8 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     try {
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final launched =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!launched) throw Exception('launchUrl returned false');
     } catch (e) {
       debugPrint('[Panic] impossible d\'ouvrir l\'app SMS : $e');
@@ -354,7 +644,8 @@ class _MapScreenState extends State<MapScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: StreetPhareTheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
             Icon(Icons.check_circle, color: StreetPhareTheme.primary),
@@ -411,10 +702,9 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   // --------------------------------------------------------------------------
-  // Logique des événements sur la carte
+  // Couches événements
   // --------------------------------------------------------------------------
 
-  /// Construit les polylines et markers pour tous les événements actifs.
   _EventLayers _buildEventLayers(List<EventModel> events) {
     final polylines = <Polyline>[];
     final markers = <Marker>[];
@@ -433,18 +723,16 @@ class _MapScreenState extends State<MapScreen> {
       if (allPoints.isEmpty) continue;
 
       if (event.waypoints.isEmpty) {
-        // Pas d'étapes définies : on affiche la route complète.
         polylines.add(Polyline(
           points: allPoints,
           color: color,
           strokeWidth: 4.5,
         ));
       } else {
-        final activeStep = event.activeStepIndex(now: now, userPos: userLatLng);
+        final activeStep =
+            event.activeStepIndex(now: now, userPos: userLatLng);
 
         if (activeStep >= event.waypoints.length) {
-          // Toutes les étapes sont passées : on affiche le tracé complet
-          // en grisé pour indiquer que l'événement est terminé.
           polylines.add(Polyline(
             points: allPoints,
             color: color.withValues(alpha: 0.30),
@@ -453,7 +741,6 @@ class _MapScreenState extends State<MapScreen> {
           continue;
         }
 
-        // ── Segment de l'étape active ────────────────────────────────────
         final segmentPoints = event.getSegmentPoints(activeStep, allPoints);
         if (segmentPoints.length >= 2) {
           polylines.add(Polyline(
@@ -463,7 +750,6 @@ class _MapScreenState extends State<MapScreen> {
           ));
         }
 
-        // ── Marker waypoint actif ────────────────────────────────────────
         final currentWp = event.waypoints[activeStep];
         markers.add(Marker(
           point: currentWp.position,
@@ -477,7 +763,6 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ));
 
-        // ── Marker waypoint suivant (révélé à l'avance) ──────────────────
         if (activeStep + 1 < event.waypoints.length) {
           final nextWp = event.waypoints[activeStep + 1];
           markers.add(Marker(
@@ -493,6 +778,79 @@ class _MapScreenState extends State<MapScreen> {
           ));
         }
       }
+
+      // Affiche les centres de soins de l'événement.
+      for (final cc in event.careCenters) {
+        markers.add(Marker(
+          point: cc.position,
+          width: 36,
+          height: 36,
+          child: Tooltip(
+            message: cc.label,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1B5E20),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: const Icon(Icons.medical_services,
+                  color: Colors.white, size: 18),
+            ),
+          ),
+        ));
+      }
+
+      // Affiche les points de sortie.
+      for (final ep in event.exitPoints) {
+        markers.add(Marker(
+          point: ep.position,
+          width: 36,
+          height: 36,
+          child: Tooltip(
+            message: 'Sortie : ${ep.label}',
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1565C0),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: const Icon(Icons.exit_to_app,
+                  color: Colors.white, size: 18),
+            ),
+          ),
+        ));
+      }
+
+      // Affiche les zones safes.
+      for (final sz in event.safeZones) {
+        markers.add(Marker(
+          point: sz.position,
+          width: 40,
+          height: 40,
+          child: Tooltip(
+            message: '🛡 Zone Safe : ${sz.label}',
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF2E7D32),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: const Icon(Icons.shield,
+                  color: Colors.white, size: 20),
+            ),
+          ),
+        ));
+      }
+    }
+
+    // Marqueur du point utilisateur.
+    if (_userPointMarker != null) {
+      markers.add(Marker(
+        point: _userPointMarker!,
+        width: 44,
+        height: 44,
+        child: const _UserPointMarker(),
+      ));
     }
 
     return _EventLayers(polylines: polylines, markers: markers);
@@ -504,7 +862,6 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ── Surveillance du thème pour la correction du mode sombre ───────────
     return ValueListenableBuilder<AppThemeMode>(
       valueListenable: ThemeController.instance,
       builder: (context, themeMode, _) {
@@ -514,7 +871,6 @@ class _MapScreenState extends State<MapScreen> {
                 brightness == Brightness.dark);
         final tileUrl = isDark ? _kTileUrlDark : _kTileUrlLight;
 
-        // ── Surveillance des événements ──────────────────────────────────
         return ValueListenableBuilder<List<EventModel>>(
           valueListenable: EventManager.instance,
           builder: (context, events, _) {
@@ -534,25 +890,19 @@ class _MapScreenState extends State<MapScreen> {
                       minZoom: 3,
                       maxZoom: 19,
                       interactionOptions: const InteractionOptions(
-                        flags:
-                            InteractiveFlag.all & ~InteractiveFlag.rotate,
+                        flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                       ),
+                      onLongPress: _onMapLongPress,
                     ),
                     children: [
-                      // FIX MODE SOMBRE : key force la destruction/recréation
-                      // du TileLayer quand le thème change.
                       TileLayer(
                         key: ValueKey('tiles_$isDark'),
                         urlTemplate: tileUrl,
                         userAgentPackageName: 'com.streetphare.app',
                         maxNativeZoom: 19,
                       ),
-
-                      // ── Tracés des événements ──────────────────────────
                       if (layers.polylines.isNotEmpty)
                         PolylineLayer(polylines: layers.polylines),
-
-                      // ── Marqueurs (user + waypoints) ───────────────────
                       if (hasMarkers)
                         MarkerLayer(
                           markers: [
@@ -560,8 +910,6 @@ class _MapScreenState extends State<MapScreen> {
                             ...layers.markers,
                           ],
                         ),
-
-                      // ── Indicateur GPS ─────────────────────────────────
                       if (_locating)
                         const Align(
                           alignment: Alignment.bottomLeft,
@@ -578,7 +926,6 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                           ),
                         ),
-
                       if (_positionError != null)
                         Align(
                           alignment: Alignment.bottomLeft,
@@ -611,8 +958,6 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                           ),
                         ),
-
-                      // ── Attribution ────────────────────────────────────
                       RichAttributionWidget(
                         alignment: AttributionAlignment.bottomLeft,
                         attributions: [
@@ -636,7 +981,6 @@ class _MapScreenState extends State<MapScreen> {
                         padding: const EdgeInsets.all(12),
                         child: Row(
                           children: [
-                            // Logo
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 14, vertical: 8),
@@ -676,58 +1020,158 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ),
 
-                  // ── Chips d'événements (sous la barre) ─────────────────
+                  // ── Chips d'événements (sélection active) ──────────────
                   if (events.isNotEmpty)
-                    Positioned(
-                      top: 80,
-                      left: 12,
-                      right: 80,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: events.asMap().entries.map((entry) {
-                            final i = entry.key;
-                            final ev = entry.value;
-                            final col =
-                                _kEventColors[i % _kEventColors.length];
-                            final isVisible = ev.isRouteVisible();
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 6),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: col.withValues(alpha: 0.88),
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      isVisible
-                                          ? Icons.navigation
-                                          : Icons.lock_clock,
-                                      color: Colors.white,
-                                      size: 12,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      ev.title,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
+                    ValueListenableBuilder<AppPreferences>(
+                      valueListenable: AppPreferencesStore.instance,
+                      builder: (context, prefs, _) {
+                        return Positioned(
+                          top: 80,
+                          left: 12,
+                          right: 80,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: events.asMap().entries.map((entry) {
+                                final i = entry.key;
+                                final ev = entry.value;
+                                final col =
+                                    _kEventColors[i % _kEventColors.length];
+                                final isVisible = ev.isRouteVisible();
+                                final isActive =
+                                    prefs.activeEventIndex == i;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: GestureDetector(
+                                    onTap: () => AppPreferencesStore.instance
+                                        .setActiveEventIndex(i),
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 200),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: isActive
+                                            ? col
+                                            : col.withValues(alpha: 0.50),
+                                        borderRadius:
+                                            BorderRadius.circular(14),
+                                        border: isActive
+                                            ? Border.all(
+                                                color: Colors.white,
+                                                width: 2)
+                                            : null,
                                       ),
-                                      overflow: TextOverflow.ellipsis,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            isVisible
+                                                ? Icons.navigation
+                                                : Icons.lock_clock,
+                                            color: Colors.white,
+                                            size: 12,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            ev.title,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (isActive) ...[
+                                            const SizedBox(width: 4),
+                                            const Icon(Icons.check_circle,
+                                                color: Colors.white,
+                                                size: 12),
+                                          ],
+                                        ],
+                                      ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                  // ── Bouton GPS Recentrer (gauche bas) ──────────────────
+                  Positioned(
+                    left: 16,
+                    bottom: 120,
+                    child: Material(
+                      elevation: 4,
+                      shape: const CircleBorder(),
+                      color: StreetPhareTheme.surface.withValues(alpha: 0.9),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: _animateToUser,
+                        child: const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Icon(
+                            Icons.gps_fixed,
+                            color: StreetPhareTheme.primary,
+                            size: 24,
+                          ),
                         ),
                       ),
                     ),
+                  ),
+
+                  // ── Indicateur de destination actuelle ─────────────────
+                  ValueListenableBuilder<AppPreferences>(
+                    valueListenable: AppPreferencesStore.instance,
+                    builder: (context, prefs, _) {
+                      return Positioned(
+                        right: 80,
+                        bottom: 120,
+                        child: GestureDetector(
+                          onTap: _openDestinationSelector,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: StreetPhareTheme.surface
+                                  .withValues(alpha: 0.88),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: StreetPhareTheme.primary
+                                    .withValues(alpha: 0.5),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.my_location,
+                                    size: 13,
+                                    color: StreetPhareTheme.primary),
+                                const SizedBox(width: 5),
+                                Text(
+                                  prefs.routeDestinationType.label,
+                                  style: const TextStyle(
+                                    color: StreetPhareTheme.textPrimary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.expand_less,
+                                    size: 14,
+                                    color: StreetPhareTheme.textSecondary),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
 
                   // ── FABs actions ────────────────────────────────────────
                   Positioned(
@@ -750,7 +1194,7 @@ class _MapScreenState extends State<MapScreen> {
                           backgroundColor: StreetPhareTheme.surface,
                           foregroundColor: StreetPhareTheme.primary,
                           borderColor: StreetPhareTheme.primary,
-                          onPressed: _triggerRouteSafe,
+                          onPressed: () => _triggerRouteSafe(),
                         ),
                         const SizedBox(height: 12),
                         _ActionFab(
@@ -774,7 +1218,158 @@ class _MapScreenState extends State<MapScreen> {
   }
 }
 
-// ── Données brutes des layers événements ─────────────────────────────────────
+// ============================================================================
+// Sélecteur de destination (bottom sheet)
+// ============================================================================
+
+class _DestinationSelectorSheet extends StatelessWidget {
+  const _DestinationSelectorSheet({required this.events});
+  final List<EventModel> events;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<AppPreferences>(
+      valueListenable: AppPreferencesStore.instance,
+      builder: (context, prefs, _) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: StreetPhareTheme.surface,
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: StreetPhareTheme.textSecondary
+                          .withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const Row(
+                  children: [
+                    Icon(Icons.my_location,
+                        color: StreetPhareTheme.primary, size: 22),
+                    SizedBox(width: 10),
+                    Text(
+                      'Objectif de la Route Safe',
+                      style: TextStyle(
+                        color: StreetPhareTheme.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Appui long 3 s sur la carte → "Point utilisateur"',
+                  style: TextStyle(
+                    color: StreetPhareTheme.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                RadioGroup<RouteDestinationType>(
+                  groupValue: prefs.routeDestinationType,
+                  onChanged: (v) {
+                    if (v == null) return;
+                    AppPreferencesStore.instance.setRouteDestination(v);
+                  },
+                  child: Column(
+                    children: [
+                      for (final type in RouteDestinationType.values)
+                        RadioListTile<RouteDestinationType>(
+                          value: type,
+                          title: Text(
+                            type.label,
+                            style: const TextStyle(
+                              color: StreetPhareTheme.textPrimary,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: Text(
+                            type.description,
+                            style: const TextStyle(
+                              color: StreetPhareTheme.textSecondary,
+                              fontSize: 11,
+                            ),
+                          ),
+                          activeColor: StreetPhareTheme.primary,
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
+                    ],
+                  ),
+                ),
+                if (events.length > 1) ...[
+                  const Divider(height: 20),
+                  const Text(
+                    'Événement actif',
+                    style: TextStyle(
+                      color: StreetPhareTheme.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  RadioGroup<int>(
+                    groupValue: prefs.activeEventIndex,
+                    onChanged: (v) {
+                      if (v == null) return;
+                      AppPreferencesStore.instance.setActiveEventIndex(v);
+                    },
+                    child: Column(
+                      children: [
+                        for (int i = 0; i < events.length; i++)
+                          RadioListTile<int>(
+                            value: i,
+                            title: Text(
+                              events[i].title,
+                              style: TextStyle(
+                                color: _kEventColors[i % _kEventColors.length],
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            activeColor: _kEventColors[i % _kEventColors.length],
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Fermer'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ============================================================================
+// Données des layers événements
+// ============================================================================
 
 class _EventLayers {
   const _EventLayers({required this.polylines, required this.markers});
@@ -783,7 +1378,7 @@ class _EventLayers {
 }
 
 // ============================================================================
-// Marker waypoint sur la carte
+// Markers
 // ============================================================================
 
 class _WaypointMarker extends StatelessWidget {
@@ -806,8 +1401,7 @@ class _WaypointMarker extends StatelessWidget {
       children: [
         Container(
           constraints: const BoxConstraints(maxWidth: 100),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(8),
@@ -842,10 +1436,6 @@ class _WaypointMarker extends StatelessWidget {
     );
   }
 }
-
-// ============================================================================
-// Marqueur position utilisateur
-// ============================================================================
 
 class _UserPhareMarker extends StatelessWidget {
   const _UserPhareMarker({required this.accuracy});
@@ -896,8 +1486,32 @@ class _UserPhareMarker extends StatelessWidget {
   }
 }
 
+/// Marqueur du point utilisateur (appui long).
+class _UserPointMarker extends StatelessWidget {
+  const _UserPointMarker();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF7B1FA2),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7B1FA2).withValues(alpha: 0.5),
+            blurRadius: 8,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: const Icon(Icons.place, color: Colors.white, size: 22),
+    );
+  }
+}
+
 // ============================================================================
-// Badge "Appareils proches"
+// Widgets UI de l'écran carte
 // ============================================================================
 
 class _PeerCounterBadge extends StatelessWidget {
@@ -948,10 +1562,6 @@ class _PeerCounterBadge extends StatelessWidget {
     );
   }
 }
-
-// ============================================================================
-// FAB action
-// ============================================================================
 
 class _ActionFab extends StatelessWidget {
   const _ActionFab({
@@ -1018,10 +1628,6 @@ class _ActionFab extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// Bouton circulaire barre supérieure
-// ============================================================================
-
 class _CircleIconButton extends StatelessWidget {
   const _CircleIconButton({required this.icon, required this.onTap});
   final IconData icon;
@@ -1037,8 +1643,7 @@ class _CircleIconButton extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(10),
-          child:
-              Icon(icon, color: StreetPhareTheme.textPrimary, size: 22),
+          child: Icon(icon, color: StreetPhareTheme.textPrimary, size: 22),
         ),
       ),
     );

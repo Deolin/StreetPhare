@@ -60,6 +60,12 @@ class AvoidanceFilters {
         return avoidManifestations;
       case AlertType.autre:
         return avoidAutres;
+      case AlertType.zoneSafe:
+        // Les zones safes sont des points positifs, on ne les évite jamais.
+        return false;
+      case AlertType.panicCollectif:
+        // Les alertes panic collectives sont traitées comme des dangers autres.
+        return avoidAutres;
     }
   }
 

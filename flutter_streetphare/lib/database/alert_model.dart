@@ -35,6 +35,10 @@ enum AlertType {
   controle,
   accident,
   manifestation,
+  /// Zone safe signalée par un utilisateur. Sert de point de repli.
+  zoneSafe,
+  /// Alerte panic collective automatique (5 appareils / 2 min).
+  panicCollectif,
   autre,
 }
 

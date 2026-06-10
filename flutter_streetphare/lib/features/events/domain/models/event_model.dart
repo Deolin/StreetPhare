@@ -15,6 +15,9 @@
 //   * `waypoints`     : étapes ordonnées avec heure prévue (points
 //                      de rassemblement "juste-à-temps" dynamiques).
 //   * `pois`          : points d'intérêt officiels (compat. legacy).
+//   * `careCenters`   : centres de soins / street-medics (NOUVEAU).
+//   * `exitPoints`    : zones d'évacuation / sorties de secours (NOUVEAU).
+//   * `safezones`     : zones de repli identifiées (NOUVEAU).
 //   * `destination`   : point d'arrivée B.
 
 import 'package:latlong2/latlong.dart';
@@ -128,6 +131,135 @@ class EventPoi {
 }
 
 // ============================================================================
+// EventCareCenter — Centre de soins / street-medics (NOUVEAU)
+// ============================================================================
+
+/// Un centre de soins de rue (street-medics, secours de proximité)
+/// défini dans le JSON de l'événement. Sert de point de repli
+/// pour l'algorithme de routage "Route Safe".
+class EventCareCenter {
+  const EventCareCenter({
+    required this.label,
+    required this.latitude,
+    required this.longitude,
+    this.contact = '',
+    this.notes = '',
+  });
+
+  final String label;
+  final double latitude;
+  final double longitude;
+
+  /// Numéro de téléphone ou canal radio (optionnel).
+  final String contact;
+
+  /// Notes complémentaires (spécialisation, capacité, etc.).
+  final String notes;
+
+  LatLng get position => LatLng(latitude, longitude);
+
+  Map<String, dynamic> toJson() => {
+        'label': label,
+        'lat': latitude,
+        'lng': longitude,
+        'contact': contact,
+        'notes': notes,
+      };
+
+  factory EventCareCenter.fromJson(Map<String, dynamic> json) {
+    return EventCareCenter(
+      label: json['label'] as String,
+      latitude: (json['lat'] as num).toDouble(),
+      longitude: (json['lng'] as num).toDouble(),
+      contact: (json['contact'] as String?) ?? '',
+      notes: (json['notes'] as String?) ?? '',
+    );
+  }
+}
+
+// ============================================================================
+// EventExitPoint — Point de sortie / zone d'évacuation (NOUVEAU)
+// ============================================================================
+
+/// Un point de sortie ou zone d'évacuation défini dans le JSON
+/// de l'événement. Utilisé comme destination de repli par
+/// l'algorithme de routage en cas de blocage.
+class EventExitPoint {
+  const EventExitPoint({
+    required this.label,
+    required this.latitude,
+    required this.longitude,
+    this.direction = '',
+  });
+
+  final String label;
+  final double latitude;
+  final double longitude;
+
+  /// Direction ou indication textuelle vers la sortie.
+  final String direction;
+
+  LatLng get position => LatLng(latitude, longitude);
+
+  Map<String, dynamic> toJson() => {
+        'label': label,
+        'lat': latitude,
+        'lng': longitude,
+        'direction': direction,
+      };
+
+  factory EventExitPoint.fromJson(Map<String, dynamic> json) {
+    return EventExitPoint(
+      label: json['label'] as String,
+      latitude: (json['lat'] as num).toDouble(),
+      longitude: (json['lng'] as num).toDouble(),
+      direction: (json['direction'] as String?) ?? '',
+    );
+  }
+}
+
+// ============================================================================
+// EventSafeZone — Zone de repli sûre (NOUVEAU)
+// ============================================================================
+
+/// Une zone de repli identifiée dans le JSON de l'événement.
+/// Sert aussi de destination de secours pour l'algorithme
+/// de routage ("failover").
+class EventSafeZone {
+  const EventSafeZone({
+    required this.label,
+    required this.latitude,
+    required this.longitude,
+    this.radius = 50.0,
+  });
+
+  final String label;
+  final double latitude;
+  final double longitude;
+
+  /// Rayon de la zone sûre en mètres.
+  final double radius;
+
+  LatLng get position => LatLng(latitude, longitude);
+
+  Map<String, dynamic> toJson() => {
+        'label': label,
+        'lat': latitude,
+        'lng': longitude,
+        'radius': radius,
+      };
+
+  factory EventSafeZone.fromJson(Map<String, dynamic> json) {
+    return EventSafeZone(
+      label: json['label'] as String,
+      latitude: (json['lat'] as num).toDouble(),
+      longitude: (json['lng'] as num).toDouble(),
+      radius: (json['radius'] as num?)?.toDouble() ?? 50.0,
+    );
+  }
+}
+
+// ============================================================================
 // EventModel — Événement complet
 // ============================================================================
 
@@ -143,6 +275,9 @@ class EventModel {
     required this.destinationLatitude,
     required this.destinationLongitude,
     this.waypoints = const [],
+    this.careCenters = const [],
+    this.exitPoints = const [],
+    this.safeZones = const [],
   });
 
   /// Code d'invitation (ex: "MANIF-123").
@@ -166,6 +301,15 @@ class EventModel {
 
   /// Points d'intérêt officiels (compat. legacy).
   final List<EventPoi> pois;
+
+  /// Centres de soins de rue / street-medics (NOUVEAU).
+  final List<EventCareCenter> careCenters;
+
+  /// Points de sortie / zones d'évacuation (NOUVEAU).
+  final List<EventExitPoint> exitPoints;
+
+  /// Zones de repli sûres (NOUVEAU).
+  final List<EventSafeZone> safeZones;
 
   /// Coordonnées du point d'arrivée B.
   final double destinationLatitude;
@@ -201,6 +345,61 @@ class EventModel {
     return waypoints.length;
   }
 
+  // --------------------------------------------------------------------------
+  // Utilitaires : cherche le point le plus proche d'une position
+  // --------------------------------------------------------------------------
+
+  /// Retourne le centre de soins le plus proche de [userPos].
+  /// Retourne `null` si la liste est vide.
+  EventCareCenter? nearestCareCenter(LatLng userPos) {
+    if (careCenters.isEmpty) return null;
+    const d = Distance();
+    EventCareCenter? best;
+    double bestDist = double.infinity;
+    for (final c in careCenters) {
+      final dist = d.as(LengthUnit.Meter, userPos, c.position);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = c;
+      }
+    }
+    return best;
+  }
+
+  /// Retourne le point de sortie le plus proche de [userPos].
+  /// Retourne `null` si la liste est vide.
+  EventExitPoint? nearestExitPoint(LatLng userPos) {
+    if (exitPoints.isEmpty) return null;
+    const d = Distance();
+    EventExitPoint? best;
+    double bestDist = double.infinity;
+    for (final e in exitPoints) {
+      final dist = d.as(LengthUnit.Meter, userPos, e.position);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = e;
+      }
+    }
+    return best;
+  }
+
+  /// Retourne la zone safe la plus proche de [userPos].
+  /// Retourne `null` si la liste est vide.
+  EventSafeZone? nearestSafeZone(LatLng userPos) {
+    if (safeZones.isEmpty) return null;
+    const d = Distance();
+    EventSafeZone? best;
+    double bestDist = double.infinity;
+    for (final z in safeZones) {
+      final dist = d.as(LengthUnit.Meter, userPos, z.position);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = z;
+      }
+    }
+    return best;
+  }
+
   /// Retourne les points de la polyline pour le segment [stepIndex].
   ///
   /// Trouve le point de route le plus proche de chaque waypoint et
@@ -221,8 +420,6 @@ class EventModel {
         : allPoints.length - 1;
 
     if (fromIdx >= toIdx) {
-      // Segment d'un seul point : retourne au moins 2 points pour
-      // que PolylineLayer puisse tracer quelque chose.
       final end = (fromIdx + 1).clamp(0, allPoints.length - 1);
       return allPoints.sublist(fromIdx, end + 1);
     }
@@ -280,6 +477,9 @@ class EventModel {
         'route': routeGeoJson,
         'waypoints': waypoints.map((w) => w.toJson()).toList(),
         'pois': pois.map((p) => p.toJson()).toList(),
+        'careCenters': careCenters.map((c) => c.toJson()).toList(),
+        'exitPoints': exitPoints.map((e) => e.toJson()).toList(),
+        'safeZones': safeZones.map((z) => z.toJson()).toList(),
         'destLat': destinationLatitude,
         'destLng': destinationLongitude,
       };
@@ -297,6 +497,15 @@ class EventModel {
           .toList(),
       pois: ((json['pois'] as List?) ?? const [])
           .map((p) => EventPoi.fromJson(p as Map<String, dynamic>))
+          .toList(),
+      careCenters: ((json['careCenters'] as List?) ?? const [])
+          .map((c) => EventCareCenter.fromJson(c as Map<String, dynamic>))
+          .toList(),
+      exitPoints: ((json['exitPoints'] as List?) ?? const [])
+          .map((e) => EventExitPoint.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      safeZones: ((json['safeZones'] as List?) ?? const [])
+          .map((z) => EventSafeZone.fromJson(z as Map<String, dynamic>))
           .toList(),
       destinationLatitude: (json['destLat'] as num).toDouble(),
       destinationLongitude: (json['destLng'] as num).toDouble(),

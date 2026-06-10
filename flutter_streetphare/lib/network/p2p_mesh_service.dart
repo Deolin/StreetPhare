@@ -108,6 +108,13 @@ class P2PMeshService {
       StreamController<Alert>.broadcast();
   Stream<Alert> get alertsReceived => _alertsReceivedController.stream;
 
+  /// Stream des signaux "panic" bruts reçus des pairs.
+  /// Chaque événement est une map { 'peerId', 'lat', 'lng' }.
+  final _panicSignalController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get panicSignals =>
+      _panicSignalController.stream;
+
   final Map<String, MeshPeer> _peers = {};
   Timer? _gossipTimer;
   Timer? _discoveryTimer;
@@ -147,6 +154,20 @@ class P2PMeshService {
         await t.broadcast(payload);
       } catch (e) {
         if (kDebugMode) debugPrint('[P2PMeshService] broadcast ${t.name}: $e');
+      }
+    }
+  }
+
+  /// Diffuse un payload JSON brut (ex : signal panic) sur tous les transports.
+  Future<void> broadcastRawJson(Map<String, dynamic> json) async {
+    final payload = jsonEncode(json);
+    for (final t in transports) {
+      try {
+        await t.broadcast(payload);
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[P2PMeshService] broadcastRaw ${t.name}: $e');
+        }
       }
     }
   }
@@ -210,7 +231,20 @@ class P2PMeshService {
         return;
       }
 
-      // Cas 3 : ping de présence.
+      // Cas 3 : signal panic d'un pair.
+      if (json['kind'] == 'panic' &&
+          json['peerId'] is String &&
+          json['lat'] is num &&
+          json['lng'] is num) {
+        _panicSignalController.add({
+          'peerId': json['peerId'] as String,
+          'lat': (json['lat'] as num).toDouble(),
+          'lng': (json['lng'] as num).toDouble(),
+        });
+        return;
+      }
+
+      // Cas 4 : ping de présence.
       if (json['kind'] == 'ping' && json['id'] is String) {
         _peers[json['id']] = MeshPeer(
           id: json['id'],

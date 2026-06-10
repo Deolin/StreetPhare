@@ -50,6 +50,10 @@ class ProximityValidationSheet extends StatelessWidget {
         return 'un danger / accident';
       case AlertType.manifestation:
         return 'un groupe de casseurs';
+      case AlertType.zoneSafe:
+        return 'une zone safe';
+      case AlertType.panicCollectif:
+        return 'une alerte panic collective';
       case AlertType.autre:
         return 'un danger';
     }
@@ -67,6 +71,10 @@ class ProximityValidationSheet extends StatelessWidget {
         return Icons.warning_amber;
       case AlertType.manifestation:
         return Icons.groups;
+      case AlertType.zoneSafe:
+        return Icons.shield_outlined;
+      case AlertType.panicCollectif:
+        return Icons.emergency;
       case AlertType.autre:
         return Icons.error_outline;
     }
@@ -84,6 +92,10 @@ class ProximityValidationSheet extends StatelessWidget {
         return const Color(0xFFFF6F00);
       case AlertType.manifestation:
         return const Color(0xFF7B1FA2);
+      case AlertType.zoneSafe:
+        return const Color(0xFF2E7D32);
+      case AlertType.panicCollectif:
+        return const Color(0xFFE53935);
       case AlertType.autre:
         return const Color(0xFF607D8B);
     }

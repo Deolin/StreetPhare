@@ -31,6 +31,7 @@ import '../database/alert_model.dart';
 import '../database/alert_ttl_policy.dart';
 import '../database/crypto_utils.dart';
 import '../database/hive_alert_database.dart';
+import 'collective_panic_service.dart';
 import 'failover_manager.dart';
 import 'p2p_mesh_service.dart';
 
@@ -77,6 +78,16 @@ class NetworkCoordinator {
 
     // À chaque réception d'alerte P2P, on incrémente le consensus.
     _subs.add(_mesh!.alertsReceived.listen(_onAlertReceivedViaMesh));
+
+    // Brancher le service de panic collectif.
+    CollectivePanicService.instance.setCreateAlertCallback(createAlert);
+    _subs.add(_mesh!.panicSignals.listen((signal) {
+      CollectivePanicService.instance.recordPanicSignal(
+        peerId: signal['peerId'] as String,
+        lat: signal['lat'] as double,
+        lng: signal['lng'] as double,
+      );
+    }));
 
     await _mesh!.start();
 
@@ -144,6 +155,25 @@ class NetworkCoordinator {
       debugPrint('[NetworkCoordinator] alerte créée : $alert');
     }
     return alert;
+  }
+
+  /// Diffuse le signal panic local sur le maillage P2P.
+  /// Appelé par l'UI quand l'utilisateur active son bouton PANIC.
+  Future<void> broadcastLocalPanic({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final payload =
+        CollectivePanicService.instance.buildLocalPanicPayload(
+      localPeerId: _ephemeralUserId,
+      lat: latitude,
+      lng: longitude,
+    );
+    await _mesh?.broadcastRawJson(payload);
+    if (kDebugMode) {
+      debugPrint(
+          '[NetworkCoordinator] signal panic local broadcasté ($latitude, $longitude)');
+    }
   }
 
   /// Confirme manuellement une alerte (par ex. si l'utilisateur

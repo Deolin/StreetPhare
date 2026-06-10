@@ -68,6 +68,10 @@ class AlertTtlPolicy {
       case AlertType.controle:
       case AlertType.autre:
         return false;
+      case AlertType.zoneSafe:
+      case AlertType.panicCollectif:
+        // Les zones safes et alertes panic ne sont pas des dangers mobiles.
+        return false;
     }
   }
 

@@ -47,6 +47,8 @@ class ReportBottomSheet extends StatelessWidget {
         return AlertType.accident;
       case ReportType.groupesCasseurs:
         return AlertType.manifestation;
+      case ReportType.zoneSafe:
+        return AlertType.zoneSafe;
     }
   }
 

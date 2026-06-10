@@ -14,6 +14,7 @@ import 'features/events/presentation/event_manager.dart';
 import 'features/geofencing/presentation/geofencing_service.dart';
 import 'features/geofencing/presentation/proximity_validation_service.dart';
 import 'features/routing/data/avoidance_filter_store.dart';
+import 'features/settings/data/app_preferences_store.dart';
 import 'features/settings/data/panic_contact_store.dart';
 import 'features/splash/presentation/splash_screen.dart';
 import 'network/bootstrap.dart';
@@ -50,6 +51,7 @@ void main() async {
   await ThemeController.instance.load();
   await PanicContactStore.instance.load();
   await AvoidanceFilterStore.instance.load();
+  await AppPreferencesStore.instance.load();
 
   // === Initialisation de la "ruche" réseau décentralisée ===
   if (kDebugMode) {

@@ -46,9 +46,15 @@ enum ReportType {
   ),
   groupesCasseurs(
     id: 'groupes_casseurs',
-    label: 'Groupes de casseurs',
+    label: 'Groupes casseurs',
     icon: Icons.groups,
     color: Color(0xFF7B1FA2),
+  ),
+  zoneSafe(
+    id: 'zone_safe',
+    label: 'Zone Safe',
+    icon: Icons.shield_outlined,
+    color: Color(0xFF2E7D32),
   );
 
   const ReportType({
