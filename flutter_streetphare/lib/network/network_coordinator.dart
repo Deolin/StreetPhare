@@ -28,6 +28,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../database/alert_model.dart';
+import '../database/alert_ttl_policy.dart';
 import '../database/crypto_utils.dart';
 import '../database/hive_alert_database.dart';
 import 'failover_manager.dart';
@@ -46,7 +47,7 @@ class NetworkCoordinator {
   Timer? _uploadTimer;
   final List<StreamSubscription> _subs = [];
 
-  String _ephemeralUserId = generateEphemeralUserId();
+  final String _ephemeralUserId = generateEphemeralUserId();
   bool _initialized = false;
 
   /// Identifiant éphémère local (rotatif).
@@ -122,9 +123,19 @@ class NetworkCoordinator {
       longitude: longitude,
       description: description,
       createdAt: createdAt,
+      // Le TTL "24h" reste la limite dure (RGPD / purge Hive).
+      // La politique de TTL Phase 2 (10min / 1min) est appliquée
+      // par `AlertTtlPolicy.isAlertAlive()` et `AlertVisibilityPolicy`.
+      ttlHours: 24,
       status: AlertStatus.pending,
       confirmations: {_ephemeralUserId},
     );
+
+    if (kDebugMode) {
+      debugPrint(
+          '[NetworkCoordinator] TTL Phase 2 pour type=${type.name} : '
+          '${AlertTtlPolicy.ttlForAlertType(type).inMinutes} min');
+    }
 
     await _db.upsert(alert);
     await _mesh?.broadcastAlert(alert);

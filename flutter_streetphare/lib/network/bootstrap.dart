@@ -10,6 +10,7 @@
 
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,8 +27,13 @@ import 'transports/wifi_direct_transport.dart';
 class NetworkBootstrap {
   final FailoverConfig failoverConfig;
   final List<MeshTransport> transports;
+  final String peerId;
 
-  NetworkBootstrap({required this.failoverConfig, required this.transports});
+  NetworkBootstrap({
+    required this.failoverConfig,
+    required this.transports,
+    required this.peerId,
+  });
 }
 
 /// Construit la configuration réseau + transports en fonction de
@@ -68,20 +74,79 @@ Future<NetworkBootstrap> buildNetworkBootstrap({
     masterPassphrase: masterPassphrase,
   );
 
+  // Identifiant de session anonyme STABLE. Utilisé comme peerId
+  // par les transports pour que les pairs distants puissent
+  // dédupliquer nos pings dans leur fenêtre glissante (cf.
+  // contrat anti-double-comptage du PeerCounterService).
+  // Persisté dans SharedPreferences pour rester stable d'un
+  // lancement de l'app à l'autre.
+  final sharedPeerId = await loadOrCreateStablePeerId();
+
   final transports = <MeshTransport>[];
 
   // Wi-Fi Direct / LAN multicast
   if (!kIsWeb) {
-    transports.add(WifiDirectMeshTransport());
+    transports.add(
+      WifiDirectMeshTransport(peerId: sharedPeerId),
+    );
   }
 
-  // BLE
-  transports.add(BleMeshTransport());
+  // BLE : peerId stable = clé de déduplication du compteur HIVE.
+  transports.add(
+    BleMeshTransport(peerId: sharedPeerId),
+  );
 
   // Relay via WebSocket
-  transports.add(RelayMeshTransport(relayUrl: relayUrl));
+  transports.add(
+    RelayMeshTransport(relayUrl: relayUrl, peerId: sharedPeerId),
+  );
 
-  return NetworkBootstrap(failoverConfig: cfg, transports: transports);
+  return NetworkBootstrap(
+    failoverConfig: cfg,
+    transports: transports,
+    peerId: sharedPeerId,
+  );
+}
+
+/// Charge (ou génère + persiste) un identifiant de session
+/// anonyme STABLE d'un lancement de l'app à l'autre. C'est la
+/// clé qui permet aux pairs distants de dédupliquer nos pings
+/// dans leur fenêtre glissante de 60 secondes.
+///
+/// L'ID est stocké sous la clé `streetphare.peer_id` dans
+/// SharedPreferences. Tant qu'il existe, on le réutilise tel
+/// quel (pas de rotation pendant la durée de vie de l'app).
+Future<String> loadOrCreateStablePeerId() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    const key = 'streetphare.peer_id';
+    final existing = prefs.getString(key);
+    if (existing != null && existing.isNotEmpty) return existing;
+    // Génère un nouvel ID anonyme (16 octets hex → 32 caractères).
+    final id = _generatePeerId();
+    await prefs.setString(key, id);
+    return id;
+  } catch (_) {
+    // Fallback non persistant : moins idéal, mais évite de crasher.
+    return _generatePeerId();
+  }
+}
+
+/// Génère un identifiant de session anonyme. Format : `sp-XXXXXXXX`
+/// (préfixe lisible + 16 octets hex). Utilise un générateur
+/// cryptographique si disponible (web), `Random.secure()` sinon.
+String _generatePeerId() {
+  final bytes = List<int>.generate(8, (_) => _secureNextInt(256));
+  final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  return 'sp-$hex';
+}
+
+int _secureNextInt(int max) {
+  try {
+    return math.Random.secure().nextInt(max);
+  } catch (_) {
+    return math.Random().nextInt(max);
+  }
 }
 
 /// Génère une chaîne initiale de secours chiffrée.

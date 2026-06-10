@@ -13,6 +13,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -24,10 +25,17 @@ class RelayMeshTransport implements MeshTransport {
   RelayMeshTransport({
     required this.relayUrl,
     this.heartbeat = const Duration(seconds: 20),
-  });
+    String? peerId,
+  }) : _peerId = peerId ?? _generateRandomPeerId();
 
   /// URL WebSocket du relay (ex: wss://relay.streetphare.org/mesh).
   final String relayUrl;
+
+  /// Identifiant de session anonyme stable, inclus dans les
+  /// pings pour permettre la déduplication côté serveur/pairs.
+  final String _peerId;
+
+  String get peerId => _peerId;
 
   final Duration heartbeat;
 
@@ -133,5 +141,13 @@ class RelayMeshTransport implements MeshTransport {
   void dispose() {
     _disposed = true;
     _incomingController.close();
+  }
+
+  /// Génère un peerId anonyme stable. En pratique, on injecte
+  /// l'`ephemeralUserId` du `NetworkCoordinator` (cf. bootstrap).
+  static String _generateRandomPeerId() {
+    final rng = math.Random.secure();
+    final bytes = List<int>.generate(8, (_) => rng.nextInt(256));
+    return 'relay-${bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}';
   }
 }

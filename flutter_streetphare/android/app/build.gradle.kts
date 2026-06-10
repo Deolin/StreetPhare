@@ -6,8 +6,15 @@ plugins {
 
 android {
     namespace = "com.example.flutter_streetphare"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Android 16 (API 36) — Baklava
+    // compileSdk 36 > 34 requis par les plugins (reactive_ble_mobile,
+    // nearby_connections, geolocator_android, etc.) pour résoudre
+    // l'erreur Gradle "CheckAarMetadataWorkAction".
+    compileSdk = 36
+    // NDK 28.2.13676358 = version la plus haute requise par les
+    // plugins installés (rétrocompatible). Suppression du warning
+    // Gradle "plugin requires a different NDK version".
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -19,8 +26,11 @@ android {
         applicationId = "com.example.flutter_streetphare"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        // minSdk 24 requis par plusieurs plugins (BLE, Nearby Connections) et
+        // toujours compatible avec Android 16 (API 36).
+        minSdk = maxOf(flutter.minSdkVersion, 24)
+        // Cible Android 16 (API 36)
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

@@ -12,11 +12,22 @@
 //   - Scanner BLE pour découvrir les autres appareils
 //
 // Les payloads d'alertes sont courts (≤ 244 octets typiques d'une
-// caractéristique BLE), ce qui impose un format compact (déjà
+// caractéristique BLE), ce impose un format compact (déjà
 // prévu dans `Alert.toCompact()`).
+//
+// === Identifiant de pair (UUID de session anonyme) ===
+//
+// Chaque instance de transport embarque un `peerId` (par défaut,
+// l'`ephemeralUserId` du `NetworkCoordinator`). Ce peerId est
+// inclus dans tous les pings de présence diffusés sur le maillage.
+// Côté réception, le consommateur (ex. `PeerCounterService`) peut
+// ainsi dédupliquer les signaux d'un même émetteur, même si celui-ci
+// émet en boucle. C'est la **clé du contrat anti-double-comptage**
+// du compteur HIVE.
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
@@ -30,10 +41,26 @@ import '../p2p_mesh_service.dart';
 /// Sur les autres plateformes, [isAvailable] vaut `false` et le
 /// service démarre quand même sans elle.
 class BleMeshTransport implements MeshTransport {
-  BleMeshTransport({FlutterReactiveBle? ble})
-      : _ble = ble ?? FlutterReactiveBle();
+  BleMeshTransport({
+    FlutterReactiveBle? ble,
+    String? peerId,
+    this._pingInterval = const Duration(seconds: 8),
+  })  : _ble = ble ?? FlutterReactiveBle(),
+        _peerId = peerId ?? _generateRandomPeerId();
+  // Note : on utilise le formal initializer `this._pingInterval` pour
+  // satisfaire `prefer_initializing_formals` : le paramètre n'a pas
+  // le même nom que le champ (underscore), donc l'affectation est
+  // implicite.
 
   final FlutterReactiveBle _ble;
+
+  /// Identifiant STABLE de l'appareil émetteur, diffusé dans
+  /// chaque ping de présence. C'est ce peerId que les pairs
+  /// distants utiliseront pour dédupliquer les signaux.
+  final String _peerId;
+
+  /// Intervalle entre deux pings BLE de présence.
+  final Duration _pingInterval;
 
   /// UUID du service GATT StreetPhare (à déclarer dans le code natif).
   static final Uuid serviceUuid =
@@ -44,11 +71,17 @@ class BleMeshTransport implements MeshTransport {
   @override
   String get name => 'ble';
 
+  /// Expose le peerId local pour que la couche applicative puisse
+  /// l'utiliser (par ex. pour le loguer, ou pour le passer à un
+  /// autre transport qui en aurait besoin).
+  String get peerId => _peerId;
+
   final _incomingController = StreamController<String>.broadcast();
   @override
   Stream<String> get incoming => _incomingController.stream;
 
   StreamSubscription<DiscoveredDevice>? _scanSub;
+  Timer? _pingTimer;
   bool _started = false;
 
   @override
@@ -83,10 +116,20 @@ class BleMeshTransport implements MeshTransport {
     }, onError: (Object e) {
       if (kDebugMode) debugPrint('[BLE] scan error: $e');
     });
+
+    // Ping périodique de présence (inclut le peerId stable).
+    // Les pairs distants reçoivent ce ping, l'inscrivent dans
+    // leur fenêtre glissante, et le compteur HIVE déduplique
+    // automatiquement sur le peerId.
+    _pingTimer = Timer.periodic(_pingInterval, (_) => _sendPresencePing());
+    // Émet un ping immédiatement pour se signaler vite.
+    _sendPresencePing();
   }
 
   @override
   Future<void> stop() async {
+    _pingTimer?.cancel();
+    _pingTimer = null;
     await _scanSub?.cancel();
     _scanSub = null;
     _started = false;
@@ -130,6 +173,28 @@ class BleMeshTransport implements MeshTransport {
     }
   }
 
+  /// Construit et émet un ping de présence BLE contenant le
+  /// peerId stable. C'est ce peerId qui sert de clé de
+  /// déduplication côté réception.
+  void _sendPresencePing() {
+    final ping = jsonEncode({
+      'kind': 'ping',
+      // IMPORTANT : `id` = peerId STABLE de la session anonyme
+      // courante. C'est cette clé qui permet aux pairs distants
+      // de dédupliquer ce signal dans leur fenêtre glissante.
+      'id': _peerId,
+      't': name, // nom du transport ('ble')
+      'ts': DateTime.now().toUtc().toIso8601String(),
+    });
+    // En production : injecter dans un advertisement ou une
+    // caractéristique notifiable. Ici, on log en debug et on
+    // laisse `broadcast` côté GATT faire le relais.
+    if (kDebugMode) {
+      debugPrint('[BLE] presence ping peerId=$_peerId');
+    }
+    broadcast(ping);
+  }
+
   /// Helper de test : permet d'injecter un message reçu (utile
   /// pour les tests unitaires sans device BLE).
   void debugInjectIncoming(String payload) {
@@ -139,6 +204,16 @@ class BleMeshTransport implements MeshTransport {
   /// Libère les ressources internes (canal broadcast).
   void dispose() {
     _incomingController.close();
+  }
+
+  /// Génère un peerId anonyme stable pour la session courante.
+  /// En pratique, on injecte l'`ephemeralUserId` du
+  /// `NetworkCoordinator` au constructeur. Ce fallback aléatoire
+  /// n'est utilisé que pour les tests / l'instanciation directe.
+  static String _generateRandomPeerId() {
+    final rng = Random.secure();
+    final bytes = List<int>.generate(8, (_) => rng.nextInt(256));
+    return 'ble-${bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}';
   }
 }
 

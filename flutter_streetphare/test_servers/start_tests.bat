@@ -1,4 +1,4 @@
-@echo off
+@echo OFF
 REM ============================================================
 REM  start_tests.bat
 REM  Lance les deux serveurs Node.js de test StreetPhare

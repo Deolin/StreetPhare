@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "C:/Users/Deolin/Documents/Documents travail/Projet/StreetPhare/flutter_streetphare/windows/flutter"
+    "cmake.sourceDirectory": "C:/Users/Deolin/Documents/Documents travail/Projet/StreetPhare/flutter_streetphare/windows/flutter",
+    "java.compile.nullAnalysis.mode": "automatic"
 }

@@ -19,10 +19,15 @@ endif()
 set(FLUTTER_LIBRARY "${EPHEMERAL_DIR}/flutter_windows.dll")
 
 # Published to parent scope for install step.
-set(FLUTTER_LIBRARY ${FLUTTER_LIBRARY} PARENT_SCOPE)
-set(FLUTTER_ICU_DATA_FILE "${EPHEMERAL_DIR}/icudtl.dat" PARENT_SCOPE)
-set(PROJECT_BUILD_DIR "${PROJECT_DIR}/build/" PARENT_SCOPE)
-set(AOT_LIBRARY "${PROJECT_DIR}/build/windows/app.so" PARENT_SCOPE)
+# On utilise CACHE INTERNAL pour partager ces variables avec le
+# CMakeLists parent (windows/CMakeLists.txt) sans déclencher le
+# warning "current scope has no parent" des versions récentes
+# de CMake (3.27+) lorsqu'on tente PARENT_SCOPE depuis le scope
+# racine d'un sous-répertoire.
+set(FLUTTER_LIBRARY ${FLUTTER_LIBRARY} CACHE INTERNAL "")
+set(FLUTTER_ICU_DATA_FILE "${EPHEMERAL_DIR}/icudtl.dat" CACHE INTERNAL "")
+set(PROJECT_BUILD_DIR "${PROJECT_DIR}/build/" CACHE INTERNAL "")
+set(AOT_LIBRARY "${PROJECT_DIR}/build/windows/app.so" CACHE INTERNAL "")
 
 list(APPEND FLUTTER_LIBRARY_HEADERS
   "flutter_export.h"

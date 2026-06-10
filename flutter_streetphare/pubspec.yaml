@@ -72,6 +72,9 @@ dependencies:
   # message pré-rempli (numéros + GPS).
   url_launcher: ^6.3.0
 
+  # Scanner de QR Code (camera) — ajout d'événements via QR
+  mobile_scanner: ^6.0.0
+
 
 dev_dependencies:
   flutter_test:

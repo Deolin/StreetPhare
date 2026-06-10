@@ -17,6 +17,9 @@ import 'package:flutter/services.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../events/presentation/events_screen.dart';
+import '../../routing/data/avoidance_filter_store.dart';
+import '../../routing/domain/models/avoidance_filters.dart';
 import '../data/panic_contact.dart';
 import '../data/panic_contact_store.dart';
 
@@ -34,12 +37,17 @@ class SettingsScreen extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurface,
         ),
       ),
-      body: ListView(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        children: const [
-          _ThemeSection(),
-          _PanicContactsSection(),
-        ],
+        child: const Column(
+          children: [
+            _ThemeSection(),
+            _EventsSection(),
+            _AvoidanceFiltersSection(),
+            _PanicContactsSection(),
+            _AboutSection(),
+          ],
+        ),
       ),
     );
   }
@@ -90,19 +98,27 @@ class _ThemeSection extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                ...AppThemeMode.values.map(
-                  (mode) => RadioListTile<AppThemeMode>(
-                    value: mode,
-                    groupValue: current,
-                    onChanged: (v) {
-                      if (v == null) return;
-                      ThemeController.instance.setMode(v);
-                    },
-                    title: Text(mode.label),
-                    subtitle: Text(_subtitleFor(mode)),
-                    activeColor: StreetPhareTheme.primary,
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
+                // Flutter 3.32+ : RadioListTile déprécié.
+                // On utilise le nouveau RadioGroup<T> qui encapsule
+                // un ensemble de Radio<T> et gère la sélection.
+                RadioGroup<AppThemeMode>(
+                  groupValue: current,
+                  onChanged: (v) {
+                    if (v == null) return;
+                    ThemeController.instance.setMode(v);
+                  },
+                  child: Column(
+                    children: [
+                      for (final mode in AppThemeMode.values)
+                        RadioListTile<AppThemeMode>(
+                          value: mode,
+                          title: Text(mode.label),
+                          subtitle: Text(_subtitleFor(mode)),
+                          activeColor: StreetPhareTheme.primary,
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -411,6 +427,283 @@ class _ContactFormDialogState extends State<_ContactFormDialog> {
           },
           child: Text(isEdit ? 'Enregistrer' : 'Ajouter'),
         ),
+      ],
+    );
+  }
+}
+
+// ============================================================================
+// Section ÉVÉNEMENTS (lien vers la page de codes d'invitation)
+// ============================================================================
+
+class _EventsSection extends StatelessWidget {
+  const _EventsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.event, color: StreetPhareTheme.primary, size: 26),
+        title: const Text('Événements'),
+        subtitle: const Text(
+          'Rejoindre une manifestation via un code d\'invitation.\n'
+          'Le trajet est révélé uniquement à l\'heure dite.',
+        ),
+        trailing: const Icon(Icons.chevron_right,
+            color: StreetPhareTheme.textSecondary),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const EventsScreen()),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// Section FILTRES D'ÉVITEMENT (préférences Safe Path)
+// ============================================================================
+
+class _AvoidanceFiltersSection extends StatelessWidget {
+  const _AvoidanceFiltersSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: ValueListenableBuilder<AvoidanceFilters>(
+          valueListenable: AvoidanceFilterStore.instance,
+          builder: (context, filters, _) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.shield,
+                        color: StreetPhareTheme.primary, size: 22),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Filtres d\'évitement (Route Safe)',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.only(left: 30),
+                  child: Text(
+                    'Cochez les types de dangers que vous voulez '
+                    'ABSOLUMENT ÉVITER. Le moteur de routage traitera '
+                    'les autres comme franchissables (avec une légère '
+                    'pénalité de proximité).',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _AvoidanceTile(
+                  title: 'Éviter les barrages',
+                  subtitle: 'Barrages filtrants ou durs',
+                  value: filters.avoidBarrages,
+                  onChanged: (v) => AvoidanceFilterStore.instance.update(
+                      filters.copyWith(avoidBarrages: v)),
+                ),
+                _AvoidanceTile(
+                  title: 'Éviter les nasses',
+                  subtitle: 'Pièges, zones encerclées',
+                  value: filters.avoidNasses,
+                  onChanged: (v) => AvoidanceFilterStore.instance.update(
+                      filters.copyWith(avoidNasses: v)),
+                ),
+                _AvoidanceTile(
+                  title: 'Éviter les contrôles de police',
+                  subtitle: 'Filtrages, contrôles d\'identité',
+                  value: filters.avoidControles,
+                  onChanged: (v) => AvoidanceFilterStore.instance.update(
+                      filters.copyWith(avoidControles: v)),
+                ),
+                _AvoidanceTile(
+                  title: 'Éviter les accidents / autopompes',
+                  subtitle: 'Camions de pompiers, zones accidentées',
+                  value: filters.avoidAccidents,
+                  onChanged: (v) => AvoidanceFilterStore.instance.update(
+                      filters.copyWith(avoidAccidents: v)),
+                ),
+                _AvoidanceTile(
+                  title: 'Éviter les manifestations / casseurs',
+                  subtitle: 'Zones de rassemblement à risque',
+                  value: filters.avoidManifestations,
+                  onChanged: (v) => AvoidanceFilterStore.instance.update(
+                      filters.copyWith(avoidManifestations: v)),
+                ),
+                _AvoidanceTile(
+                  title: 'Éviter les dangers "autres"',
+                  subtitle: 'Tout autre signalement non catégorisé',
+                  value: filters.avoidAutres,
+                  onChanged: (v) => AvoidanceFilterStore.instance.update(
+                      filters.copyWith(avoidAutres: v)),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _AvoidanceTile extends StatelessWidget {
+  const _AvoidanceTile({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SwitchListTile(
+      title: Text(title,
+          style: const TextStyle(
+              color: StreetPhareTheme.textPrimary, fontSize: 14)),
+      subtitle: Text(subtitle,
+          style: const TextStyle(
+              color: StreetPhareTheme.textSecondary, fontSize: 12)),
+      value: value,
+      onChanged: onChanged,
+      activeThumbColor: StreetPhareTheme.primary,
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+    );
+  }
+}
+
+// ============================================================================
+// Section À PROPOS
+// ============================================================================
+
+class _AboutSection extends StatelessWidget {
+  const _AboutSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ListTile(
+        leading: const Icon(Icons.info_outline,
+            color: StreetPhareTheme.primary, size: 26),
+        title: const Text('À propos de StreetPhare'),
+        subtitle: const Text('Version, licence, open source'),
+        trailing: const Icon(Icons.chevron_right,
+            color: StreetPhareTheme.textSecondary),
+        onTap: () => _showAboutDialog(context),
+      ),
+    );
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(ctx).colorScheme.surface,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.lightbulb, color: StreetPhareTheme.primary, size: 28),
+            SizedBox(width: 10),
+            Text('StreetPhare',
+                style: TextStyle(
+                    color: StreetPhareTheme.textPrimary,
+                    fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _AboutRow(label: 'Version', value: '1.0.0'),
+              SizedBox(height: 6),
+              _AboutRow(label: 'Plateforme', value: 'Flutter / Dart'),
+              SizedBox(height: 6),
+              _AboutRow(label: 'Licence', value: 'GNU GPL v3'),
+              SizedBox(height: 12),
+              Text(
+                'Projet open-source citoyen',
+                style: TextStyle(
+                    color: StreetPhareTheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13),
+              ),
+              SizedBox(height: 6),
+              Text(
+                'StreetPhare est une application de cartographie '
+                'collaborative en temps réel conçue pour renforcer '
+                'la sécurité collective lors de rassemblements citoyens.\n\n'
+                'Aucune donnée personnelle n\'est collectée ni transmise '
+                'à des tiers. Toutes les données restent locales ou '
+                'transitent uniquement via des relais pair-à-pair '
+                'chiffrés.\n\n'
+                'Le code source est disponible sous licence GNU GPL v3, '
+                'garantissant votre liberté de l\'étudier, le modifier '
+                'et le redistribuer.',
+                style: TextStyle(
+                    color: StreetPhareTheme.textSecondary, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Ligne clé/valeur pour le dialogue À propos.
+class _AboutRow extends StatelessWidget {
+  const _AboutRow({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text('$label : ',
+            style: const TextStyle(
+                color: StreetPhareTheme.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500)),
+        Text(value,
+            style: const TextStyle(
+                color: StreetPhareTheme.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600)),
       ],
     );
   }

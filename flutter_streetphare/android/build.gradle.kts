@@ -1,3 +1,27 @@
+// android/build.gradle.kts
+//
+// Script Gradle RACINE du projet Android.
+//
+// Responsabilités :
+//   1. Déclarer les dépôts (Google, Maven Central) pour TOUS
+//      les sous-projets (app + plugins Flutter).
+//   2. Définir un répertoire de build partagé (à la racine du
+//      repo Flutter, pas dans `android/build/`).
+//   3. === FORCER LE compileSdk DE TOUS LES PLUGINS === pour
+//      contourner le bug de `flutter_reactive_ble` (et autres)
+//      qui déclarent compileSdk = 33 dans leur build.gradle
+//      interne, ce qui déclenche l'erreur Gradle
+//      `CheckAarMetadataWorkAction` quand les dépendances
+//      AndroidX modernes (core, lifecycle, fragment, activity,
+//      annotation-experimental, exifinterface…) exigent
+//      compileSdk >= 34. Le script ci-dessous injecte une
+//      propriété `compileSdkVersion` (et `targetSdkVersion`)
+//      DÈS LE DÉBUT de l'évaluation de chaque sous-projet,
+//      AVANT que le bloc `android { ... }` du plugin ne soit
+//      parsé. C'est le seul timing qui marche : la valeur est
+//      lue par AGP pendant la phase de configuration du plugin.
+//   4. Déclarer la tâche `clean`.
+
 allprojects {
     repositories {
         google()
@@ -17,6 +41,64 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+// ============================================================================
+// === COMPATIBILITÉ : force compileSdk/targetSdk = 36 sur tous les plugins
+// ============================================================================
+//
+// Le hook `gradle.beforeProject` s'exécute AVANT que le
+// `build.gradle` du sous-projet ne soit évalué. À ce stade, on
+// peut injecter des propriétés que les blocs `android { ... }`
+// liront. C'est l'astuce documentée par la team Flutter pour
+// gérer les plugins qui n'ont pas encore migré leur compileSdk.
+//
+// Référence : https://docs.gradle.org/current/dsl/org.gradle.api.invocation.Gradle.html
+//             + ticket flutter/flutter#138297 (compileSdk plugins)
+// ============================================================================
+
+val targetCompileSdk: Int = 36
+
+gradle.beforeProject {
+    // Ne s'applique qu'aux sous-projets qui NE SONT PAS l'app
+    // principale (`:app`), pour ne pas écraser la config
+    // Kotlin DSL explicite de notre `app/build.gradle.kts`.
+    if (project.name == "app") return@beforeProject
+
+    // Injecte les propriétés Gradle qui seront lues par le
+    // bloc `android { compileSdk = <valeur> }` de chaque
+    // plugin. Si le plugin utilise `compileSdk project.property(...)`
+    // ou `compileSdk rootProject.ext.compileSdkVersion`, ces
+    // valeurs seront prises en compte.
+    project.ext.set("compileSdkVersion", targetCompileSdk)
+    project.ext.set("targetSdkVersion", targetCompileSdk)
+    project.ext.set("compileSdk", targetCompileSdk)
+    project.ext.set("targetSdk", targetCompileSdk)
+}
+
+// Variante "post-evaluation" : pour les plugins qui ne lisent
+// pas les propriétés `ext.*` (la plupart, malheureusement, ont
+// une valeur en dur dans leur `build.gradle`), on force aussi
+// la valeur via réflexion sur l'extension `android`. Ça ne
+// fonctionne pas toujours car la valeur `compileSdk` est résolue
+// très tôt par AGP, mais ça ne coûte rien de tenter.
+gradle.projectsEvaluated {
+    rootProject.subprojects {
+        if (project.name == "app") return@subprojects
+        if (project.extensions.findByName("android") != null) {
+            try {
+                val androidExt = project.extensions.getByName("android")
+                val setter = androidExt.javaClass.methods.firstOrNull {
+                    it.name == "setCompileSdkVersion" &&
+                        it.parameterCount == 1 &&
+                        it.parameterTypes[0] == Int::class.javaPrimitiveType
+                }
+                setter?.invoke(androidExt, targetCompileSdk)
+            } catch (_: Throwable) {
+                // Ignorer : un plugin peut utiliser un DSL exotique.
+            }
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

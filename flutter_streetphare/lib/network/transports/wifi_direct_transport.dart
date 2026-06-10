@@ -14,6 +14,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
@@ -24,10 +25,17 @@ class WifiDirectMeshTransport implements MeshTransport {
   WifiDirectMeshTransport({
     this.multicastAddress = '239.255.42.42',
     this.port = 42424,
-  });
+    String? peerId,
+  }) : _peerId = peerId ?? _generateRandomPeerId();
 
   final String multicastAddress;
   final int port;
+
+  /// Identifiant de session anonyme stable, inclus dans les
+  /// pings multicast pour permettre la déduplication côté pairs.
+  final String _peerId;
+
+  String get peerId => _peerId;
 
   RawDatagramSocket? _socket;
   InternetAddress? _mcastGroup;
@@ -115,5 +123,13 @@ class WifiDirectMeshTransport implements MeshTransport {
   /// Libère les ressources internes (canal broadcast).
   void dispose() {
     _incomingController.close();
+  }
+
+  /// Génère un peerId anonyme stable. En pratique, on injecte
+  /// l'`ephemeralUserId` du `NetworkCoordinator` (cf. bootstrap).
+  static String _generateRandomPeerId() {
+    final rng = math.Random.secure();
+    final bytes = List<int>.generate(8, (_) => rng.nextInt(256));
+    return 'wifi-${bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}';
   }
 }

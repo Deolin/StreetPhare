@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
+import '../../../database/alert_model.dart';
+import '../../../network/network_coordinator.dart';
 import '../domain/models/report_type.dart';
 
 /// Feuille d'ancrage (Bottom Sheet) présentant les différents types
@@ -8,7 +11,11 @@ import '../domain/models/report_type.dart';
 ///
 /// L'utilisateur peut :
 ///   1. Choisir un type de signalement (Barrages, Nasses, etc.)
-///   2. Confirmer pour enregistrer le signalement (MVP : log console)
+///   2. Le système capture **automatiquement la position GPS réelle**
+///      de l'appareil À CE MOMENT PRÉCIS (latitude + longitude).
+///   3. Une `Alert` signée anonymement est créée, persistée dans
+///      la base Hive locale (TTL 24h) et broadcastée sur le maillage.
+///   4. Le marqueur apparaît INSTANTANÉMENT sur la carte.
 class ReportBottomSheet extends StatelessWidget {
   const ReportBottomSheet({super.key});
 
@@ -20,6 +27,27 @@ class ReportBottomSheet extends StatelessWidget {
       isScrollControlled: true,
       builder: (_) => const ReportBottomSheet(),
     );
+  }
+
+  /// Mapping entre un `ReportType` (UI) et un `AlertType` (couche
+  /// métier / base de données).
+  static AlertType _alertTypeFor(ReportType type) {
+    switch (type) {
+      case ReportType.barrages:
+        return AlertType.barrage;
+      case ReportType.zonesFiltrees:
+        return AlertType.controle;
+      case ReportType.nasses:
+        return AlertType.nasse;
+      case ReportType.autopompes:
+        return AlertType.accident;
+      case ReportType.policiers:
+        return AlertType.controle;
+      case ReportType.dangers:
+        return AlertType.accident;
+      case ReportType.groupesCasseurs:
+        return AlertType.manifestation;
+    }
   }
 
   @override
@@ -68,7 +96,8 @@ class ReportBottomSheet extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
               child: Text(
-                'Sélectionnez la nature de l\'événement à signaler :',
+                'Sélectionnez la nature de l\'événement à signaler :\n'
+                'Votre position GPS sera capturée automatiquement.',
                 style: TextStyle(
                   color: StreetPhareTheme.textSecondary,
                   fontSize: 13,
@@ -127,31 +156,120 @@ class ReportBottomSheet extends StatelessWidget {
     );
   }
 
-  /// Action déclenchée lors du choix d'un type de signalement
-  void _onTypeSelected(BuildContext context, ReportType type) {
-    // Ferme la feuille d'ancrage
+  /// Action déclenchée lors du choix d'un type de signalement.
+  ///
+  /// Pipeline :
+  ///   1. Ferme la feuille d'ancrage.
+  ///   2. Capture la position GPS de l'appareil.
+  ///   3. Crée une `Alert` via `NetworkCoordinator.createAlert`
+  ///      (qui la signe, la persiste dans Hive, la broadcast).
+  ///   4. Affiche un snackbar de confirmation à l'utilisateur.
+  Future<void> _onTypeSelected(
+    BuildContext context,
+    ReportType type,
+  ) async {
+    // Capture le ScaffoldMessenger AVANT les awaits pour éviter
+    // tout "use_build_context_synchronously" sur context.
+    final messenger = ScaffoldMessenger.of(context);
     Navigator.of(context).pop();
 
-    // Affiche un message de confirmation (MVP)
-    // Note : aucune donnée nominative n'est collectée.
-    debugPrint('[Report] Signalement de type "${type.label}" enregistré.');
+    // 1) Capture la position GPS de l'appareil.
+    final pos = await _capturePosition();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+    if (pos == null) {
+      _showSnackBar(
+        messenger,
+        'Impossible d\'obtenir la position GPS. '
+        'Activez la localisation et réessayez.',
+        icon: Icons.location_off,
+        backgroundColor: StreetPhareTheme.danger,
+        foregroundColor: Colors.white,
+      );
+      return;
+    }
+
+    // 2) Crée l'alerte (signe + persiste Hive + broadcast).
+    try {
+      final alertType = _alertTypeFor(type);
+      await NetworkCoordinator.instance.createAlert(
+        type: alertType,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        description: type.label,
+      );
+      debugPrint(
+        '[Report] Signalement "${type.label}" enregistré à '
+        '(${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}).',
+      );
+      _showSnackBar(
+        messenger,
+        'Signalement "${type.label}" enregistré à '
+        '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}.\n'
+        'Merci de votre contribution citoyenne.',
+        icon: type.icon,
         backgroundColor: type.color,
+        foregroundColor: Colors.white,
+      );
+    } catch (e) {
+      debugPrint('[Report] erreur createAlert: $e');
+      _showSnackBar(
+        messenger,
+        'Erreur lors de l\'enregistrement du signalement : $e',
+        icon: Icons.error_outline,
+        backgroundColor: StreetPhareTheme.danger,
+        foregroundColor: Colors.white,
+      );
+    }
+  }
+
+  /// Capture la position GPS réelle de l'appareil À CE MOMENT PRÉCIS.
+  /// Reprend la même logique que dans `map_screen.dart` (factorisable
+  /// dans un service dédié à terme).
+  Future<Position?> _capturePosition() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return null;
+      }
+      if (permission == LocationPermission.deniedForever) return null;
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+    } catch (e) {
+      debugPrint('[Report] erreur GPS : $e');
+      return null;
+    }
+  }
+
+  void _showSnackBar(
+    ScaffoldMessengerState messenger,
+    String message, {
+    required IconData icon,
+    required Color backgroundColor,
+    required Color foregroundColor,
+  }) {
+    messenger.showSnackBar(
+      SnackBar(
+        backgroundColor: backgroundColor,
         content: Row(
           children: [
-            Icon(type.icon, color: Colors.white),
+            Icon(icon, color: foregroundColor),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Signalement "${type.label}" enregistré.\n'
-                'Merci de votre contribution citoyenne.',
+                message,
+                style: TextStyle(color: foregroundColor),
               ),
             ),
           ],
         ),
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
       ),
     );
