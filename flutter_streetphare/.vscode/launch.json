@@ -1,25 +1,157 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "flutter_streetphare",
-            "request": "launch",
-            "type": "dart"
-        },
-        {
-            "name": "flutter_streetphare (profile mode)",
-            "request": "launch",
-            "type": "dart",
-            "flutterMode": "profile"
-        },
-        {
-            "name": "flutter_streetphare (release mode)",
-            "request": "launch",
-            "type": "dart",
-            "flutterMode": "release"
-        }
-    ]
+  // StreetPhare — Configuration de débogage VS Code
+  //
+  // Ce fichier lance simultanément :
+  //   1. Le client Flutter (Android/Chrome/Windows)
+  //   2. Le serveur de test principal (Port 3000)
+  //   3. Le serveur de backup  (Port 3001)
+  //   4. L'Admin Dashboard     (Port 4000)
+  //
+  // Usage : F5 ou "Run > Start Debugging" → choisir "StreetPhare — Full Stack"
+  //         Ou lancer chaque configuration individuellement.
+
+  "version": "0.2.0",
+  "configurations": [
+
+    // ── 1. Flutter — Client Android ──────────────────────────────────────────
+    {
+      "name": "Flutter — Android (debug)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "debug",
+      "deviceId": "android",
+      "args": ["--dart-define=ENV=debug"]
+    },
+
+    // ── 2. Flutter — Chrome (web) ─────────────────────────────────────────────
+    {
+      "name": "Flutter — Chrome (debug)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "debug",
+      "deviceId": "chrome",
+      "args": ["--dart-define=ENV=debug"]
+    },
+
+    // ── 3. Flutter — Windows Desktop ─────────────────────────────────────────
+    {
+      "name": "Flutter — Windows Desktop",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "debug",
+      "deviceId": "windows",
+      "args": ["--dart-define=ENV=debug"]
+    },
+
+    // ── 4. Node.js — Serveur Principal (Port 3000) ────────────────────────────
+    {
+      "name": "Node — Serveur Principal (3000)",
+      "request": "launch",
+      "type": "node",
+      "program": "${workspaceFolder}/test_servers/server_primary_v2.js",
+      "cwd": "${workspaceFolder}/test_servers",
+      "env": {
+        "PORT": "3000",
+        "ROLE": "primary",
+        "NEXT_BACKUP_URL": "http://localhost:3001",
+        "STREETPHARE_MASTER_KEY": "streetphare-dev-key-CHANGE_ME_IN_PROD",
+        "STREETPHARE_LOG": "1",
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+
+    // ── 5. Node.js — Serveur Backup (Port 3001) ───────────────────────────────
+    {
+      "name": "Node — Serveur Backup (3001)",
+      "request": "launch",
+      "type": "node",
+      "program": "${workspaceFolder}/test_servers/server_secondary_v2.js",
+      "cwd": "${workspaceFolder}/test_servers",
+      "env": {
+        "PORT": "3001",
+        "ROLE": "secondary",
+        "PRIMARY_URL": "http://localhost:3000",
+        "STREETPHARE_MASTER_KEY": "streetphare-dev-key-CHANGE_ME_IN_PROD",
+        "STREETPHARE_LOG": "1",
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+
+    // ── 6. Node.js — Admin Dashboard (Port 4000) ──────────────────────────────
+    {
+      "name": "Node — Admin Dashboard (4000)",
+      "request": "launch",
+      "type": "node",
+      "program": "${workspaceFolder}/test_servers/admin_dashboard.js",
+      "cwd": "${workspaceFolder}/test_servers",
+      "env": {
+        "ADMIN_PORT": "4000",
+        "PRIMARY_URL": "http://localhost:3000",
+        "SECONDARY_URL": "http://localhost:3001",
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ],
+
+  "compounds": [
+    // ── Full Stack : Flutter + Serveur Principal + Backup + Admin ─────────────
+    // Lance les 4 processus en parallèle avec un seul F5.
+    {
+      "name": "StreetPhare — Full Stack (Android)",
+      "configurations": [
+        "Flutter — Android (debug)",
+        "Node — Serveur Principal (3000)",
+        "Node — Serveur Backup (3001)",
+        "Node — Admin Dashboard (4000)"
+      ],
+      "stopAll": true,
+      "presentation": {
+        "hidden": false,
+        "group": "streetphare",
+        "order": 1
+      }
+    },
+
+    // ── Full Stack : Flutter Web + Serveurs ───────────────────────────────────
+    {
+      "name": "StreetPhare — Full Stack (Chrome)",
+      "configurations": [
+        "Flutter — Chrome (debug)",
+        "Node — Serveur Principal (3000)",
+        "Node — Serveur Backup (3001)",
+        "Node — Admin Dashboard (4000)"
+      ],
+      "stopAll": true,
+      "presentation": {
+        "hidden": false,
+        "group": "streetphare",
+        "order": 2
+      }
+    },
+
+    // ── Serveurs uniquement (sans client Flutter) ─────────────────────────────
+    {
+      "name": "StreetPhare — Serveurs uniquement",
+      "configurations": [
+        "Node — Serveur Principal (3000)",
+        "Node — Serveur Backup (3001)",
+        "Node — Admin Dashboard (4000)"
+      ],
+      "stopAll": true,
+      "presentation": {
+        "hidden": false,
+        "group": "streetphare",
+        "order": 3
+      }
+    }
+  ]
 }

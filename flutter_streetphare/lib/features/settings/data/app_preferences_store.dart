@@ -7,6 +7,9 @@
 //   - Filtre de notifications en arrière-plan
 //   - Événement actif sélectionné (index parmi les 3 max)
 //   - Type de destination pour la Route Safe
+//   - Mode Malvoyant (grand texte + interface adaptée)
+//   - Filtre messagerie Hive P2P
+//   - Cache cartes (durée max en jours)
 
 import 'dart:convert';
 
@@ -55,16 +58,9 @@ extension NotificationFilterExt on NotificationFilter {
 
 /// Type de destination pour l'algorithme "Route Safe".
 enum RouteDestinationType {
-  /// Destination par défaut du point de l'événement actif.
   manifestPoint,
-
-  /// Centre de soins le plus proche (défini dans le JSON de l'événement).
   careCenter,
-
-  /// Point de sortie le plus proche (zones d'évacuation du JSON).
   exitPoint,
-
-  /// Point personnalisé placé manuellement sur la carte.
   userPoint,
 }
 
@@ -96,6 +92,49 @@ extension RouteDestinationTypeExt on RouteDestinationType {
   }
 }
 
+/// Filtre des messages Hive P2P reçus.
+enum MessageFilter {
+  /// Tous les messages diffusés.
+  all,
+
+  /// Uniquement les messages émis depuis moins de 300 m.
+  nearbyOnly,
+
+  /// Uniquement les messages des administrateurs d'événement.
+  adminOnly,
+
+  /// Uniquement les messages d'alerte (type ALERT).
+  alertOnly,
+}
+
+extension MessageFilterExt on MessageFilter {
+  String get label {
+    switch (this) {
+      case MessageFilter.all:
+        return 'Tous les messages';
+      case MessageFilter.nearbyOnly:
+        return 'Messages proches uniquement';
+      case MessageFilter.adminOnly:
+        return 'Administrateurs de l\'événement';
+      case MessageFilter.alertOnly:
+        return 'Messages d\'alerte uniquement';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case MessageFilter.all:
+        return 'Reçoit tous les messages diffusés sur le réseau';
+      case MessageFilter.nearbyOnly:
+        return 'Messages émis dans un rayon de 300 m';
+      case MessageFilter.adminOnly:
+        return 'Messages signés par un administrateur de l\'événement';
+      case MessageFilter.alertOnly:
+        return 'Uniquement les alertes critiques (type ALERT)';
+    }
+  }
+}
+
 // ============================================================================
 // Modèle de snapshot des préférences
 // ============================================================================
@@ -108,25 +147,26 @@ class AppPreferences {
     this.activeEventIndex = 0,
     this.userPointLatitude,
     this.userPointLongitude,
+    this.lowVisionMode = false,
+    this.messageFilter = MessageFilter.all,
+    this.mapCacheMaxAgeDays = 7,
   });
 
-  /// Mode Économe activé : réduit la fréquence GPS/BLE, coupe la carte.
   final bool batterySaverEnabled;
-
-  /// Filtre des notifications en arrière-plan.
   final NotificationFilter notificationFilter;
-
-  /// Type de destination pour l'algorithme Route Safe.
   final RouteDestinationType routeDestinationType;
-
-  /// Index (0-2) de l'événement actif parmi les 3 max.
   final int activeEventIndex;
-
-  /// Latitude du point utilisateur (si routeDestinationType == userPoint).
   final double? userPointLatitude;
-
-  /// Longitude du point utilisateur (si routeDestinationType == userPoint).
   final double? userPointLongitude;
+
+  /// Mode Malvoyant : grand texte, interface adaptée, signalement 2 colonnes.
+  final bool lowVisionMode;
+
+  /// Filtre des messages Hive P2P.
+  final MessageFilter messageFilter;
+
+  /// Durée de rétention du cache des tuiles (en jours). Défaut : 7 jours.
+  final int mapCacheMaxAgeDays;
 
   AppPreferences copyWith({
     bool? batterySaverEnabled,
@@ -135,6 +175,9 @@ class AppPreferences {
     int? activeEventIndex,
     double? userPointLatitude,
     double? userPointLongitude,
+    bool? lowVisionMode,
+    MessageFilter? messageFilter,
+    int? mapCacheMaxAgeDays,
   }) {
     return AppPreferences(
       batterySaverEnabled: batterySaverEnabled ?? this.batterySaverEnabled,
@@ -143,6 +186,9 @@ class AppPreferences {
       activeEventIndex: activeEventIndex ?? this.activeEventIndex,
       userPointLatitude: userPointLatitude ?? this.userPointLatitude,
       userPointLongitude: userPointLongitude ?? this.userPointLongitude,
+      lowVisionMode: lowVisionMode ?? this.lowVisionMode,
+      messageFilter: messageFilter ?? this.messageFilter,
+      mapCacheMaxAgeDays: mapCacheMaxAgeDays ?? this.mapCacheMaxAgeDays,
     );
   }
 
@@ -153,6 +199,9 @@ class AppPreferences {
         'activeEvent': activeEventIndex,
         'userLat': userPointLatitude,
         'userLng': userPointLongitude,
+        'lowVisionMode': lowVisionMode,
+        'messageFilter': messageFilter.name,
+        'mapCacheMaxAgeDays': mapCacheMaxAgeDays,
       };
 
   factory AppPreferences.fromJson(Map<String, dynamic> json) {
@@ -169,6 +218,12 @@ class AppPreferences {
       activeEventIndex: (json['activeEvent'] as int?) ?? 0,
       userPointLatitude: (json['userLat'] as num?)?.toDouble(),
       userPointLongitude: (json['userLng'] as num?)?.toDouble(),
+      lowVisionMode: (json['lowVisionMode'] as bool?) ?? false,
+      messageFilter: MessageFilter.values.firstWhere(
+        (e) => e.name == json['messageFilter'],
+        orElse: () => MessageFilter.all,
+      ),
+      mapCacheMaxAgeDays: (json['mapCacheMaxAgeDays'] as int?) ?? 7,
     );
   }
 }
@@ -183,7 +238,7 @@ class AppPreferencesStore extends ValueNotifier<AppPreferences> {
   AppPreferencesStore._() : super(const AppPreferences());
   static final AppPreferencesStore instance = AppPreferencesStore._();
 
-  static const String _prefsKey = 'streetphare_app_preferences_v1';
+  static const String _prefsKey = 'streetphare_app_preferences_v2';
   SharedPreferences? _prefs;
 
   /// Charge depuis SharedPreferences. À appeler au démarrage.
@@ -212,24 +267,18 @@ class AppPreferencesStore extends ValueNotifier<AppPreferences> {
     await _prefs!.setString(_prefsKey, jsonEncode(prefs.toJson()));
   }
 
-  /// Raccourci : active/désactive le mode économe.
   Future<void> setBatterySaver(bool enabled) =>
       update(value.copyWith(batterySaverEnabled: enabled));
 
-  /// Raccourci : change le filtre de notifications.
   Future<void> setNotificationFilter(NotificationFilter filter) =>
       update(value.copyWith(notificationFilter: filter));
 
-  /// Raccourci : change le type de destination.
   Future<void> setRouteDestination(RouteDestinationType type) =>
       update(value.copyWith(routeDestinationType: type));
 
-  /// Raccourci : sélectionne l'index de l'événement actif.
   Future<void> setActiveEventIndex(int index) =>
       update(value.copyWith(activeEventIndex: index.clamp(0, 2)));
 
-  /// Raccourci : définit le point utilisateur et bascule sur le
-  /// type de destination UserPoint.
   Future<void> setUserPoint(double lat, double lng) => update(
         value.copyWith(
           routeDestinationType: RouteDestinationType.userPoint,
@@ -237,4 +286,16 @@ class AppPreferencesStore extends ValueNotifier<AppPreferences> {
           userPointLongitude: lng,
         ),
       );
+
+  /// Active/désactive le Mode Malvoyant.
+  Future<void> setLowVisionMode(bool enabled) =>
+      update(value.copyWith(lowVisionMode: enabled));
+
+  /// Modifie le filtre messagerie Hive P2P.
+  Future<void> setMessageFilter(MessageFilter filter) =>
+      update(value.copyWith(messageFilter: filter));
+
+  /// Modifie la durée de cache des tuiles (en jours).
+  Future<void> setMapCacheMaxAgeDays(int days) =>
+      update(value.copyWith(mapCacheMaxAgeDays: days.clamp(1, 30)));
 }

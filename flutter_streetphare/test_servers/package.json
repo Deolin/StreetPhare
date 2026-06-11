@@ -1,16 +1,28 @@
 {
   "name": "streetphare-test-servers",
-  "version": "1.0.0",
-  "description": "Serveurs Node.js de test local pour StreetPhare (failover + consensus 3 validations)",
+  "version": "2.0.0",
+  "description": "Serveurs Node.js StreetPhare — Événements, Safe Route, Signalements, Failover",
   "private": true,
-  "main": "server_primary.js",
+  "main": "start_servers_v2.js",
   "scripts": {
-    "start": "node start_servers.js",
-    "start:primary": "node server_primary.js",
-    "start:secondary": "node server_secondary.js",
-    "test:ping": "curl http://localhost:3000/ping && curl http://localhost:3001/ping"
+    "start":             "node start_servers_v2.js",
+    "start:v1":          "node start_servers.js",
+    "start:primary":     "node server_primary_v2.js",
+    "start:backup":      "node server_secondary_v2.js",
+    "start:primary:v1":  "node server_primary.js",
+    "start:backup:v1":   "node server_secondary.js",
+    "test:ping":         "curl http://localhost:3000/ping && curl http://localhost:3001/ping",
+    "test:status":       "curl http://localhost:3001/status",
+    "test:events":       "curl http://localhost:3000/v1/events",
+    "test:route":        "curl -s -X POST http://localhost:3000/v1/events/fleurus-tour/route -H \"Content-Type: application/json\" -d \"{}\"",
+    "test:report":       "curl -s -X POST http://localhost:3000/v1/reports -H \"Content-Type: application/json\" -d \"{\\\"id\\\":\\\"test-001\\\",\\\"type\\\":\\\"barrage\\\",\\\"lat\\\":50.489,\\\"lon\\\":4.545,\\\"reporter_id\\\":\\\"dev-1\\\"}\"",
+    "test:failover":     "curl -s -X POST http://localhost:3000/_debug/demote -H \"Content-Type: application/json\" -d \"{\\\"reason\\\":\\\"test failover\\\"}\"",
+    "test:debug":        "curl http://localhost:3000/_debug/reports"
   },
   "dependencies": {
     "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

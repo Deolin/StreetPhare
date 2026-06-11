@@ -3,6 +3,8 @@
 // Initialise très tôt le logger de débogage client
 // (lib/debug/client_debug_logger.dart) pour qu'il commence
 // à produire `CLIENT_DEBUG.md` dès la phase de bootstrap.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -13,6 +15,7 @@ import 'debug/client_debug_logger.dart';
 import 'features/events/presentation/event_manager.dart';
 import 'features/geofencing/presentation/geofencing_service.dart';
 import 'features/geofencing/presentation/proximity_validation_service.dart';
+import 'features/messaging/presentation/hive_messaging_service.dart';
 import 'features/routing/data/avoidance_filter_store.dart';
 import 'features/settings/data/app_preferences_store.dart';
 import 'features/settings/data/panic_contact_store.dart';
@@ -21,6 +24,7 @@ import 'features/tutorial/data/tutorial_store.dart';
 import 'network/bootstrap.dart';
 import 'network/network_config.dart';
 import 'network/network_coordinator.dart';
+import 'services/notification_service.dart';
 
 /// Point d'entrée principal de l'application StreetPhare
 void main() async {
@@ -28,6 +32,9 @@ void main() async {
 
   // Initialise le logger Markdown de débogage (no-op en release).
   await ClientDebugLogger.instance.init();
+
+  // Initialise le service de notifications locales (persistante + alertes).
+  await NotificationService.instance.init();
 
   // Orientation verrouillée en portrait
   await SystemChrome.setPreferredOrientations([
@@ -90,11 +97,14 @@ void main() async {
 
     // === Phase 2 : Intelligence StreetPhare ===
     // Démarre les services "intelligents" : géofencing, validation
-    // de proximité (avec cooldown anti-spam) et gestionnaire
-    // d'événements (countdown "juste-à-temps").
+    // de proximité (avec cooldown anti-spam), gestionnaire
+    // d'événements (countdown "juste-à-temps") et messagerie Hive P2P.
     GeofencingService.instance.start();
     ProximityValidationService.instance.start();
     EventManager.instance.start();
+    HiveMessagingService.instance.start();
+    // Affiche la notification persistante "StreetPhare actif".
+    unawaited(NotificationService.instance.showPersistentNotification());
   } catch (e, st) {
     if (kDebugMode) {
       debugPrint('[main] ERREUR initialisation réseau : $e\n$st');

@@ -2,105 +2,183 @@
 //
 // Compteur d'appareils proches ("HIVE") en fenêtre glissante.
 //
-// Responsabilité unique : exposer, à n'importe quel widget, le
-// NOMBRE d'appareils distincts détectés par l'un des transports
-// P2P (BLE / Wi-Fi / Relay) AU COURS DES 60 DERNIÈRES SECONDES.
+// === Filtre Strict BLE StreetPhare ===
+//
+// À partir de la v1.2, le compteur n'incrémente le score QUE si
+// l'appareil distant signale la signature de service BLE spécifique
+// à StreetPhare :
+//
+//   UUID de service BLE : "STREET-PHARE-HIVE-SVC-0001"
+//
+// Cette signature est diffusée dans le payload d'advertisement BLE
+// par le transport [P2PMeshService]. Un appareil Bluetooth générique
+// ou une autre application ne corresponde PAS et n'est pas compté.
 //
 // === Contrat de déduplication (anti-double-comptage) ===
 //
-// Chaque appareil émetteur est identifié par un `peerId` STABLE
-// pendant la durée d'une session anonyme : c'est l'`ephemeralUserId`
-// du pair distant (par exemple, l'EUID diffusé dans le paquet BLE).
-//
-// Le compteur n'incrémente la valeur que si un `peerId` ENTIÈREMENT
-// NOUVEAU (jamais vu dans la fenêtre) est observé. Si le même
-// `peerId` réapparaît, on met simplement à jour son timestamp
-// `lastSeen` et le compteur NE BOUGE PAS.
-//
-// Implémentation :
-//   * Une `Map<String, DateTime>` associe l'identifiant éphémère
-//     d'un pair à la dernière fois qu'on l'a vu.
-//   * Un `Timer` s'exécute toutes les secondes et PURGE toutes
-//     les entrées dont le `lastSeen` est antérieur à `now - 60s`.
-//   * Un `ValueNotifier<int>` expose le compte courant pour que
-//     la couche UI puisse se reconstruire sans polling.
-//
-// Cette classe est délibérément isolée de la couche `network/`
-// pour rester un service UI-level (la persistance des pairs dans
-// `P2PMeshService` reste l'autorité métier, ce service-ci n'est
-// qu'un agrégateur temporel pour le badge "Appareils proches").
+// Chaque appareil StreetPhare est identifié par un `peerId` STABLE
+// pendant la durée d'une session anonyme (son `ephemeralUserId`).
+// Le compteur n'incrémente que si un `peerId` ENTIÈREMENT NOUVEAU
+// est observé avec la signature StreetPhare valide.
 
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-/// Service singleton : compte les pairs P2P vus dans la dernière
+// ============================================================================
+// Constantes de signature BLE StreetPhare
+// ============================================================================
+
+/// UUID de service BLE exclusif à StreetPhare.
+/// Seuls les appareils diffusant cet UUID dans leur advertisement
+/// seront comptés par [PeerCounterService].
+///
+/// Ce UUID doit correspondre à la valeur configurée dans [P2PMeshService]
+/// (transport BLE) côté émetteur.
+const String kStreetPhareBleServiceUuid = 'STREET-PHARE-HIVE-SVC-0001';
+
+/// Préfixe attendu dans le `metadata` ou `serviceId` d'un pair pour
+/// que ce pair soit considéré comme un appareil StreetPhare authentique.
+const String kStreetPhareSignaturePrefix = 'SP_HIVE_';
+
+// ============================================================================
+// PeerCounterService
+// ============================================================================
+
+/// Service singleton : compte les pairs P2P StreetPhare vus dans la dernière
 /// fenêtre glissante de 60 secondes.
+///
+/// Filtre strict : seuls les pairs ayant passé [isStreetPharePeer] = true
+/// sont comptabilisés. Les appareils Bluetooth génériques et les autres
+/// applications sont ignorés.
 class PeerCounterService extends ValueNotifier<int> {
   PeerCounterService._() : super(0);
 
   static final PeerCounterService instance = PeerCounterService._();
 
-  /// Largeur de la fenêtre glissante (par défaut 60 s, comme
-  /// spécifié dans la roadmap "HIVE counter").
+  /// Largeur de la fenêtre glissante (60 s).
   static const Duration windowSize = Duration(seconds: 60);
 
-  /// Période du timer de purge (par défaut 1 s).
+  /// Période du timer de purge (1 s).
   static const Duration tickInterval = Duration(seconds: 1);
 
-  /// Identifiant éphémère -> dernier timestamp observé.
-  ///
-  /// Clé = `peerId` STABLE pendant toute la durée de la session
-  /// anonyme de l'émetteur (ex : son `ephemeralUserId`).
+  /// Identifiant éphémère → dernier timestamp observé.
   final Map<String, DateTime> _lastSeen = <String, DateTime>{};
 
   Timer? _ticker;
   bool _started = false;
 
-  /// Démarre le ticker (idempotent). À appeler une fois, par
-  /// exemple depuis `initState` du `MapScreen`.
+  // --------------------------------------------------------------------------
+  // Validation de la signature StreetPhare
+  // --------------------------------------------------------------------------
+
+  /// Vérifie qu'un pair correspond à un appareil exécutant StreetPhare.
+  ///
+  /// Règles de validation (ANY des conditions suffit) :
+  ///   1. [serviceUuid] correspond à [kStreetPhareBleServiceUuid].
+  ///   2. [metadata] commence par [kStreetPhareSignaturePrefix].
+  ///   3. [peerId] commence par [kStreetPhareSignaturePrefix] (mode demo/test).
+  ///
+  /// En mode DEBUG, un pair dont le [peerId] commence par "demo_" est
+  /// toujours accepté pour faciliter les tests de l'interface.
+  static bool isStreetPharePeer({
+    required String peerId,
+    String? serviceUuid,
+    String? metadata,
+  }) {
+    // Mode demo (DEBUG uniquement) : injection de faux pairs pour l'UI.
+    if (kDebugMode && peerId.startsWith('demo_')) return true;
+
+    // Validation par UUID de service BLE.
+    if (serviceUuid != null &&
+        serviceUuid.toUpperCase() == kStreetPhareBleServiceUuid) {
+      return true;
+    }
+
+    // Validation par métadonnée de payload.
+    if (metadata != null &&
+        metadata.startsWith(kStreetPhareSignaturePrefix)) {
+      return true;
+    }
+
+    // Validation par préfixe d'ID (convention interne des transports StreetPhare).
+    if (peerId.startsWith(kStreetPhareSignaturePrefix)) return true;
+
+    return false;
+  }
+
+  // --------------------------------------------------------------------------
+  // Cycle de vie
+  // --------------------------------------------------------------------------
+
+  /// Démarre le ticker (idempotent).
   void start() {
     if (_started) return;
     _started = true;
     _ticker = Timer.periodic(tickInterval, (_) => _pruneAndEmit());
   }
 
-  /// Enregistre l'observation d'un pair.
+  // --------------------------------------------------------------------------
+  // Enregistrement d'un pair
+  // --------------------------------------------------------------------------
+
+  /// Enregistre l'observation d'un pair StreetPhare.
   ///
-  /// **Règle anti-double-comptage** :
-  ///   * Si [peerId] est **inconnu** dans la fenêtre → on l'ajoute
-  ///     et le compteur augmente de 1.
-  ///   * Si [peerId] est **déjà présent** → on met juste à jour
-  ///     son timestamp `lastSeen` (rafraîchissement de la fenêtre)
-  ///     et le compteur NE BOUGE PAS. Aucun doublon n'est créé.
+  /// [peerId] : identifiant éphémère du pair.
+  /// [serviceUuid] : UUID de service BLE annoncé par ce pair (optionnel).
+  /// [metadata] : payload / métadonnée associée (optionnel).
   ///
-  /// Le compteur exposé par ce service reflète donc le **nombre
-  /// d'UUID uniques** vus dans la fenêtre glissante, pas le
-  /// **nombre de paquets reçus**.
-  void recordPeer(String peerId) {
+  /// Le pair n'est comptabilisé QUE s'il passe la validation
+  /// [isStreetPharePeer]. Les autres appareils sont silencieusement ignorés.
+  void recordPeer(
+    String peerId, {
+    String? serviceUuid,
+    String? metadata,
+  }) {
     if (peerId.isEmpty) return;
+
+    // ── Filtre strict : signature StreetPhare requise ──────────────────────
+    if (!isStreetPharePeer(
+      peerId: peerId,
+      serviceUuid: serviceUuid,
+      metadata: metadata,
+    )) {
+      if (kDebugMode) {
+        debugPrint('[PeerCounter] ignoré (non-StreetPhare): $peerId');
+      }
+      return;
+    }
+
     final now = DateTime.now().toUtc();
     final previous = _lastSeen[peerId];
     _lastSeen[peerId] = now;
     if (previous == null) {
-      // Nouveau pair (UUID jamais vu dans la fenêtre) : on MAJ
-      // le compteur après purge des entrées expirées.
+      // Nouveau pair StreetPhare valide.
       value = _prune(now).length;
+      if (kDebugMode) {
+        debugPrint('[PeerCounter] nouveau pair StreetPhare: $peerId — total=$value');
+      }
     }
-    // Sinon : même pair, simple rafraîchissement du timestamp.
-    // Le compteur reste inchangé → pas de doublon.
+    // Pair déjà connu : simple rafraîchissement du timestamp.
   }
 
-  /// Variante batch : utile quand un transport nous remonte
-  /// plusieurs pairs d'un coup (ex. fin d'un cycle de scan).
-  ///
-  /// Chaque identifiant est traité indépendamment par
-  /// [recordPeer] : les doublons sont dédupliqués.
-  void recordPeers(Iterable<String> peerIds) {
+  /// Variante batch : traite plusieurs pairs d'un coup.
+  void recordPeers(
+    Iterable<String> peerIds, {
+    String? serviceUuid,
+    String? metadata,
+  }) {
     final now = DateTime.now().toUtc();
     bool added = false;
     for (final id in peerIds) {
       if (id.isEmpty) continue;
+      if (!isStreetPharePeer(
+        peerId: id,
+        serviceUuid: serviceUuid,
+        metadata: metadata,
+      )) {
+        continue; // Filtre strict
+      }
       final prev = _lastSeen[id];
       _lastSeen[id] = now;
       if (prev == null) added = true;
@@ -110,22 +188,19 @@ class PeerCounterService extends ValueNotifier<int> {
     }
   }
 
-  /// Purge manuelle (par ex. quand on perd la connexion réseau).
+  /// Purge manuelle.
   void reset() {
     _lastSeen.clear();
     value = 0;
   }
 
-  /// Renvoie la liste des identifiants actuellement dans la
-  /// fenêtre (utile pour les tests / debug).
+  /// Identifiants actuellement dans la fenêtre.
   List<String> get currentPeerIds => List.unmodifiable(_lastSeen.keys);
 
-  /// Date de dernière observation d'un pair (ou `null` s'il
-  /// n'est pas dans la fenêtre). Utile pour le debug.
+  /// Dernier timestamp d'observation d'un pair.
   DateTime? lastSeenOf(String peerId) => _lastSeen[peerId];
 
-  /// Nettoie la map et MAJ la valeur.
-  /// Retourne la liste des ids qui restent dans la fenêtre.
+  /// Nettoie la map et retourne les IDs restants.
   List<String> _prune(DateTime now) {
     final cutoff = now.subtract(windowSize);
     _lastSeen.removeWhere((_, ts) => ts.isBefore(cutoff));
@@ -139,14 +214,11 @@ class PeerCounterService extends ValueNotifier<int> {
     if (count != value) {
       value = count;
     } else {
-      // Pour conserver la fréquence d'update stable, on émet
-      // systématiquement (ValueNotifier déduplique via ==
-      // seulement, donc c'est un no-op visuel).
       notifyListeners();
     }
   }
 
-  /// À appeler au démontage (par ex. `dispose` du `MapScreen`).
+  /// Arrêt propre du service.
   void stop() {
     _ticker?.cancel();
     _ticker = null;

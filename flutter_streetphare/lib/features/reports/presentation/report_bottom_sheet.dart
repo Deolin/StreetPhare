@@ -1,36 +1,60 @@
+// lib/features/reports/presentation/report_bottom_sheet.dart
+//
+// Feuille d'ancrage de signalement — v2.1
+//
+// Nouvelles fonctionnalités v2.1 :
+//   1. Callback [onLocalReport] : appelé IMMÉDIATEMENT après la création
+//      locale du signalement pour que MapScreen affiche un marqueur instantané.
+//   2. Mode Malvoyant : si `lowVisionMode` est actif dans les préférences,
+//      la grille passe à 2 colonnes (grands boutons tactiles).
+//   3. Le réseau P2P diffuse le signalement, visible des autres après ≥3 votes.
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../database/alert_model.dart';
 import '../../../network/network_coordinator.dart';
+import '../../settings/data/app_preferences_store.dart';
 import '../domain/models/report_type.dart';
+
+/// Type du callback de signalement local immédiat.
+typedef LocalReportCallback = void Function(LatLng position, AlertType type);
 
 /// Feuille d'ancrage (Bottom Sheet) présentant les différents types
 /// de signalements citoyens disponibles.
 ///
 /// L'utilisateur peut :
 ///   1. Choisir un type de signalement (Barrages, Nasses, etc.)
-///   2. Le système capture **automatiquement la position GPS réelle**
-///      de l'appareil À CE MOMENT PRÉCIS (latitude + longitude).
-///   3. Une `Alert` signée anonymement est créée, persistée dans
-///      la base Hive locale (TTL 24h) et broadcastée sur le maillage.
-///   4. Le marqueur apparaît INSTANTANÉMENT sur la carte.
+///   2. Le système capture automatiquement la position GPS.
+///   3. Une `Alert` est créée, persistée dans Hive (TTL 24h) et broadcastée.
+///   4. [onLocalReport] est appelé IMMÉDIATEMENT → marqueur local sur la carte.
+///   5. Le signalement est visible des autres pairs dès qu'il atteint ≥3 votes.
 class ReportBottomSheet extends StatelessWidget {
-  const ReportBottomSheet({super.key});
+  const ReportBottomSheet({
+    super.key,
+    this.onLocalReport,
+  });
 
-  /// Affiche la feuille d'ancrage modale
-  static Future<void> show(BuildContext context) {
+  /// Callback déclenché dès que le signalement est créé localement.
+  /// Permet à MapScreen d'afficher immédiatement un marqueur provisoire.
+  final LocalReportCallback? onLocalReport;
+
+  /// Affiche la feuille d'ancrage modale.
+  static Future<void> show(
+    BuildContext context, {
+    LocalReportCallback? onLocalReport,
+  }) {
     return showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => const ReportBottomSheet(),
+      builder: (_) => ReportBottomSheet(onLocalReport: onLocalReport),
     );
   }
 
-  /// Mapping entre un `ReportType` (UI) et un `AlertType` (couche
-  /// métier / base de données).
+  /// Mapping entre un `ReportType` (UI) et un `AlertType` (base de données).
   static AlertType _alertTypeFor(ReportType type) {
     switch (type) {
       case ReportType.barrages:
@@ -54,6 +78,12 @@ class ReportBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLowVision =
+        AppPreferencesStore.instance.value.lowVisionMode;
+    // Mode malvoyant : 2 colonnes larges ; mode normal : 4 colonnes.
+    final crossAxisCount = isLowVision ? 2 : 4;
+    final childAspectRatio = isLowVision ? 1.1 : 0.85;
+
     return Container(
       decoration: const BoxDecoration(
         color: StreetPhareTheme.surface,
@@ -77,17 +107,17 @@ class ReportBottomSheet extends StatelessWidget {
             ),
 
             // Titre
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Row(
                 children: [
-                  Icon(Icons.add_alert, color: StreetPhareTheme.primary),
-                  SizedBox(width: 12),
+                  const Icon(Icons.add_alert, color: StreetPhareTheme.primary),
+                  const SizedBox(width: 12),
                   Text(
                     'Nouveau signalement',
                     style: TextStyle(
                       color: StreetPhareTheme.textPrimary,
-                      fontSize: 18,
+                      fontSize: isLowVision ? 22 : 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -95,14 +125,14 @@ class ReportBottomSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
                 'Sélectionnez la nature de l\'événement à signaler :\n'
                 'Votre position GPS sera capturée automatiquement.',
                 style: TextStyle(
                   color: StreetPhareTheme.textSecondary,
-                  fontSize: 13,
+                  fontSize: isLowVision ? 15 : 13,
                 ),
               ),
             ),
@@ -114,14 +144,15 @@ class ReportBottomSheet extends StatelessWidget {
               child: GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 4,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 0.85,
+                crossAxisCount: crossAxisCount,
+                mainAxisSpacing: isLowVision ? 12 : 8,
+                crossAxisSpacing: isLowVision ? 12 : 8,
+                childAspectRatio: childAspectRatio,
                 children: ReportType.values
                     .map(
                       (type) => _ReportTypeTile(
                         type: type,
+                        isLargeMode: isLowVision,
                         onTap: () => _onTypeSelected(context, type),
                       ),
                     )
@@ -139,15 +170,18 @@ class ReportBottomSheet extends StatelessWidget {
                   onPressed: () => Navigator.of(context).pop(),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
-                      color: StreetPhareTheme.textSecondary.withValues(
-                        alpha: 0.3,
-                      ),
+                      color: StreetPhareTheme.textSecondary
+                          .withValues(alpha: 0.3),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: EdgeInsets.symmetric(
+                        vertical: isLowVision ? 18 : 14),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Annuler',
-                    style: TextStyle(color: StreetPhareTheme.textPrimary),
+                    style: TextStyle(
+                      color: StreetPhareTheme.textPrimary,
+                      fontSize: isLowVision ? 17 : 14,
+                    ),
                   ),
                 ),
               ),
@@ -158,24 +192,19 @@ class ReportBottomSheet extends StatelessWidget {
     );
   }
 
-  /// Action déclenchée lors du choix d'un type de signalement.
-  ///
-  /// Pipeline :
-  ///   1. Ferme la feuille d'ancrage.
-  ///   2. Capture la position GPS de l'appareil.
-  ///   3. Crée une `Alert` via `NetworkCoordinator.createAlert`
-  ///      (qui la signe, la persiste dans Hive, la broadcast).
-  ///   4. Affiche un snackbar de confirmation à l'utilisateur.
+  /// Pipeline de signalement :
+  ///   1. Ferme la feuille.
+  ///   2. Capture la position GPS.
+  ///   3. Appelle [onLocalReport] IMMÉDIATEMENT → marqueur local sur la carte.
+  ///   4. Crée l'alerte (Hive + broadcast réseau).
+  ///   5. Snackbar de confirmation.
   Future<void> _onTypeSelected(
     BuildContext context,
     ReportType type,
   ) async {
-    // Capture le ScaffoldMessenger AVANT les awaits pour éviter
-    // tout "use_build_context_synchronously" sur context.
     final messenger = ScaffoldMessenger.of(context);
     Navigator.of(context).pop();
 
-    // 1) Capture la position GPS de l'appareil.
     final pos = await _capturePosition();
 
     if (pos == null) {
@@ -190,9 +219,15 @@ class ReportBottomSheet extends StatelessWidget {
       return;
     }
 
-    // 2) Crée l'alerte (signe + persiste Hive + broadcast).
+    final alertType = _alertTypeFor(type);
+    final position = LatLng(pos.latitude, pos.longitude);
+
+    // ── FEEDBACK IMMÉDIAT : appelle le callback AVANT la persistance réseau ──
+    // Le marqueur local apparaît instantanément sur la carte de l'émetteur.
+    onLocalReport?.call(position, alertType);
+
+    // ── Création de l'alerte (persistance Hive + broadcast P2P) ──
     try {
-      final alertType = _alertTypeFor(type);
       await NetworkCoordinator.instance.createAlert(
         type: alertType,
         latitude: pos.latitude,
@@ -205,9 +240,8 @@ class ReportBottomSheet extends StatelessWidget {
       );
       _showSnackBar(
         messenger,
-        'Signalement "${type.label}" enregistré à '
-        '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}.\n'
-        'Merci de votre contribution citoyenne.',
+        '✅ Signalement "${type.label}" enregistré.\n'
+        'Visible des autres pairs dès 3 confirmations.',
         icon: type.icon,
         backgroundColor: type.color,
         foregroundColor: Colors.white,
@@ -216,7 +250,7 @@ class ReportBottomSheet extends StatelessWidget {
       debugPrint('[Report] erreur createAlert: $e');
       _showSnackBar(
         messenger,
-        'Erreur lors de l\'enregistrement du signalement : $e',
+        'Erreur lors de l\'enregistrement : $e',
         icon: Icons.error_outline,
         backgroundColor: StreetPhareTheme.danger,
         foregroundColor: Colors.white,
@@ -224,9 +258,6 @@ class ReportBottomSheet extends StatelessWidget {
     }
   }
 
-  /// Capture la position GPS réelle de l'appareil À CE MOMENT PRÉCIS.
-  /// Reprend la même logique que dans `map_screen.dart` (factorisable
-  /// dans un service dédié à terme).
   Future<Position?> _capturePosition() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -278,15 +309,25 @@ class ReportBottomSheet extends StatelessWidget {
   }
 }
 
-/// Tuile représentant un type de signalement
+/// Tuile représentant un type de signalement.
 class _ReportTypeTile extends StatelessWidget {
-  const _ReportTypeTile({required this.type, required this.onTap});
+  const _ReportTypeTile({
+    required this.type,
+    required this.onTap,
+    this.isLargeMode = false,
+  });
 
   final ReportType type;
   final VoidCallback onTap;
 
+  /// Si `true`, affiche des boutons plus grands (mode malvoyant).
+  final bool isLargeMode;
+
   @override
   Widget build(BuildContext context) {
+    final iconSize = isLargeMode ? 44.0 : 32.0;
+    final labelSize = isLargeMode ? 13.0 : 11.0;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -305,14 +346,14 @@ class _ReportTypeTile extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(type.icon, color: type.color, size: 32),
+              Icon(type.icon, color: type.color, size: iconSize),
               const SizedBox(height: 8),
               Text(
                 type.label,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   color: StreetPhareTheme.textPrimary,
-                  fontSize: 11,
+                  fontSize: labelSize,
                   fontWeight: FontWeight.w500,
                 ),
                 maxLines: 2,

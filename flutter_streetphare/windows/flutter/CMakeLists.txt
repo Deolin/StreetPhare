@@ -1,6 +1,16 @@
 # This file controls Flutter-level build steps. It should not be edited.
 cmake_minimum_required(VERSION 3.14)
 
+if (NOT COMMAND apply_standard_settings)
+  macro(apply_standard_settings target)
+    set_target_properties(${target} PROPERTIES
+      CXX_STANDARD 17
+      CXX_STANDARD_REQUIRED YES
+      CXX_EXTENSIONS NO
+    )
+  endmacro()
+endif()
+
 set(EPHEMERAL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ephemeral")
 
 # Configuration provided via flutter tool.

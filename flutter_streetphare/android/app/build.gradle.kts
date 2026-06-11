@@ -8,29 +8,28 @@ plugins {
 android {
     namespace = "com.example.flutter_streetphare"
     // Android 16 (API 36) — Baklava
-    // compileSdk 36 > 34 requis par les plugins (reactive_ble_mobile,
-    // nearby_connections, geolocator_android, etc.) pour résoudre
-    // l'erreur Gradle "CheckAarMetadataWorkAction".
     compileSdk = 36
-    // NDK 28.2.13676358 = version la plus haute requise par les
-    // plugins installés (rétrocompatible). Suppression du warning
-    // Gradle "plugin requires a different NDK version".
     ndkVersion = "28.2.13676358"
 
     compileOptions {
+        // ── Core Library Desugaring ──────────────────────────────────────
+        // Requis par flutter_local_notifications pour les TimezoneAware
+        // APIs (java.time.*) sur Android < 26 (Oreo).
+        // Sans cela : build error "D8: Program type already present:
+        //   j$.time.zone.ZoneRulesProvider"
+        coreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.flutter_streetphare"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // minSdk 24 requis par plusieurs plugins (BLE, Nearby Connections) et
-        // toujours compatible avec Android 16 (API 36).
+        // minSdk 24 requis par BLE, Nearby Connections.
         minSdk = maxOf(flutter.minSdkVersion, 24)
-        // Cible Android 16 (API 36)
         targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -38,8 +37,6 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -53,4 +50,12 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // ── Core Library Desugaring ──────────────────────────────────────────
+    // Fournit les implémentations Java 8+ (java.time, streams, etc.)
+    // pour les appareils Android < API 26.
+    // Version 2.1.4 = dernière compatible avec AGP 8.x + flutter_local_notifications 18.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
