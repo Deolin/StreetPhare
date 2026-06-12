@@ -130,6 +130,16 @@ function isAutoLockNeeded(uuid) {
   return user?.autoLockTriggered === true;
 }
 
+// ── État serveur simulé ──────────────────────────────────────────────────────
+let serverState = {
+  routingEngineEnabled: true,
+  alertValidationThreshold: 3,
+  cacheClearedAt: null,
+  totalAlertsValidated: 0,
+  connectedClients: 0,
+  networkTopology: 'primary_active', // 'primary_active' | 'failover_active' | 'both_active'
+};
+
 // ── HTML du dashboard ────────────────────────────────────────────────────────
 function getDashboardHtml() {
   const kickList = Array.from(kickedUsers.entries())
@@ -154,6 +164,35 @@ function getDashboardHtml() {
         <td>${escapeHtml(r.title || '')}</td>
         <td style="max-width:300px">${escapeHtml(r.description || '')}</td>
       </tr>`).join('');
+
+  // Dashboard v4.0 — Vue unifiée
+  const statsHtml = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">
+      <div style="background:#0d1117;border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#FFB300" id="stat-clients">${serverState.connectedClients}</div>
+        <div style="font-size:10px;color:#8b949e;text-transform:uppercase;margin-top:4px">Clients connectés</div>
+      </div>
+      <div style="background:#0d1117;border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#3fb950" id="stat-alerts">${serverState.totalAlertsValidated}</div>
+        <div style="font-size:10px;color:#8b949e;text-transform:uppercase;margin-top:4px">Alertes validées</div>
+      </div>
+      <div style="background:#0d1117;border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:${serverState.routingEngineEnabled ? '#3fb950' : '#f85149'}" id="stat-routing">${serverState.routingEngineEnabled ? 'ON' : 'OFF'}</div>
+        <div style="font-size:10px;color:#8b949e;text-transform:uppercase;margin-top:4px">Moteur Routage</div>
+      </div>
+      <div style="background:#0d1117;border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#58a6ff" id="stat-threshold">${serverState.alertValidationThreshold}</div>
+        <div style="font-size:10px;color:#8b949e;text-transform:uppercase;margin-top:4px">Seuil Validation</div>
+      </div>
+      <div style="background:#0d1117;border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#d2a8ff" id="stat-kicks">${kickedUsers.size}</div>
+        <div style="font-size:10px;color:#8b949e;text-transform:uppercase;margin-top:4px">Kicks actifs</div>
+      </div>
+      <div style="background:#0d1117;border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#f85149" id="stat-bugs">${bugReports.length}</div>
+        <div style="font-size:10px;color:#8b949e;text-transform:uppercase;margin-top:4px">Bugs signalés</div>
+      </div>
+    </div>`;
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -201,7 +240,7 @@ function getDashboardHtml() {
     .badge.banned { background: var(--danger); color: #fff; }
     .badge.kicked { background: #e3b341; color: #000; }
     .mono { font-family: monospace; font-size: 12px; }
-    .server-controls { display: flex; gap: 10px; margin-top: 12px; }
+    .server-controls { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
     #qr-preview { margin-top: 12px; text-align: center; }
     #qr-preview svg, #qr-preview img { border: 2px solid var(--border); border-radius: 8px; }
     .log { background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
@@ -212,33 +251,75 @@ function getDashboardHtml() {
     #status-bar { background: var(--surface); border-top: 1px solid var(--border);
                  padding: 8px 24px; font-size: 12px; color: var(--muted);
                  position: fixed; bottom: 0; left: 0; right: 0; }
+    .toggle { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+    .toggle input[type="checkbox"] { width:40px; height:22px; appearance:none; background:var(--border);
+      border-radius:11px; cursor:pointer; position:relative; transition:background .2s; }
+    .toggle input[type="checkbox"]:checked { background:var(--success); }
+    .toggle input[type="checkbox"]::after { content:''; position:absolute; width:18px; height:18px;
+      background:#fff; border-radius:50%; top:2px; left:2px; transition:transform .2s; }
+    .toggle input[type="checkbox"]:checked::after { transform:translateX(18px); }
+    .threshold-control { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .threshold-control input[type="range"] { flex:1; accent-color:var(--primary); }
+    .topology-badge { display:inline-block; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+    .topology-primary { background:#1a3a1a; color:#3fb950; }
+    .topology-failover { background:#3a1a1a; color:#f85149; }
   </style>
 </head>
 <body>
 <header>
   <div class="status-dot" id="status-dot"></div>
   <h1>💡 StreetPhare — Administration</h1>
+  <span class="topology-badge topology-primary" id="topology-badge">🟢 Serveur Principal Actif</span>
   <span style="margin-left:auto;font-size:12px;color:var(--muted)">
-    Serveur : ${new Date().toLocaleString('fr-BE')}
+    Dashboard v4.0 — ${new Date().toLocaleString('fr-BE')}
   </span>
 </header>
 
 <div class="container">
+
+  <!-- ── Stats globales ──────────────────────────────────────────── -->
+  ${statsHtml}
+
   <div class="grid">
 
-    <!-- ── Contrôle du serveur ─────────────────────────────────── -->
-    <div class="card">
-      <h2><span class="icon">🖥️</span> Contrôle Serveur Local</h2>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
-        Gère le processus serveur principal (port ${PRIMARY_SERVER_PORT}) sur cette machine.
-      </p>
-      <div class="server-controls">
-        <button class="btn btn-success" onclick="serverAction('start')">▶ Start</button>
-        <button class="btn btn-danger" onclick="serverAction('stop')">■ Stop</button>
-        <button class="btn btn-primary" onclick="serverAction('restart')">↺ Restart</button>
-        <button class="btn btn-outline" onclick="serverAction('status')">? Status</button>
+    <!-- ── Contrôle du serveur + routage + seuils ────────────────── -->
+    <div class="card" style="grid-column:1/-1">
+      <h2><span class="icon">🎛️</span> Contrôle Total du Serveur</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;flex-wrap:wrap">
+        <div>
+          <h3 style="font-size:12px;color:var(--muted);margin-bottom:8px">Processus Serveur (port ${PRIMARY_SERVER_PORT})</h3>
+          <div class="server-controls">
+            <button class="btn btn-success" onclick="serverAction('start')">▶ Start</button>
+            <button class="btn btn-danger" onclick="serverAction('stop')">■ Stop</button>
+            <button class="btn btn-primary" onclick="serverAction('restart')">↺ Restart</button>
+          </div>
+          <div class="log" id="server-log">En attente de commandes…</div>
+        </div>
+        <div>
+          <h3 style="font-size:12px;color:var(--muted);margin-bottom:8px">Moteur de Routage OsmAnd Core</h3>
+          <div class="toggle">
+            <input type="checkbox" id="routing-toggle" ${serverState.routingEngineEnabled ? 'checked' : ''} onchange="toggleRouting(this.checked)">
+            <label for="routing-toggle" style="font-size:13px">${serverState.routingEngineEnabled ? '🟢 Activé' : '🔴 Désactivé'}</label>
+          </div>
+          <h3 style="font-size:12px;color:var(--muted);margin:12px 0 8px">Seuil de Validation des Alertes</h3>
+          <div class="threshold-control">
+            <input type="range" id="threshold-slider" min="1" max="10" value="${serverState.alertValidationThreshold}" oninput="document.getElementById('threshold-val').textContent=this.value">
+            <span id="threshold-val" style="font-size:16px;font-weight:bold;color:var(--primary);min-width:30px">${serverState.alertValidationThreshold}</span>
+            <button class="btn btn-primary btn-sm" onclick="setThreshold(document.getElementById('threshold-slider').value)">Appliquer</button>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="clearCache()" style="margin-top:12px">🗑 Effacer le Cache Global</button>
+        </div>
+        <div>
+          <h3 style="font-size:12px;color:var(--muted);margin-bottom:8px">Injection de Données Fictives (Sandbox)</h3>
+          <div class="server-controls">
+            <button class="btn btn-primary" onclick="sandboxQuick('alerts',5)">🚨 +5 Alertes</button>
+            <button class="btn btn-primary" onclick="sandboxQuick('users',10)">👥 +10 Users</button>
+            <button class="btn btn-primary" onclick="sandboxQuick('panic',3)">🆘 Panic</button>
+          </div>
+          <div class="log" id="sandbox-log">Prêt pour injection…</div>
+          <a href="/sandbox" target="_blank" class="btn btn-outline btn-sm" style="margin-top:8px;display:inline-block">🔗 Ouvrir la Sandbox complète</a>
+        </div>
       </div>
-      <div class="log" id="server-log">En attente de commandes…</div>
     </div>
 
     <!-- ── Générateur QR Code ──────────────────────────────────── -->
@@ -428,6 +509,57 @@ async function clearBugReports() {
 }
 
 loadEvents();
+
+// ── Fonctions de contrôle serveur (Dashboard v4.0) ──────────────────
+async function toggleRouting(enabled) {
+  await api('/routing-toggle', 'POST', { enabled });
+  document.getElementById('stat-routing').textContent = enabled ? 'ON' : 'OFF';
+  document.getElementById('stat-routing').style.color = enabled ? '#3fb950' : '#f85149';
+}
+
+async function setThreshold(val) {
+  await api('/threshold', 'POST', { threshold: parseInt(val) });
+  document.getElementById('stat-threshold').textContent = val;
+}
+
+async function clearCache() {
+  const r = await api('/clear-cache', 'POST');
+  alert(r.message || 'Cache effacé');
+}
+
+async function sandboxQuick(type, count) {
+  const log = document.getElementById('sandbox-log');
+  log.textContent = 'Injection en cours…';
+  try {
+    const endpoint = type === 'panic' ? '/trigger-panic' : type === 'users' ? '/simulate-users' : '/inject-alerts';
+    const body = type === 'panic' ? { peerCount: count } : { count };
+    const r = await fetch('/sandbox' + endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    log.textContent = '✅ ' + JSON.stringify(data).substring(0, 120);
+  } catch(e) {
+    log.textContent = '❌ ' + e.message;
+  }
+}
+
+async function refreshDashboard() {
+  try {
+    const r = await api('/server-state');
+    document.getElementById('stat-clients').textContent = r.connectedClients;
+    document.getElementById('stat-alerts').textContent = r.totalAlertsValidated;
+    document.getElementById('stat-kicks').textContent = r.kickedUsersCount;
+    document.getElementById('stat-bugs').textContent = r.bugReportsCount;
+    document.getElementById('stat-routing').textContent = r.routingEngineEnabled ? 'ON' : 'OFF';
+    document.getElementById('stat-routing').style.color = r.routingEngineEnabled ? '#3fb950' : '#f85149';
+    document.getElementById('stat-threshold').textContent = r.alertValidationThreshold;
+    document.getElementById('threshold-slider').value = r.alertValidationThreshold;
+    document.getElementById('threshold-val').textContent = r.alertValidationThreshold;
+  } catch(_) {}
+}
+setInterval(refreshDashboard, 10000);
 </script>
 </body>
 </html>`;
@@ -703,6 +835,46 @@ const server = http.createServer((req, res) => {
       bugReports = [];
       saveData();
       json(200, { message: 'Rapports de bugs effacés' });
+      return;
+    }
+
+    // POST /api/routing-toggle — Activation/désactivation moteur de routage
+    if (req.method === 'POST' && apiPath === '/routing-toggle') {
+      bodyPromise().then(body => {
+        serverState.routingEngineEnabled = !!body.enabled;
+        console.log(`[Admin] Moteur routage ${serverState.routingEngineEnabled ? 'ACTIVÉ' : 'DÉSACTIVÉ'}`);
+        json(200, { enabled: serverState.routingEngineEnabled });
+      });
+      return;
+    }
+
+    // POST /api/threshold — Modification du seuil de validation
+    if (req.method === 'POST' && apiPath === '/threshold') {
+      bodyPromise().then(body => {
+        const val = parseInt(body.threshold) || 3;
+        serverState.alertValidationThreshold = Math.max(1, Math.min(10, val));
+        console.log(`[Admin] Seuil de validation → ${serverState.alertValidationThreshold}`);
+        json(200, { threshold: serverState.alertValidationThreshold });
+      });
+      return;
+    }
+
+    // POST /api/clear-cache — Effacement global du cache
+    if (req.method === 'POST' && apiPath === '/clear-cache') {
+      serverState.cacheClearedAt = new Date().toISOString();
+      console.log('[Admin] Cache global effacé');
+      json(200, { message: 'Cache effacé', clearedAt: serverState.cacheClearedAt });
+      return;
+    }
+
+    // GET /api/server-state — État global du serveur
+    if (req.method === 'GET' && apiPath === '/server-state') {
+      json(200, {
+        ...serverState,
+        kickedUsersCount: kickedUsers.size,
+        bugReportsCount: bugReports.length,
+        uptime: process.uptime(),
+      });
       return;
     }
 

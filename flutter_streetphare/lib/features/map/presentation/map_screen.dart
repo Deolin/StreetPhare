@@ -2228,3 +2228,276 @@ class _AboutRow extends StatelessWidget {
     );
   }
 }
+
+// ============================================================================
+// [DEBUG] Bouton et panneau de débogage — PREMIER PLAN ABSOLU
+// Visible uniquement en kDebugMode.
+// ============================================================================
+
+class _DebugButton extends StatelessWidget {
+  const _DebugButton({
+    required this.userPosition,
+    required this.safeRoutePoints,
+    required this.mapReady,
+    required this.isTracking,
+  });
+
+  final Position? userPosition;
+  final List<LatLng>? safeRoutePoints;
+  final bool mapReady;
+  final bool isTracking;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 12,
+      shape: const CircleBorder(),
+      color: Colors.redAccent,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => _showDebugOverlay(context),
+        child: const Padding(
+          padding: EdgeInsets.all(12),
+          child: Icon(Icons.bug_report, color: Colors.white, size: 22),
+        ),
+      ),
+    );
+  }
+
+  void _showDebugOverlay(BuildContext context) {
+    final pos = userPosition;
+    final routeLen = safeRoutePoints?.length ?? 0;
+    final loggerSnapshot = ClientDebugLogger.instance.getSnapshot();
+    final allLines = loggerSnapshot.split('\n');
+    final recentLines =
+        allLines.length > 40 ? allLines.sublist(allLines.length - 40) : allLines;
+    final recent = recentLines.join('\n');
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _DebugOverlaySheet(
+        mapReady: mapReady,
+        isTracking: isTracking,
+        position: pos,
+        routePointCount: routeLen,
+        loggerSnapshot: recent,
+      ),
+    );
+  }
+}
+
+/// BottomSheet de débogage (overlay kDebugMode).
+class _DebugOverlaySheet extends StatelessWidget {
+  const _DebugOverlaySheet({
+    required this.mapReady,
+    required this.isTracking,
+    required this.position,
+    required this.routePointCount,
+    required this.loggerSnapshot,
+  });
+
+  final bool mapReady;
+  final bool isTracking;
+  final Position? position;
+  final int routePointCount;
+  final String loggerSnapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final ts =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+
+    final routeLabel =
+        routePointCount == 0 ? 'Aucun point' : '$routePointCount points';
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A1A2E),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Icon(Icons.bug_report, color: Colors.redAccent, size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'DEBUG OVERLAY',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                Spacer(),
+                Text(
+                  'kDebugMode',
+                  style: TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: Colors.white12, height: 16),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _debugRow(Icons.access_time, 'Timestamp', ts),
+                  _debugRow(
+                    Icons.map,
+                    'Carte',
+                    mapReady ? '✅ Prête' : '⏳ Chargement…',
+                  ),
+                  _debugRow(
+                    Icons.gps_fixed,
+                    'GPS',
+                    isTracking
+                        ? (position != null ? '✅ Actif' : '⚠️ En attente')
+                        : '❌ Arrêté',
+                  ),
+                  if (position != null) ...[
+                    _debugRow(
+                      Icons.my_location,
+                      'Latitude',
+                      position!.latitude.toStringAsFixed(7),
+                    ),
+                    _debugRow(
+                      Icons.my_location,
+                      'Longitude',
+                      position!.longitude.toStringAsFixed(7),
+                    ),
+                    _debugRow(
+                      Icons.straighten,
+                      'Précision',
+                      '${position!.accuracy.toStringAsFixed(1)} m',
+                    ),
+                    _debugRow(
+                      Icons.speed,
+                      'Vitesse',
+                      '${(position!.speed * 3.6).toStringAsFixed(1)} km/h',
+                    ),
+                  ],
+                  _debugRow(Icons.route, 'Route Safe', routeLabel),
+                  const Divider(color: Colors.white12, height: 20),
+                  const Text(
+                    '📋 CLIENT_DEBUG.md (dernières lignes)',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      loggerSnapshot,
+                      style: const TextStyle(
+                        color: Colors.greenAccent,
+                        fontSize: 10,
+                        fontFamily: 'monospace',
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white12,
+                    ),
+                    icon: const Icon(Icons.copy, size: 16),
+                    label: const Text('Copier le snapshot'),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: loggerSnapshot));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Snapshot copié !'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                    ),
+                    icon: const Icon(Icons.close, size: 16),
+                    label: const Text('Fermer'),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _debugRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: Colors.white54),
+          const SizedBox(width: 8),
+          Text(
+            '$label : ',
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

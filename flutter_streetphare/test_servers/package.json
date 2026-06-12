@@ -17,7 +17,9 @@
     "test:route":        "curl -s -X POST http://localhost:3000/v1/events/fleurus-tour/route -H \"Content-Type: application/json\" -d \"{}\"",
     "test:report":       "curl -s -X POST http://localhost:3000/v1/reports -H \"Content-Type: application/json\" -d \"{\\\"id\\\":\\\"test-001\\\",\\\"type\\\":\\\"barrage\\\",\\\"lat\\\":50.489,\\\"lon\\\":4.545,\\\"reporter_id\\\":\\\"dev-1\\\"}\"",
     "test:failover":     "curl -s -X POST http://localhost:3000/_debug/demote -H \"Content-Type: application/json\" -d \"{\\\"reason\\\":\\\"test failover\\\"}\"",
-    "test:debug":        "curl http://localhost:3000/_debug/reports"
+    "test:debug":        "curl http://localhost:3000/_debug/reports",
+    "sim":               "node sim.js",
+    "sim:reset":         "node sim.js --reset"
   },
   "dependencies": {
     "express": "^4.19.2"
