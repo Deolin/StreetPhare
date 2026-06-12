@@ -43,6 +43,7 @@ class HiveMessage {
     this.latitude,
     this.longitude,
     this.isFromAdmin = false,
+    this.threadId,
   });
 
   /// Identifiant unique (UUID v4 éphémère).
@@ -67,6 +68,9 @@ class HiveMessage {
   /// `true` si le message provient d'un administrateur d'événement.
   final bool isFromAdmin;
 
+  /// ID du fil de discussion temporaire (null = fil principal).
+  final String? threadId;
+
   /// Position GPS de l'émetteur (null si non disponible).
   LatLng? get position =>
       latitude != null && longitude != null ? LatLng(latitude!, longitude!) : null;
@@ -85,6 +89,7 @@ class HiveMessage {
         'lat': latitude,
         'lng': longitude,
         'isAdmin': isFromAdmin,
+        'threadId': threadId,
       };
 
   /// Désérialisation depuis JSON.
@@ -101,6 +106,31 @@ class HiveMessage {
       latitude: (json['lat'] as num?)?.toDouble(),
       longitude: (json['lng'] as num?)?.toDouble(),
       isFromAdmin: (json['isAdmin'] as bool?) ?? false,
+      threadId: json['threadId'] as String?,
+    );
+  }
+
+  HiveMessage copyWith({
+    String? id,
+    String? senderEphemeralId,
+    String? content,
+    HiveMessageType? type,
+    DateTime? sentAt,
+    double? latitude,
+    double? longitude,
+    bool? isFromAdmin,
+    String? threadId,
+  }) {
+    return HiveMessage(
+      id: id ?? this.id,
+      senderEphemeralId: senderEphemeralId ?? this.senderEphemeralId,
+      content: content ?? this.content,
+      type: type ?? this.type,
+      sentAt: sentAt ?? this.sentAt,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      isFromAdmin: isFromAdmin ?? this.isFromAdmin,
+      threadId: threadId ?? this.threadId,
     );
   }
 

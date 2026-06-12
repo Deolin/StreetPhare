@@ -14,17 +14,19 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # Cartographie OpenStreetMap
-  flutter_map: ^7.0.2
+  flutter_map: ^8.3.0
   latlong2: ^0.9.1
 
   # Cache des tuiles de la carte (7 jours)
-  flutter_map_cache: ^1.4.0
+  flutter_map_cache: ^2.1.0
 
   # Stockage local (SharedPreferences)
   shared_preferences: ^2.3.2
 
   # Géolocalisation GPS
-  geolocator: ^13.0.1
+  # 14.0.3 : correctif du threading — les flux de position sont désormais
+  # correctement renvoyés sur le Main/Platform Thread Flutter (WARN #4 résolu).
+  geolocator: ^14.0.3
 
   # Requêtes HTTP (OSRM / GraphHopper routing)
   http: ^1.2.2
@@ -37,10 +39,16 @@ dependencies:
   cryptography: ^2.7.0
 
   # Bluetooth Low Energy (mesh courte portée)
-  flutter_reactive_ble: ^5.0.3
+  # 5.5.0 : dernière version stable (correctifs BLE + compatibilité AGP 9).
+  flutter_reactive_ble: ^5.5.0
 
   # Wi-Fi Direct / Nearby
-  nearby_connections: ^4.1.0
+  # 4.3.0 : dernière version stable disponible sur pub.dev (06/2026).
+  # NOTE : les warnings Java 8 (source value 8 obsolete) et APIs dépréciées
+  # (getAuthenticationToken(), asJavaFile()) dans NearbyConnectionsPlugin.java
+  # appartiennent à l'auteur du package — à surveiller pour une v5.x future.
+  # Ref: https://pub.dev/packages/nearby_connections
+  nearby_connections: ^4.3.0
 
   # WebSocket pour le transport relay
   web_socket_channel: ^3.0.3
@@ -49,13 +57,14 @@ dependencies:
   url_launcher: ^6.3.0
 
   # Scanner de QR Code
-  mobile_scanner: ^6.0.0
+  # 7.2.0 : dernière version stable compatible AGP 9 / builtInKotlin=true.
+  mobile_scanner: ^7.2.0
 
   # Notifications locales (service persistant + alertes)
-  flutter_local_notifications: ^18.0.1
+  flutter_local_notifications: ^22.0.0
 
   # Gestion des permissions (arrière-plan, batterie)
-  permission_handler: ^11.3.1
+  permission_handler: ^12.0.3
 
 dev_dependencies:
   flutter_test:

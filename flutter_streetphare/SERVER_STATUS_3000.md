@@ -1,6 +1,6 @@
 # 📡 Tableau de bord de Débogage - StreetPhare
 
-> Dernière mise à jour : **2026-06-11 15:46:11** (UTC serveur). Ce fichier est généré automatiquement par `test_servers/logger.js`.
+> Dernière mise à jour : **2026-06-13 00:31:42** (UTC serveur). Ce fichier est généré automatiquement par `test_servers/logger.js`.
 
 ---
 
@@ -12,9 +12,9 @@
 
 ## ⚡ Résumé Express
 
-- 💓 Pings reçus : **201**
+- 💓 Pings reçus : **2249**
 - 📨 Alertes connues : **0** (✅ validées : **0**)
-- 🕒 Dernier ping : **2026-06-11 15:46:11**
+- 🕒 Dernier ping : **2026-06-13 00:31:42**
 
 ## 🌐 Flux du Consensus (Dernières Alertes)
 
@@ -26,11 +26,9 @@
 
 | Heure | Niveau | Évènement | Détails |
 | --- | --- | --- | --- |
-| 15:39:07 | 📅 INFO | Événements demandés | 3 événements |
-| 15:30:28 | 📅 INFO | Événements demandés | 3 événements |
-| 15:30:07 | 📅 INFO | Événements demandés | 3 événements |
-| 15:29:29 | 💓 PING | Ping reçu | GET /healthz |
-| 15:29:28 | 🟢 INFO | Démarrage | Principal en ligne sur http://localhost:3000 |
+| 22:20:44 | 🔐 BACKUP | Adresse de backup chiffrée renvoyée | 108 caractères |
+| 22:20:01 | 💓 PING | Ping reçu | GET /healthz |
+| 22:20:01 | 🟢 INFO | Démarrage | Principal en ligne sur http://localhost:3000 |
 
 ---
 

@@ -141,16 +141,29 @@ class ProximityValidationSheet extends StatelessWidget {
               child: Icon(_iconForType(alert.type), color: color, size: 32),
             ),
             const SizedBox(height: 12),
-            // Question principale
+            // Question principale — formulation exacte requise
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
-                '${_labelForType(alert.type)} est signalé${alert.type == AlertType.barrage ? '' : 'e'} ici, est-il toujours là ?',
+                'La zone est-elle toujours sans danger ou le danger est-il toujours là ?',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: StreetPhareTheme.textPrimary,
-                  fontSize: 18,
+                  fontSize: 17,
                   fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                '${_labelForType(alert.type)[0].toUpperCase()}${_labelForType(alert.type).substring(1)} signalé${alert.type == AlertType.barrage || alert.type == AlertType.controle ? '' : 'e'} à ${event.distanceMeters.toStringAsFixed(0)} m.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: StreetPhareTheme.primary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),

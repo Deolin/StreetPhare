@@ -21,6 +21,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -32,6 +33,7 @@ import '../../../core/network/peer_counter_service.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../database/alert_model.dart';
+import '../../../debug/client_debug_logger.dart';
 import '../../events/domain/models/event_model.dart';
 import '../../events/presentation/event_manager.dart';
 import '../../messaging/presentation/hive_messaging_screen.dart';
@@ -85,6 +87,9 @@ class _MapScreenState extends State<MapScreen> {
   bool _locating = true;
   StreamSubscription<Position>? _positionSub;
 
+  /// [3] Tracking actif — `false` dès que l'utilisateur clique X.
+  bool _isTracking = false;
+
   StreamSubscription<CollectivePanicEvent>? _collectivePanicSub;
 
   /// `true` une fois que FlutterMap est prêt (tuiles initialisées).
@@ -98,6 +103,15 @@ class _MapScreenState extends State<MapScreen> {
 
   /// Vitesse GPS en m/s (pour valider l'affichage de la flèche directionnelle).
   double _userSpeed = 0.0;
+
+  /// Position précédente pour calculer le déplacement effectif (seuil 5 m).
+  Position? _previousPosition;
+
+  /// Distance cumulée de déplacement depuis le dernier arrêt (mètres).
+  double _movementAccumulator = 0.0;
+
+  /// Indique si l'utilisateur a effectivement bougé de plus de 5 m.
+  bool _hasMovedBeyondThreshold = false;
 
   /// Points de la Route Safe active.
   List<LatLng>? _safeRoutePoints;
@@ -182,13 +196,39 @@ class _MapScreenState extends State<MapScreen> {
       });
       _animateToUser();
       _positionSub?.cancel();
+      _isTracking = true;
       _positionSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 5,
+          distanceFilter: 2, // Ecoute fine pour détecter les micro-mouvements
         ),
       ).listen((p) {
         if (mounted) {
+          // [2] Seuil GPS 5 m : calcule le déplacement effectif depuis la
+          // dernière position connue. Si < 5 m → cache la flèche directionnelle.
+          final prev = _previousPosition;
+          if (prev != null) {
+            final dist = Geolocator.distanceBetween(
+              prev.latitude, prev.longitude,
+              p.latitude, p.longitude,
+            );
+            _movementAccumulator += dist;
+            if (_movementAccumulator >= 5.0) {
+              _hasMovedBeyondThreshold = true;
+            }
+          } else {
+            // Première position — réinitialise l'accumulateur
+            _movementAccumulator = 0.0;
+            _hasMovedBeyondThreshold = false;
+          }
+
+          // Réinitialise l'accumulateur si l'appareil s'est arrêté (speed ≈ 0)
+          if (p.speed < 0.3) {
+            _movementAccumulator = 0.0;
+            _hasMovedBeyondThreshold = false;
+          }
+
+          _previousPosition = p;
           setState(() {
             _userPosition = p;
             _userSpeed = p.speed < 0 ? 0 : p.speed;
@@ -204,6 +244,20 @@ class _MapScreenState extends State<MapScreen> {
         });
       }
     }
+  }
+
+  /// [3] Arrête le tracking GPS et SUPPRIME INSTANTANÉMENT le marqueur
+  /// de position de la carte.
+  void _stopTracking() {
+    _positionSub?.cancel();
+    _positionSub = null;
+    setState(() {
+      _isTracking = false;
+      _userPosition = null; // ← Suppression instantanée du marqueur
+      _userHeading = 0.0;
+      _userSpeed = 0.0;
+    });
+    debugPrint('[MapScreen] tracking arrêté, marqueur effacé.');
   }
 
   /// Recentre la carte sur la position GPS avec zoom ≈ 100 m.
@@ -228,10 +282,17 @@ class _MapScreenState extends State<MapScreen> {
   // Gestion dynamique du curseur (flèche vs point)
   // --------------------------------------------------------------------------
 
-  /// Affiche la flèche directionnelle uniquement si le cap est valide et
-  /// effectif (vitesse > 0.5 m/s OU capteur boussole fournit un cap > 0°).
+  /// [2] Affiche la flèche directionnelle uniquement si l'appareil a
+  /// effectivement bougé de plus de 5 m (seuil effectif anti-oscillations GPS).
+  ///
+  /// Règles :
+  ///   - _hasMovedBeyondThreshold = true → déplacement réel ≥ 5 m → flèche.
+  ///   - _hasMovedBeyondThreshold = false → surplace / micro-oscillations → point.
+  ///   - Cap < 0 ou vitesse < 0.5 m/s ET pas de seuil franchi → point.
   bool get _shouldShowArrow =>
-      _userHeading >= 0 && (_userSpeed > 0.5 || _userHeading > 0);
+      _hasMovedBeyondThreshold &&
+      _userHeading >= 0 &&
+      _userSpeed > 0.5;
 
   Marker _buildUserMarker() {
     final pos = _userPosition!;
@@ -346,10 +407,30 @@ class _MapScreenState extends State<MapScreen> {
 
       switch (prefs.routeDestinationType) {
         case RouteDestinationType.manifestPoint:
-          if (events.isNotEmpty) {
+          // [1] Verrouillage : aucun événement chargé → avertissement
+          if (events.isEmpty) {
+            _showManifNoEventWarning();
+            return;
+          }
+          final idx0 = prefs.activeEventIndex.clamp(0, events.length - 1);
+          destination = events[idx0].destination;
+          destinationLabel = 'Point de manif (${events[idx0].title})';
+
+        case RouteDestinationType.safeZoneOrCareCenter:
+          // [1] Priorité absolue : Zone Safe OU Centre de soins le plus proche
+          if (userLatLng != null && events.isNotEmpty) {
             final idx = prefs.activeEventIndex.clamp(0, events.length - 1);
-            destination = events[idx].destination;
-            destinationLabel = 'Point de manif (${events[idx].title})';
+            final safeZone = events[idx].nearestSafeZone(userLatLng);
+            if (safeZone != null) {
+              destination = safeZone.position;
+              destinationLabel = '🛡 Zone Safe : ${safeZone.label}';
+            } else {
+              final center = events[idx].nearestCareCenter(userLatLng);
+              if (center != null) {
+                destination = center.position;
+                destinationLabel = '🏥 Centre de soins : ${center.label}';
+              }
+            }
           }
 
         case RouteDestinationType.careCenter:
@@ -467,6 +548,65 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ),
       );
+  }
+
+  // --------------------------------------------------------------------------
+  // [1] Dialogue de verrouillage manif — aucun événement chargé
+  // --------------------------------------------------------------------------
+
+  void _showManifNoEventWarning() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: StreetPhareTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.event_busy,
+                color: StreetPhareTheme.primary, size: 26),
+            SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                'Aucun événement chargé',
+                style: TextStyle(
+                  color: StreetPhareTheme.textPrimary,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Veuillez ajouter un événement avant de lancer le suivi.',
+          style: TextStyle(
+            color: StreetPhareTheme.textSecondary,
+            fontSize: 14,
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: StreetPhareTheme.primary,
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+            child: const Text(
+              'Ajouter un événement',
+              style: TextStyle(color: Colors.black),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Annuler',
+                style: TextStyle(color: StreetPhareTheme.textSecondary)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showNoDestinationError() {
@@ -1459,13 +1599,14 @@ class _MapScreenState extends State<MapScreen> {
                       },
                     ),
 
-                  // ── Bouton GPS Recentrer + effacer Route Safe ───────────
+                  // ── Bouton GPS Recentrer + Stop Tracking + effacer Route Safe
                   Positioned(
                     left: 16,
                     bottom: 120,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Recentrer sur position GPS
                         Material(
                           elevation: 4,
                           shape: const CircleBorder(),
@@ -1473,17 +1614,50 @@ class _MapScreenState extends State<MapScreen> {
                               StreetPhareTheme.surface.withValues(alpha: 0.9),
                           child: InkWell(
                             customBorder: const CircleBorder(),
-                            onTap: _animateToUser,
-                            child: const Padding(
-                              padding: EdgeInsets.all(12),
+                            onTap: _isTracking
+                                ? _animateToUser
+                                : _initUserLocation,
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
                               child: Icon(
-                                Icons.gps_fixed,
-                                color: StreetPhareTheme.primary,
+                                _isTracking
+                                    ? Icons.gps_fixed
+                                    : Icons.gps_not_fixed,
+                                color: _isTracking
+                                    ? StreetPhareTheme.primary
+                                    : StreetPhareTheme.textSecondary,
                                 size: 24,
                               ),
                             ),
                           ),
                         ),
+                        // [3] Bouton STOP tracking (X) — cache le marqueur
+                        // instantanément dès le clic
+                        if (_isTracking) ...[
+                          const SizedBox(height: 8),
+                          Tooltip(
+                            message: 'Arrêter le suivi de position',
+                            child: Material(
+                              elevation: 4,
+                              shape: const CircleBorder(),
+                              color: StreetPhareTheme.surface
+                                  .withValues(alpha: 0.9),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: _stopTracking,
+                                child: const Padding(
+                                  padding: EdgeInsets.all(12),
+                                  child: Icon(
+                                    Icons.close,
+                                    color: StreetPhareTheme.danger,
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        // Effacer la Route Safe
                         if (_safeRoutePoints != null) ...[
                           const SizedBox(height: 8),
                           Material(
@@ -1604,6 +1778,27 @@ class _MapScreenState extends State<MapScreen> {
                       ],
                     ),
                   ),
+
+                  // ── [DEBUG] Bouton de débogage — PREMIER PLAN ABSOLU ────
+                  // Visible uniquement en kDebugMode.
+                  // Positionné au-dessus de tous les autres widgets (dernier
+                  // enfant du Stack = z-index maximal).
+                  if (kDebugMode)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 64, right: 12),
+                          child: _DebugButton(
+                            userPosition: _userPosition,
+                            safeRoutePoints: _safeRoutePoints,
+                            mapReady: _mapReady,
+                            isTracking: _isTracking,
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             );

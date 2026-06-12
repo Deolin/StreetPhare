@@ -46,7 +46,7 @@ const String kStreetPhareSignaturePrefix = 'SP_HIVE_';
 // ============================================================================
 
 /// Service singleton : compte les pairs P2P StreetPhare vus dans la dernière
-/// fenêtre glissante de 60 secondes.
+/// fenêtre glissante de 5 minutes.
 ///
 /// Filtre strict : seuls les pairs ayant passé [isStreetPharePeer] = true
 /// sont comptabilisés. Les appareils Bluetooth génériques et les autres
@@ -56,8 +56,9 @@ class PeerCounterService extends ValueNotifier<int> {
 
   static final PeerCounterService instance = PeerCounterService._();
 
-  /// Largeur de la fenêtre glissante (60 s).
-  static const Duration windowSize = Duration(seconds: 60);
+  /// Largeur de la fenêtre glissante (5 minutes — persistance accrue pour
+  /// mieux refléter les appareils StreetPhare présents dans la foule).
+  static const Duration windowSize = Duration(minutes: 5);
 
   /// Période du timer de purge (1 s).
   static const Duration tickInterval = Duration(seconds: 1);

@@ -59,6 +59,8 @@ extension NotificationFilterExt on NotificationFilter {
 /// Type de destination pour l'algorithme "Route Safe".
 enum RouteDestinationType {
   manifestPoint,
+  /// [PRIORITAIRE] Zone Safe OU Centre de soins le plus proche.
+  safeZoneOrCareCenter,
   careCenter,
   exitPoint,
   userPoint,
@@ -69,6 +71,8 @@ extension RouteDestinationTypeExt on RouteDestinationType {
     switch (this) {
       case RouteDestinationType.manifestPoint:
         return 'Suivre le point de manif actuel';
+      case RouteDestinationType.safeZoneOrCareCenter:
+        return 'Vers la Zone Safe / Centre de soins le plus proche';
       case RouteDestinationType.careCenter:
         return 'Centre de soins le plus proche';
       case RouteDestinationType.exitPoint:
@@ -82,6 +86,8 @@ extension RouteDestinationTypeExt on RouteDestinationType {
     switch (this) {
       case RouteDestinationType.manifestPoint:
         return 'Destination par défaut de l\'événement actif';
+      case RouteDestinationType.safeZoneOrCareCenter:
+        return '⭐ Priorité absolue : zone de sécurité ou médecin de rue le plus proche';
       case RouteDestinationType.careCenter:
         return 'Street-medics ou secours de rue les plus proches';
       case RouteDestinationType.exitPoint:
@@ -150,6 +156,7 @@ class AppPreferences {
     this.lowVisionMode = false,
     this.messageFilter = MessageFilter.all,
     this.mapCacheMaxAgeDays = 7,
+    this.androidChannelSettings = const {},
   });
 
   final bool batterySaverEnabled;
@@ -168,6 +175,14 @@ class AppPreferences {
   /// Durée de rétention du cache des tuiles (en jours). Défaut : 7 jours.
   final int mapCacheMaxAgeDays;
 
+  /// [4] Canaux de notifications Android — état activé/désactivé par canal.
+  /// Clés : 'alerts', 'events', 'panic', 'messages'
+  final Map<String, bool> androidChannelSettings;
+
+  /// Retourne si un canal Android est activé (actif par défaut).
+  bool isAndroidChannelEnabled(String channelId) =>
+      androidChannelSettings[channelId] ?? true;
+
   AppPreferences copyWith({
     bool? batterySaverEnabled,
     NotificationFilter? notificationFilter,
@@ -178,6 +193,7 @@ class AppPreferences {
     bool? lowVisionMode,
     MessageFilter? messageFilter,
     int? mapCacheMaxAgeDays,
+    Map<String, bool>? androidChannelSettings,
   }) {
     return AppPreferences(
       batterySaverEnabled: batterySaverEnabled ?? this.batterySaverEnabled,
@@ -189,6 +205,8 @@ class AppPreferences {
       lowVisionMode: lowVisionMode ?? this.lowVisionMode,
       messageFilter: messageFilter ?? this.messageFilter,
       mapCacheMaxAgeDays: mapCacheMaxAgeDays ?? this.mapCacheMaxAgeDays,
+      androidChannelSettings:
+          androidChannelSettings ?? this.androidChannelSettings,
     );
   }
 
@@ -202,9 +220,15 @@ class AppPreferences {
         'lowVisionMode': lowVisionMode,
         'messageFilter': messageFilter.name,
         'mapCacheMaxAgeDays': mapCacheMaxAgeDays,
+        'androidChannels': androidChannelSettings,
       };
 
   factory AppPreferences.fromJson(Map<String, dynamic> json) {
+    final rawChannels = json['androidChannels'];
+    final Map<String, bool> channels = rawChannels is Map
+        ? Map<String, bool>.from(
+            rawChannels.map((k, v) => MapEntry(k.toString(), v as bool? ?? true)))
+        : const {};
     return AppPreferences(
       batterySaverEnabled: (json['batterySaver'] as bool?) ?? false,
       notificationFilter: NotificationFilter.values.firstWhere(
@@ -218,6 +242,7 @@ class AppPreferences {
       activeEventIndex: (json['activeEvent'] as int?) ?? 0,
       userPointLatitude: (json['userLat'] as num?)?.toDouble(),
       userPointLongitude: (json['userLng'] as num?)?.toDouble(),
+      androidChannelSettings: channels,
       lowVisionMode: (json['lowVisionMode'] as bool?) ?? false,
       messageFilter: MessageFilter.values.firstWhere(
         (e) => e.name == json['messageFilter'],
@@ -298,4 +323,11 @@ class AppPreferencesStore extends ValueNotifier<AppPreferences> {
   /// Modifie la durée de cache des tuiles (en jours).
   Future<void> setMapCacheMaxAgeDays(int days) =>
       update(value.copyWith(mapCacheMaxAgeDays: days.clamp(1, 30)));
+
+  /// [4] Active/désactive un canal de notifications Android système.
+  Future<void> setAndroidChannelEnabled(String channelId, bool enabled) {
+    final updated = Map<String, bool>.from(value.androidChannelSettings)
+      ..[channelId] = enabled;
+    return update(value.copyWith(androidChannelSettings: updated));
+  }
 }

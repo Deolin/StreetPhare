@@ -68,6 +68,18 @@ class RelayMeshTransport implements MeshTransport {
     if (_disposed) return;
     try {
       _channel = WebSocketChannel.connect(Uri.parse(relayUrl));
+
+      // web_socket_channel ≥ 3.0 : les erreurs de handshake (ex. serveur
+      // absent, upgrade HTTP refusé) arrivent sur le Future `ready` et NON
+      // sur le stream. Sans ce catchError, elles deviennent une
+      // "Unhandled Exception" qui fait crasher la zone Dart.
+      _channel!.ready.then<void>((_) {
+        if (kDebugMode) debugPrint('[Relay] ws connecté à $relayUrl');
+      }).catchError((Object err, StackTrace st) {
+        if (kDebugMode) debugPrint('[Relay] ws handshake error: $err');
+        _scheduleReconnect();
+      });
+
       _sub = _channel!.stream.listen(
         (data) {
           if (data is String) {
@@ -77,11 +89,11 @@ class RelayMeshTransport implements MeshTransport {
           }
         },
         onError: (Object err) {
-          if (kDebugMode) debugPrint('[Relay] ws error: $err');
+          if (kDebugMode) debugPrint('[Relay] ws stream error: $err');
           _scheduleReconnect();
         },
         onDone: () {
-          if (kDebugMode) debugPrint('[Relay] ws closed');
+          if (kDebugMode) debugPrint('[Relay] ws fermé');
           _scheduleReconnect();
         },
         cancelOnError: true,

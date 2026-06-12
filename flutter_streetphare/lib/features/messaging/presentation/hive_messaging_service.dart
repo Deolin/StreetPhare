@@ -2,12 +2,15 @@
 //
 // Service de messagerie décentralisée basé sur l'infrastructure Hive P2P.
 //
-// Fonctionnalités :
-//   1. Diffusion (broadcast) de messages textuels sur le réseau maillé.
-//   2. Réception et déduplication des messages entrants.
-//   3. Filtrage configurable (tous / proches / admin / alertes).
-//   4. Identification éphémère par UUID de session (anonymat garanti).
-//   5. TTL des messages : 6 heures (purge automatique).
+// [1] Architecture Réseau Hybride Asynchrone :
+//     Le réseau local P2P (BLE Mesh / Wi-Fi Local) traite les données
+//     en PRIORITÉ ABSOLUE. La propagation vers le serveur distant est
+//     reléguée en arrière-plan via une tâche asynchrone non bloquante.
+//
+// [2] Messagerie filtrée & groupes temporaires :
+//     - Blocage par UUID éphémère (filtre local invisible).
+//     - Création de fils temporaires (30 min par défaut, configurable).
+//     - Ajout de participants à un fil existant.
 
 import 'dart:async';
 import 'dart:math';
@@ -15,7 +18,9 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../network/network_coordinator.dart';
 import '../../settings/data/app_preferences_store.dart';
+import '../data/hive_block_service.dart';
 import '../domain/models/hive_message.dart';
 
 // ============================================================================
@@ -37,20 +42,9 @@ const int _kMaxMessages = 200;
 
 /// Service singleton de messagerie P2P décentralisée.
 ///
-/// Usage :
-/// ```dart
-/// // Broadcaster un message
-/// HiveMessagingService.instance.broadcast(
-///   content: 'RAS côté Nord',
-///   userPosition: LatLng(50.47, 4.55),
-/// );
-///
-/// // Écouter les messages filtrés
-/// ValueListenableBuilder<List<HiveMessage>>(
-///   valueListenable: HiveMessagingService.instance,
-///   builder: (_, messages, __) => ...,
-/// );
-/// ```
+/// Architecture réseau hybride :
+///   PRIORITÉ 1 → Réseau local P2P (BLE Mesh / Wi-Fi Direct) — synchrone.
+///   PRIORITÉ 2 → Serveur distant (192.168.31.18) — tâche d'arrière-plan.
 class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
   HiveMessagingService._() : super(const []);
 
@@ -79,6 +73,8 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
       const Duration(minutes: 5),
       (_) => _purgeExpired(),
     );
+    // Charge les préférences de blocage.
+    HiveBlockService.instance.load();
     debugPrint('[HiveMessaging] service démarré — id=$_localEphemeralId');
   }
 
@@ -90,21 +86,24 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
   }
 
   // --------------------------------------------------------------------------
-  // Diffusion d'un message
+  // Diffusion d'un message — [1] PRIORITÉ LOCALE P2P
   // --------------------------------------------------------------------------
 
   /// Diffuse un message textuel sur le réseau Hive P2P.
   ///
-  /// [content] : texte du message (max 500 caractères).
-  /// [userPosition] : position GPS de l'émetteur (optionnel).
-  /// [type] : type du message (défaut : [HiveMessageType.text]).
+  /// Ordre de priorité strict :
+  ///   1. Affichage local immédiat (UI non bloquante).
+  ///   2. Propagation P2P locale (BLE Mesh / Wi-Fi Direct) — synchrone.
+  ///   3. Propagation vers le serveur distant — tâche d'arrière-plan.
   void broadcast({
     required String content,
     LatLng? userPosition,
     HiveMessageType type = HiveMessageType.text,
+    String? threadId,
   }) {
     if (content.trim().isEmpty) return;
-    final trimmed = content.trim().substring(0, min(content.trim().length, 500));
+    final trimmed =
+        content.trim().substring(0, min(content.trim().length, 500));
 
     final msg = HiveMessage(
       id: _generateMessageId(),
@@ -115,16 +114,49 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
       latitude: userPosition?.latitude,
       longitude: userPosition?.longitude,
       isFromAdmin: false,
+      threadId: threadId,
     );
 
-    // Le message de l'utilisateur local est toujours visible (pas de filtre).
+    // PRIORITÉ 1 : Affichage local immédiat.
     _allMessages[msg.id] = msg;
     _trimToLimit();
     _emitFiltered(userPosition: userPosition);
 
-    // TODO : diffuser msg.toJson() sur le réseau maillé (BLE/Relay).
-    // NetworkCoordinator.instance.broadcastMessage(msg.toJson());
-    debugPrint('[HiveMessaging] message diffusé: ${msg.id}');
+    // PRIORITÉ 2 : Diffusion P2P locale + propagation serveur distant
+    // dans une tâche d'arrière-plan (unawaited = non bloquant pour l'UI).
+    unawaited(_broadcastWithPriority(msg));
+    debugPrint('[HiveMessaging] message diffusé localement: ${msg.id}');
+  }
+
+  /// Pipeline de broadcast hiérarchique :
+  ///   1. Réseau local P2P (BLE Mesh / Wi-Fi) — prioritaire.
+  ///   2. Serveur distant — tâche d'arrière-plan non bloquante.
+  Future<void> _broadcastWithPriority(HiveMessage msg) async {
+    // Étape 1 : broadcast P2P local via NetworkCoordinator.
+    try {
+      await NetworkCoordinator.instance.broadcastHiveMessage(
+        msg.toJson(),
+        localPriorityOnly: true, // Signale au coordinator : réseau local ONLY.
+      );
+    } catch (e) {
+      debugPrint('[HiveMessaging] échec broadcast P2P local: $e');
+    }
+
+    // Étape 2 (arrière-plan) : propagation vers le serveur distant.
+    // Complètement détaché de l'UI.
+    unawaited(_propagateToRemoteServer(msg));
+  }
+
+  /// Propagation asynchrone (background) vers le serveur distant.
+  Future<void> _propagateToRemoteServer(HiveMessage msg) async {
+    try {
+      await NetworkCoordinator.instance.broadcastHiveMessage(
+        msg.toJson(),
+        localPriorityOnly: false, // Toutes les destinations.
+      );
+    } catch (e) {
+      debugPrint('[HiveMessaging] échec propagation serveur distant: $e');
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -132,9 +164,6 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
   // --------------------------------------------------------------------------
 
   /// Appelé par le transport P2P lorsqu'un message est reçu d'un pair.
-  ///
-  /// [json] : payload JSON du message reçu.
-  /// [localPosition] : position GPS locale (pour le filtre "proches").
   void receiveRemote(
     Map<String, dynamic> json, {
     LatLng? localPosition,
@@ -143,9 +172,15 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
       final msg = HiveMessage.fromJson(json);
       if (msg.id.isEmpty) return;
 
-      // Déduplication : on ignore les messages déjà reçus.
+      // Déduplication.
       if (_allMessages.containsKey(msg.id)) {
         debugPrint('[HiveMessaging] message dupliqué ignoré: ${msg.id}');
+        return;
+      }
+
+      // [2] Filtrage des utilisateurs bloqués.
+      if (HiveBlockService.instance.isBlocked(msg.senderEphemeralId)) {
+        debugPrint('[HiveMessaging] message filtré (user bloqué): ${msg.senderEphemeralId}');
         return;
       }
 
@@ -169,9 +204,15 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
 
     final filtered = _allMessages.values
         .where((msg) {
-          // Filtre TTL (messages expirés).
+          // Filtre : messages expirés.
           if (now.difference(msg.sentAt) > _kMessageTtl) return false;
 
+          // [2] Filtre : utilisateurs bloqués (filtrage en temps réel).
+          if (HiveBlockService.instance.isBlocked(msg.senderEphemeralId)) {
+            return false;
+          }
+
+          // Filtre par type configuré dans les préférences.
           switch (filter) {
             case MessageFilter.all:
               return true;
@@ -189,7 +230,7 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
           }
         })
         .toList()
-      ..sort((a, b) => b.sentAt.compareTo(a.sentAt)); // Plus récent en premier
+      ..sort((a, b) => b.sentAt.compareTo(a.sentAt)); // Plus récent en premier.
 
     value = filtered;
   }
@@ -209,12 +250,12 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
       (_, msg) => now.difference(msg.sentAt) > _kMessageTtl,
     );
     _emitFiltered();
-    debugPrint('[HiveMessaging] purge — ${_allMessages.length} messages conservés');
+    debugPrint(
+        '[HiveMessaging] purge — ${_allMessages.length} messages conservés');
   }
 
   void _trimToLimit() {
     if (_allMessages.length <= _kMaxMessages) return;
-    // Supprime les plus anciens messages.
     final sorted = _allMessages.values.toList()
       ..sort((a, b) => a.sentAt.compareTo(b.sentAt));
     final toRemove = sorted.take(_allMessages.length - _kMaxMessages);

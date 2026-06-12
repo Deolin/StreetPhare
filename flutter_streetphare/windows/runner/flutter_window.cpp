@@ -27,7 +27,14 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
+  // Show the window immediately so it is visible regardless of whether the
+  // first Dart frame fires the callback (e.g. in release mode where a plugin
+  // initialisation error can silently prevent the first frame from rendering).
+  this->Show();
+
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
+    // Idempotent second call — ensures the window stays visible after the
+    // first frame is painted (handles any edge-case hide/restore).
     this->Show();
   });
 

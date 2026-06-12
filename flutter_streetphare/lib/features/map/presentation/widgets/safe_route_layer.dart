@@ -34,27 +34,50 @@ import '../../../../core/theme/streetphare_theme.dart';
 ///   - une polyline stylisée
 ///   - des flèches directionnelles espacées régulièrement
 ///   - un marqueur de départ et un marqueur d'arrivée
+// [1] Couleurs contrastées pour la carte sombre (lisibilité forte luminosité)
+/// Couleur de la Route Safe en mode clair (vert vif StreetPhare).
+const Color _kRouteColorLight = StreetPhareTheme.primary;
+
+/// Couleur de la Route Safe en mode sombre : jaune néon haute visibilité,
+/// lisible même en plein soleil sur fond de carte sombre CartoDB.
+const Color _kRouteColorDark = Color(0xFFFFEB3B); // Jaune Material 500
+
+/// Largeur renforcée du trait en mode sombre pour la lisibilité.
+const double _kStrokeWidthDark = 6.0;
+const double _kStrokeWidthLight = 4.5;
+
 class SafeRouteLayer extends StatelessWidget {
   const SafeRouteLayer({
     super.key,
     required this.routePoints,
     this.arrowStepCount = 6,
-    this.routeColor = StreetPhareTheme.primary,
-    this.strokeWidth = 4.5,
+    this.routeColor,         // null = auto-détection selon le thème
+    this.strokeWidth,        // null = auto selon le thème
+    this.isDarkMap = false,  // injecté depuis MapScreen
   });
 
   /// Liste ordonnée des coordonnées de la Route Safe.
   final List<LatLng> routePoints;
 
   /// Nombre de points entre chaque flèche directionnelle.
-  /// Une valeur de 6 signifie 1 flèche tous les 6 points du tableau.
   final int arrowStepCount;
 
-  /// Couleur du tracé (et des flèches).
-  final Color routeColor;
+  /// Couleur du tracé (null = auto selon isDarkMap).
+  final Color? routeColor;
 
-  /// Épaisseur du trait de la polyline.
-  final double strokeWidth;
+  /// Épaisseur du trait (null = auto selon isDarkMap).
+  final double? strokeWidth;
+
+  /// Si true, utilise les couleurs haute-visibilité pour la carte sombre.
+  final bool isDarkMap;
+
+  /// Résout la couleur effective selon le thème.
+  Color get _effectiveColor =>
+      routeColor ?? (isDarkMap ? _kRouteColorDark : _kRouteColorLight);
+
+  /// Résout l'épaisseur effective selon le thème.
+  double get _effectiveStroke =>
+      strokeWidth ?? (isDarkMap ? _kStrokeWidthDark : _kStrokeWidthLight);
 
   // --------------------------------------------------------------------------
   // Calcul du gisement (bearing) entre deux points GPS
@@ -95,7 +118,7 @@ class SafeRouteLayer extends StatelessWidget {
           height: 28,
           child: _DirectionArrow(
             bearingRad: bearing,
-            color: routeColor,
+            color: _effectiveColor,
           ),
         ),
       );
@@ -117,7 +140,7 @@ class SafeRouteLayer extends StatelessWidget {
         width: 32,
         height: 32,
         child: _EndpointDot(
-          color: routeColor,
+          color: _effectiveColor,
           icon: Icons.trip_origin,
           size: 20,
         ),
@@ -161,17 +184,19 @@ class SafeRouteLayer extends StatelessWidget {
         // ── Trait de la Route Safe ────────────────────────────────
         PolylineLayer(
           polylines: [
-            // Trait de fond (halo sombre pour la lisibilité)
+            // Halo contrasté : noir en clair, blanc en sombre pour isolation
             Polyline(
               points: routePoints,
-              color: Colors.black.withValues(alpha: 0.20),
-              strokeWidth: strokeWidth + 3.0,
+              color: isDarkMap
+                  ? Colors.black.withValues(alpha: 0.70)
+                  : Colors.black.withValues(alpha: 0.20),
+              strokeWidth: _effectiveStroke + 4.0,
             ),
-            // Trait principal coloré
+            // Trait principal haute-visibilité
             Polyline(
               points: routePoints,
-              color: routeColor,
-              strokeWidth: strokeWidth,
+              color: _effectiveColor,
+              strokeWidth: _effectiveStroke,
             ),
           ],
         ),

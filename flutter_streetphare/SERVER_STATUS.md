@@ -1,6 +1,6 @@
 # 📡 Tableau de bord StreetPhare — Topologie Serveurs
 
-> Dernière mise à jour : **2026-06-11 15:27:53** — Uptime orchestrateur : **94623s**
+> Dernière mise à jour : **2026-06-12 01:21:59** — Uptime orchestrateur : **3083s**
 > Fichier généré par `test_servers/start_servers_v2.js`
 
 ---
@@ -10,7 +10,7 @@
 | Serveur | Port | URL | Statut | Redémarrages |
 | --- | --- | --- | --- | --- |
 | ⭐ Principal | 3000 | http://localhost:3000 | ⚫ ARRÊTÉ | 0/3 |
-| 🛡️ Backup    | 3001  | http://localhost:3001  | 🟢 EN LIGNE  | 1/3 |
+| 🛡️ Backup    | 3001  | http://localhost:3001  | ⚫ ARRÊTÉ  | 3/3 |
 
 ---
 
@@ -98,4 +98,4 @@ curl http://localhost:3001/status
 ---
 
 > ℹ️ Pour suivre en direct : `tail -f SERVER_STATUS.md`
-> Orchestrateur démarré le : **2026-06-10 13:10:50**
+> Orchestrateur démarré le : **2026-06-12 00:30:36**

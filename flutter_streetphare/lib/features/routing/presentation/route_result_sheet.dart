@@ -3,12 +3,13 @@
 // Feuille d'ancrage présentant le(s) itinéraire(s) calculé(s) par
 // le moteur "Safe Path".
 //
-// Comportement UI :
-//   * Affiche d'abord le chemin RECOMMANDÉ (le moins risqué) avec
-//     un bouton "Accepter" et un bouton "Voir les alternatives".
-//   * Si l'utilisateur clique sur "Voir les alternatives",
-//     déplie la liste des 2 autres itinéraires calculés en
-//     parallèle, que l'utilisateur peut comparer et choisir.
+// Comportement UI v2.1 (Juste-à-Temps / Lazy Loading) :
+//   * Affiche UNIQUEMENT le chemin RECOMMANDÉ dès le premier calcul.
+//   * Un bouton "Routes alternatives" est présent MAIS les alternatives
+//     ne sont calculées QUE lorsque l'utilisateur appuie sur ce bouton.
+//   * Pendant le calcul des alternatives : overlay de chargement.
+//   * Les alternatives calculées remplacent le bouton et affichent
+//     la liste des 2 autres itinéraires.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -16,20 +17,45 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
 import '../domain/models/route_result.dart';
+import '../infrastructure/osmand_routing_service.dart';
+import 'widgets/route_calculation_overlay.dart';
+
+/// Callback asynchrone pour charger les alternatives à la demande.
+typedef AlternativesLoader = Future<List<RouteResult>> Function();
 
 class RouteResultSheet extends StatefulWidget {
-  const RouteResultSheet({super.key, required this.routes});
+  const RouteResultSheet({
+    super.key,
+    required this.routes,
+    this.onRequestAlternatives,
+  });
+
+  /// Liste des itinéraires (le premier = recommandé, les suivants = alternatives
+  /// pré-calculées). Si [onRequestAlternatives] est fourni, les alternatives
+  /// ne sont chargées que sur demande (JIT).
   final List<RouteResult> routes;
 
+  /// Callback appelé quand l'utilisateur demande les alternatives.
+  /// Si null, les alternatives de [routes] sont affichées directement.
+  final AlternativesLoader? onRequestAlternatives;
+
+  /// Affiche la feuille d'ancrage modale.
+  ///
+  /// [routes] : itinéraires pré-calculés (ou [primary only]).
+  /// [onRequestAlternatives] : callback JIT pour les alternatives.
   static Future<RouteResult?> show(
     BuildContext context, {
     required List<RouteResult> routes,
+    AlternativesLoader? onRequestAlternatives,
   }) {
     return showModalBottomSheet<RouteResult>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => RouteResultSheet(routes: routes),
+      builder: (_) => RouteResultSheet(
+        routes: routes,
+        onRequestAlternatives: onRequestAlternatives,
+      ),
     );
   }
 
@@ -39,12 +65,56 @@ class RouteResultSheet extends StatefulWidget {
 
 class _RouteResultSheetState extends State<RouteResultSheet> {
   bool _showAlternatives = false;
+  bool _loadingAlternatives = false;
   RouteResult? _selected;
+  List<RouteResult> _alternatives = const [];
 
   @override
   void initState() {
     super.initState();
     if (widget.routes.isNotEmpty) _selected = widget.routes.first;
+    // Si des alternatives sont déjà dans routes (pas de JIT), on les stocke.
+    if (widget.onRequestAlternatives == null && widget.routes.length > 1) {
+      _alternatives = widget.routes.skip(1).toList();
+    }
+  }
+
+  /// Charge les alternatives à la demande (JIT) lorsque l'utilisateur
+  /// appuie sur "Routes alternatives".
+  Future<void> _loadAlternatives() async {
+    if (_loadingAlternatives) return;
+
+    final loader = widget.onRequestAlternatives;
+    if (loader == null) {
+      // Alternatives déjà disponibles dans routes.
+      setState(() {
+        _alternatives = widget.routes.skip(1).toList();
+        _showAlternatives = true;
+      });
+      return;
+    }
+
+    setState(() => _loadingAlternatives = true);
+
+    try {
+      final alts = await loader();
+      if (!mounted) return;
+      setState(() {
+        _alternatives = alts;
+        _showAlternatives = true;
+        _loadingAlternatives = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingAlternatives = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de calculer les alternatives.'),
+          duration: Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
@@ -63,8 +133,8 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
         ),
       );
     }
+
     final recommended = widget.routes.first;
-    final alternatives = widget.routes.skip(1).toList();
 
     return _wrap(
       Padding(
@@ -73,6 +143,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // ── En-tête ─────────────────────────────────────────────────
             Row(
               children: [
                 const Icon(Icons.shield,
@@ -95,8 +166,12 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
               ],
             ),
             const SizedBox(height: 8),
+
+            // ── Mini-carte ───────────────────────────────────────────────
             _MiniRouteMap(route: _selected ?? recommended),
             const SizedBox(height: 12),
+
+            // ── Itinéraire recommandé ────────────────────────────────────
             _RouteTile(
               route: recommended,
               isSelected: _selected?.id == recommended.id,
@@ -104,19 +179,54 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
               badge: 'Recommandé',
             ),
             const SizedBox(height: 8),
-            if (alternatives.isNotEmpty && !_showAlternatives)
-              TextButton.icon(
-                onPressed: () =>
-                    setState(() => _showAlternatives = true),
-                icon: const Icon(Icons.alt_route,
-                    color: StreetPhareTheme.primary),
-                label: Text(
-                  'Voir les alternatives (${alternatives.length})',
-                  style: const TextStyle(color: StreetPhareTheme.primary),
+
+            // ── Bouton "Routes alternatives" (JIT) ───────────────────────
+            if (!_showAlternatives && !_loadingAlternatives) ...[
+              // Affiche le bouton si des alternatives peuvent être chargées.
+              if (widget.onRequestAlternatives != null ||
+                  widget.routes.length > 1)
+                TextButton.icon(
+                  onPressed: _loadAlternatives,
+                  icon: const Icon(Icons.alt_route,
+                      color: StreetPhareTheme.primary),
+                  label: const Text(
+                    'Voir les routes alternatives',
+                    style: TextStyle(color: StreetPhareTheme.primary),
+                  ),
+                ),
+            ],
+
+            // ── Indicateur de chargement des alternatives ────────────────
+            if (_loadingAlternatives)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            StreetPhareTheme.primary),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Calcul des alternatives en cours…',
+                      style: TextStyle(
+                        color: StreetPhareTheme.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
                 ),
               ),
+
+            // ── Liste des alternatives chargées ──────────────────────────
             if (_showAlternatives)
-              ...alternatives.map(
+              ..._alternatives.map(
                 (r) => Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: _RouteTile(
@@ -126,7 +236,15 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                   ),
                 ),
               ),
+
+            const SizedBox(height: 8),
+
+            // ── Bouton "Ouvrir dans OsmAnd" (Mode Externe) ───────────────
+            _OsmAndLaunchButton(route: _selected ?? recommended),
+
             const SizedBox(height: 12),
+
+            // ── Bouton "Accepter" ─────────────────────────────────────────
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -189,8 +307,7 @@ class _RouteTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: isSelected
                 ? StreetPhareTheme.primary.withValues(alpha: 0.15)
-                : StreetPhareTheme.darkSurfaceVariant
-                    .withValues(alpha: 0.5),
+                : StreetPhareTheme.darkSurfaceVariant.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isSelected
@@ -218,9 +335,7 @@ class _RouteTile extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            route.label.isEmpty
-                                ? 'Itinéraire'
-                                : route.label,
+                            route.label.isEmpty ? 'Itinéraire' : route.label,
                             style: const TextStyle(
                               color: StreetPhareTheme.textPrimary,
                               fontWeight: FontWeight.w600,
@@ -268,6 +383,91 @@ class _RouteTile extends StatelessWidget {
     );
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// _OsmAndLaunchButton — Bouton "Ouvrir dans OsmAnd"
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Bouton secondaire qui propose à l'utilisateur d'ouvrir l'itinéraire
+/// directement dans OsmAnd (Mode Externe — navigation guidée vocale).
+///
+/// Si OsmAnd n'est pas installé, affiche [OsmAndNotInstalledDialog].
+class _OsmAndLaunchButton extends StatelessWidget {
+  const _OsmAndLaunchButton({required this.route});
+
+  final RouteResult route;
+
+  @override
+  Widget build(BuildContext context) {
+    if (route.points.isEmpty) return const SizedBox.shrink();
+
+    return OutlinedButton.icon(
+      onPressed: () => _launch(context),
+      icon: const Icon(Icons.map_outlined, size: 18),
+      label: const Text('Ouvrir dans OsmAnd'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: StreetPhareTheme.primary,
+        side: BorderSide(
+          color: StreetPhareTheme.primary.withValues(alpha: 0.6),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launch(BuildContext context) async {
+    final svc = OsmAndRoutingService.instance;
+    final start = route.points.first;
+    final end = route.points.last;
+    final destName = route.label.isNotEmpty ? route.label : 'Destination';
+
+    final success = await svc.launchExternalNavigation(
+      start: start,
+      end: end,
+      destinationName: destName,
+      onNotInstalled: () {
+        if (context.mounted) {
+          OsmAndNotInstalledDialog.show(
+            context,
+            onInstall: () => svc.openInstallPage(),
+            onUseFallback: () {
+              // Ferme la feuille et laisse le routage interne (déjà affiché).
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Itinéraire calculé via OSM — affiché sur la carte.',
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
+            },
+          );
+        }
+      },
+    );
+
+    if (!success && context.mounted) {
+      // Feedback si le lancement a échoué pour une autre raison
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de lancer OsmAnd.'),
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// _MiniRouteMap
+// ══════════════════════════════════════════════════════════════════════════════
 
 class _MiniRouteMap extends StatelessWidget {
   const _MiniRouteMap({required this.route});

@@ -2,16 +2,19 @@
 //
 // Gestionnaire de plugins pour le projet Android Flutter.
 //
-// Avec android.builtInKotlin=true (gradle.properties), le plugin Flutter
-// applique automatiquement le plugin Kotlin dans le sous-projet :app.
-// La déclaration ci-dessous (`apply false`) permet de :
-//   1. Fixer une version GLOBALE de Kotlin pour tous les sous-projets
-//      (évite les warnings "KGP incompatible version" des plugins tiers).
-//   2. Laisser chaque sous-projet décider d'appliquer ou non le plugin
-//      via son propre build.gradle.
+// Mode actuel : android.builtInKotlin=false (gradle.properties)
+// → Les plugins tiers (flutter_local_notifications 22.0.0, mobile_scanner 7.x,
+//   reactive_ble_mobile 5.x) appliquent encore `kotlin-android` manuellement.
+//   Avec builtInKotlin=true + AGP 9.0, cela provoque une IllegalStateException.
+//   On maintient builtInKotlin=false et on déclare KGP ici pour épingler la version
+//   globalement (tous les sous-projets utilisent KGP 2.3.20).
 //
-// Version Kotlin 2.3.20 = dernière stable compatible AGP 9.x + Flutter 3.x
-// (Kotlin 2.x est requis pour les nouvelles API Compose Compiler).
+// Quand migrer vers builtInKotlin=true ?
+//   Lorsque TOUS les plugins ci-dessus auront supprimé leur `apply 'kotlin-android'`
+//   interne. Retirer alors la ligne id("org.jetbrains.kotlin.android") de ce fichier
+//   ET de android/app/build.gradle.kts, puis passer builtInKotlin=true.
+//
+// Ref: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin
 
 pluginManagement {
     val flutterSdkPath =
@@ -35,9 +38,11 @@ pluginManagement {
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "9.0.1" apply false
-    // Version Kotlin globale — alignée sur tous les sous-projets (flutter_reactive_ble,
-    // mobile_scanner, nearby_connections, geolocator_android, etc.)
-    // Supprime les avertissements "Built-in Kotlin / KGP incompatible version".
+    // KGP déclaré ici pour épingler la version globalement (builtInKotlin=false).
+    // apply false → le plugin est disponible sur le classpath mais non appliqué ici ;
+    // il est appliqué explicitement dans android/app/build.gradle.kts.
+    // Les plugins tiers (mobile_scanner, reactive_ble_mobile, etc.) utiliseront
+    // cette version 2.3.20 quand ils feront leur propre `apply 'kotlin-android'`.
     id("org.jetbrains.kotlin.android") version "2.3.20" apply false
 }
 

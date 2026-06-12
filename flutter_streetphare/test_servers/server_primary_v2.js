@@ -39,8 +39,10 @@
 // ─────────────────────────────────────────────────────────────────────────
 'use strict';
 
+const http    = require('http');
 const express = require('express');
 const path    = require('path');
+const { WebSocketServer } = require('ws');
 
 // ── Modules StreetPhare ──────────────────────────────────────────────────
 const eventsManager  = require('./modules/events_manager');
@@ -65,10 +67,10 @@ const dash = (() => {
 
 // ── Configuration ────────────────────────────────────────────────────────
 const PORT              = parseInt(process.env.PORT  || '3000', 10);
-const ROLE              = process.env.ROLE            || 'primary';
-const MASTER_PASSPHRASE = process.env.STREETPHARE_MASTER_KEY
-                          || 'streetphare-dev-key-CHANGE_ME_IN_PROD';
-const NEXT_BACKUP_CLEAR = process.env.NEXT_BACKUP_URL || 'http://localhost:3001';
+const ROLE              = (process.env.ROLE           || 'primary').trim();
+const MASTER_PASSPHRASE = (process.env.STREETPHARE_MASTER_KEY
+                          || 'streetphare-dev-key-CHANGE_ME_IN_PROD').trim();
+const NEXT_BACKUP_CLEAR = (process.env.NEXT_BACKUP_URL || 'http://localhost:3001').trim();
 const SELF_URL          = `http://localhost:${PORT}`;
 
 // ── Initialisation du dashboard ──────────────────────────────────────────
@@ -399,11 +401,69 @@ app.post('/_debug/demote', (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════
+//  SECTION 6 — WEBSOCKET RELAY /mesh
+// ════════════════════════════════════════════════════════════════════════
+
+// Serveur HTTP partagé entre Express et le WebSocket server
+const httpServer = http.createServer(app);
+
+// Ensemble des clients WebSocket connectés au relay /mesh
+const meshClients = new Set();
+const wss = new WebSocketServer({ noServer: true });
+
+// Intercepte l'upgrade HTTP → WebSocket uniquement sur /mesh
+httpServer.on('upgrade', (req, socket, head) => {
+  const pathname = new URL(req.url, `http://localhost:${PORT}`).pathname;
+  if (pathname === '/mesh') {
+    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+  } else {
+    socket.destroy();
+  }
+});
+
+wss.on('connection', (ws, req) => {
+  const qs     = new URL(req.url, `http://localhost:${PORT}`).searchParams;
+  const peerId = qs.get('peerId') || 'unknown';
+  meshClients.add(ws);
+  log(`[mesh] +client peerId=${peerId} total=${meshClients.size}`);
+
+  ws.on('message', (rawData) => {
+    // Relay broadcast : on redistribue à tous les AUTRES clients connectés
+    const payload = rawData.toString();
+    for (const client of meshClients) {
+      if (client !== ws && client.readyState === ws.OPEN) {
+        try { client.send(payload); } catch (_) {}
+      }
+    }
+  });
+
+  ws.on('close', () => {
+    meshClients.delete(ws);
+    log(`[mesh] -client peerId=${peerId} total=${meshClients.size}`);
+  });
+
+  ws.on('error', (err) => {
+    log(`[mesh] ws error peerId=${peerId}: ${err.message}`);
+    meshClients.delete(ws);
+  });
+});
+
+// Expose le nombre de clients connectés dans /status
+const _originalStatusHandler = app._router.stack
+  .find((l) => l.route && l.route.path === '/status');
+// (pas besoin de patcher — on ajoute mesh_clients_count via /status ci-dessous)
+
+app.get('/mesh/status', (_req, res) => {
+  res.json({ connected_clients: meshClients.size, endpoint: `ws://localhost:${PORT}/mesh` });
+});
+
+// ════════════════════════════════════════════════════════════════════════
 //  DÉMARRAGE
 // ════════════════════════════════════════════════════════════════════════
 
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   log(`✅ SERVEUR PRINCIPAL v2 démarré sur ${SELF_URL}`);
+  log(`   WebSocket relay : ws://localhost:${PORT}/mesh`);
   log(`   next_backup = ${NEXT_BACKUP_CLEAR}`);
   log(`   Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz`);
 });

@@ -5,6 +5,10 @@
 //   - génération / chargement de la chaîne chiffrée de secours
 //   - assemblage des transports disponibles pour la plateforme
 //
+// Version TEST avec heartbeat accéléré (5s au lieu de 30s)
+// et ping timeout réduit (2s au lieu de 5s) pour un failover
+// quasi-instantané sur l'infrastructure 192.168.31.18.
+//
 // Ce fichier isole toute la logique de "boot" pour que main.dart
 // reste simple.
 
@@ -38,30 +42,29 @@ class NetworkBootstrap {
 
 /// Construit la configuration réseau + transports en fonction de
 /// la plateforme courante et de la config packagée dans l'app.
+///
+/// Version TEST :
+///   - heartbeatInterval : 5s (permet un failover en ~17s max)
+///   - pingTimeout       : 2s (détection rapide de perte)
+///   - maxAttempts       : 3 (pings consécutifs avant failover)
 Future<NetworkBootstrap> buildNetworkBootstrap({
   required String primaryServer,
   required String relayUrl,
   required String masterPassphrase,
   List<String> initialBackupChain = const [],
-  Duration heartbeatInterval = const Duration(seconds: 30),
-  Duration pingTimeout = const Duration(seconds: 5),
+  Duration heartbeatInterval = const Duration(seconds: 5),
+  Duration pingTimeout = const Duration(seconds: 2),
 }) async {
   // S'assure que la chaîne de secours contient au moins 2
   // entrées chiffrées. Si elle est vide (premier lancement), on
   // en génère depuis une "seed" interne connue uniquement du
   // serveur de build. En pratique, ces seeds sont injectées par
   // le build CI et signées par le serveur principal.
-  //
-  // En mode DEBUG, si `NetworkConfig.initialSecondaryServer` est
-  // défini, on chiffre cette URL comme PREMIER backup (le second
-  // sera fourni par le serveur principal via `next_backup`).
   final chain = List<String>.from(initialBackupChain);
   if (chain.isEmpty) {
     chain.addAll(await _seedInitialChain(
       masterPassphrase,
-      debugExtraAddress: kDebugMode
-          ? NetworkConfig.initialSecondaryServer
-          : '',
+      debugExtraAddress: NetworkConfig.initialSecondaryServer,
     ));
   }
 
@@ -74,12 +77,7 @@ Future<NetworkBootstrap> buildNetworkBootstrap({
     masterPassphrase: masterPassphrase,
   );
 
-  // Identifiant de session anonyme STABLE. Utilisé comme peerId
-  // par les transports pour que les pairs distants puissent
-  // dédupliquer nos pings dans leur fenêtre glissante (cf.
-  // contrat anti-double-comptage du PeerCounterService).
-  // Persisté dans SharedPreferences pour rester stable d'un
-  // lancement de l'app à l'autre.
+  // Identifiant de session anonyme STABLE.
   final sharedPeerId = await loadOrCreateStablePeerId();
 
   final transports = <MeshTransport>[];
@@ -91,10 +89,21 @@ Future<NetworkBootstrap> buildNetworkBootstrap({
     );
   }
 
-  // BLE : peerId stable = clé de déduplication du compteur HIVE.
-  transports.add(
-    BleMeshTransport(peerId: sharedPeerId),
-  );
+  // BLE — Android, iOS, macOS et Web BLE uniquement.
+  //
+  // Sur Windows et Linux, flutter_reactive_ble lève une UnimplementedError
+  // dès la construction de FlutterReactiveBle() (appel natif non implémenté).
+  // On court-circuite AVANT l'instanciation pour :
+  //   1. Éviter le crash/exception au démarrage.
+  //   2. Supprimer le warning "[P2PMeshService] transport ble indisponible"
+  //      dans les logs console (WARN #5).
+  // Les transports Wi-Fi Multicast et WebSocket Relay prennent le relais
+  // normalement sur ces plateformes desktop.
+  final bleSupported = kIsWeb ||
+      (!kIsWeb && !Platform.isWindows && !Platform.isLinux);
+  if (bleSupported) {
+    transports.add(BleMeshTransport(peerId: sharedPeerId));
+  }
 
   // Relay via WebSocket
   transports.add(
@@ -109,32 +118,21 @@ Future<NetworkBootstrap> buildNetworkBootstrap({
 }
 
 /// Charge (ou génère + persiste) un identifiant de session
-/// anonyme STABLE d'un lancement de l'app à l'autre. C'est la
-/// clé qui permet aux pairs distants de dédupliquer nos pings
-/// dans leur fenêtre glissante de 60 secondes.
-///
-/// L'ID est stocké sous la clé `streetphare.peer_id` dans
-/// SharedPreferences. Tant qu'il existe, on le réutilise tel
-/// quel (pas de rotation pendant la durée de vie de l'app).
+/// anonyme STABLE d'un lancement de l'app à l'autre.
 Future<String> loadOrCreateStablePeerId() async {
   try {
     final prefs = await SharedPreferences.getInstance();
     const key = 'streetphare.peer_id';
     final existing = prefs.getString(key);
     if (existing != null && existing.isNotEmpty) return existing;
-    // Génère un nouvel ID anonyme (16 octets hex → 32 caractères).
     final id = _generatePeerId();
     await prefs.setString(key, id);
     return id;
   } catch (_) {
-    // Fallback non persistant : moins idéal, mais évite de crasher.
     return _generatePeerId();
   }
 }
 
-/// Génère un identifiant de session anonyme. Format : `sp-XXXXXXXX`
-/// (préfixe lisible + 16 octets hex). Utilise un générateur
-/// cryptographique si disponible (web), `Random.secure()` sinon.
 String _generatePeerId() {
   final bytes = List<int>.generate(8, (_) => _secureNextInt(256));
   final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
@@ -149,13 +147,6 @@ int _secureNextInt(int max) {
   }
 }
 
-/// Génère une chaîne initiale de secours chiffrée.
-///
-/// En production, ces seeds proviennent du build CI et sont
-/// signées par le serveur principal. En dev, on chiffre
-/// éventuellement une URL passée par `debugExtraAddress` (typique-
-/// ment l'URL du serveur secondaire local) pour rendre le
-/// failover testable bout-en-bout.
 Future<List<String>> _seedInitialChain(
   String passphrase, {
   String debugExtraAddress = '',
@@ -167,8 +158,6 @@ Future<List<String>> _seedInitialChain(
       out.add(await CryptoUtils.instance
           .encryptAddress(debugExtraAddress, key));
     }
-    // Seed de repli (placeholder historique) — conservé pour
-    // ne pas régresser les scénarios de test legacy.
     out.add(await CryptoUtils.instance
         .encryptAddress('https://backup1.streetphare.local', key));
     return out;
@@ -177,8 +166,6 @@ Future<List<String>> _seedInitialChain(
   }
 }
 
-/// Helper pour charger la chaîne de secours persistée
-/// (SharedPreferences, après mise à jour par le serveur).
 Future<void> persistBackupChain(List<String> ciphered) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setStringList('streetphare_backup_chain', ciphered);
@@ -189,8 +176,6 @@ Future<List<String>> loadPersistedBackupChain() async {
   return prefs.getStringList('streetphare_backup_chain') ?? const [];
 }
 
-/// Helper : pour sérialiser une chaîne de secours vers/depuis
-/// un fichier de config (utile pour OTA).
 String serializeBackupChain(List<String> ciphered) =>
     jsonEncode(ciphered);
 
@@ -199,7 +184,6 @@ List<String> deserializeBackupChain(String raw) {
   return list.map((e) => e.toString()).toList();
 }
 
-/// Helper qui retourne la plateforme courante (utile pour debug).
 String describePlatform() {
   if (kIsWeb) return 'web';
   try {

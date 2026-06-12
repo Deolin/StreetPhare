@@ -1,0 +1,103 @@
+================================================================================
+LICENCES DES COMPOSANTS TIERS — StreetPhare v1.3 · Moteur de routage piéton
+================================================================================
+Mis à jour le : 2026-06-11
+Maintenu par  : Équipe StreetPhare
+
+Ce dossier contient du code source original de StreetPhare et des intégrations
+de composants tiers. Les licences de chaque composant sont détaillées ci-dessous.
+
+────────────────────────────────────────────────────────────────────────────────
+1. GRAPHHOPPER CORE — Moteur de routage embarqué
+────────────────────────────────────────────────────────────────────────────────
+
+Copyright (C) 2012–2024 GraphHopper GmbH
+and contributors (see AUTHORS list at github.com/graphhopper/graphhopper)
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Source : https://github.com/graphhopper/graphhopper
+Version utilisée dans StreetPhare : 7.0
+
+MODIFICATIONS APPORTÉES PAR STREETPHARE (2026-06-11) :
+  - Intégration via MethodChannel Flutter (OsmAndBridgePlugin.kt)
+  - Profil de routage limité à "foot" (piéton strict)
+  - Injection des zones d'évitement dynamiques via block_area (dangers P2P)
+  - Extraction du fichier OSM depuis les assets Android au premier démarrage
+
+────────────────────────────────────────────────────────────────────────────────
+2. OPENSTREETMAP DATA — Données géographiques
+────────────────────────────────────────────────────────────────────────────────
+
+© OpenStreetMap contributors
+Données disponibles sous licence Open Data Commons Open Database License (ODbL)
+Version 1.0.
+
+    https://opendatacommons.org/licenses/odbl/1-0/
+    https://www.openstreetmap.org/copyright
+
+Tout redistribution ou utilisation du fichier fleurus.osm.pbf doit :
+  1. Conserver la mention "© OpenStreetMap contributors"
+  2. Respecter les termes de l'ODbL (partage à l'identique des données dérivées)
+  3. Ne pas imposer de restrictions supplémentaires à la base de données
+
+────────────────────────────────────────────────────────────────────────────────
+3. OSRM (Open Source Routing Machine) — Fallback HTTP public
+────────────────────────────────────────────────────────────────────────────────
+
+Copyright (C) 2010–2024 OSRM contributors
+Licensed under the BSD 2-Clause License.
+
+    https://github.com/Project-OSRM/osrm-backend/blob/master/LICENSE
+
+L'API publique utilisée en fallback (router.project-osrm.org) est fournie
+par Project OSRM pour usage non-commercial.
+
+────────────────────────────────────────────────────────────────────────────────
+4. OSMAND (PROTOCOLE D'URL) — Mode External Launch
+────────────────────────────────────────────────────────────────────────────────
+
+OsmAnd est développé par OsmAnd BV.
+Copyright (C) 2010–2024 OsmAnd BV and contributors.
+Licensed under GNU General Public License v3 (GPLv3).
+
+    https://osmand.net/
+    https://github.com/osmandapp/OsmAnd/blob/master/LICENSE
+
+IMPORTANT — PÉRIMÈTRE D'UTILISATION PAR STREETPHARE :
+  StreetPhare N'INCLUT PAS de code source OsmAnd dans cette version.
+  L'intégration se limite à :
+    • L'utilisation du protocole d'URL publié osmand.api:// pour lancer
+      l'application OsmAnd si elle est installée sur l'appareil.
+    • Ce protocole est documenté publiquement par OsmAnd BV et est conçu
+      pour être utilisé par des applications tierces.
+
+  Aucune icône, ressource graphique, logo, style de carte, ou code source
+  d'OsmAnd n'est embarqué dans StreetPhare.
+
+  La mention des marques "OsmAnd" et "OsmAnd+" dans ce document est
+  descriptive et non indicative d'une approbation par OsmAnd BV.
+
+────────────────────────────────────────────────────────────────────────────────
+5. CODE ORIGINAL STREETPHARE
+────────────────────────────────────────────────────────────────────────────────
+
+Les fichiers suivants sont du code original StreetPhare :
+  - OsmAndBridgePlugin.kt       (bridge MethodChannel)
+  - OsmAndNativeChannel.dart    (canal Dart)
+  - OsmAndRoutingService.dart   (service de routage)
+  - osmand_routing_service.dart (orchestrateur)
+
+Copyright (C) 2026 Équipe StreetPhare. Tous droits réservés.
+
+================================================================================

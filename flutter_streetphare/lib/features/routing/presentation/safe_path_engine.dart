@@ -74,6 +74,96 @@ class SafePathEngine {
   /// Nombre maximum d'alternatives retournées.
   static const int maxAlternatives = 3;
 
+  /// Calcule UNIQUEMENT le meilleur itinéraire piéton (route principale).
+  ///
+  /// Méthode JIT (Juste-à-Temps) : ne calcule pas les alternatives.
+  /// Plus rapide que [computeRoutes], idéale pour l'affichage initial.
+  /// Utilisez [computeAlternatives] ensuite si l'utilisateur le demande.
+  static List<RouteResult> computePrimaryOnly({
+    required LatLng start,
+    required LatLng end,
+    required AvoidanceFilters filters,
+    PedestrianConstraints constraints = PedestrianConstraints.urban,
+  }) {
+    final alerts = AlertVisibilityPolicy.filterVisible(
+      HiveAlertDatabase.instance.getAllValid(),
+    );
+    final grid = _Grid.build(
+      start: start,
+      end: end,
+      alerts: alerts,
+      filters: filters,
+      constraints: constraints,
+    );
+    final primary = _dijkstra(grid, grid.startIdx, grid.endIdx, jitter: 0.0);
+    if (primary == null || primary.points.isEmpty) {
+      return const <RouteResult>[];
+    }
+    return [
+      RouteResult(
+        id: 'primary',
+        points: primary.points,
+        totalDistanceMeters: primary.distance,
+        totalRiskScore: primary.risk,
+        pois: const <RoutePoi>[],
+        label: 'Itinéraire piéton recommandé',
+      ),
+    ];
+  }
+
+  /// Calcule uniquement les ALTERNATIVES (sans la route principale).
+  ///
+  /// À appeler APRÈS [computePrimaryOnly], sur demande de l'utilisateur.
+  static List<RouteResult> computeAlternatives({
+    required LatLng start,
+    required LatLng end,
+    required AvoidanceFilters filters,
+    PedestrianConstraints constraints = PedestrianConstraints.urban,
+  }) {
+    final alerts = AlertVisibilityPolicy.filterVisible(
+      HiveAlertDatabase.instance.getAllValid(),
+    );
+    final grid = _Grid.build(
+      start: start,
+      end: end,
+      alerts: alerts,
+      filters: filters,
+      constraints: constraints,
+    );
+    // On calcule le chemin principal pour avoir sa signature (déduplication).
+    final primary = _dijkstra(grid, grid.startIdx, grid.endIdx, jitter: 0.0);
+    final seen = <String>{
+      if (primary != null) _signature(primary.points),
+    };
+
+    final results = <RouteResult>[];
+    int altIndex = 1;
+    final random = math.Random(42);
+    for (int attempt = 0;
+        altIndex < maxAlternatives && attempt < 6;
+        attempt++) {
+      final jitter =
+          1.0 + alternativesJitter * (random.nextDouble() - 0.5) * 2;
+      final alt = _dijkstra(grid, grid.startIdx, grid.endIdx, jitter: jitter);
+      if (alt == null || alt.points.isEmpty) continue;
+      final sig = _signature(alt.points);
+      if (seen.contains(sig)) continue;
+      seen.add(sig);
+      results.add(
+        RouteResult(
+          id: 'alt$altIndex',
+          points: alt.points,
+          totalDistanceMeters: alt.distance,
+          totalRiskScore: alt.risk,
+          pois: const <RoutePoi>[],
+          label: 'Alternative $altIndex',
+        ),
+      );
+      altIndex++;
+    }
+    return results;
+  }
+
   /// Calcule 1 à 3 itinéraires PIÉTONS sûrs entre [start] et [end].
   ///
   /// Les itinéraires sont calculés en évitant :
@@ -278,10 +368,9 @@ class _GridCell {
 }
 
 class _Edge {
-  _Edge(this.to, this.weight, this.seed);
+  _Edge(this.to, this.weight);
   final int to;
   final double weight;
-  final int seed;
 }
 
 class _Grid {
@@ -446,7 +535,6 @@ class _Grid {
       [-1, -1], // Nord-Ouest
     ];
 
-    int edgeSeed = 0;
     for (int i = 0; i < latCount; i++) {
       for (int j = 0; j < lngCount; j++) {
         final from = idx(i, j);
@@ -465,7 +553,7 @@ class _Grid {
           final baseDist = GeofencingService.distanceBetween(cFrom, cTo);
           // Poids = distance (m) + risque cellule destination.
           final w = baseDist + cells[to].riskWeight;
-          adjacency[from].add(_Edge(to, w, edgeSeed++));
+          adjacency[from].add(_Edge(to, w));
         }
 
         // ── Arêtes diagonales (pénalité piétonne × diagonalPenaltyFactor) ─
@@ -483,7 +571,7 @@ class _Grid {
           // + risque cellule destination.
           final w = baseDist * constraints.diagonalPenaltyFactor
               + cells[to].riskWeight;
-          adjacency[from].add(_Edge(to, w, edgeSeed++));
+          adjacency[from].add(_Edge(to, w));
         }
       }
     }

@@ -83,11 +83,11 @@ const dash = (() => {
 
 // ── Configuration ────────────────────────────────────────────────────────
 const PORT                = parseInt(process.env.PORT  || '3001', 10);
-const ROLE                = process.env.ROLE            || 'secondary';
-const MASTER_PASSPHRASE   = process.env.STREETPHARE_MASTER_KEY
-                            || 'streetphare-dev-key-CHANGE_ME_IN_PROD';
-const NEXT_BACKUP_CLEAR   = process.env.NEXT_BACKUP_URL || 'http://localhost:3002';
-const PRIMARY_URL         = process.env.PRIMARY_URL     || 'http://localhost:3000';
+const ROLE                = (process.env.ROLE           || 'secondary').trim();
+const MASTER_PASSPHRASE   = (process.env.STREETPHARE_MASTER_KEY
+                            || 'streetphare-dev-key-CHANGE_ME_IN_PROD').trim();
+const NEXT_BACKUP_CLEAR   = (process.env.NEXT_BACKUP_URL || 'http://localhost:3002').trim();
+const PRIMARY_URL         = (process.env.PRIMARY_URL    || 'http://localhost:3000').trim();
 const SELF_URL            = `http://localhost:${PORT}`;
 
 // Paramètres heartbeat (surchargeables via env)

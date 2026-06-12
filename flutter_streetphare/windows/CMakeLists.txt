@@ -32,6 +32,18 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+# Suppress <experimental/coroutine> deprecation error from flutter_local_notifications_windows
+# and any other plugin still using C++17 experimental coroutines with VS 18 (2026).
+add_definitions(-D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+
+# Provide a stub <atlbase.h> when the ATL component is not installed in VS BuildTools.
+# flutter_local_notifications_windows includes atlbase.h but uses no ATL symbols
+# (it relies on WinRT instead). The stub satisfies the #include without defining anything.
+# To remove this workaround: install "C++ ATL for v143 build tools" via VS Installer.
+if(NOT EXISTS "$ENV{INCLUDE}/atlbase.h")
+  include_directories(BEFORE "${CMAKE_CURRENT_SOURCE_DIR}/atl_stub")
+endif()
+
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by
@@ -43,6 +55,10 @@ function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_options(${TARGET} PRIVATE /EHsc)
   target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
   target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
+  # Suppress experimental coroutine deprecation warnings from permission_handler_windows
+  # and other plugins using <experimental/coroutine> (VS 2019+)
+  target_compile_definitions(${TARGET} PRIVATE
+    "_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS")
 endfunction()
 
 # Flutter library and tool build rules.

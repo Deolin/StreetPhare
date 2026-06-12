@@ -21,6 +21,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../services/notification_service.dart';
+import '../../bug_report/presentation/bug_report_fab.dart';
 import '../../events/presentation/events_screen.dart';
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/domain/models/avoidance_filters.dart';
@@ -48,33 +49,40 @@ class SettingsScreen extends StatelessWidget {
         backgroundColor: Theme.of(context).colorScheme.surface,
         iconTheme: IconThemeData(color: onSurface),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          children: const [
-            // ★ Événements EN PREMIER
-            _EventsSection(),
-            // Accessibilité
-            _LowVisionSection(),
-            // Messagerie
-            _MessageFilterSection(),
-            // Thème
-            _ThemeSection(),
-            // Mode Économe + Notifications
-            _BatterySaverSection(),
-            // Filtres évitement Route Safe
-            _AvoidanceFiltersSection(),
-            // Cartes & Cache
-            _MapCacheSection(),
-            // Service arrière-plan
-            _BackgroundServiceSection(),
-            // Contacts Panic
-            _PanicContactsSection(),
-            // Tutoriel
-            _TutorialSection(),
-            // À propos
-            _AboutSection(),
-          ],
+      body: Scrollbar(
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            children: [
+              // ★ Événements EN PREMIER
+              const _EventsSection(),
+              // Accessibilité (Mode Malvoyant)
+              const _LowVisionSection(),
+              // Messagerie Hive P2P
+              const _MessageFilterSection(),
+              // Thème
+              const _ThemeSection(),
+              // Mode Économe + Notifications internes
+              const _BatterySaverSection(),
+              // [4] Notifications Android système séparées
+              const _AndroidNotificationSection(),
+              // Filtres évitement Route Safe
+              const _AvoidanceFiltersSection(),
+              // Cartes & Cache
+              const _MapCacheSection(),
+              // Service arrière-plan
+              const _BackgroundServiceSection(),
+              // Contacts Panic
+              const _PanicContactsSection(),
+              // Tutoriel
+              const _TutorialSection(),
+              // À propos
+              const _AboutSection(),
+              // [5] Signalement de bugs
+              const _BugReportSection(),
+            ],
+          ),
         ),
       ),
     );
@@ -1203,6 +1211,249 @@ class _AboutRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ============================================================================
+// [4b] Section NOTIFICATIONS ANDROID SYSTÈME (canal séparé)
+// ============================================================================
+
+/// [4] Notifications système Android — indépendantes des alertes internes.
+/// L'utilisateur peut choisir indépendamment ce que le système Android notifie.
+class _AndroidNotificationSection extends StatelessWidget {
+  const _AndroidNotificationSection();
+
+  static const List<_AndroidChannel> _channels = [
+    _AndroidChannel(
+      id: 'alerts',
+      icon: Icons.warning_amber_outlined,
+      title: 'Alertes terrain',
+      subtitle: 'Barrages, nasses, zones de tension',
+      color: Color(0xFFFF6F00),
+    ),
+    _AndroidChannel(
+      id: 'events',
+      icon: Icons.event_note_outlined,
+      title: 'Événements & Trajets',
+      subtitle: 'Début de trajet, waypoints, fin de manif',
+      color: Color(0xFF1565C0),
+    ),
+    _AndroidChannel(
+      id: 'panic',
+      icon: Icons.emergency_outlined,
+      title: 'Alertes Panic collectives',
+      subtitle: 'Déclenchement panic multi-appareils',
+      color: Color(0xFFC62828),
+    ),
+    _AndroidChannel(
+      id: 'messages',
+      icon: Icons.forum_outlined,
+      title: 'Messages Hive P2P',
+      subtitle: 'Nouveaux messages sur le réseau local',
+      color: Color(0xFF00695C),
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return _Card(
+      child: ValueListenableBuilder<AppPreferences>(
+        valueListenable: AppPreferencesStore.instance,
+        builder: (context, prefs, _) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionHeader(
+                icon: Icons.notification_important_outlined,
+                title: 'Notifications Android (canaux système)',
+                color: const Color(0xFF6A1B9A),
+              ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.only(left: 30),
+                child: Text(
+                  'Configurez chaque canal de notification Android '
+                  'indépendamment des alertes internes de l\'application.\n'
+                  'Ces réglages s\'appliquent aux notifications système '
+                  'visibles dans le tiroir de notifications d\'Android.',
+                  style: TextStyle(
+                    color: onSurface.withValues(alpha: 0.65),
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              for (final ch in _channels)
+                _AndroidChannelTile(
+                  channel: ch,
+                  enabled: prefs.isAndroidChannelEnabled(ch.id),
+                  onChanged: (v) => AppPreferencesStore.instance
+                      .setAndroidChannelEnabled(ch.id, v),
+                ),
+              const Divider(height: 20),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.settings_outlined, size: 16),
+                    label: const Text(
+                      'Gérer dans les Paramètres Android',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    onPressed: () => _openAndroidNotificationSettings(),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF6A1B9A)),
+                      foregroundColor: const Color(0xFF6A1B9A),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  static Future<void> _openAndroidNotificationSettings() async {
+    // Ouvre les paramètres de notification de l'app dans Android.
+    // Sur les autres plateformes, cette action est ignorée silencieusement.
+    try {
+      const channel =
+          MethodChannel('com.streetphare.app/system');
+      await channel.invokeMethod('openNotificationSettings');
+    } catch (_) {
+      // Pas disponible sur cette plateforme — ignorer.
+    }
+  }
+}
+
+class _AndroidChannel {
+  const _AndroidChannel({
+    required this.id,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+  });
+  final String id;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+}
+
+class _AndroidChannelTile extends StatelessWidget {
+  const _AndroidChannelTile({
+    required this.channel,
+    required this.enabled,
+    required this.onChanged,
+  });
+  final _AndroidChannel channel;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return SwitchListTile(
+      secondary: Icon(channel.icon, color: channel.color, size: 22),
+      title: Text(channel.title,
+          style: TextStyle(color: onSurface, fontSize: 13)),
+      subtitle: Text(
+        channel.subtitle,
+        style: TextStyle(
+            color: onSurface.withValues(alpha: 0.6), fontSize: 11),
+      ),
+      value: enabled,
+      onChanged: onChanged,
+      activeThumbColor: channel.color,
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+    );
+  }
+}
+
+// ============================================================================
+// [5b] Section SIGNALEMENT DE BUGS
+// ============================================================================
+
+/// [5] Section dédiée dans les Paramètres avec bouton de report de bugs
+/// et texte explicatif.
+class _BugReportSection extends StatelessWidget {
+  const _BugReportSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(
+            icon: Icons.bug_report_outlined,
+            title: 'Signalement de bugs & Suggestions',
+            color: const Color(0xFF00838F),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00838F).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: const Color(0xFF00838F).withValues(alpha: 0.3),
+              ),
+            ),
+            child: Text(
+              '🐛 Bouton Bug (en bas à gauche de la carte) : '
+              'signalez un bug ou une suggestion directement depuis '
+              'l\'interface principale sans quitter la carte.\n\n'
+              '💡 Ce formulaire envoie un rapport technique au serveur '
+              'web d\'administration de StreetPhare '
+              '(192.168.31.18:3001). Les rapports aident les '
+              'développeurs à identifier et corriger les problèmes '
+              'rapidement.\n\n'
+              '🔒 Aucune donnée personnelle n\'est transmise. '
+              'Seuls le titre, la description, la catégorie et la '
+              'version de l\'application sont envoyés.',
+              style: TextStyle(
+                color: onSurface.withValues(alpha: 0.75),
+                fontSize: 12,
+                height: 1.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              ElevatedButton.icon(
+                icon: const Icon(Icons.bug_report, size: 18),
+                label: const Text('Signaler un bug'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00838F),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => BugReportDialog.show(context),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.lightbulb_outline, size: 18),
+                label: const Text('Suggérer'),
+                onPressed: () => BugReportDialog.show(context),
+                style: OutlinedButton.styleFrom(
+                  side:
+                      const BorderSide(color: Color(0xFF00838F)),
+                  foregroundColor: const Color(0xFF00838F),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

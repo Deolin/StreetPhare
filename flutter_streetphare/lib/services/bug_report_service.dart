@@ -68,7 +68,7 @@ class BugReportService {
   static final BugReportService instance = BugReportService._();
 
   /// URL du serveur d'administration.
-  static const String _adminBaseUrl = 'http://localhost:4000';
+  static const String _adminBaseUrl = 'http://192.168.31.18:4000';
 
   /// Détecte si l'app tourne dans un environnement de test Google
   /// (Firebase Test Lab, Play Console pre-launch testing).
@@ -96,7 +96,7 @@ class BugReportService {
     try {
       final response = await http
           .post(
-            Uri.parse('$_adminBaseUrl/api/bugs'),
+            Uri.parse('$_adminBaseUrl/api/bug-report'),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(report.toJson()),
           )

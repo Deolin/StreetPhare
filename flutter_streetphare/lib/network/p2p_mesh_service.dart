@@ -135,9 +135,23 @@ class P2PMeshService {
             debugPrint('[P2PMeshService] transport ${t.name} démarré');
           }
         } else if (kDebugMode) {
-          debugPrint('[P2PMeshService] transport ${t.name} indisponible');
+          // Transport déclaré non-disponible sur cette plateforme
+          // (ex. BLE sur Windows/Linux). Non-bloquant : les autres
+          // transports prennent le relais normalement.
+          debugPrint('[P2PMeshService] transport ${t.name} ignoré (non supporté)');
+        }
+      } on UnimplementedError catch (e) {
+        // Comportement attendu : transport dont l'implémentation
+        // native n'existe pas sur cette plateforme (ex. flutter_reactive_ble
+        // sur Windows). On log silencieusement en mode debug seulement.
+        if (kDebugMode) {
+          debugPrint(
+            '[P2PMeshService] transport ${t.name} non implémenté '
+            'sur cette plateforme — ignoré. ($e)',
+          );
         }
       } catch (e) {
+        // Erreur inattendue : loguée mais non fatale.
         if (kDebugMode) debugPrint('[P2PMeshService] erreur ${t.name}: $e');
       }
     }
@@ -169,6 +183,42 @@ class P2PMeshService {
           debugPrint('[P2PMeshService] broadcastRaw ${t.name}: $e');
         }
       }
+    }
+  }
+
+  /// [1] Diffuse un payload JSON sur les transports LOCAUX uniquement
+  /// (BLE + Wi-Fi Direct), en excluant le relay Internet.
+  /// Utilisé pour la PRIORITÉ LOCALE dans l'architecture hybride.
+  Future<void> broadcastRawJsonLocal(Map<String, dynamic> json) async {
+    final payload = jsonEncode(json);
+    // Les transports "locaux" sont identifiés par leur nom :
+    // 'ble', 'wifi', 'wifi_direct', 'nearby'. Le relay est exclu.
+    final localTransports = transports.where(
+      (t) => !t.name.toLowerCase().contains('relay') &&
+             !t.name.toLowerCase().contains('remote') &&
+             !t.name.toLowerCase().contains('server'),
+    );
+    for (final t in localTransports) {
+      try {
+        if (t.isAvailable) {
+          await t.broadcast(payload);
+          if (kDebugMode) {
+            debugPrint('[P2PMeshService] broadcastLocal ${t.name}: OK');
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[P2PMeshService] broadcastLocal ${t.name}: $e');
+        }
+      }
+    }
+    // Fallback : si aucun transport local n'est disponible,
+    // on utilise tous les transports pour ne pas perdre le message.
+    if (!localTransports.any((t) => t.isAvailable)) {
+      if (kDebugMode) {
+        debugPrint('[P2PMeshService] no local transport, fallback to all');
+      }
+      await broadcastRawJson(json);
     }
   }
 

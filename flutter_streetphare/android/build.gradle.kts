@@ -21,6 +21,11 @@
 //      parsé. C'est le seul timing qui marche : la valeur est
 //      lue par AGP pendant la phase de configuration du plugin.
 //   4. Déclarer la tâche `clean`.
+//
+// NOTE Java 8 → warning non-bloquant : nearby_connections 4.3.0 déclare
+// encore `sourceCompatibility JavaVersion.VERSION_1_8`. Surcharger
+// compileOptions via réflexion post-évaluation est impossible sans
+// casser AGP 8+ (état gelé) — le warning javac est inhérent au plugin.
 
 allprojects {
     repositories {
@@ -79,21 +84,28 @@ gradle.beforeProject {
 // Variante "post-evaluation" : pour les plugins qui ne lisent
 // pas les propriétés `ext.*` (la plupart, malheureusement, ont
 // une valeur en dur dans leur `build.gradle`), on force aussi
-// la valeur via réflexion sur l'extension `android`. Ça ne
-// fonctionne pas toujours car la valeur `compileSdk` est résolue
-// très tôt par AGP, mais ça ne coûte rien de tenter.
+// compileSdkVersion via réflexion sur l'extension `android`.
+//
+// NOTE : la surcharge de compileOptions.sourceCompatibility via
+// réflexion post-évaluation est intentionnellement OMISE ici.
+// AGP 8+ gèle l'état de CompileOptions après l'évaluation ; toute
+// modification réflexive déclenche un "Failed to notify project
+// evaluation listener" non rattrapable qui casse le build.
+// Le warning javac "source value 8 is obsolete" de nearby_connections
+// est un avertissement non-bloquant inhérent au plugin 4.3.0 lui-même.
 gradle.projectsEvaluated {
     rootProject.subprojects {
         if (project.name == "app") return@subprojects
         if (project.extensions.findByName("android") != null) {
             try {
                 val androidExt = project.extensions.getByName("android")
-                val setter = androidExt.javaClass.methods.firstOrNull {
+
+                // ── Force compileSdkVersion ──────────────────────────────
+                androidExt.javaClass.methods.firstOrNull {
                     it.name == "setCompileSdkVersion" &&
                         it.parameterCount == 1 &&
                         it.parameterTypes[0] == Int::class.javaPrimitiveType
-                }
-                setter?.invoke(androidExt, targetCompileSdk)
+                }?.invoke(androidExt, targetCompileSdk)
             } catch (_: Throwable) {
                 // Ignorer : un plugin peut utiliser un DSL exotique.
             }

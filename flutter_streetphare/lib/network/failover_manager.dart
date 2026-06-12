@@ -91,39 +91,49 @@ class SyncResponse {
       );
 }
 
-/// Configuration du FailoverManager.
-class FailoverConfig {
-  /// URL du serveur principal initial (intégré dans l'app, peut
-  /// être mis à jour via OTA / build flags).
-  final String primaryAddress;
+  /// Configuration du FailoverManager.
+  ///
+  /// Version TEST avec heartbeat accéléré :
+  ///   - heartbeatInterval : 5s (au lieu de 30s)
+  ///   - pingTimeout       : 2s (au lieu de 5s)
+  ///   - maxAttempts       : 3 pings consécutifs
+  ///
+  /// Basculement théorique le plus rapide : 3 × 5s + 2s = ~17s max
+  /// En pratique, le premier ping KO est détecté en 2s.
+  /// Dès le 3ème KO consécutif (15s écoulées), le failover est
+  /// déclenché instantanément.
+  class FailoverConfig {
+    /// URL du serveur principal initial (intégré dans l'app, peut
+    /// être mis à jour via OTA / build flags).
+    final String primaryAddress;
 
-  /// Liste des adresses de secours chiffrées (AES).
-  /// La première est utilisée en premier lors d'un basculement.
-  final List<String> encryptedBackupChain;
+    /// Liste des adresses de secours chiffrées (AES).
+    /// La première est utilisée en premier lors d'un basculement.
+    final List<String> encryptedBackupChain;
 
-  /// Nombre de tentatives avant de marquer un serveur défaillant.
-  final int maxAttempts;
+    /// Nombre de tentatives avant de marquer un serveur défaillant.
+    final int maxAttempts;
 
-  /// Délai entre deux heartbeats.
-  final Duration heartbeatInterval;
+    /// Délai entre deux heartbeats.
+    final Duration heartbeatInterval;
 
-  /// Timeout d'une tentative individuelle de ping.
-  final Duration pingTimeout;
+    /// Timeout d'une tentative individuelle de ping.
+    final Duration pingTimeout;
 
-  /// Master passphrase pour dériver la clé AES. En production,
-  /// ce devrait être une clé issue du secure-storage iOS/Android
-  /// ou d'un serveur de clés distant.
-  final String masterPassphrase;
+    /// Master passphrase pour dériver la clé AES. En production,
+    /// ce devrait être une clé issue du secure-storage iOS/Android
+    /// ou d'un serveur de clés distant.
+    final String masterPassphrase;
 
-  const FailoverConfig({
-    required this.primaryAddress,
-    required this.encryptedBackupChain,
-    this.maxAttempts = 3,
-    this.heartbeatInterval = const Duration(seconds: 30),
-    this.pingTimeout = const Duration(seconds: 5),
-    required this.masterPassphrase,
-  });
-}
+    const FailoverConfig({
+      required this.primaryAddress,
+      required this.encryptedBackupChain,
+      this.maxAttempts = 3,
+      this.heartbeatInterval = const Duration(seconds: 5),
+      this.pingTimeout = const Duration(seconds: 2),
+      required this.masterPassphrase,
+    });
+  }
 
 /// FailoverManager singleton.
 class FailoverManager {

@@ -42,7 +42,36 @@ class NotificationService {
   Future<void> init() async {
     if (_initialized) return;
 
-    // Paramètres spécifiques à chaque plateforme.
+    // ── Graceful fallback pour Windows & Web ──────────────────────────────
+    // Sur Windows, flutter_local_notifications v22 requiert
+    // WindowsInitializationSettings. On les fournit ici ; en cas d'échec
+    // (permissions manquantes, runtime non supporté) on dégrade proprement.
+    if (!kIsWeb && Platform.isWindows) {
+      try {
+        const windowsSettings = WindowsInitializationSettings(
+          appName: 'StreetPhare',
+          appUserModelId: 'com.streetphare.streetphare',
+          guid: 'a4b2c3d4-e5f6-7890-abcd-ef1234567890',
+        );
+        await _plugin.initialize(
+          settings: const InitializationSettings(windows: windowsSettings),
+          onDidReceiveNotificationResponse: _onNotificationTap,
+        );
+        _initialized = true;
+        if (kDebugMode) {
+          debugPrint('[NotificationService] initialisé (Windows)');
+        }
+      } catch (e) {
+        // Notifications non disponibles en mode debug Windows — non bloquant.
+        _initialized = true;
+        if (kDebugMode) {
+          debugPrint('[NotificationService] Windows fallback: $e');
+        }
+      }
+      return;
+    }
+
+    // ── Android + iOS ──────────────────────────────────────────────────────
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
@@ -51,15 +80,11 @@ class NotificationService {
       requestSoundPermission: true,
     );
 
-    // Windows est supporté depuis flutter_local_notifications 14+
-    // On construit les settings dynamiquement pour rester compatible.
-    final initSettings = _buildInitSettings(
-      android: androidSettings,
-      ios: iosSettings,
-    );
-
     await _plugin.initialize(
-      initSettings,
+      settings: const InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      ),
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
 
@@ -67,12 +92,12 @@ class NotificationService {
     if (kDebugMode) debugPrint('[NotificationService] initialisé');
   }
 
-  /// Construit [InitializationSettings] de façon portable.
+  /// Construit [InitializationSettings] de façon portable (garde pour
+  /// compatibilité rétrograde si d'autres widgets l'appellent).
   static InitializationSettings _buildInitSettings({
     required AndroidInitializationSettings android,
     required DarwinInitializationSettings ios,
   }) {
-    // On cible Android + iOS. Windows est expérimental et non-requis ici.
     return InitializationSettings(
       android: android,
       iOS: ios,
@@ -121,10 +146,10 @@ class NotificationService {
     );
 
     await _plugin.show(
-      _kPersistentNotifId,
-      '🔦 StreetPhare est actif',
-      'Surveillance de votre zone en cours. Appuyez pour ouvrir.',
-      details,
+      id: _kPersistentNotifId,
+      title: '🔦 StreetPhare est actif',
+      body: 'Surveillance de votre zone en cours. Appuyez pour ouvrir.',
+      notificationDetails: details,
       payload: 'bring_to_foreground',
     );
 
@@ -134,7 +159,7 @@ class NotificationService {
   }
 
   Future<void> dismissPersistentNotification() async {
-    await _plugin.cancel(_kPersistentNotifId);
+    await _plugin.cancel(id: _kPersistentNotifId);
   }
 
   // --------------------------------------------------------------------------
@@ -172,7 +197,13 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    await _plugin.show(notifId, title, body, details, payload: 'alert_tap');
+    await _plugin.show(
+      id: notifId,
+      title: title,
+      body: body,
+      notificationDetails: details,
+      payload: 'alert_tap',
+    );
     if (kDebugMode) debugPrint('[NotificationService] alerte: $title');
   }
 

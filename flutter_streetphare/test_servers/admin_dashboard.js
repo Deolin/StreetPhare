@@ -1,477 +1,735 @@
 // test_servers/admin_dashboard.js
 //
-// StreetPhare — Interface Web d'Administration
-// =============================================
+// [6] Serveur web d'administration StreetPhare — v3.0
 //
-// Dashboard HTML/JS accessible à distance pour :
-//   1. Visualiser l'état en temps réel des serveurs (Principal / Backup).
-//   2. Configurer les événements (créer, modifier, supprimer).
-//   3. Voir les signalements actifs et leur statut de votes.
-//   4. Simuler une panne du serveur principal (test failover).
-//   5. Accéder aux statistiques réseau et panic queue.
-//
-// Démarrage :
-//   node admin_dashboard.js
-//   → http://localhost:4000/admin
-//
-// Intégré au start_servers_v2.js (PORT 4000 par défaut).
+// Nouvelles fonctionnalités v3.0 :
+//   - Générateur de QR Code pour événements
+//   - Menu de gestion des événements (CRUD trajets Fleurus)
+//   - Console de communication (Broadcast + Alertes réseau Hive)
+//   - Contrôle serveur local (Start / Stop / Restart)
+//   - Système de Kick et Bannissement des utilisateurs malveillants
+//   - Endpoint de réception des rapports de bugs (/api/bug-report)
+//   - Verrouillage automatique client après 3 kicks en 30 min
 
 'use strict';
 
-const express = require('express');
-const http    = require('http');
-const path    = require('path');
+const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const path = require('path');
+const { execSync, spawn, exec } = require('child_process');
+const crypto = require('crypto');
 
-const ADMIN_PORT = parseInt(process.env.ADMIN_PORT || '4000', 10);
-const PRIMARY_URL   = process.env.PRIMARY_URL   || 'http://localhost:3000';
-const SECONDARY_URL = process.env.SECONDARY_URL || 'http://localhost:3001';
-
-const app = express();
-app.use(express.json({ limit: '1mb' }));
-app.use(express.static(path.join(__dirname, 'admin_static')));
-
-function log(...args) {
-  console.log(`[${new Date().toISOString()}][admin:${ADMIN_PORT}]`, ...args);
+// [4] Sandbox / diagnostic — monté sur /sandbox via Express sub-app
+let _sandboxApp = null;
+function getSandboxApp() {
+  if (_sandboxApp) return _sandboxApp;
+  try {
+    const express = require('express');
+    const { router } = require('./sandbox');
+    _sandboxApp = express();
+    _sandboxApp.use('/sandbox', router);
+  } catch (e) {
+    console.warn('[Admin] Sandbox non disponible (express manquant?):', e.message);
+  }
+  return _sandboxApp;
 }
 
-// ── Helper : requête HTTP interne vers les serveurs StreetPhare ──────────────
-function fetchInternal(url, method = 'GET', body = null) {
-  return new Promise((resolve, reject) => {
-    const urlObj = new URL(url);
-    const options = {
-      hostname: urlObj.hostname,
-      port:     urlObj.port || 80,
-      path:     urlObj.pathname + urlObj.search,
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 3000,
+// ── Port et configuration ────────────────────────────────────────────────────
+const PORT = process.env.ADMIN_PORT || 4000;
+const PRIMARY_SERVER_PORT = process.env.PRIMARY_PORT || 3000;
+const DATA_FILE = path.join(__dirname, 'admin_data.json');
+
+// ── État en mémoire ──────────────────────────────────────────────────────────
+let kickedUsers = new Map();   // uuid → { count, firstKick, lastKick, banned }
+let bugReports = [];
+let broadcastLog = [];
+let serverProcess = null;
+
+// ── Persistance des données admin ────────────────────────────────────────────
+function loadData() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const raw = fs.readFileSync(DATA_FILE, 'utf8');
+      const data = JSON.parse(raw);
+      kickedUsers = new Map(Object.entries(data.kickedUsers || {}));
+      bugReports = data.bugReports || [];
+      broadcastLog = data.broadcastLog || [];
+    }
+  } catch (e) {
+    console.error('[Admin] Erreur chargement données:', e.message);
+  }
+}
+
+function saveData() {
+  try {
+    const data = {
+      kickedUsers: Object.fromEntries(kickedUsers),
+      bugReports: bugReports.slice(-200), // garder les 200 derniers
+      broadcastLog: broadcastLog.slice(-100),
     };
-    const req = http.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => (data += chunk));
-      res.on('end', () => {
-        try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
-        catch { resolve({ status: res.statusCode, body: data }); }
-      });
-    });
-    req.on('error',   reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
-    if (body) req.write(JSON.stringify(body));
-    req.end();
-  });
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.error('[Admin] Erreur sauvegarde données:', e.message);
+  }
 }
 
-// ============================================================================
-//  API ADMIN
-// ============================================================================
+loadData();
 
-// GET /admin/api/status — état des deux serveurs
-app.get('/admin/api/status', async (_req, res) => {
-  const [primary, secondary] = await Promise.allSettled([
-    fetchInternal(`${PRIMARY_URL}/status`),
-    fetchInternal(`${SECONDARY_URL}/status`),
-  ]);
-  res.json({
-    primary:   primary.status   === 'fulfilled' ? primary.value   : { error: primary.reason?.message },
-    secondary: secondary.status === 'fulfilled' ? secondary.value : { error: secondary.reason?.message },
-    admin_time: new Date().toISOString(),
-  });
-});
+// ── Utilitaires QR Code (génération SVG simple) ─────────────────────────────
+function generateQRCodeSvg(text) {
+  // QR Code minimaliste : renvoie une URL de service externe fiable
+  // En production, utiliser qrcode npm package
+  const encoded = encodeURIComponent(text);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <rect width="200" height="200" fill="white"/>
+  <image href="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encoded}" 
+         x="10" y="10" width="180" height="180"/>
+</svg>`;
+}
 
-// GET /admin/api/reports — signalements actifs du serveur principal
-app.get('/admin/api/reports', async (_req, res) => {
-  try {
-    const r = await fetchInternal(`${PRIMARY_URL}/v1/reports`);
-    res.json(r.body);
-  } catch (e) {
-    res.status(502).json({ error: e.message });
+// ── Kick / Ban System ────────────────────────────────────────────────────────
+function kickUser(uuid, reason) {
+  const now = Date.now();
+  const existing = kickedUsers.get(uuid) || { count: 0, firstKick: now, lastKick: 0, banned: false };
+  
+  // Réinitialise le compteur si la fenêtre de 30 min est dépassée
+  const windowMs = 30 * 60 * 1000;
+  if (now - existing.firstKick > windowMs) {
+    existing.count = 0;
+    existing.firstKick = now;
   }
-});
-
-// GET /admin/api/reports/stats — statistiques
-app.get('/admin/api/reports/stats', async (_req, res) => {
-  try {
-    const r = await fetchInternal(`${PRIMARY_URL}/v1/reports/stats`);
-    res.json(r.body);
-  } catch (e) {
-    res.status(502).json({ error: e.message });
+  
+  existing.count++;
+  existing.lastKick = now;
+  existing.reason = reason || 'Comportement malveillant';
+  
+  // Bannissement automatique après 3 kicks en 30 min
+  if (existing.count >= 3) {
+    existing.banned = true;
+    existing.autoLockTriggered = true;
+    console.log(`[Admin] AUTO-LOCK déclenché pour ${uuid} (${existing.count} kicks en <30min)`);
   }
-});
+  
+  kickedUsers.set(uuid, existing);
+  saveData();
+  return existing;
+}
 
-// GET /admin/api/events — liste des événements
-app.get('/admin/api/events', async (_req, res) => {
-  try {
-    const r = await fetchInternal(`${PRIMARY_URL}/v1/events`);
-    res.json(r.body);
-  } catch (e) {
-    res.status(502).json({ error: e.message });
-  }
-});
+function isUserKicked(uuid) {
+  const user = kickedUsers.get(uuid);
+  if (!user) return false;
+  // Les kicks expirent après 2 heures (sauf bannissement permanent)
+  if (user.banned) return true;
+  const twoHours = 2 * 60 * 60 * 1000;
+  return (Date.now() - user.lastKick) < twoHours;
+}
 
-// ── KILL SWITCH : arrêt logiciel du serveur principal ───────────────────────
-//
-// POST /admin/api/kill-primary
-//
-// Envoie une demande de démission (/_debug/demote) au serveur principal.
-// Cela simule une panne et déclenche le failover automatique vers
-// le serveur de backup (Port 3001).
-//
-// ⚠️  ATTENTION : cette action ARRÊTE le processus Node.js du serveur
-//     principal. À n'utiliser que dans un environnement de test.
-//
-app.post('/admin/api/kill-primary', async (req, res) => {
-  const reason = (req.body && req.body.reason) || 'Kill depuis Admin Dashboard';
-  log(`⚠️  KILL PRINCIPAL demandé : ${reason}`);
-  try {
-    const r = await fetchInternal(
-      `${PRIMARY_URL}/_debug/demote`,
-      'POST',
-      { reason },
-    );
-    log(`   → Serveur principal a répondu : ${JSON.stringify(r.body)}`);
-    res.json({
-      ok: true,
-      message: `Serveur principal (${PRIMARY_URL}) en cours d'arrêt.`,
-      demote_response: r.body,
-    });
-  } catch (e) {
-    // Si le serveur ne répond plus, il est peut-être déjà arrêté.
-    log(`   → Aucune réponse (déjà arrêté ?) : ${e.message}`);
-    res.json({
-      ok: true,
-      message: `Serveur principal ne répond plus (peut-être déjà arrêté).`,
-      error: e.message,
-    });
-  }
-});
+function isAutoLockNeeded(uuid) {
+  const user = kickedUsers.get(uuid);
+  return user?.autoLockTriggered === true;
+}
 
-// ── RESTART : redémarre le serveur de backup ─────────────────────────────────
-app.get('/admin/api/secondary/health', async (_req, res) => {
-  try {
-    const r = await fetchInternal(`${SECONDARY_URL}/healthz`);
-    res.json({ online: r.status === 200, body: r.body });
-  } catch (e) {
-    res.json({ online: false, error: e.message });
-  }
-});
+// ── HTML du dashboard ────────────────────────────────────────────────────────
+function getDashboardHtml() {
+  const kickList = Array.from(kickedUsers.entries())
+    .map(([uuid, data]) => `
+      <tr>
+        <td class="mono">${uuid.substring(0,12)}…</td>
+        <td>${data.count}</td>
+        <td>${data.banned ? '<span class="badge banned">BANNI</span>' : '<span class="badge kicked">Kické</span>'}</td>
+        <td>${data.reason || '-'}</td>
+        <td>${new Date(data.lastKick).toLocaleString('fr-BE')}</td>
+        <td>
+          <button onclick="unban('${uuid}')" class="btn btn-sm btn-success">Lever</button>
+        </td>
+      </tr>`).join('');
 
-// ── DEBUG STORE ──────────────────────────────────────────────────────────────
-app.get('/admin/api/debug/primary', async (_req, res) => {
-  try {
-    const r = await fetchInternal(`${PRIMARY_URL}/_debug/reports`);
-    res.json(r.body);
-  } catch (e) {
-    res.status(502).json({ error: e.message });
-  }
-});
+  const bugList = bugReports.slice(-10).reverse()
+    .map(r => `
+      <tr>
+        <td>${new Date(r.submitted_at || Date.now()).toLocaleString('fr-BE')}</td>
+        <td><span class="badge">${r.category || 'bug'}</span></td>
+        <td>${r.platform || '?'}</td>
+        <td>${escapeHtml(r.title || '')}</td>
+        <td style="max-width:300px">${escapeHtml(r.description || '')}</td>
+      </tr>`).join('');
 
-// ============================================================================
-//  INTERFACE HTML (Dashboard principal)
-// ============================================================================
-
-app.get('/admin', (_req, res) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(ADMIN_HTML);
-});
-
-// Redirect racine → /admin
-app.get('/', (_req, res) => res.redirect('/admin'));
-
-// ============================================================================
-//  HTML INLINE DU DASHBOARD
-// ============================================================================
-
-const ADMIN_HTML = `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>StreetPhare — Admin Dashboard</title>
-<style>
-  :root {
-    --primary: #FFB300;
-    --danger: #E53935;
-    --surface: #1E1E1E;
-    --card: #2A2A2A;
-    --text: #EEEEEE;
-    --text2: #999;
-    --green: #4CAF50;
-    --blue: #2196F3;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--surface); color: var(--text); font-family: 'Segoe UI', sans-serif; font-size: 14px; }
-  header { background: var(--card); padding: 14px 24px; display: flex; align-items: center; gap: 12px; border-bottom: 2px solid var(--primary); }
-  header h1 { font-size: 20px; color: var(--primary); }
-  header span { color: var(--text2); font-size: 12px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; padding: 20px; }
-  .card { background: var(--card); border-radius: 12px; padding: 18px; border: 1px solid #333; }
-  .card h2 { font-size: 15px; margin-bottom: 12px; color: var(--primary); display: flex; align-items: center; gap: 8px; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
-  .badge.online { background: #1B5E20; color: #81C784; }
-  .badge.offline { background: #B71C1C; color: #EF9A9A; }
-  .badge.warn { background: #E65100; color: #FFCC80; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th { text-align: left; color: var(--text2); padding: 4px 8px; border-bottom: 1px solid #444; }
-  td { padding: 5px 8px; border-bottom: 1px solid #333; vertical-align: top; }
-  td.val { color: var(--primary); font-weight: 600; }
-  .btn { display: inline-block; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; margin: 4px 2px; transition: opacity .2s; }
-  .btn:hover { opacity: .85; }
-  .btn-primary { background: var(--primary); color: #000; }
-  .btn-danger  { background: var(--danger);  color: #fff; }
-  .btn-blue    { background: var(--blue);    color: #fff; }
-  .btn-ghost   { background: #444; color: var(--text); }
-  .log { background: #111; border-radius: 8px; padding: 10px; font-family: monospace; font-size: 11px; max-height: 200px; overflow-y: auto; color: #a8d08d; white-space: pre-wrap; }
-  .stat-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #333; }
-  .stat-label { color: var(--text2); }
-  .stat-val   { color: var(--primary); font-weight: 600; }
-  .kill-section { border: 2px solid var(--danger); border-radius: 12px; padding: 18px; margin-top: 0; }
-  .kill-section h2 { color: var(--danger); }
-  .section-title { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; display: none; z-index: 999; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StreetPhare — Administration</title>
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --primary: #FFB300; --danger: #f85149; --success: #3fb950;
+      --text: #c9d1d9; --muted: #8b949e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border);
+             padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 20px; color: var(--primary); }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); }
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; }
+    .card { background: var(--surface); border: 1px solid var(--border); 
+            border-radius: 10px; padding: 20px; }
+    .card h2 { font-size: 14px; color: var(--muted); margin-bottom: 16px; 
+               text-transform: uppercase; letter-spacing: 0.8px; }
+    .card h2 .icon { margin-right: 8px; }
+    input, textarea, select { background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); padding: 8px 12px; border-radius: 6px; width: 100%;
+      font-size: 14px; margin-bottom: 10px; }
+    textarea { resize: vertical; min-height: 80px; }
+    .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+           font-size: 13px; font-weight: 600; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--primary); color: #000; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-success { background: var(--success); color: #000; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-sm { padding: 4px 10px; font-size: 11px; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; color: var(--muted); padding: 8px 4px; 
+         border-bottom: 1px solid var(--border); }
+    td { padding: 8px 4px; border-bottom: 1px solid var(--border); }
+    .badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .badge.banned { background: var(--danger); color: #fff; }
+    .badge.kicked { background: #e3b341; color: #000; }
+    .mono { font-family: monospace; font-size: 12px; }
+    .server-controls { display: flex; gap: 10px; margin-top: 12px; }
+    #qr-preview { margin-top: 12px; text-align: center; }
+    #qr-preview svg, #qr-preview img { border: 2px solid var(--border); border-radius: 8px; }
+    .log { background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+           padding: 10px; font-family: monospace; font-size: 12px; max-height: 200px;
+           overflow-y: auto; margin-top: 8px; color: var(--muted); }
+    .broadcast-type { display: flex; gap: 8px; margin-bottom: 10px; }
+    .broadcast-type label { font-size: 13px; cursor: pointer; }
+    #status-bar { background: var(--surface); border-top: 1px solid var(--border);
+                 padding: 8px 24px; font-size: 12px; color: var(--muted);
+                 position: fixed; bottom: 0; left: 0; right: 0; }
+  </style>
 </head>
 <body>
-
 <header>
-  <span style="font-size:24px">🔦</span>
-  <h1>StreetPhare Admin</h1>
-  <span id="clock"></span>
-  <span style="flex:1"></span>
-  <button class="btn btn-primary" onclick="refreshAll()">↻ Actualiser</button>
-  <button class="btn btn-ghost" onclick="toggleAutoRefresh()" id="autoBtn">▶ Auto (5s)</button>
+  <div class="status-dot" id="status-dot"></div>
+  <h1>💡 StreetPhare — Administration</h1>
+  <span style="margin-left:auto;font-size:12px;color:var(--muted)">
+    Serveur : ${new Date().toLocaleString('fr-BE')}
+  </span>
 </header>
 
-<div class="grid">
+<div class="container">
+  <div class="grid">
 
-  <!-- Statut Serveurs -->
-  <div class="card">
-    <h2>🖥️ Serveurs <span id="badge-primary" class="badge warn">…</span></h2>
-    <div class="section-title">Serveur Principal (Port 3000)</div>
-    <table id="tbl-primary"></table>
-    <br>
-    <div class="section-title">Serveur Backup (Port 3001)</div>
-    <table id="tbl-secondary"></table>
-    <br>
-    <button class="btn btn-blue" onclick="loadStatus()">Rafraîchir statut</button>
-  </div>
-
-  <!-- Signalements -->
-  <div class="card">
-    <h2>📍 Signalements actifs</h2>
-    <div id="reports-stats" style="margin-bottom:10px;"></div>
-    <table id="tbl-reports">
-      <thead><tr><th>Type</th><th>Votes</th><th>Dist. ?</th><th>Expire</th></tr></thead>
-      <tbody></tbody>
-    </table>
-    <br>
-    <button class="btn btn-ghost" onclick="loadReports()">↻ Rafraîchir</button>
-  </div>
-
-  <!-- Événements -->
-  <div class="card">
-    <h2>📅 Événements</h2>
-    <table id="tbl-events">
-      <thead><tr><th>ID</th><th>Titre</th><th>Statut</th></tr></thead>
-      <tbody></tbody>
-    </table>
-    <br>
-    <button class="btn btn-ghost" onclick="loadEvents()">↻ Rafraîchir</button>
-  </div>
-
-  <!-- Kill Switch -->
-  <div class="card kill-section">
-    <h2>⚠️ Simulation de Panne</h2>
-    <p style="color:var(--text2); font-size:12px; margin-bottom:12px;">
-      Arrête logiquement le serveur principal (Port 3000) pour valider
-      instantanément le basculement automatique vers le backup (Port 3001).
-    </p>
-    <div style="margin-bottom:12px;">
-      <input id="kill-reason" type="text" value="Test failover depuis Admin Dashboard"
-        style="width:100%; padding:8px; background:#111; color:#fff; border:1px solid #555; border-radius:6px; font-size:12px;">
+    <!-- ── Contrôle du serveur ─────────────────────────────────── -->
+    <div class="card">
+      <h2><span class="icon">🖥️</span> Contrôle Serveur Local</h2>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+        Gère le processus serveur principal (port ${PRIMARY_SERVER_PORT}) sur cette machine.
+      </p>
+      <div class="server-controls">
+        <button class="btn btn-success" onclick="serverAction('start')">▶ Start</button>
+        <button class="btn btn-danger" onclick="serverAction('stop')">■ Stop</button>
+        <button class="btn btn-primary" onclick="serverAction('restart')">↺ Restart</button>
+        <button class="btn btn-outline" onclick="serverAction('status')">? Status</button>
+      </div>
+      <div class="log" id="server-log">En attente de commandes…</div>
     </div>
-    <button class="btn btn-danger" onclick="killPrimary()">
-      🔴 KILL Serveur Principal
-    </button>
-    <div id="kill-result" style="margin-top:10px; font-size:12px; color:var(--text2);"></div>
+
+    <!-- ── Générateur QR Code ──────────────────────────────────── -->
+    <div class="card">
+      <h2><span class="icon">📱</span> Générateur de QR Code</h2>
+      <input type="text" id="qr-event-title" placeholder="Titre de l'événement">
+      <input type="text" id="qr-event-code" placeholder="Code d'accès (ex: FLEURUS2026)">
+      <input type="datetime-local" id="qr-event-time">
+      <button class="btn btn-primary" onclick="generateQR()">Générer le QR Code</button>
+      <div id="qr-preview"></div>
+      <div id="qr-data" style="font-size:11px;color:var(--muted);margin-top:8px;word-break:break-all"></div>
+    </div>
+
+    <!-- ── Gestion des événements ──────────────────────────────── -->
+    <div class="card">
+      <h2><span class="icon">📍</span> Gestion des Événements Fleurus</h2>
+      <input type="text" id="ev-title" placeholder="Titre (ex: Marche de Fleurus 2026)">
+      <textarea id="ev-route" placeholder="Coordonnées du trajet (JSON ou GeoJSON)…" rows="4"></textarea>
+      <input type="text" id="ev-destination" placeholder="Destination (lat,lng)">
+      <input type="datetime-local" id="ev-time">
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveEvent()">💾 Enregistrer</button>
+        <button class="btn btn-outline" onclick="loadEvents()">🔄 Actualiser</button>
+      </div>
+      <div id="events-list" style="margin-top:12px;font-size:13px"></div>
+    </div>
+
+    <!-- ── Console de communication ───────────────────────────── -->
+    <div class="card">
+      <h2><span class="icon">📡</span> Console de Communication Réseau</h2>
+      <div class="broadcast-type">
+        <label><input type="radio" name="btype" value="broadcast" checked> 📢 Broadcast global</label>
+        <label><input type="radio" name="btype" value="alert"> 🚨 Alerte événement</label>
+        <label><input type="radio" name="btype" value="info"> ℹ️ Information</label>
+      </div>
+      <input type="text" id="bc-title" placeholder="Titre du message">
+      <textarea id="bc-message" placeholder="Contenu du message à diffuser sur le réseau Hive…"></textarea>
+      <button class="btn btn-primary" onclick="sendBroadcast()">📤 Envoyer sur le réseau Hive</button>
+      <div class="log" id="broadcast-log">Aucun broadcast envoyé.</div>
+    </div>
+
+    <!-- ── Kick / Ban ──────────────────────────────────────────── -->
+    <div class="card">
+      <h2><span class="icon">🚫</span> Kick & Bannissement</h2>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
+        3 kicks en 30 min → verrouillage automatique de l'application cliente.
+      </p>
+      <input type="text" id="kick-uuid" placeholder="UUID éphémère de l'utilisateur">
+      <input type="text" id="kick-reason" placeholder="Raison (ex: Spam, Insultes)">
+      <div class="btn-row">
+        <button class="btn btn-danger" onclick="kickUser()">🦵 Kicker</button>
+        <button class="btn btn-outline" onclick="banUser()">⛔ Bannir définitivement</button>
+      </div>
+      <table style="margin-top:16px">
+        <thead>
+          <tr>
+            <th>UUID</th><th>Kicks</th><th>Statut</th>
+            <th>Raison</th><th>Dernier kick</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="kick-table">${kickList || '<tr><td colspan="6" style="color:var(--muted)">Aucun utilisateur kické.</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <!-- ── Rapports de bugs ────────────────────────────────────── -->
+    <div class="card">
+      <h2><span class="icon">🐛</span> Rapports de Bugs (${bugReports.length})</h2>
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Cat.</th><th>Plateforme</th><th>Titre</th><th>Description</th></tr>
+        </thead>
+        <tbody id="bug-table">${bugList || '<tr><td colspan="5" style="color:var(--muted)">Aucun rapport.</td></tr>'}</tbody>
+      </table>
+      <button class="btn btn-outline btn-sm" onclick="clearBugReports()" style="margin-top:8px">
+        Effacer tous les rapports
+      </button>
+    </div>
+
   </div>
-
-  <!-- Journal des actions -->
-  <div class="card" style="grid-column: 1 / -1;">
-    <h2>📋 Journal des actions</h2>
-    <div class="log" id="log-box">Prêt. En attente d'actions…
-</div>
-  </div>
-
 </div>
 
-<div id="toast"></div>
+<div id="status-bar">Admin StreetPhare v3.0 | Port ${PORT} | 
+  Kicks actifs : <span id="kick-count">${kickedUsers.size}</span> | 
+  Bugs reçus : <span id="bug-count">${bugReports.length}</span>
+</div>
 
 <script>
-  let autoRefreshInterval = null;
-  let autoActive = false;
+async function api(endpoint, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch('/api' + endpoint, opts);
+  return r.json();
+}
 
-  function addLog(msg) {
-    const box = document.getElementById('log-box');
-    const ts = new Date().toLocaleTimeString('fr-FR');
-    box.textContent += '[' + ts + '] ' + msg + '\\n';
-    box.scrollTop = box.scrollHeight;
+async function serverAction(action) {
+  const log = document.getElementById('server-log');
+  log.textContent = 'Exécution de : ' + action + '…';
+  try {
+    const res = await api('/server/' + action, 'POST');
+    log.textContent = res.message || JSON.stringify(res);
+  } catch(e) { log.textContent = 'Erreur : ' + e.message; }
+}
+
+function generateQR() {
+  const title = document.getElementById('qr-event-title').value;
+  const code = document.getElementById('qr-event-code').value;
+  const time = document.getElementById('qr-event-time').value;
+  const payload = JSON.stringify({ title, code, time, type: 'streetphare_event' });
+  const preview = document.getElementById('qr-preview');
+  const dataEl = document.getElementById('qr-data');
+  const encoded = encodeURIComponent(payload);
+  preview.innerHTML = \`<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=\${encoded}" width="200" height="200" alt="QR Code">\`;
+  dataEl.textContent = 'Données : ' + payload;
+}
+
+async function saveEvent() {
+  const ev = {
+    title: document.getElementById('ev-title').value,
+    route: document.getElementById('ev-route').value,
+    destination: document.getElementById('ev-destination').value,
+    eventTime: document.getElementById('ev-time').value,
+  };
+  const res = await api('/events', 'POST', ev);
+  alert(res.message || 'Événement sauvegardé');
+  loadEvents();
+}
+
+async function loadEvents() {
+  const res = await api('/events');
+  const el = document.getElementById('events-list');
+  if (!res.events || res.events.length === 0) {
+    el.textContent = 'Aucun événement enregistré.';
+    return;
   }
+  el.innerHTML = res.events.map((ev, i) => \`
+    <div style="padding:8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px">
+      <strong>\${ev.title}</strong> — \${ev.eventTime || 'heure inconnue'}
+      <button class="btn btn-sm btn-danger" onclick="deleteEvent(\${i})" style="float:right">🗑</button>
+    </div>\`).join('');
+}
 
-  function toast(msg, color = '#333') {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.style.background = color;
-    t.style.display = 'block';
-    setTimeout(() => t.style.display = 'none', 3000);
-  }
+async function deleteEvent(i) {
+  await api('/events/' + i, 'DELETE');
+  loadEvents();
+}
 
-  // ── Horloge ──────────────────────────────────────────────────────────────
-  function updateClock() {
-    document.getElementById('clock').textContent =
-      new Date().toLocaleTimeString('fr-FR');
-  }
-  setInterval(updateClock, 1000);
-  updateClock();
+async function sendBroadcast() {
+  const type = document.querySelector('input[name="btype"]:checked').value;
+  const title = document.getElementById('bc-title').value;
+  const message = document.getElementById('bc-message').value;
+  if (!message.trim()) { alert('Message vide'); return; }
+  const res = await api('/broadcast', 'POST', { type, title, message });
+  const log = document.getElementById('broadcast-log');
+  log.textContent = '[' + new Date().toLocaleTimeString('fr-BE') + '] ' 
+    + (res.message || 'Broadcast envoyé') + '\\n' + log.textContent;
+  document.getElementById('bc-message').value = '';
+}
 
-  // ── Statut serveurs ───────────────────────────────────────────────────────
-  async function loadStatus() {
-    try {
-      const r = await fetch('/admin/api/status');
-      const d = await r.json();
-      renderServer('tbl-primary',   d.primary,   'badge-primary');
-      renderServer('tbl-secondary', d.secondary, null);
-    } catch (e) {
-      addLog('Erreur chargement statut : ' + e.message);
-    }
-  }
+async function kickUser() {
+  const uuid = document.getElementById('kick-uuid').value.trim();
+  const reason = document.getElementById('kick-reason').value.trim();
+  if (!uuid) { alert('UUID requis'); return; }
+  const res = await api('/kick', 'POST', { uuid, reason });
+  alert(res.message);
+  location.reload();
+}
 
-  function renderServer(tableId, data, badgeId) {
-    const tbl = document.getElementById(tableId);
-    const isOnline = data && !data.error;
-    if (badgeId) {
-      const badge = document.getElementById(badgeId);
-      badge.className = 'badge ' + (isOnline ? 'online' : 'offline');
-      badge.textContent = isOnline ? 'En ligne' : 'Hors ligne';
-    }
-    if (data && data.error) {
-      tbl.innerHTML = '<tr><td style="color:#EF9A9A">Hors ligne : ' + data.error + '</td></tr>';
-      return;
-    }
-    const body = data.body || data;
-    const rows = Object.entries(body || {}).map(([k, v]) =>
-      '<tr><th>' + k + '</th><td class="val">' + JSON.stringify(v) + '</td></tr>'
-    ).join('');
-    tbl.innerHTML = rows || '<tr><td>Aucune donnée</td></tr>';
-  }
+async function banUser() {
+  const uuid = document.getElementById('kick-uuid').value.trim();
+  const reason = document.getElementById('kick-reason').value.trim();
+  if (!uuid) { alert('UUID requis'); return; }
+  const res = await api('/ban', 'POST', { uuid, reason });
+  alert(res.message);
+  location.reload();
+}
 
-  // ── Signalements ─────────────────────────────────────────────────────────
-  async function loadReports() {
-    try {
-      const [r, s] = await Promise.all([
-        fetch('/admin/api/reports').then(x => x.json()),
-        fetch('/admin/api/reports/stats').then(x => x.json()),
-      ]);
-      const tbody = document.querySelector('#tbl-reports tbody');
-      const reports = r.reports || [];
-      tbody.innerHTML = reports.length === 0
-        ? '<tr><td colspan="4" style="color:var(--text2)">Aucun signalement actif</td></tr>'
-        : reports.map(rep =>
-            '<tr><td>' + rep.type + '</td>' +
-            '<td class="val">' + (rep.votes || 0) + '</td>' +
-            '<td>' + (rep.distributed ? '✅' : '❌') + '</td>' +
-            '<td>' + Math.round((rep.ttl_remaining_s || 0) / 60) + ' min</td></tr>'
-          ).join('');
-      const statsDiv = document.getElementById('reports-stats');
-      statsDiv.innerHTML = '<div class="stat-row"><span class="stat-label">Total actifs</span><span class="stat-val">' + (s.total_active_reports || 0) + '</span></div>' +
-        '<div class="stat-row"><span class="stat-label">Panic en attente</span><span class="stat-val">' + (s.panic_queue_size || 0) + '</span></div>' +
-        '<div class="stat-row"><span class="stat-label">Votes requis</span><span class="stat-val">' + (s.votes_required || 3) + '</span></div>';
-    } catch (e) {
-      addLog('Erreur signalements : ' + e.message);
-    }
-  }
+async function unban(uuid) {
+  const res = await api('/unban', 'POST', { uuid });
+  alert(res.message);
+  location.reload();
+}
 
-  // ── Événements ────────────────────────────────────────────────────────────
-  async function loadEvents() {
-    try {
-      const r = await fetch('/admin/api/events');
-      const d = await r.json();
-      const tbody = document.querySelector('#tbl-events tbody');
-      const events = d.events || [];
-      tbody.innerHTML = events.length === 0
-        ? '<tr><td colspan="3" style="color:var(--text2)">Aucun événement</td></tr>'
-        : events.map(ev =>
-            '<tr><td>' + (ev.id || '—') + '</td>' +
-            '<td>' + (ev.title || ev.name || '—') + '</td>' +
-            '<td>' + (ev.status || ev.state || '—') + '</td></tr>'
-          ).join('');
-    } catch (e) {
-      addLog('Erreur événements : ' + e.message);
-    }
-  }
+async function clearBugReports() {
+  if (!confirm('Effacer tous les rapports de bugs ?')) return;
+  await api('/bug-reports/clear', 'DELETE');
+  location.reload();
+}
 
-  // ── Kill Switch ───────────────────────────────────────────────────────────
-  async function killPrimary() {
-    const reason = document.getElementById('kill-reason').value;
-    if (!confirm('⚠️ Arrêter le serveur principal ?\\nCela déclenchera le failover vers le backup.')) return;
-    addLog('🔴 Kill switch activé : ' + reason);
-    try {
-      const r = await fetch('/admin/api/kill-primary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason }),
-      });
-      const d = await r.json();
-      document.getElementById('kill-result').textContent =
-        JSON.stringify(d, null, 2);
-      toast('Kill envoyé ! Vérifiez le basculement.', '#B71C1C');
-      addLog('Kill result : ' + JSON.stringify(d));
-      setTimeout(loadStatus, 1500);
-    } catch (e) {
-      addLog('Erreur kill : ' + e.message);
-      toast('Erreur : ' + e.message, '#B71C1C');
-    }
-  }
-
-  // ── Auto-refresh ──────────────────────────────────────────────────────────
-  function toggleAutoRefresh() {
-    autoActive = !autoActive;
-    const btn = document.getElementById('autoBtn');
-    if (autoActive) {
-      autoRefreshInterval = setInterval(refreshAll, 5000);
-      btn.textContent = '⏸ Auto actif';
-      btn.style.background = 'var(--primary)';
-      btn.style.color = '#000';
-    } else {
-      clearInterval(autoRefreshInterval);
-      btn.textContent = '▶ Auto (5s)';
-      btn.style.background = '#444';
-      btn.style.color = 'var(--text)';
-    }
-  }
-
-  function refreshAll() {
-    loadStatus();
-    loadReports();
-    loadEvents();
-  }
-
-  // ── Init ──────────────────────────────────────────────────────────────────
-  refreshAll();
-  addLog('Dashboard chargé — ' + new Date().toLocaleString('fr-FR'));
+loadEvents();
 </script>
 </body>
 </html>`;
-
-// ============================================================================
-//  DÉMARRAGE
-// ============================================================================
-
-if (require.main === module) {
-  app.listen(ADMIN_PORT, () => {
-    log(`✅ Admin Dashboard démarré → http://localhost:${ADMIN_PORT}/admin`);
-    log(`   Connecté à Primary:   ${PRIMARY_URL}`);
-    log(`   Connecté à Secondary: ${SECONDARY_URL}`);
-  });
 }
 
-module.exports = { app, ADMIN_PORT };
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── Gestion des événements (fichier events.json) ─────────────────────────────
+const EVENTS_FILE = path.join(__dirname, 'events_admin.json');
+
+function loadEvents() {
+  try {
+    if (fs.existsSync(EVENTS_FILE)) {
+      return JSON.parse(fs.readFileSync(EVENTS_FILE, 'utf8'));
+    }
+  } catch (_) {}
+  return [];
+}
+
+function saveEvents(events) {
+  fs.writeFileSync(EVENTS_FILE, JSON.stringify(events, null, 2));
+}
+
+// ── Routeur HTTP ──────────────────────────────────────────────────────────────
+const server = http.createServer((req, res) => {
+  const url = new URL(req.url, `http://localhost:${PORT}`);
+  const pathname = url.pathname;
+
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-StreetPhare-Client');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+
+  // Dashboard principal
+  if (pathname === '/' || pathname === '/dashboard') {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(getDashboardHtml());
+    return;
+  }
+
+  // Lecture du body JSON
+  const bodyPromise = () => new Promise((resolve) => {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try { resolve(JSON.parse(body)); } catch (_) { resolve({}); }
+    });
+  });
+
+  const json = (code, data) => {
+    res.writeHead(code, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+  };
+
+  // ── API Routes ──────────────────────────────────────────────────
+  if (pathname.startsWith('/api/')) {
+    const apiPath = pathname.slice(4); // retire /api
+
+    // POST /api/bug-report — Réception des rapports de bugs depuis les clients
+    if (req.method === 'POST' && apiPath === '/bug-report') {
+      bodyPromise().then(body => {
+        const report = { ...body, receivedAt: new Date().toISOString() };
+        bugReports.push(report);
+        saveData();
+        console.log(`[Admin] Bug report reçu: ${body.title || 'Sans titre'} (${body.platform})`);
+        json(201, { status: 'ok', message: 'Rapport reçu' });
+      });
+      return;
+    }
+
+    // POST /api/server/start|stop|restart|status
+    if (req.method === 'POST' && apiPath.startsWith('/server/')) {
+      const action = apiPath.split('/')[2];
+      const serverScript = path.join(__dirname, 'server_primary_v2.js');
+
+      if (action === 'start') {
+        if (serverProcess) {
+          json(200, { message: 'Serveur déjà en cours d\'exécution.' });
+          return;
+        }
+        try {
+          serverProcess = spawn('node', [serverScript], {
+            stdio: 'inherit',
+            detached: false,
+          });
+          serverProcess.on('exit', () => { serverProcess = null; });
+          json(200, { message: `Serveur démarré (PID ${serverProcess.pid})` });
+        } catch (e) {
+          json(500, { message: `Erreur: ${e.message}` });
+        }
+      } else if (action === 'stop') {
+        if (!serverProcess) {
+          json(200, { message: 'Aucun serveur en cours.' });
+          return;
+        }
+        try {
+          serverProcess.kill('SIGTERM');
+          serverProcess = null;
+          json(200, { message: 'Serveur arrêté.' });
+        } catch (e) {
+          json(500, { message: `Erreur: ${e.message}` });
+        }
+      } else if (action === 'restart') {
+        if (serverProcess) {
+          try { serverProcess.kill('SIGTERM'); } catch (_) {}
+          serverProcess = null;
+        }
+        try {
+          serverProcess = spawn('node', [serverScript], {
+            stdio: 'inherit',
+            detached: false,
+          });
+          serverProcess.on('exit', () => { serverProcess = null; });
+          json(200, { message: `Serveur redémarré (PID ${serverProcess.pid})` });
+        } catch (e) {
+          json(500, { message: `Erreur: ${e.message}` });
+        }
+      } else if (action === 'status') {
+        json(200, {
+          running: serverProcess !== null,
+          pid: serverProcess?.pid || null,
+          message: serverProcess ? `En cours (PID ${serverProcess.pid})` : 'Arrêté',
+        });
+      } else {
+        json(404, { message: 'Action inconnue' });
+      }
+      return;
+    }
+
+    // GET /api/events
+    if (req.method === 'GET' && apiPath === '/events') {
+      json(200, { events: loadEvents() });
+      return;
+    }
+
+    // POST /api/events
+    if (req.method === 'POST' && apiPath === '/events') {
+      bodyPromise().then(body => {
+        const events = loadEvents();
+        events.push({ ...body, id: crypto.randomUUID(), createdAt: new Date().toISOString() });
+        saveEvents(events);
+        json(201, { message: 'Événement créé' });
+      });
+      return;
+    }
+
+    // DELETE /api/events/:index
+    if (req.method === 'DELETE' && apiPath.startsWith('/events/')) {
+      const idx = parseInt(apiPath.split('/')[2]);
+      const events = loadEvents();
+      if (idx >= 0 && idx < events.length) {
+        events.splice(idx, 1);
+        saveEvents(events);
+        json(200, { message: 'Événement supprimé' });
+      } else {
+        json(404, { message: 'Événement introuvable' });
+      }
+      return;
+    }
+
+    // POST /api/broadcast — Diffuse un message vers le serveur primaire
+    if (req.method === 'POST' && apiPath === '/broadcast') {
+      bodyPromise().then(body => {
+        const { type = 'broadcast', title, message } = body;
+        const entry = {
+          type, title, message,
+          sentAt: new Date().toISOString(),
+        };
+        broadcastLog.push(entry);
+        saveData();
+
+        // Forward vers le serveur primaire
+        const payload = JSON.stringify({
+          event: 'admin_broadcast',
+          type,
+          title: title || 'Message Administrateur',
+          message,
+          timestamp: entry.sentAt,
+        });
+
+        const options = {
+          hostname: '127.0.0.1',
+          port: PRIMARY_SERVER_PORT,
+          path: '/api/admin-broadcast',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload),
+            'X-Admin-Key': process.env.ADMIN_KEY || 'streetphare_admin',
+          },
+        };
+
+        const req2 = http.request(options, r => {
+          console.log(`[Admin] Broadcast relayé → ${r.statusCode}`);
+        });
+        req2.on('error', err => {
+          console.error('[Admin] Erreur relay broadcast:', err.message);
+        });
+        req2.write(payload);
+        req2.end();
+
+        json(200, { message: `Broadcast "${type}" envoyé sur le réseau Hive` });
+      });
+      return;
+    }
+
+    // POST /api/kick
+    if (req.method === 'POST' && apiPath === '/kick') {
+      bodyPromise().then(body => {
+        const { uuid, reason } = body;
+        if (!uuid) { json(400, { message: 'UUID requis' }); return; }
+        const result = kickUser(uuid, reason);
+        const msg = result.autoLockTriggered
+          ? `⚠️ VERROUILLAGE AUTO déclenché pour ${uuid} (${result.count} kicks)`
+          : `Utilisateur ${uuid} kické (${result.count} fois)`;
+        json(200, { message: msg, autoLock: result.autoLockTriggered });
+      });
+      return;
+    }
+
+    // POST /api/ban
+    if (req.method === 'POST' && apiPath === '/ban') {
+      bodyPromise().then(body => {
+        const { uuid, reason } = body;
+        if (!uuid) { json(400, { message: 'UUID requis' }); return; }
+        const existing = kickedUsers.get(uuid) || { count: 0, firstKick: Date.now() };
+        existing.banned = true;
+        existing.reason = reason || 'Bannissement manuel';
+        existing.lastKick = Date.now();
+        kickedUsers.set(uuid, existing);
+        saveData();
+        json(200, { message: `Utilisateur ${uuid} banni définitivement` });
+      });
+      return;
+    }
+
+    // POST /api/unban
+    if (req.method === 'POST' && apiPath === '/unban') {
+      bodyPromise().then(body => {
+        const { uuid } = body;
+        kickedUsers.delete(uuid);
+        saveData();
+        json(200, { message: `Utilisateur ${uuid} débanni` });
+      });
+      return;
+    }
+
+    // GET /api/kick-status/:uuid — Vérifié par les clients
+    if (req.method === 'GET' && apiPath.startsWith('/kick-status/')) {
+      const uuid = apiPath.split('/')[2];
+      json(200, {
+        kicked: isUserKicked(uuid),
+        autoLock: isAutoLockNeeded(uuid),
+        banned: kickedUsers.get(uuid)?.banned || false,
+      });
+      return;
+    }
+
+    // DELETE /api/bug-reports/clear
+    if (req.method === 'DELETE' && apiPath === '/bug-reports/clear') {
+      bugReports = [];
+      saveData();
+      json(200, { message: 'Rapports de bugs effacés' });
+      return;
+    }
+
+    json(404, { message: 'Route API inconnue' });
+    return;
+  }
+
+  // [4] Sandbox — délègue à l'app Express sous-montée sur /sandbox
+  if (pathname.startsWith('/sandbox')) {
+    const app = getSandboxApp();
+    if (app) {
+      app(req, res);
+    } else {
+      res.writeHead(503, { 'Content-Type': 'text/plain' });
+      res.end('Sandbox indisponible (express non installé). Lancez : cd test_servers && npm install');
+    }
+    return;
+  }
+
+  res.writeHead(404);
+  res.end('Not found');
+});
+
+server.listen(PORT, () => {
+  console.log(`\n🌐 [Admin Dashboard] StreetPhare v3.0`);
+  console.log(`   URL : http://localhost:${PORT}`);
+  console.log(`   Fonctionnalités : QR Codes | Événements | Broadcast | Kick/Ban | Bug Reports\n`);
+});
+
+module.exports = { kickUser, isUserKicked, isAutoLockNeeded };
