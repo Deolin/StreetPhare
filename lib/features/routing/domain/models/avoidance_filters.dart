@@ -66,6 +66,9 @@ class AvoidanceFilters {
       case AlertType.panicCollectif:
         // Les alertes panic collectives sont traitées comme des dangers autres.
         return avoidAutres;
+      case AlertType.density:
+        // La densité est une information de pondération, pas un obstacle bloquant.
+        return false;
     }
   }
 

@@ -1,0 +1,38 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ProjectOutputs>
+    <ProjectOutput>
+      <FullPath>C:\Projets\StreetPhare\build\windows\x64\x64\Debug\ZERO_CHECK</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Projets\StreetPhare\build\windows\x64\plugins\flutter_local_notifications_windows\shared\Debug\flutter_local_notifications_windows.dll</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Projets\StreetPhare\build\windows\x64\flutter\x64\Debug\flutter_assemble</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Projets\StreetPhare\build\windows\x64\plugins\geolocator_windows\Debug\geolocator_windows_plugin.dll</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Projets\StreetPhare\build\windows\x64\plugins\permission_handler_windows\Debug\permission_handler_windows_plugin.dll</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Projets\StreetPhare\build\windows\x64\plugins\url_launcher_windows\Debug\url_launcher_windows_plugin.dll</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Projets\StreetPhare\build\windows\x64\runner\Debug\flutter_streetphare.exe</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Projets\StreetPhare\build\windows\x64\plugins\jni\shared\Debug\dartjni.dll</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Projets\StreetPhare\build\windows\x64\x64\Debug\ALL_BUILD</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>C:\Projets\StreetPhare\build\windows\x64\x64\Debug\INSTALL</FullPath>
+    </ProjectOutput>
+  </ProjectOutputs>
+  <ContentFiles />
+  <SatelliteDlls />
+  <NonRecipeFileRefs />
+</Project>

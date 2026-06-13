@@ -5,6 +5,7 @@ import '../../../core/theme/streetphare_theme.dart';
 import '../../map/presentation/map_screen.dart';
 import '../../tutorial/data/tutorial_store.dart';
 import '../../tutorial/presentation/tutorial_screen.dart';
+import '../../../services/version_check_service.dart';
 
 /// Écran de chargement (Splash Screen) de StreetPhare.
 ///
@@ -59,6 +60,13 @@ class _SplashScreenState extends State<SplashScreen>
   /// Séquence complète de démarrage
   Future<void> _bootstrap() async {
     try {
+      // Étape 0 : Vérification de la version (Kill Switch)
+      _updateProgress(0.05, 'Vérification de la version…');
+      if (mounted) {
+        await VersionCheckService.instance.checkVersion(context);
+        if (VersionCheckService.instance.isObsolete) return;
+      }
+
       // Étape 1 : Vérification du cache
       _updateProgress(0.15, 'Vérification du cache local…');
       final status = await CacheManager.instance.initialize();

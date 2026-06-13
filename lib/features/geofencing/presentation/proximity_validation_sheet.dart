@@ -54,6 +54,8 @@ class ProximityValidationSheet extends StatelessWidget {
         return 'une zone safe';
       case AlertType.panicCollectif:
         return 'une alerte panic collective';
+      case AlertType.density:
+        return 'un rapport de densité Bluetooth';
       case AlertType.autre:
         return 'un danger';
     }
@@ -75,6 +77,8 @@ class ProximityValidationSheet extends StatelessWidget {
         return Icons.shield_outlined;
       case AlertType.panicCollectif:
         return Icons.emergency;
+      case AlertType.density:
+        return Icons.bolt;
       case AlertType.autre:
         return Icons.error_outline;
     }
@@ -96,6 +100,8 @@ class ProximityValidationSheet extends StatelessWidget {
         return const Color(0xFF2E7D32);
       case AlertType.panicCollectif:
         return const Color(0xFFE53935);
+      case AlertType.density:
+        return const Color(0xFFFFB300);
       case AlertType.autre:
         return const Color(0xFF607D8B);
     }

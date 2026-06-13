@@ -24,6 +24,7 @@ import 'features/tutorial/data/tutorial_store.dart';
 import 'network/bootstrap.dart';
 import 'network/network_config.dart';
 import 'network/network_coordinator.dart';
+import 'services/connectivity_service.dart';
 import 'services/notification_service.dart';
 
 /// Point d'entrée principal de l'application StreetPhare
@@ -98,6 +99,7 @@ void main() async {
     // Démarre les services "intelligents" : géofencing, validation
     // de proximité (avec cooldown anti-spam), gestionnaire
     // d'événements (countdown "juste-à-temps") et messagerie Hive P2P.
+    ConnectivityService.instance.start();
     GeofencingService.instance.start();
     ProximityValidationService.instance.start();
     EventManager.instance.start();

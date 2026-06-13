@@ -15,6 +15,7 @@
 //    GET  /ping                    heartbeat simple (spec Flutter)
 //    GET  /healthz                 heartbeat FailoverManager
 //    GET  /status                  topologie complète JSON
+//    GET  /api/version/check       vérification de version (Kill Switch)
 //
 //  Événements (Fleurus 6220)
 //    GET  /v1/events               liste tous les événements
@@ -129,6 +130,11 @@ app.get('/status', (_req, res) => {
     reports_active: reportsStore.getActiveReports().total_active,
     panic_pending:  reportsStore.getPendingPanicCount(),
   });
+});
+
+// GET /api/version/check — vérification de version (Kill Switch)
+app.get('/api/version/check', (_req, res) => {
+  res.json(reportsStore.getVersionInfo());
 });
 
 // ════════════════════════════════════════════════════════════════════════

@@ -1,6 +1,6 @@
 # 🐛 Tableau de bord de Débogage Client - StreetPhare
 
-> Dernière mise à jour : **2026-06-13 02:14:32** (heure locale). Ce fichier est généré par `lib/debug/client_debug_logger.dart` uniquement en mode `kDebugMode`.
+> Dernière mise à jour : **2026-06-14 01:27:30** (heure locale). Ce fichier est généré par `lib/debug/client_debug_logger.dart` uniquement en mode `kDebugMode`.
 
 ---
 
@@ -8,7 +8,7 @@
 
 | Plateforme | État | Serveur Principal Courant |
 | --- | --- | --- |
-| windows | 🟢 **Connecté au principal** | `http://192.168.31.18:3000` |
+| windows | 🛑 **Mode dégradé** | `http://192.168.31.18:3000` |
 
 ## 🔐 Chaîne de Secours (déchiffrée en mémoire)
 
@@ -22,72 +22,101 @@
 
 | Heure | Étape | Détail |
 | --- | --- | --- |
-| 02:08:02 | Bootstrap terminé | Principal verrouillé sur `http://192.168.31.18:3000`. 2 serveur(s) de secours déchiffré(s). |
+| 01:27:30 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:30 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:29 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:28 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:28 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:27 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:25 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:24 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:24 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:23 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:23 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:22 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:21 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:21 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:19 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:19 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:18 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:18 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:16 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:15 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:14 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:13 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:13 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:12 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:11 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:09 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:08 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:07 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:07 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
+| 01:27:06 | Basculement impossible | Tous les secours sont injoignables. L'app reste connectée à `http://192.168.31.18:3000` (marqué défaillant) jusqu'à relance de la session. |
 
 ## 📜 Journal Temps Réel (Debug Client)
 
 | Heure | Niveau | Évènement | Détails |
 | --- | --- | --- | --- |
-| 02:09:37 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:09:42 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:09:47 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:09:52 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:09:57 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:10:02 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:10:07 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:10:12 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:10:17 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:10:22 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:10:27 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:10:32 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:10:37 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:10:42 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:10:47 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:10:52 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:10:57 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:11:02 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:11:07 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:11:12 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:11:17 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:11:22 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:11:27 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:11:32 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:11:37 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:11:42 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:11:47 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:11:52 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:11:57 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:12:02 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:12:07 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:12:12 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:12:17 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:12:22 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:12:27 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:12:32 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:12:37 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:12:42 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:12:47 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:12:52 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:12:57 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:13:02 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:13:07 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:13:12 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:13:17 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:13:22 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:13:27 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:13:32 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:13:37 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:13:42 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:13:47 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:13:52 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:13:57 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:14:02 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:14:07 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:14:12 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:14:17 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:14:22 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:14:27 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
-| 02:14:32 | 💓 PING | Heartbeat OK | http://192.168.31.18:3000 |
+| 01:27:19 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:19 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:19 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:19 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:19 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:19 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:20 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:21 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:21 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:21 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:21 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:21 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:21 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:21 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:22 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:22 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:22 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:22 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:23 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:23 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:23 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:23 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:23 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:23 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:23 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:24 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:24 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:24 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:24 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:24 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:24 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:24 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:24 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:25 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:25 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:25 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:25 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:27 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:27 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:27 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:27 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:28 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:28 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:28 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:28 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:28 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:28 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:28 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:29 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:29 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:29 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:29 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:30 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:30 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:30 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:30 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
+| 01:27:30 | ❌ PING | Heartbeat KO | http://192.168.31.18:3000 |
+| 01:27:30 | 💀 DEAD | Serveur marqué défaillant | http://192.168.31.18:3000 (plus jamais retenté pour cette session) |
+| 01:27:30 | 🛑 FAILOVER | Basculement impossible | Aucun serveur de secours disponible (perdu depuis `http://192.168.31.18:3000`) |
+| 01:27:30 | 📤❌ UPLOAD | Upload alertes KO | 1 alerte(s) → http://192.168.31.18:3000 (serveur inactif) |
 
 ---
 

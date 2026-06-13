@@ -29,6 +29,7 @@
 //    GET  /ping                    heartbeat simple
 //    GET  /healthz                 heartbeat FailoverManager
 //    GET  /status                  topologie + état du monitor
+//    GET  /api/version/check       vérification de version (Kill Switch)
 //
 //  Événements
 //    GET  /v1/events
@@ -230,6 +231,11 @@ app.get('/status', (_req, res) => {
       },
     },
   });
+});
+
+// GET /api/version/check — vérification de version (Kill Switch)
+app.get('/api/version/check', (_req, res) => {
+  res.json(reportsStore.getVersionInfo());
 });
 
 // ════════════════════════════════════════════════════════════════════════

@@ -192,6 +192,10 @@ function getDashboardHtml() {
         <div style="font-size:28px;font-weight:700;color:#f85149" id="stat-bugs">${bugReports.length}</div>
         <div style="font-size:10px;color:#8b949e;text-transform:uppercase;margin-top:4px">Bugs signalés</div>
       </div>
+      <div style="background:#0d1117;border-radius:8px;padding:14px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:#58a6ff" id="stat-version">${reportsStore.getVersionInfo().min_required}</div>
+        <div style="font-size:10px;color:#8b949e;text-transform:uppercase;margin-top:4px">Version Min Requise</div>
+      </div>
     </div>`;
 
   return `<!DOCTYPE html>
@@ -310,7 +314,14 @@ function getDashboardHtml() {
           <button class="btn btn-danger btn-sm" onclick="clearCache()" style="margin-top:12px">🗑 Effacer le Cache Global</button>
         </div>
         <div>
-          <h3 style="font-size:12px;color:var(--muted);margin-bottom:8px">Injection de Données Fictives (Sandbox)</h3>
+          <h3 style="font-size:12px;color:var(--muted);margin-bottom:8px">Kill Switch & Versions</h3>
+          <div style="display:flex;flex-direction:column;gap:5px">
+             <input type="text" id="v-latest" placeholder="Dernière version (ex: 1.2.0)" value="${reportsStore.getVersionInfo().latest}">
+             <input type="text" id="v-min" placeholder="Version min requise (ex: 1.1.0)" value="${reportsStore.getVersionInfo().min_required}">
+             <input type="text" id="v-url" placeholder="URL de téléchargement" value="${reportsStore.getVersionInfo().url}">
+             <button class="btn btn-danger btn-sm" onclick="updateVersionInfo()">⚠️ Appliquer Kill Switch</button>
+          </div>
+          <h3 style="font-size:12px;color:var(--muted);margin:12px 0 8px">Injection de Données Fictives (Sandbox)</h3>
           <div class="server-controls">
             <button class="btn btn-primary" onclick="sandboxQuick('alerts',5)">🚨 +5 Alertes</button>
             <button class="btn btn-primary" onclick="sandboxQuick('users',10)">👥 +10 Users</button>
@@ -527,6 +538,17 @@ async function clearCache() {
   alert(r.message || 'Cache effacé');
 }
 
+async function updateVersionInfo() {
+  const info = {
+    latest: document.getElementById('v-latest').value,
+    min_required: document.getElementById('v-min').value,
+    url: document.getElementById('v-url').value,
+  };
+  await api('/version-config', 'POST', info);
+  alert('Configuration des versions mise à jour');
+  refreshDashboard();
+}
+
 async function sandboxQuick(type, count) {
   const log = document.getElementById('sandbox-log');
   log.textContent = 'Injection en cours…';
@@ -557,6 +579,7 @@ async function refreshDashboard() {
     document.getElementById('stat-threshold').textContent = r.alertValidationThreshold;
     document.getElementById('threshold-slider').value = r.alertValidationThreshold;
     document.getElementById('threshold-val').textContent = r.alertValidationThreshold;
+    document.getElementById('stat-version').textContent = r.min_required;
   } catch(_) {}
 }
 setInterval(refreshDashboard, 10000);
@@ -867,10 +890,22 @@ const server = http.createServer((req, res) => {
       return;
     }
 
+    // POST /api/version-config — Configuration du Kill Switch
+    if (req.method === 'POST' && apiPath === '/version-config') {
+      bodyPromise().then(body => {
+        reportsStore.setVersionInfo(body);
+        console.log('[Admin] Configuration version mise à jour:', body);
+        json(200, { status: 'ok' });
+      });
+      return;
+    }
+
     // GET /api/server-state — État global du serveur
     if (req.method === 'GET' && apiPath === '/server-state') {
+      const vInfo = reportsStore.getVersionInfo();
       json(200, {
         ...serverState,
+        ...vInfo,
         kickedUsersCount: kickedUsers.size,
         bugReportsCount: bugReports.length,
         uptime: process.uptime(),

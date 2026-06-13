@@ -70,7 +70,8 @@ class AlertTtlPolicy {
         return false;
       case AlertType.zoneSafe:
       case AlertType.panicCollectif:
-        // Les zones safes et alertes panic ne sont pas des dangers mobiles.
+      case AlertType.density:
+        // Les zones safes, alertes panic et densité ne sont pas des dangers mobiles.
         return false;
     }
   }

@@ -43,6 +43,7 @@ import '../../settings/data/panic_contact_store.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../../network/collective_panic_service.dart';
 import '../../../network/network_coordinator.dart';
+import '../../../services/connectivity_service.dart';
 
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/presentation/route_result_sheet.dart';
@@ -406,15 +407,15 @@ class _MapScreenState extends State<MapScreen> {
           : null;
 
       switch (prefs.routeDestinationType) {
-        case RouteDestinationType.manifestPoint:
+        case RouteDestinationType.eventPoint:
           // [1] Verrouillage : aucun événement chargé → avertissement
           if (events.isEmpty) {
-            _showManifNoEventWarning();
+            _showEventNoEventWarning();
             return;
           }
           final idx0 = prefs.activeEventIndex.clamp(0, events.length - 1);
           destination = events[idx0].destination;
-          destinationLabel = 'Point de manif (${events[idx0].title})';
+          destinationLabel = 'Point d\'événement (${events[idx0].title})';
 
         case RouteDestinationType.safeZoneOrCareCenter:
           // [1] Priorité absolue : Zone Safe OU Centre de soins le plus proche
@@ -551,10 +552,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   // --------------------------------------------------------------------------
-  // [1] Dialogue de verrouillage manif — aucun événement chargé
+  // [1] Dialogue de verrouillage événement — aucun événement chargé
   // --------------------------------------------------------------------------
 
-  void _showManifNoEventWarning() {
+  void _showEventNoEventWarning() {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1799,6 +1800,9 @@ class _MapScreenState extends State<MapScreen> {
                         ),
                       ),
                     ),
+
+                  // ── Bandeau d'isolement critique ──────────────────────────
+                  const _ConnectivityBanner(),
                 ],
               ),
             );
@@ -2498,6 +2502,71 @@ class _DebugOverlaySheet extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ============================================================================
+// Bandeau de connectivité critique
+// ============================================================================
+
+class _ConnectivityBanner extends StatelessWidget {
+  const _ConnectivityBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: ConnectivityService.instance,
+      builder: (context, _) {
+        if (!ConnectivityService.instance.isIsolated) {
+          return const SizedBox.shrink();
+        }
+
+        return Positioned(
+          top: 120,
+          left: 12,
+          right: 12,
+          child: Material(
+            elevation: 8,
+            borderRadius: BorderRadius.circular(12),
+            color: const Color(0xFFF85149), // Danger Red
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.wifi_off, color: Colors.white, size: 24),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Réseau StreetPhare indisponible',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'L\'application ne peut pas fonctionner pour le moment '
+                          'faute de connexion serveur ou de pairs (Hive) à proximité.',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

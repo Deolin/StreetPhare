@@ -28,8 +28,8 @@ enum NotificationFilter {
   /// Uniquement les dangers confirmés (≥3 votes) à moins de 100 m.
   nearbyDangersOnly,
 
-  /// Uniquement les changements de points de manif imminents (<3 min).
-  manifestChangesOnly,
+  /// Uniquement les changements de points d'événement imminents (<3 min).
+  eventChangesOnly,
 }
 
 extension NotificationFilterExt on NotificationFilter {
@@ -39,7 +39,7 @@ extension NotificationFilterExt on NotificationFilter {
         return 'Toutes les alertes';
       case NotificationFilter.nearbyDangersOnly:
         return 'Dangers proches confirmés uniquement';
-      case NotificationFilter.manifestChangesOnly:
+      case NotificationFilter.eventChangesOnly:
         return 'Changements de points imminents';
     }
   }
@@ -50,7 +50,7 @@ extension NotificationFilterExt on NotificationFilter {
         return 'Notifie chaque micro-événement du réseau';
       case NotificationFilter.nearbyDangersOnly:
         return 'Filtre : danger ≥3 votes détecté à moins de 100 m';
-      case NotificationFilter.manifestChangesOnly:
+      case NotificationFilter.eventChangesOnly:
         return 'Notifie si le prochain point est révélé dans <3 min';
     }
   }
@@ -58,7 +58,7 @@ extension NotificationFilterExt on NotificationFilter {
 
 /// Type de destination pour l'algorithme "Route Safe".
 enum RouteDestinationType {
-  manifestPoint,
+  eventPoint,
   /// [PRIORITAIRE] Zone Safe OU Centre de soins le plus proche.
   safeZoneOrCareCenter,
   careCenter,
@@ -69,8 +69,8 @@ enum RouteDestinationType {
 extension RouteDestinationTypeExt on RouteDestinationType {
   String get label {
     switch (this) {
-      case RouteDestinationType.manifestPoint:
-        return 'Suivre le point de manif actuel';
+      case RouteDestinationType.eventPoint:
+        return 'Suivre le point d\'événement actuel';
       case RouteDestinationType.safeZoneOrCareCenter:
         return 'Vers la Zone Safe / Centre de soins le plus proche';
       case RouteDestinationType.careCenter:
@@ -84,7 +84,7 @@ extension RouteDestinationTypeExt on RouteDestinationType {
 
   String get description {
     switch (this) {
-      case RouteDestinationType.manifestPoint:
+      case RouteDestinationType.eventPoint:
         return 'Destination par défaut de l\'événement actif';
       case RouteDestinationType.safeZoneOrCareCenter:
         return '⭐ Priorité absolue : zone de sécurité ou médecin de rue le plus proche';
@@ -149,7 +149,7 @@ class AppPreferences {
   const AppPreferences({
     this.batterySaverEnabled = false,
     this.notificationFilter = NotificationFilter.nearbyDangersOnly,
-    this.routeDestinationType = RouteDestinationType.manifestPoint,
+    this.routeDestinationType = RouteDestinationType.eventPoint,
     this.activeEventIndex = 0,
     this.userPointLatitude,
     this.userPointLongitude,
@@ -237,7 +237,7 @@ class AppPreferences {
       ),
       routeDestinationType: RouteDestinationType.values.firstWhere(
         (e) => e.name == json['routeDest'],
-        orElse: () => RouteDestinationType.manifestPoint,
+        orElse: () => RouteDestinationType.eventPoint,
       ),
       activeEventIndex: (json['activeEvent'] as int?) ?? 0,
       userPointLatitude: (json['userLat'] as num?)?.toDouble(),

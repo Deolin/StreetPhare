@@ -117,6 +117,22 @@ const panicQueue = [];
  */
 const changeListeners = [];
 
+// ── Gestion des versions applicatives (Kill Switch) ────────────────────────
+
+let appVersionInfo = {
+  latest: '1.2.0',
+  min_required: '1.1.0',
+  url: 'https://streetphare.org/download'
+};
+
+function getVersionInfo() {
+  return appVersionInfo;
+}
+
+function setVersionInfo(info) {
+  appVersionInfo = { ...appVersionInfo, ...info };
+}
+
 // ── Nettoyage périodique (purge des entrées expirées) ─────────────────────
 
 setInterval(() => {
@@ -517,6 +533,8 @@ module.exports = {
   getDebugSnapshot,
   deleteReport,
   onStoreChange,
+  getVersionInfo,
+  setVersionInfo,
   // Constantes exposées pour documentation et tests
   TTL_BY_TYPE,
   VOTES_REQUIRED_FOR_DISTRIBUTION,

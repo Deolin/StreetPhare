@@ -1,0 +1,10 @@
+^C:\PROJETS\STREETPHARE\BUILD\WINDOWS\X64\CMAKEFILES\5BD75E7F4796AD791590DA5D6486B511\INSTALL_FORCE.RULE
+setlocal
+cd .
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
