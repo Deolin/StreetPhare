@@ -1,0 +1,21 @@
+[2026-06-12T20:11:46.989Z][primary:3000] ✅ SERVEUR PRINCIPAL v2 démarré sur http://localhost:3000
+[2026-06-12T20:11:46.991Z][primary:3000]    WebSocket relay : ws://localhost:3000/mesh
+[2026-06-12T20:11:46.991Z][primary:3000]    next_backup = http://localhost:3001 
+[2026-06-12T20:11:46.991Z][primary:3000]    Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz
+[2026-06-12T20:15:04.946Z][primary:3000] GET /v1/events — 3 événements
+[2026-06-12T20:15:06.443Z][primary:3000] backup-route demandé → http://localhost:3001  (chiffré)
+[2026-06-12T20:20:01.818Z][primary:3000] ✅ SERVEUR PRINCIPAL v2 démarré sur http://localhost:3000
+[2026-06-12T20:20:01.823Z][primary:3000]    WebSocket relay : ws://localhost:3000/mesh
+[2026-06-12T20:20:01.823Z][primary:3000]    next_backup = http://localhost:3001
+[2026-06-12T20:20:01.823Z][primary:3000]    Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz
+[2026-06-12T20:20:44.102Z][primary:3000] backup-route demandé → http://localhost:3001 (chiffré)
+[2026-06-12T20:33:21.843Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-12T21:21:22.844Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-12T21:24:41.612Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-12T21:33:13.297Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-12T23:34:22.814Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-13T00:01:02.402Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-13T00:01:14.846Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-13T00:05:48.683Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-13T00:08:04.032Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-13T00:14:36.693Z][primary:3000] [mesh] -client peerId=unknown total=0

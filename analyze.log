@@ -1,0 +1,18 @@
+Analyzing flutter_streetphare...                                
+
+  error - The named parameter 'mac' is required, but there's no corresponding argument. Try adding the required argument - lib\database\crypto_utils.dart:129:17 - missing_required_argument
+  error - The method 'save' isn't defined for the type 'Alert'. Try correcting the name to the name of an existing method, or defining a method named 'save' - lib\database\hive_alert_database.dart:105:20 - undefined_method
+  error - The method 'save' isn't defined for the type 'Alert'. Try correcting the name to the name of an existing method, or defining a method named 'save' - lib\database\hive_alert_database.dart:169:17 - undefined_method
+  error - The argument type 'String' can't be assigned to the parameter type 'List<int>'.  - lib\network\failover_manager.dart:318:15 - argument_type_not_assignable
+   info - The private field _ephemeralUserId could be 'final'. Try making the field 'final' - lib\network\network_coordinator.dart:49:10 - prefer_final_fields
+  error - Const variables must be initialized with a constant value. Try changing the initializer to be a constant expression - lib\network\transports\ble_transport.dart:38:35 - const_initialized_with_non_constant_value
+  error - The constructor being called isn't a const constructor. Try removing 'const' from the constructor invocation - lib\network\transports\ble_transport.dart:38:35 - const_with_non_const
+  error - Const variables must be initialized with a constant value. Try changing the initializer to be a constant expression - lib\network\transports\ble_transport.dart:40:7 - const_initialized_with_non_constant_value
+  error - The constructor being called isn't a const constructor. Try removing 'const' from the constructor invocation - lib\network\transports\ble_transport.dart:40:7 - const_with_non_const
+warning - Dead code. Try removing the code, or fixing the code before it so that it can be reached - lib\network\transports\ble_transport.dart:79:57 - dead_code
+warning - The left operand can't be null, so the right operand is never executed. Try removing the operator and the right operand - lib\network\transports\ble_transport.dart:79:60 - dead_null_aware_expression
+warning - The method doesn't override an inherited method. Try updating this class to match the superclass, or removing the override annotation - lib\network\transports\ble_transport.dart:135:8 - override_on_non_overriding_member
+warning - The method doesn't override an inherited method. Try updating this class to match the superclass, or removing the override annotation - lib\network\transports\relay_transport.dart:133:8 - override_on_non_overriding_member
+warning - The method doesn't override an inherited method. Try updating this class to match the superclass, or removing the override annotation - lib\network\transports\wifi_direct_transport.dart:115:8 - override_on_non_overriding_member
+
+14 issues found. (ran in 12.2s)

@@ -1,0 +1,32 @@
+{
+  "assets": {},
+  "config": {
+    "build_asset_types": [
+      "code_assets/code"
+    ],
+    "extensions": {
+      "code_assets": {
+        "c_compiler": {
+          "ar": "C:\\Program Files (x86)\\Microsoft Visual Studio\\18\\BuildTools\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\lib.exe",
+          "cc": "C:\\Program Files (x86)\\Microsoft Visual Studio\\18\\BuildTools\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\cl.exe",
+          "ld": "C:\\Program Files (x86)\\Microsoft Visual Studio\\18\\BuildTools\\VC\\Tools\\MSVC\\14.51.36231\\bin\\Hostx64\\x64\\link.exe",
+          "windows": {
+            "developer_command_prompt": {
+              "arguments": [],
+              "script": "C:\\Program Files (x86)\\Microsoft Visual Studio\\18\\BuildTools\\VC\\Auxiliary\\Build\\vcvars64.bat"
+            }
+          }
+        },
+        "link_mode_preference": "dynamic",
+        "target_architecture": "x64",
+        "target_os": "windows"
+      }
+    },
+    "linking_enabled": false
+  },
+  "out_dir_shared": "C:\\Projets\\StreetPhare\\.dart_tool\\hooks_runner\\shared\\objective_c\\build\\",
+  "out_file": "C:\\Projets\\StreetPhare\\.dart_tool\\hooks_runner\\objective_c\\2824ffff81\\output.json",
+  "package_name": "objective_c",
+  "package_root": "C:\\Users\\Deolin\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\objective_c-9.4.1\\",
+  "user_defines": {}
+}

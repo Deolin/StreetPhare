@@ -1,0 +1,9 @@
+Analyzing flutter_streetphare...                                
+
+warning - Unused import: 'package:hive/hive.dart'. Try removing the import directive - lib\database\alert_model.dart:11:8 - unused_import
+  error - The named parameter 'mac' is required, but there's no corresponding argument. Try adding the required argument - lib\database\crypto_utils.dart:129:17 - missing_required_argument
+   info - The private field _ephemeralUserId could be 'final'. Try making the field 'final' - lib\network\network_coordinator.dart:49:10 - prefer_final_fields
+warning - Dead code. Try removing the code, or fixing the code before it so that it can be reached - lib\network\transports\ble_transport.dart:81:57 - dead_code
+warning - The left operand can't be null, so the right operand is never executed. Try removing the operator and the right operand - lib\network\transports\ble_transport.dart:81:60 - dead_null_aware_expression
+
+5 issues found. (ran in 11.6s)

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Solution>
+	<Configurations>
+		<BuildType Name="Debug"/>
+		<BuildType Name="Profile"/>
+		<BuildType Name="Release"/>
+		<Platform Name="x64"/>
+	</Configurations>
+	<Project Path="ALL_BUILD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="69c69bfb-a7af-3eea-abbd-e94e3d7213e3" DefaultStartup="true">
+		<BuildDependency Project="../../ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="shared/jni.vcxproj"/>
+	</Project>
+	<Project Path="INSTALL.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="86c152e4-935d-35b7-bb98-5e109de38094">
+		<BuildDependency Project="ALL_BUILD.vcxproj"/>
+		<BuildDependency Project="../../ZERO_CHECK.vcxproj"/>
+		<Build Solution="Debug|*" Project="false"/>
+		<Build Solution="Profile|*" Project="false"/>
+		<Build Solution="Release|*" Project="false"/>
+	</Project>
+	<Project Path="../../ZERO_CHECK.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e38228f6-f326-31ba-8fab-dee5374ba07b"/>
+	<Project Path="shared/jni.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="9e14c146-cd3a-3d1f-bba2-c3e689c78abd">
+		<BuildDependency Project="../../ZERO_CHECK.vcxproj"/>
+	</Project>
+</Solution>

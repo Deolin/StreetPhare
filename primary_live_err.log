@@ -1,0 +1,10 @@
+[logger] écriture échouée: Error: EPERM: operation not permitted, rename 'c:\Users\Deolin\Documents\Documents travail\Projet\StreetPhare\flutter_streetphare\SERVER_STATUS_3000.md.tmp' -> 'c:\Users\Deolin\Documents\Documents travail\Projet\StreetPhare\flutter_streetphare\SERVER_STATUS_3000.md'
+    at Object.renameSync (node:fs:1008:11)
+    at render (c:\Users\Deolin\Documents\Documents travail\Projet\StreetPhare\flutter_streetphare\test_servers\logger.js:391:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  errno: -4048,
+  code: 'EPERM',
+  syscall: 'rename',
+  path: 'c:\\Users\\Deolin\\Documents\\Documents travail\\Projet\\StreetPhare\\flutter_streetphare\\SERVER_STATUS_3000.md.tmp',
+  dest: 'c:\\Users\\Deolin\\Documents\\Documents travail\\Projet\\StreetPhare\\flutter_streetphare\\SERVER_STATUS_3000.md'
+}

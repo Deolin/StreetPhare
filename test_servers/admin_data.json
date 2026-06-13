@@ -1,0 +1,30 @@
+{
+  "kickedUsers": {},
+  "bugReports": [],
+  "broadcastLog": [
+    {
+      "type": "broadcast",
+      "title": "test",
+      "message": "fjdfjhf",
+      "sentAt": "2026-06-12T23:35:51.499Z"
+    },
+    {
+      "type": "info",
+      "title": "Risque de grèle",
+      "message": "prenez vos manteaux",
+      "sentAt": "2026-06-12T23:36:24.148Z"
+    },
+    {
+      "type": "broadcast",
+      "title": "j",
+      "message": "jjytjyt",
+      "sentAt": "2026-06-12T23:37:11.607Z"
+    },
+    {
+      "type": "broadcast",
+      "title": "jjhjh",
+      "message": ",h,hh",
+      "sentAt": "2026-06-12T23:37:27.776Z"
+    }
+  ]
+}

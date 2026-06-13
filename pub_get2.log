@@ -1,0 +1,12 @@
+Resolving dependencies...
+Because web_socket_channel >=2.4.4 <3.0.1 depends on web ^0.5.0 and geolocator_web >=4.0.1 depends on web ^1.0.0, web_socket_channel >=2.4.4 <3.0.1 is incompatible with geolocator_web >=4.0.1.
+And because geolocator >=13.0.1 depends on geolocator_web ^4.1.1, web_socket_channel >=2.4.4 <3.0.1 is incompatible with geolocator >=13.0.1.
+So, because flutter_streetphare depends on both geolocator ^13.0.1 and web_socket_channel ^2.4.5, version solving failed.
+
+
+You can try one of the following suggestions to make the pubspec resolve:
+* Try upgrading your constraint on web_socket_channel: flutter pub add web_socket_channel:^3.0.3
+* Consider downgrading your constraint on geolocator: flutter pub add geolocator:^12.0.0
+Failed to update packages.
+
+C:\Users\Deolin\Documents\Documents travail\Projet\StreetPhare\flutter_streetphare>

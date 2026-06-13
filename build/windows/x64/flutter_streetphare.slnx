@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Solution>
+	<Configurations>
+		<BuildType Name="Debug"/>
+		<BuildType Name="Profile"/>
+		<BuildType Name="Release"/>
+		<Platform Name="x64"/>
+	</Configurations>
+	<Project Path="ALL_BUILD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="69c69bfb-a7af-3eea-abbd-e94e3d7213e3" DefaultStartup="true">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="plugins/flutter_local_notifications_windows/shared/flutter_local_notifications_windows.vcxproj"/>
+		<BuildDependency Project="runner/flutter_streetphare.vcxproj"/>
+		<BuildDependency Project="flutter/flutter_wrapper_app.vcxproj"/>
+		<BuildDependency Project="flutter/flutter_wrapper_plugin.vcxproj"/>
+		<BuildDependency Project="plugins/geolocator_windows/geolocator_windows_plugin.vcxproj"/>
+		<BuildDependency Project="plugins/jni/shared/jni.vcxproj"/>
+		<BuildDependency Project="plugins/permission_handler_windows/permission_handler_windows_plugin.vcxproj"/>
+		<BuildDependency Project="plugins/url_launcher_windows/url_launcher_windows_plugin.vcxproj"/>
+	</Project>
+	<Project Path="INSTALL.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="86c152e4-935d-35b7-bb98-5e109de38094">
+		<BuildDependency Project="ALL_BUILD.vcxproj"/>
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="ZERO_CHECK.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e38228f6-f326-31ba-8fab-dee5374ba07b"/>
+	<Project Path="flutter/flutter_assemble.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="51c14a1f-c66b-308f-a8ad-14db2c74144e">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="plugins/flutter_local_notifications_windows/shared/flutter_local_notifications_windows.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="98078139-25a6-3907-b9c3-c9c55e75de0b">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="runner/flutter_streetphare.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="b7c1ba5d-77a7-3bfd-bdc8-5cd25f2705fc">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="flutter/flutter_assemble.vcxproj"/>
+		<BuildDependency Project="flutter/flutter_wrapper_app.vcxproj"/>
+		<BuildDependency Project="plugins/geolocator_windows/geolocator_windows_plugin.vcxproj"/>
+		<BuildDependency Project="plugins/permission_handler_windows/permission_handler_windows_plugin.vcxproj"/>
+		<BuildDependency Project="plugins/url_launcher_windows/url_launcher_windows_plugin.vcxproj"/>
+	</Project>
+	<Project Path="flutter/flutter_wrapper_app.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="3b506016-64dc-3da1-9b3f-6acab8cd5ae3">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="flutter/flutter_assemble.vcxproj"/>
+	</Project>
+	<Project Path="flutter/flutter_wrapper_plugin.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="9da728ed-3be9-31db-99cf-dd7b23cbb3e8">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="flutter/flutter_assemble.vcxproj"/>
+	</Project>
+	<Project Path="plugins/geolocator_windows/geolocator_windows_plugin.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="f9724a7f-b6dc-365b-82c1-4ab942f1ac65">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="flutter/flutter_assemble.vcxproj"/>
+		<BuildDependency Project="flutter/flutter_wrapper_plugin.vcxproj"/>
+	</Project>
+	<Project Path="plugins/jni/shared/jni.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="9e14c146-cd3a-3d1f-bba2-c3e689c78abd">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="plugins/permission_handler_windows/permission_handler_windows_plugin.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="66592051-6c54-371e-814f-93513b2630a4">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="flutter/flutter_assemble.vcxproj"/>
+		<BuildDependency Project="flutter/flutter_wrapper_plugin.vcxproj"/>
+	</Project>
+	<Project Path="plugins/url_launcher_windows/url_launcher_windows_plugin.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="79dc3010-d437-3a90-bc96-471576622e49">
+		<BuildDependency Project="ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="flutter/flutter_assemble.vcxproj"/>
+		<BuildDependency Project="flutter/flutter_wrapper_plugin.vcxproj"/>
+	</Project>
+</Solution>

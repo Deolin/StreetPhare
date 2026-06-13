@@ -1,0 +1,10 @@
+^C:\PROJETS\STREETPHARE\WINDOWS\FLUTTER\EPHEMERAL\.PLUGIN_SYMLINKS\JNI\SRC\CMAKELISTS.TXT
+setlocal
+"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/Projets/StreetPhare/windows -BC:/Projets/StreetPhare/build/windows/x64 --check-stamp-file C:/Projets/StreetPhare/build/windows/x64/plugins/jni/shared/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

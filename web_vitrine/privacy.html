@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Politique de confidentialité de StreetPhare — Aucune donnée personnelle collectée.">
+  <meta name="theme-color" content="#FFB300">
+  <title>Politique de Confidentialité — StreetPhare</title>
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --surface: #131929;
+      --border: #1e2d45;
+      --primary: #FFB300;
+      --accent: #00e676;
+      --text: #e8eaf6;
+      --muted: #90a4ae;
+      --danger: #ff1744;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      line-height: 1.7; min-height: 100vh;
+    }
+
+    /* NAV */
+    .nav {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 14px 24px; display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .nav .logo { font-size: 20px; font-weight: 700; color: var(--primary); text-decoration: none; }
+    .nav .logo span { color: var(--text); }
+    .nav-links { display: flex; gap: 20px; align-items: center; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .2s; }
+    .nav-links a:hover { color: var(--primary); }
+    .nav-links a.active { color: var(--primary); }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+    h1 { font-size: 2.2rem; color: var(--primary); margin-bottom: 8px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 40px; }
+    h2 { color: var(--accent); font-size: 1.2rem; margin-top: 36px; margin-bottom: 12px; border-left: 4px solid var(--accent); padding-left: 14px; }
+    h3 { color: var(--primary); font-size: 1rem; margin-top: 24px; margin-bottom: 8px; }
+    p, li { font-size: 15px; margin-bottom: 12px; }
+    ul { padding-left: 24px; }
+    li { margin-bottom: 8px; }
+    a { color: var(--primary); text-decoration: underline; }
+    .highlight-box {
+      background: rgba(0,230,118,.06); border: 1px solid rgba(0,230,118,.25);
+      border-radius: var(--radius); padding: 20px 24px; margin: 20px 0;
+    }
+    .highlight-box p { color: var(--accent); font-weight: 600; margin-bottom: 0; }
+    .warn-box {
+      background: rgba(255,23,68,.06); border: 1px solid rgba(255,23,68,.25);
+      border-radius: var(--radius); padding: 20px 24px; margin: 20px 0;
+    }
+    .warn-box p { color: var(--danger); font-weight: 600; margin-bottom: 0; }
+    .metric-row { display: grid; grid-template-columns: 120px 1fr; gap: 8px; margin: 16px 0; }
+    .metric-row dt { color: var(--muted); font-weight: 600; font-size: 13px; }
+    .metric-row dd { font-size: 15px; }
+    footer { text-align: center; color: var(--muted); font-size: 13px; padding: 32px 24px; border-top: 1px solid var(--border); }
+    @media(max-width:600px) { h1 { font-size: 1.6rem; } .container { padding: 24px 16px 60px; } }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="logo">⚡ <span>StreetPhare</span></a>
+  <div class="nav-links">
+    <a href="index.html">Accueil</a>
+    <a href="privacy.html" class="active">Confidentialité</a>
+    <a href="about.html">À propos</a>
+  </div>
+</nav>
+
+<div class="container">
+  <h1>Politique de confidentialité</h1>
+  <p class="subtitle">Dernière mise à jour : 13 juin 2026 · Conforme au RGPD (Règlement UE 2016/679)</p>
+
+  <div class="highlight-box">
+    <p>🔒 Principe fondamental : StreetPhare ne collecte, ne stocke, ne transmet AUCUNE donnée personnelle. Aucun identifiant fixe, aucun historique de géolocalisation, aucune donnée de navigation n'est conservée.</p>
+  </div>
+
+  <h2>1. Objet et responsable du traitement</h2>
+  <p>La présente politique de confidentialité s'applique à l'application <strong>StreetPhare</strong>, application de navigation piétonne sécurisée, ainsi qu'au site vitrine hébergé au sous-domaine街StreetPhare.</p>
+  <p>StreetPhare est un logiciel libre, distribué sous licence GNU GPL v3, développé de manière bénévole. Aucune entité commerciale n'en tire profit. Aucune donnée n'est collectée à l'insu de l'utilisateur.</p>
+
+  <h2>2. Données collectées</h2>
+  <div class="warn-box">
+    <p>⚠ Aucune donnée personnelle n'est collectée, stockée, ou transmise par StreetPhare, que ce soit via l'application client, le réseau P2P, ou le serveur backend.</p>
+  </div>
+
+  <h3>2.1 Données non collectées</h3>
+  <p>StreetPhare ne collecte, ne stocke, ne transmet pas :</p>
+  <ul>
+    <li>La localisation GPS de l'utilisateur (position, trajectoire, historique)</li>
+    <li>Des identifiants fixes (nom, email, numéro de téléphone, adresse IP)</li>
+    <li>Des données de naviguation (historique, préférences transcrites, fichiers téléchargés)</li>
+    <li>Des données de session ou de compte utilisateur (aucune inscription requise)</li>
+    <li>Des données biométriques ou de recognition</li>
+    <li>Des métadonnées de l'appareil (modèle, système d'exploitation, identifiant de l'appareil)</li>
+  </ul>
+
+  <h3>2.2 Identifiants éphémères (UUID cryptographiques)</h3>
+  <p>Le réseau Hive P2P utilisé par StreetPhare utilise des identifiants éphémères (UUID cryptographiques) qui sont :</p>
+  <ul>
+    <li><strong>Générés localement</strong> sur l'appareil de l'utilisateur</li>
+    <li><strong>Rotatifs</strong> : renouvelés automatiquement à chaque session</li>
+    <li><strong>Non réutilisables</strong> : jamais utilisés plus d'une seule fois</li>
+    <li><strong>Anonymes</strong> : ne contiennent aucune information sur l'identité de l'utilisateur</li>
+    <li><strong>Purges automatiquement</strong> à l'issue de la session</li>
+  </ul>
+  <p>Ces identifiants éphémères servent uniquement au mécanisme de consensus (validation collective des alertes) et au routage P2P. Ils ne sont pas liés, directement ou indirectement, à une personne physique identifiable.</p>
+
+  <h3>2.3 Données de signalement (alertes)</h3>
+  <p>Les données de signalement (alertes) stockées temporairement dans le réseau P2P et sur le serveur :</p>
+  <ul>
+    <li>Sont <strong>anonymes</strong> (aucun identifiant fixe associé)</li>
+    <li>Ont une <strong>TTL stricte de 1 à 10 minutes</strong> selon la mobilité du danger</li>
+    <li>Sont <strong>purges automatiquement</strong> via des politiques de TTL strictes</li>
+    <li>Contiennent uniquement : type de danger, coordonnées GPS (anonymisées), horodatage UTC</li>
+    <li>Ne contiennent <strong>aucune donnée personnelle</strong> identifiable</li>
+  </ul>
+
+  <h2>3. Base legale du traitement</h2>
+  <p>Le traitement des données se fonde sur l'absence de collecte de données personnelles. Puisque aucune donnée personnelle n'est collectée, stockée, ou traitée, aucune base légale au sens du RGPD n'est requise pour le traitement de données personnelles.</p>
+  <p>Les données anonymes et éphémères utilisées pour le fonctionnement du réseau P2P relèvent de l'intérêt légitime public concernant la sécurité des personnes lors d'événements de grande envergure, dans le cadre de la solidarité citoyenne.</p>
+
+  <h2>4. Durée de conservation</h2>
+  <dl class="metric-row">
+    <dt>Données de signalement</dt>
+    <dd><strong>1 à 10 minutes</strong> (selon le type de danger)</dd>
+    <dt>Identifiants éphémères</dt>
+    <dd><strong>Durée de session</strong> (purge immédiate à la fermeture)</dd>
+    <dt>Messages Hive P2P</dt>
+    <dd><strong>Temps réel</strong> (non stockés, diffusion en flux)</dd>
+    <dt>Données de localisation</dt>
+    <dd><strong>Jamais collectées</strong> (aucun stockage)</dd>
+  </dl>
+
+  <h2>5. Réseau P2P décentralisé ettechnologie</h2>
+  <h3>5.1 Réseau Hive P2P</h3>
+  <p>StreetPhare utilise un réseau P2P (pair-à-pair) décentralisé dont les caractéristiques sont :</p>
+  <ul>
+    <li><strong>Décentralisé</strong> : aucun serveur central n'est impliqué dans la transmission des données</li>
+    <li><strong>Chiffré</strong> : les données transitent via des relais chiffrés (Ed25519, AES)</li>
+    <li><strong>Anonyme</strong> : les identifiants éphémères garantissent l'anonymat absolu des utilisateurs</li>
+    <li><strong>Pas de serveur de集中</strong> : les données ne sont pas stockées sur un serveur central</li>
+  </ul>
+
+  <h3>5.2 Données transmises au serveur</h3>
+  <p>Les seules données transmises au serveur central sont des <strong>données de signalement anonymes</strong> avec une durée de vie de 1 à 10 minutes. Ces données sont purgées automatiquement via des politiques TTL strictes.</p>
+
+  <h2>6. Droits des utilisateurs</h2>
+  <p>Conformément au RGPD, si des données personnelles étaient traitées, les utilisateurs disposeraient des droits suivants :</p>
+  <ul>
+    <li><strong>Droit d'accès</strong> : les utilisateurs peuvent consulter anonymement les données via l'application</li>
+    <li><strong>Droit de rectification</strong> : les utilisateurs peuvent corriger des données incorrectes via l'interface</li>
+    <li><strong>Droit d'effacement</strong> : les données sont automatiquement purgées à la fin de la session</li>
+    <li><strong>Droit à la portabilité</strong> : la nature P2P du réseau permet aux utilisateurs de conserver leurs données</li>
+    <li><strong>Droit de restriction</strong> : les utilisateurs peuvent limiter les données transmises via les paramètres de l'application</li>
+    <li><strong>Droit d'opposition</strong> : les utilisateurs peuvent refuser la transmission de données de signalement</li>
+  </ul>
+  <p>Cependant, comme <strong>aucune donnée personnelle n'est collectée</strong>, ces droits ne s'appliquent pas de manière pratique. Les utilisateurs restent anonymes et ninguna trace ne persiste après la fermeture de l'application.</p>
+
+  <h2>7. Partage des données avec des tiers</h2>
+  <p><strong>Aucune donnée personnelle n'est partagée avec des tiers.</strong> Le réseau P2P décentralisé garantit que les données de signalement sont transmises uniquement entre les pairs (utilisateurs) de manière chiffrée. Le serveur central (Node.js) n'est utilis&acute; que pour :</p>
+  <ul>
+    <li>Assurer le routage des itinéraires via les moteurs de routage OSM</li>
+    <li>Stocker temporairement les données de signalement (anonymes, TTL 1-10 min)</li>
+    <li>Faciliter les échanges peer-to-peer Hive (messages temps réel)</li>
+  </ul>
+
+  <h2>8. Cookies et technologies de trace :</h2>
+  <p><strong>Aucun cookie n'est utilisé.</strong> L'application neinstalle pas de cookies, ne persiste pas des données de session, et n'utilise pas de technologies de trace.</p>
+  <p>Le site vitrine de StreetPhare utilise(session cookies) uniquement pour le fonctionnement de la navigation (navigation entre pages). Aucun cookie d'analyse, de publicité ou de personnalisation n'est utilisé.</p>
+
+  <h2>9. Sécurité</h2>
+  <p>Les données sont protégées par le chiffrement end-to-end (Ed25519 + AES) dans le réseau P2P. Le serveur central utilise les protocoles HTTP/HTTPS suitable. Aucune donnée sensible n'est stockée sur le serveur.</p>
+
+  <h2>10. Modifications de la politique de confidentialité</h2>
+  <p>La présente politique de confidentialité peut être modifiée sans préavis. Les utilisateurs sont invités à consulter régulièrement cette page. La date de la dernière mise à jour est indiquée en début de cette page.</p>
+
+  <h2>11. Contact</h2>
+  <p>Pour toute question concernant la protection de vos données, vous pouvez contacter l'équipe de développement via le formulaire de contact accessible sur la page <a href="about.html">À propos</a>.</p>
+
+  <h2>12. Conditions de licence et responsabilité</h2>
+  <p>StreetPhare est un logiciel libre distribué sous licence <strong>GNU GPL v3</strong>. L'utilisation de cette application est à vos risques et périls. L'application ne constitue pas un outil d'aide à l'organisation d'événements illégaux, ni un outil de protection contre les actions des forces de l'ordre. Elle est exclusivement conçue pour la <strong>navigation piétonne sécurisée</strong> et la <strong>prévention des risques physiques</strong> lors d'événements de grande envergure.</p>
+
+</div>
+
+<footer>
+  © 2026 StreetPhare — Logiciel libre sous licence GNU GPL v3 — Conforme au RGPD (Règlement UE 2016/679)
+</footer>
+
+</body>
+</html>

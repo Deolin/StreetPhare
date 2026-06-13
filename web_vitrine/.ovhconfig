@@ -1,0 +1,10 @@
+; pour plus d'informations sur ce fichier:
+; https://docs.ovh.com/fr/hosting/configurer-fichier-ovhconfig/
+
+app.engine=php
+app.engine.version=8.2
+
+http.firewall=none
+environment=production
+
+container.image=stable64
