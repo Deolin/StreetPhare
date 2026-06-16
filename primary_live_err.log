@@ -1,10 +1,86 @@
-[logger] écriture échouée: Error: EPERM: operation not permitted, rename 'c:\Users\Deolin\Documents\Documents travail\Projet\StreetPhare\flutter_streetphare\SERVER_STATUS_3000.md.tmp' -> 'c:\Users\Deolin\Documents\Documents travail\Projet\StreetPhare\flutter_streetphare\SERVER_STATUS_3000.md'
+Debugger attached.
+Debugger attached.
+Waiting for the debugger to disconnect...
+C:\Projets\StreetPhare\test_servers\server_primary_v2.js:443
+liveMonitor.configureNoServer();
+            ^
+
+TypeError: liveMonitor.configureNoServer is not a function
+    at Object.<anonymous> (C:\Projets\StreetPhare\test_servers\server_primary_v2.js:443:13)
+    at Module._compile (node:internal/modules/cjs/loader:1873:14)
+    at Object..js (node:internal/modules/cjs/loader:2013:10)
+    at Module.load (node:internal/modules/cjs/loader:1596:32)
+    at Module._load (node:internal/modules/cjs/loader:1398:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47
+
+Node.js v26.3.0
+Debugger attached.
+Waiting for the debugger to disconnect...
+node:events:487
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:2008:16)
+    at listenInCluster (node:net:2065:12)
+    at Server.listen (node:net:2170:7)
+    at Object.<anonymous> (C:\Projets\StreetPhare\test_servers\server_primary_v2.js:503:12)
+    at Module._compile (node:internal/modules/cjs/loader:1873:14)
+    at Object..js (node:internal/modules/cjs/loader:2013:10)
+    at Module.load (node:internal/modules/cjs/loader:1596:32)
+    at Module._load (node:internal/modules/cjs/loader:1398:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2044:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}
+
+Node.js v26.3.0
+Debugger attached.
+Waiting for the debugger to disconnect...
+node:events:487
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:2008:16)
+    at listenInCluster (node:net:2065:12)
+    at Server.listen (node:net:2170:7)
+    at Object.<anonymous> (C:\Projets\StreetPhare\test_servers\server_primary_v2.js:503:12)
+    at Module._compile (node:internal/modules/cjs/loader:1873:14)
+    at Object..js (node:internal/modules/cjs/loader:2013:10)
+    at Module.load (node:internal/modules/cjs/loader:1596:32)
+    at Module._load (node:internal/modules/cjs/loader:1398:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2044:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
+}
+
+Node.js v26.3.0
+Debugger attached.
+Debugger attached.
+[logger] écriture échouée: Error: EPERM: operation not permitted, rename 'C:\Projets\StreetPhare\SERVER_STATUS_3000.md.tmp' -> 'C:\Projets\StreetPhare\SERVER_STATUS_3000.md'
     at Object.renameSync (node:fs:1008:11)
-    at render (c:\Users\Deolin\Documents\Documents travail\Projet\StreetPhare\flutter_streetphare\test_servers\logger.js:391:8)
+    at render (C:\Projets\StreetPhare\test_servers\logger.js:391:8)
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   errno: -4048,
   code: 'EPERM',
   syscall: 'rename',
-  path: 'c:\\Users\\Deolin\\Documents\\Documents travail\\Projet\\StreetPhare\\flutter_streetphare\\SERVER_STATUS_3000.md.tmp',
-  dest: 'c:\\Users\\Deolin\\Documents\\Documents travail\\Projet\\StreetPhare\\flutter_streetphare\\SERVER_STATUS_3000.md'
+  path: 'C:\\Projets\\StreetPhare\\SERVER_STATUS_3000.md.tmp',
+  dest: 'C:\\Projets\\StreetPhare\\SERVER_STATUS_3000.md'
 }

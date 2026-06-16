@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 private const val TAG = "StreetPhare.OsmAndBridge"
 
 /// Nom du canal Flutter MethodChannel.
-const val CHANNEL_NAME = "com.streetphare/osmand_routing"
+const val CHANNEL_NAME = "com.streetphare/routing"
 
 /// Nom du fichier OSM PBF bundlé dans les assets Android.
 /// À placer dans : android/app/src/main/assets/osm/fleurus.osm.pbf
@@ -126,7 +126,7 @@ class OsmAndBridgePlugin(
                 }
             }
 
-            "calculateRoute" -> {
+            "computeRoute" -> {
                 val args = call.arguments as? Map<*, *>
                 if (args == null) {
                     result.error("INVALID_ARGS", "Arguments manquants", null)

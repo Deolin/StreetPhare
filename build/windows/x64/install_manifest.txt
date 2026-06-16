@@ -1,11 +1,16 @@
 C:/Projets/StreetPhare/build/windows/x64/runner/Debug/data/icudtl.dat
 C:/Projets/StreetPhare/build/windows/x64/runner/Debug/flutter_windows.dll
+C:/Projets/StreetPhare/build/windows/x64/runner/Debug/connectivity_plus_plugin.dll
 C:/Projets/StreetPhare/build/windows/x64/runner/Debug/geolocator_windows_plugin.dll
+C:/Projets/StreetPhare/build/windows/x64/runner/Debug/objectbox_flutter_libs_plugin.dll
+C:/Projets/StreetPhare/build/windows/x64/runner/Debug/objectbox.dll
 C:/Projets/StreetPhare/build/windows/x64/runner/Debug/permission_handler_windows_plugin.dll
 C:/Projets/StreetPhare/build/windows/x64/runner/Debug/url_launcher_windows_plugin.dll
 C:/Projets/StreetPhare/build/windows/x64/runner/Debug/flutter_local_notifications_windows.dll
 C:/Projets/StreetPhare/build/windows/x64/runner/Debug/dartjni.dll
 C:/Projets/StreetPhare/build/windows/x64/runner/Debug/data/flutter_assets/AssetManifest.bin
+C:/Projets/StreetPhare/build/windows/x64/runner/Debug/data/flutter_assets/assets/icon/streetphare_icon.ico
+C:/Projets/StreetPhare/build/windows/x64/runner/Debug/data/flutter_assets/assets/icon/streetphare_icon.png
 C:/Projets/StreetPhare/build/windows/x64/runner/Debug/data/flutter_assets/FontManifest.json
 C:/Projets/StreetPhare/build/windows/x64/runner/Debug/data/flutter_assets/fonts/MaterialIcons-Regular.otf
 C:/Projets/StreetPhare/build/windows/x64/runner/Debug/data/flutter_assets/kernel_blob.bin

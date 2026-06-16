@@ -14,16 +14,24 @@ permet de tester localement, sans déploiement cloud :
 
 ## Fichiers
 
-| Fichier                | Rôle                                                         |
-| ---------------------- | ------------------------------------------------------------ |
-| `server_primary.js`    | Serveur PRINCIPAL — port 3000                                |
-| `server_secondary.js`  | Serveur SECONDAIRE (backup #1) — port 3001                   |
-| `server_crypto.js`     | Module AES-CBC + HMAC-SHA256 partagé (miroir du client Dart)|
-| `logger.js`            | Module de log Markdown → produit `SERVER_STATUS.md`          |
-| `start_servers.js`     | Orchestrateur Node unique (`npm start`)                      |
-| `start_tests.bat`      | Lance les deux serveurs dans 2 fenêtres cmd (Windows)        |
-| `start_tests.sh`       | Équivalent Linux/macOS (bash)                                |
-| `package.json`         | Dépendances (uniquement `express`)                           |
+| Fichier                    | Rôle                                                                     |
+| -------------------------- | ------------------------------------------------------------------------ |
+| `server_primary_v2.js`     | **Serveur PRINCIPAL v2** — port 3000 + WebSocket /mesh + LiveMonitor     |
+| `server_secondary_v2.js`   | **Serveur SECONDAIRE v2** (backup #1) — port 3001 + HeartbeatMonitor     |
+| `admin_dashboard_v2.js`    | **🆕 NOC Dashboard v5.0** — port 4000, flux WebSocket temps réel + CLI   |
+| `admin_dashboard.js`       | Dashboard v3/v4 historique (conservé pour rétrocompatibilité)            |
+| `modules/live_monitor.js`  | **🆕 Hub WebSocket central** — diffuse tous les événements en temps réel |
+| `modules/reports_store.js` | Store v2 des signalements (TTL, votes, Panic Collectif)                  |
+| `modules/events_manager.js`| Gestionnaire d'événements et calcul Safe Route                           |
+| `modules/heartbeat_monitor.js` | Moniteur de heartbeat pour le serveur secondaire                     |
+| `sandbox.js`               | Sandbox interactive de test (injection massive, simulation GPS)          |
+| `sim.js`                   | Outil CLI de simulation (injection depuis la ligne de commande)          |
+| `logger.js`                | Module de log Markdown → produit `SERVER_STATUS.md`                      |
+| `server_crypto.js`         | Module AES-CBC + HMAC-SHA256 partagé (miroir du client Dart)            |
+| `start_servers_v2.js`      | Orchestrateur Node v2 (`npm start`)                                      |
+| `start_tests.bat`          | Lance les deux serveurs dans 2 fenêtres cmd (Windows)                    |
+| `start_tests.sh`           | Équivalent Linux/macOS (bash)                                            |
+| `package.json`             | Dépendances (`express`, `ws`)                                            |
 
 ## Lancement
 

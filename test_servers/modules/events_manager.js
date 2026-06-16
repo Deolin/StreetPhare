@@ -62,11 +62,52 @@ const EVENTS_CATALOG = [
       [50.4875, 4.5480],  // Parc du Château
       [50.4860, 4.5440],  // Place communale
     ],
+    // ── QR Code conforme au contrat EventModel.fromJson ──────────────────
+    // Champs obligatoires (qr_scanner_screen.dart:67) :
+    //   code, title, startAt, visibleAt, route, destLat, destLng
+    // Format des dates : ISO 8601 UTC.
     qr_payload: JSON.stringify({
-      event: 'fleurus-tour',
-      server: 'http://localhost:3000',
-      endpoint: '/v1/events/fleurus-tour',
-      signed_at: '2026-06-01T00:00:00Z',
+      code: 'FLEURUS-TOUR',
+      title: 'Le Tour de Fleurus',
+      startAt: '2026-07-14T10:00:00.000Z',
+      visibleAt: '2026-07-14T09:00:00.000Z',
+      route: '[[4.5452,50.4891],[4.5420,50.4905],[4.5480,50.4875],' +
+             '[4.5440,50.4860],[4.5452,50.4891]]',
+      destLat: 50.4891,
+      destLng: 4.5452,
+      waypoints: [
+        { label: 'Départ — Place Albert Ier', lat: 50.4891, lng: 4.5452,
+          scheduledAt: '2026-07-14T10:00:00.000Z' },
+        { label: 'Rue de Namur', lat: 50.4905, lng: 4.5420,
+          scheduledAt: '2026-07-14T10:20:00.000Z' },
+        { label: 'Parc du Château', lat: 50.4875, lng: 4.5480,
+          scheduledAt: '2026-07-14T10:45:00.000Z' },
+        { label: 'Place communale', lat: 50.4860, lng: 4.5440,
+          scheduledAt: '2026-07-14T11:10:00.000Z' },
+        { label: 'Retour — Place Albert Ier', lat: 50.4891, lng: 4.5452,
+          scheduledAt: '2026-07-14T11:30:00.000Z' },
+      ],
+      pois: [
+        { label: 'Place Albert Ier', lat: 50.4891, lng: 4.5452, icon: 'flag' },
+        { label: 'Parc du Château', lat: 50.4875, lng: 4.5480, icon: 'park' },
+      ],
+      careCenters: [
+        { label: 'St-Medic — Place Albert Ier', lat: 50.4891, lng: 4.5452,
+          contact: '+32 71 82 XX XX', notes: 'Point médical permanent — centre-ville Fleurus.' },
+      ],
+      exitPoints: [
+        { label: 'Sortie nord — Rue de Namur', lat: 50.4910, lng: 4.5410,
+          direction: 'Vers Heppignies / N29' },
+        { label: 'Sortie sud — Place communale', lat: 50.4855, lng: 4.5435,
+          direction: 'Vers Gosselies / E42' },
+      ],
+      safeZones: [
+        { label: 'Zone de repli — Place Albert Ier', lat: 50.4891, lng: 4.5452, radius: 60.0 },
+      ],
+      // Métadonnées de traçabilité (non utilisées par le parser mobile)
+      _server: 'http://localhost:3000',
+      _endpoint: '/v1/events/fleurus-tour',
+      _signed_at: '2026-06-01T00:00:00Z',
     }),
     status: 'upcoming',
     color_hex: '#1565C0',
@@ -86,11 +127,46 @@ const EVENTS_CATALOG = [
       [50.4900, 4.5430],
       [50.4878, 4.5390],
     ],
+    // ── QR Code conforme au contrat EventModel.fromJson ──────────────────
     qr_payload: JSON.stringify({
-      event: 'traversee-ecoles',
-      server: 'http://localhost:3000',
-      endpoint: '/v1/events/traversee-ecoles',
-      signed_at: '2026-06-01T00:00:00Z',
+      code: 'FLEURUS-ECOLES',
+      title: 'La Traversée des Écoles',
+      startAt: '2026-07-14T08:30:00.000Z',
+      visibleAt: '2026-07-14T08:00:00.000Z',
+      route: '[[4.5500,50.4930],[4.5465,50.4920],[4.5430,50.4900],' +
+             '[4.5390,50.4878],[4.5370,50.4855]]',
+      destLat: 50.4855,
+      destLng: 4.5370,
+      waypoints: [
+        { label: 'Départ — École Saint-Pierre', lat: 50.4930, lng: 4.5500,
+          scheduledAt: '2026-07-14T08:30:00.000Z' },
+        { label: 'Rue des Étudiants', lat: 50.4920, lng: 4.5465,
+          scheduledAt: '2026-07-14T08:40:00.000Z' },
+        { label: 'Rue Centrale', lat: 50.4900, lng: 4.5430,
+          scheduledAt: '2026-07-14T08:55:00.000Z' },
+        { label: 'Avenue de la Libération', lat: 50.4878, lng: 4.5390,
+          scheduledAt: '2026-07-14T09:10:00.000Z' },
+        { label: 'Arrivée — Athénée Royal', lat: 50.4855, lng: 4.5370,
+          scheduledAt: '2026-07-14T09:25:00.000Z' },
+      ],
+      pois: [
+        { label: 'École Saint-Pierre', lat: 50.4930, lng: 4.5500, icon: 'school' },
+        { label: 'Athénée Royal', lat: 50.4855, lng: 4.5370, icon: 'school' },
+      ],
+      careCenters: [
+        { label: 'St-Medic — Place Albert Ier', lat: 50.4891, lng: 4.5452,
+          contact: '+32 71 82 XX XX', notes: 'Point médical permanent — centre-ville Fleurus.' },
+      ],
+      exitPoints: [
+        { label: 'Sortie — Rue de Namur', lat: 50.4890, lng: 4.5390,
+          direction: 'Vers Namur / N90' },
+      ],
+      safeZones: [
+        { label: 'Zone de repli — Place Albert Ier', lat: 50.4891, lng: 4.5452, radius: 60.0 },
+      ],
+      _server: 'http://localhost:3000',
+      _endpoint: '/v1/events/traversee-ecoles',
+      _signed_at: '2026-06-01T00:00:00Z',
     }),
     status: 'upcoming',
     color_hex: '#2E7D32',
@@ -111,11 +187,48 @@ const EVENTS_CATALOG = [
       [50.4880, 4.5458],
       [50.4885, 4.5445],
     ],
+    // ── QR Code conforme au contrat EventModel.fromJson ──────────────────
     qr_payload: JSON.stringify({
-      event: 'cortege-police',
-      server: 'http://localhost:3000',
-      endpoint: '/v1/events/cortege-police',
-      signed_at: '2026-06-01T00:00:00Z',
+      code: 'FLEURUS-CORTEGE',
+      title: 'Le Cortège de la Police Montée-Démonté',
+      startAt: '2026-07-14T14:00:00.000Z',
+      visibleAt: '2026-07-14T13:30:00.000Z',
+      route: '[[4.5460,50.4895],[4.5472,50.4888],[4.5458,50.4880],' +
+             '[4.5445,50.4885],[4.5452,50.4891]]',
+      destLat: 50.4891,
+      destLng: 4.5452,
+      waypoints: [
+        { label: 'Départ — Caserne de Police', lat: 50.4895, lng: 4.5460,
+          scheduledAt: '2026-07-14T14:00:00.000Z' },
+        { label: 'Étape 1', lat: 50.4888, lng: 4.5472,
+          scheduledAt: '2026-07-14T14:10:00.000Z' },
+        { label: 'Étape 2', lat: 50.4880, lng: 4.5458,
+          scheduledAt: '2026-07-14T14:20:00.000Z' },
+        { label: 'Étape 3', lat: 50.4885, lng: 4.5445,
+          scheduledAt: '2026-07-14T14:30:00.000Z' },
+        { label: 'Arrivée — Place Albert Ier', lat: 50.4891, lng: 4.5452,
+          scheduledAt: '2026-07-14T14:40:00.000Z' },
+      ],
+      pois: [
+        { label: 'Caserne de Police', lat: 50.4895, lng: 4.5460, icon: 'local_police' },
+        { label: 'Place Albert Ier', lat: 50.4891, lng: 4.5452, icon: 'flag' },
+      ],
+      careCenters: [
+        { label: 'St-Medic — Place Albert Ier', lat: 50.4891, lng: 4.5452,
+          contact: '+32 71 82 XX XX', notes: 'Point médical permanent — centre-ville Fleurus.' },
+      ],
+      exitPoints: [
+        { label: 'Sortie est — Rue Fleurjoux', lat: 50.4890, lng: 4.5480,
+          direction: 'Vers Wanfercée-Baulet' },
+        { label: 'Sortie ouest — Square de l\'Europe', lat: 50.4890, lng: 4.5418,
+          direction: 'Vers centre-ville' },
+      ],
+      safeZones: [
+        { label: 'Zone de repli — Place Albert Ier', lat: 50.4891, lng: 4.5452, radius: 60.0 },
+      ],
+      _server: 'http://localhost:3000',
+      _endpoint: '/v1/events/cortege-police',
+      _signed_at: '2026-06-01T00:00:00Z',
     }),
     status: 'upcoming',
     color_hex: '#B71C1C',

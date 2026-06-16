@@ -10,6 +10,12 @@ set(BINARY_NAME "flutter_streetphare")
 # versions of CMake.
 cmake_policy(VERSION 3.14...3.25)
 
+# Suppress deprecation warning from objectbox_flutter_libs (Issue #701)
+# FetchContent_Populate(objectbox-download) -> FetchContent_MakeAvailable
+if(POLICY CMP0169)
+  cmake_policy(SET CMP0169 OLD)
+endif()
+
 # Define build configuration option.
 get_property(IS_MULTICONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(IS_MULTICONFIG)

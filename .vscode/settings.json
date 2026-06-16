@@ -1,5 +1,28 @@
 {
     "cmake.sourceDirectory": "C:/Users/Deolin/Documents/Documents travail/Projet/StreetPhare/flutter_streetphare/windows/flutter",
     "java.compile.nullAnalysis.mode": "automatic",
-    "java.configuration.updateBuildConfiguration": "automatic"
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "continue.disableQuickFix": true,
+    "continue.enableQuickActions": true,
+    "continue.pauseCodebaseIndexOnStart": true,
+    "git.ignoreLimitWarning": true,
+    "chat.tools.terminal.autoApprove": {
+        "/^\\.\\\\gradlew\\.bat build 2>&1 \\| Tee-Object -FilePath osmand-build\\.log \\| Select-String -Pattern 'error\\|warning\\|Error\\|Warning' \\| Select-Object -First 50$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^\\.\\\\gradlew\\.bat build -q 2>&1 \\| Select-String -Pattern 'WARNING\\|error' \\| Select-Object -First 20$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        ".\\gradlew.bat": true,
+        "/^\\$p = \"\\$env:USERPROFILE\\\\AppData\\\\Local\\\\Pub\\\\Cache\\\\hosted\\\\pub\\.dev\"; Get-ChildItem -Path \\$p -Directory \\| Where-Object \\{ \\$_\\.Name -like 'flutter_foreground_task-\\*' \\} \\| ForEach-Object \\{ Write-Host \"== \\$_\\.Name ==\"; Get-Content \\$_\\.FullName\\\\android\\\\src\\\\main\\\\AndroidManifest\\.xml -ErrorAction SilentlyContinue \\}$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^\\$p = \"\\$env:USERPROFILE\\\\AppData\\\\Local\\\\Pub\\\\Cache\\\\hosted\\\\pub\\.dev\"; Get-ChildItem -Path \\$p -Directory \\| Where-Object \\{ \\$_\\.Name -like 'flutter_foreground_task-\\*' \\} \\| ForEach-Object \\{ Write-Host \"== \\$_\\.Name ==\"; Get-Content \\(Join-Path \\$_\\.FullName 'android\\\\src\\\\main\\\\AndroidManifest\\.xml'\\) -ErrorAction SilentlyContinue \\}$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }

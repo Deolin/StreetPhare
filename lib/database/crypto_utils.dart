@@ -13,7 +13,6 @@
 
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 
@@ -107,43 +106,26 @@ class CryptoUtils {
   }
 
   /// Chiffre une adresse (URL / IP) avec AES-256-CBC + HMAC.
-  /// Le ciphertext retourné est encodé en base64 et contient :
-  ///   `IV (16) ‖ MAC (32) ‖ CIPHER`
+  /// Le ciphertext retourné est encodé en base64 et contient
+  /// la concaténation (nonce + mac + cipher).
   Future<String> encryptAddress(String address, SecretKey aesKey) async {
-    final iv = _randomBytes(16);
     final box = await _aes.encrypt(
       utf8.encode(address),
       secretKey: aesKey,
-      nonce: iv,
     );
-    final mac = box.mac.bytes;
-    final combined = Uint8List(iv.length + mac.length + box.cipherText.length)
-      ..setRange(0, iv.length, iv)
-      ..setRange(iv.length, iv.length + mac.length, mac)
-      ..setRange(
-        iv.length + mac.length,
-        iv.length + mac.length + box.cipherText.length,
-        box.cipherText,
-      );
-    return base64Url.encode(combined);
+    return base64Url.encode(box.concatenation());
   }
 
   /// Déchiffre une adresse chiffrée.
   Future<String> decryptAddress(String cipherB64, SecretKey aesKey) async {
     final combined = base64Url.decode(cipherB64);
-    if (combined.length < 16 + 32 + 16) {
-      throw const FormatException('Ciphertext AES invalide');
-    }
-    final iv = combined.sublist(0, 16);
-    final mac = combined.sublist(16, 48);
-    final cipher = combined.sublist(48);
-    final box = SecretBox(cipher, nonce: iv, mac: Mac(mac));
+    // AesCbc.with256bits + Hmac.sha256 -> nonce=16, mac=32
+    final box = SecretBox.fromConcatenation(
+      combined,
+      nonceLength: 16,
+      macLength: 32,
+    );
     final clear = await _aes.decrypt(box, secretKey: aesKey);
     return utf8.decode(clear);
-  }
-
-  Uint8List _randomBytes(int n) {
-    final rng = Random.secure();
-    return Uint8List.fromList(List<int>.generate(n, (_) => rng.nextInt(256)));
   }
 }

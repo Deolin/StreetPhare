@@ -28,6 +28,9 @@ CMAKE_CXX_FLAGS_DEBUG:STRING=/MDd /Zi /Ob0 /Od /RTC1
 //Flags used by the CXX compiler during MINSIZEREL builds.
 CMAKE_CXX_FLAGS_MINSIZEREL:STRING=/MD /O1 /Ob1 /DNDEBUG
 
+//Flags used by the CXX compiler during PROFILE builds.
+CMAKE_CXX_FLAGS_PROFILE:STRING=
+
 //Flags used by the CXX compiler during RELEASE builds.
 CMAKE_CXX_FLAGS_RELEASE:STRING=/MD /O2 /Ob2 /DNDEBUG
 
@@ -154,6 +157,9 @@ CMAKE_RC_FLAGS_DEBUG:STRING=-D_DEBUG
 //Flags for Windows Resource Compiler during MINSIZEREL builds.
 CMAKE_RC_FLAGS_MINSIZEREL:STRING=
 
+//Flags for Windows Resource Compiler during PROFILE builds.
+CMAKE_RC_FLAGS_PROFILE:STRING=
+
 //Flags for Windows Resource Compiler during RELEASE builds.
 CMAKE_RC_FLAGS_RELEASE:STRING=
 
@@ -231,8 +237,15 @@ FETCHCONTENT_FULLY_DISCONNECTED:BOOL=OFF
 //Enables QUIET option for all content population
 FETCHCONTENT_QUIET:BOOL=ON
 
+//When not empty, overrides where to find pre-populated content
+// for objectbox-download
+FETCHCONTENT_SOURCE_DIR_OBJECTBOX-DOWNLOAD:PATH=
+
 //Enables UPDATE_DISCONNECTED behavior for all content population
 FETCHCONTENT_UPDATES_DISCONNECTED:BOOL=OFF
+
+//Enables UPDATE_DISCONNECTED behavior just for population of objectbox-download
+FETCHCONTENT_UPDATES_DISCONNECTED_OBJECTBOX-DOWNLOAD:BOOL=OFF
 
 //No help, variable specified on the command line.
 FLUTTER_TARGET_PLATFORM:UNINITIALIZED=windows-x64
@@ -248,6 +261,15 @@ JAVA_JVM_LIBRARY:FILEPATH=C:/Program Files/Java/jdk-22/lib/jvm.lib
 
 //Path to a program.
 NUGET:FILEPATH=C:/Users/Deolin/AppData/Local/Microsoft/WinGet/Links/nuget.exe
+
+//Value Computed by CMake
+connectivity_plus_BINARY_DIR:STATIC=C:/Projets/StreetPhare/build/windows/x64/plugins/connectivity_plus
+
+//Value Computed by CMake
+connectivity_plus_IS_TOP_LEVEL:STATIC=OFF
+
+//Value Computed by CMake
+connectivity_plus_SOURCE_DIR:STATIC=C:/Projets/StreetPhare/windows/flutter/ephemeral/.plugin_symlinks/connectivity_plus/windows
 
 //Value Computed by CMake
 flutter_local_notifications_windows_BINARY_DIR:STATIC=C:/Projets/StreetPhare/build/windows/x64/plugins/flutter_local_notifications_windows
@@ -310,6 +332,15 @@ jni_library_IS_TOP_LEVEL:STATIC=OFF
 jni_library_SOURCE_DIR:STATIC=C:/Projets/StreetPhare/windows/flutter/ephemeral/.plugin_symlinks/jni/src
 
 //Value Computed by CMake
+objectbox_flutter_libs_BINARY_DIR:STATIC=C:/Projets/StreetPhare/build/windows/x64/plugins/objectbox_flutter_libs
+
+//Value Computed by CMake
+objectbox_flutter_libs_IS_TOP_LEVEL:STATIC=OFF
+
+//Value Computed by CMake
+objectbox_flutter_libs_SOURCE_DIR:STATIC=C:/Projets/StreetPhare/windows/flutter/ephemeral/.plugin_symlinks/objectbox_flutter_libs/windows
+
+//Value Computed by CMake
 permission_handler_windows_BINARY_DIR:STATIC=C:/Projets/StreetPhare/build/windows/x64/plugins/permission_handler_windows
 
 //Value Computed by CMake
@@ -364,6 +395,8 @@ CMAKE_CXX_FLAGS-ADVANCED:INTERNAL=1
 CMAKE_CXX_FLAGS_DEBUG-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_CXX_FLAGS_MINSIZEREL
 CMAKE_CXX_FLAGS_MINSIZEREL-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: CMAKE_CXX_FLAGS_PROFILE
+CMAKE_CXX_FLAGS_PROFILE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_CXX_FLAGS_RELEASE
 CMAKE_CXX_FLAGS_RELEASE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_CXX_FLAGS_RELWITHDEBINFO
@@ -430,7 +463,7 @@ CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_MT
 CMAKE_MT-ADVANCED:INTERNAL=1
 //number of local generators
-CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=10
+CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=12
 //Platform information initialized
 CMAKE_PLATFORM_INFO_INITIALIZED:INTERNAL=1
 //noop for ranlib
@@ -444,6 +477,8 @@ CMAKE_RC_FLAGS-ADVANCED:INTERNAL=1
 CMAKE_RC_FLAGS_DEBUG-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_RC_FLAGS_MINSIZEREL
 CMAKE_RC_FLAGS_MINSIZEREL-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: CMAKE_RC_FLAGS_PROFILE
+CMAKE_RC_FLAGS_PROFILE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_RC_FLAGS_RELEASE
 CMAKE_RC_FLAGS_RELEASE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_RC_FLAGS_RELWITHDEBINFO

@@ -17,6 +17,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../debug/client_debug_logger.dart';
 import '../domain/models/event_model.dart';
 
 /// Manager singleton des événements — supporte jusqu'à [maxEvents] en parallèle.
@@ -128,7 +129,10 @@ class EventManager extends ValueNotifier<List<EventModel>> {
       }
       return true;
     } catch (e) {
-      if (kDebugMode) debugPrint('[EventManager] JSON invalide : $e');
+      if (kDebugMode) {
+        debugPrint('[EventManager] JSON invalide : $e');
+        ClientDebugLogger.instance.log('QR Code invalide ou incomplet: $e');
+      }
       return false;
     }
   }

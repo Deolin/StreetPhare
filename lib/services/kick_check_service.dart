@@ -13,8 +13,9 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' as io;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -99,11 +100,15 @@ class KickCheckService extends ChangeNotifier {
 
         notifyListeners();
       }
-    } on SocketException {
-      // Pas de connexion — silencieux (on ne punit pas le hors-ligne).
-    } on TimeoutException {
-      // Timeout — silencieux.
     } catch (e) {
+      if (!kIsWeb && e is io.SocketException) {
+        // Pas de connexion — silencieux.
+        return;
+      }
+      if (e is TimeoutException) {
+        // Timeout — silencieux.
+        return;
+      }
       debugPrint('[KickCheck] erreur: $e');
     }
   }

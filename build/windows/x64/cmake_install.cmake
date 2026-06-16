@@ -44,7 +44,17 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
+  include("C:/Projets/StreetPhare/build/windows/x64/plugins/connectivity_plus/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
   include("C:/Projets/StreetPhare/build/windows/x64/plugins/geolocator_windows/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("C:/Projets/StreetPhare/build/windows/x64/plugins/objectbox_flutter_libs/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
@@ -172,7 +182,7 @@ endif()
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Runtime" OR NOT CMAKE_INSTALL_COMPONENT)
   if(CMAKE_INSTALL_CONFIG_NAME MATCHES "^([Dd][Ee][Bb][Uu][Gg])$")
     list(APPEND CMAKE_ABSOLUTE_DESTINATION_FILES
-     "C:/Projets/StreetPhare/build/windows/x64/runner/Debug/geolocator_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Debug/permission_handler_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Debug/url_launcher_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Debug/flutter_local_notifications_windows.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Debug/dartjni.dll")
+     "C:/Projets/StreetPhare/build/windows/x64/runner/Debug/connectivity_plus_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Debug/geolocator_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Debug/objectbox_flutter_libs_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Debug/objectbox.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Debug/permission_handler_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Debug/url_launcher_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Debug/flutter_local_notifications_windows.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Debug/dartjni.dll")
     if(CMAKE_WARN_ON_ABSOLUTE_INSTALL_DESTINATION)
       message(WARNING "ABSOLUTE path INSTALL DESTINATION : ${CMAKE_ABSOLUTE_DESTINATION_FILES}")
     endif()
@@ -180,7 +190,10 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Runtime" OR NOT CMAKE_INSTALL_COMPONENT)
       message(FATAL_ERROR "ABSOLUTE path INSTALL DESTINATION forbidden (by caller): ${CMAKE_ABSOLUTE_DESTINATION_FILES}")
     endif()
     file(INSTALL DESTINATION "C:/Projets/StreetPhare/build/windows/x64/runner/Debug" TYPE FILE FILES
+      "C:/Projets/StreetPhare/build/windows/x64/plugins/connectivity_plus/Debug/connectivity_plus_plugin.dll"
       "C:/Projets/StreetPhare/build/windows/x64/plugins/geolocator_windows/Debug/geolocator_windows_plugin.dll"
+      "C:/Projets/StreetPhare/build/windows/x64/plugins/objectbox_flutter_libs/Debug/objectbox_flutter_libs_plugin.dll"
+      "C:/Projets/StreetPhare/build/windows/x64/_deps/objectbox-download-src/lib/objectbox.dll"
       "C:/Projets/StreetPhare/build/windows/x64/plugins/permission_handler_windows/Debug/permission_handler_windows_plugin.dll"
       "C:/Projets/StreetPhare/build/windows/x64/plugins/url_launcher_windows/Debug/url_launcher_windows_plugin.dll"
       "C:/Projets/StreetPhare/build/windows/x64/plugins/flutter_local_notifications_windows/shared/Debug/flutter_local_notifications_windows.dll"
@@ -188,7 +201,7 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Runtime" OR NOT CMAKE_INSTALL_COMPONENT)
       )
   elseif(CMAKE_INSTALL_CONFIG_NAME MATCHES "^([Pp][Rr][Oo][Ff][Ii][Ll][Ee])$")
     list(APPEND CMAKE_ABSOLUTE_DESTINATION_FILES
-     "C:/Projets/StreetPhare/build/windows/x64/runner/Profile/geolocator_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Profile/permission_handler_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Profile/url_launcher_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Profile/flutter_local_notifications_windows.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Profile/dartjni.dll")
+     "C:/Projets/StreetPhare/build/windows/x64/runner/Profile/connectivity_plus_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Profile/geolocator_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Profile/objectbox_flutter_libs_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Profile/objectbox.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Profile/permission_handler_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Profile/url_launcher_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Profile/flutter_local_notifications_windows.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Profile/dartjni.dll")
     if(CMAKE_WARN_ON_ABSOLUTE_INSTALL_DESTINATION)
       message(WARNING "ABSOLUTE path INSTALL DESTINATION : ${CMAKE_ABSOLUTE_DESTINATION_FILES}")
     endif()
@@ -196,7 +209,10 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Runtime" OR NOT CMAKE_INSTALL_COMPONENT)
       message(FATAL_ERROR "ABSOLUTE path INSTALL DESTINATION forbidden (by caller): ${CMAKE_ABSOLUTE_DESTINATION_FILES}")
     endif()
     file(INSTALL DESTINATION "C:/Projets/StreetPhare/build/windows/x64/runner/Profile" TYPE FILE FILES
+      "C:/Projets/StreetPhare/build/windows/x64/plugins/connectivity_plus/Profile/connectivity_plus_plugin.dll"
       "C:/Projets/StreetPhare/build/windows/x64/plugins/geolocator_windows/Profile/geolocator_windows_plugin.dll"
+      "C:/Projets/StreetPhare/build/windows/x64/plugins/objectbox_flutter_libs/Profile/objectbox_flutter_libs_plugin.dll"
+      "C:/Projets/StreetPhare/build/windows/x64/_deps/objectbox-download-src/lib/objectbox.dll"
       "C:/Projets/StreetPhare/build/windows/x64/plugins/permission_handler_windows/Profile/permission_handler_windows_plugin.dll"
       "C:/Projets/StreetPhare/build/windows/x64/plugins/url_launcher_windows/Profile/url_launcher_windows_plugin.dll"
       "C:/Projets/StreetPhare/build/windows/x64/plugins/flutter_local_notifications_windows/shared/Profile/flutter_local_notifications_windows.dll"
@@ -204,7 +220,7 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Runtime" OR NOT CMAKE_INSTALL_COMPONENT)
       )
   elseif(CMAKE_INSTALL_CONFIG_NAME MATCHES "^([Rr][Ee][Ll][Ee][Aa][Ss][Ee])$")
     list(APPEND CMAKE_ABSOLUTE_DESTINATION_FILES
-     "C:/Projets/StreetPhare/build/windows/x64/runner/Release/geolocator_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Release/permission_handler_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Release/url_launcher_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Release/flutter_local_notifications_windows.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Release/dartjni.dll")
+     "C:/Projets/StreetPhare/build/windows/x64/runner/Release/connectivity_plus_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Release/geolocator_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Release/objectbox_flutter_libs_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Release/objectbox.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Release/permission_handler_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Release/url_launcher_windows_plugin.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Release/flutter_local_notifications_windows.dll;C:/Projets/StreetPhare/build/windows/x64/runner/Release/dartjni.dll")
     if(CMAKE_WARN_ON_ABSOLUTE_INSTALL_DESTINATION)
       message(WARNING "ABSOLUTE path INSTALL DESTINATION : ${CMAKE_ABSOLUTE_DESTINATION_FILES}")
     endif()
@@ -212,7 +228,10 @@ if(CMAKE_INSTALL_COMPONENT STREQUAL "Runtime" OR NOT CMAKE_INSTALL_COMPONENT)
       message(FATAL_ERROR "ABSOLUTE path INSTALL DESTINATION forbidden (by caller): ${CMAKE_ABSOLUTE_DESTINATION_FILES}")
     endif()
     file(INSTALL DESTINATION "C:/Projets/StreetPhare/build/windows/x64/runner/Release" TYPE FILE FILES
+      "C:/Projets/StreetPhare/build/windows/x64/plugins/connectivity_plus/Release/connectivity_plus_plugin.dll"
       "C:/Projets/StreetPhare/build/windows/x64/plugins/geolocator_windows/Release/geolocator_windows_plugin.dll"
+      "C:/Projets/StreetPhare/build/windows/x64/plugins/objectbox_flutter_libs/Release/objectbox_flutter_libs_plugin.dll"
+      "C:/Projets/StreetPhare/build/windows/x64/_deps/objectbox-download-src/lib/objectbox.dll"
       "C:/Projets/StreetPhare/build/windows/x64/plugins/permission_handler_windows/Release/permission_handler_windows_plugin.dll"
       "C:/Projets/StreetPhare/build/windows/x64/plugins/url_launcher_windows/Release/url_launcher_windows_plugin.dll"
       "C:/Projets/StreetPhare/build/windows/x64/plugins/flutter_local_notifications_windows/shared/Release/flutter_local_notifications_windows.dll"

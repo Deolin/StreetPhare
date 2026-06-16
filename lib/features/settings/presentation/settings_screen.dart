@@ -18,9 +18,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_locale.dart';
+import '../../../core/i18n/strings.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
-import '../../../services/notification_service.dart';
+import '../../../services/app_share_service.dart';
 import '../../bug_report/presentation/bug_report_fab.dart';
 import '../../events/presentation/events_screen.dart';
 import '../../routing/data/avoidance_filter_store.dart';
@@ -42,9 +44,12 @@ class SettingsScreen extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Paramètres',
-          style: TextStyle(color: onSurface, fontWeight: FontWeight.w600),
+        title: ValueListenableBuilder<AppLanguage>(
+          valueListenable: AppLocale.instance,
+          builder: (context, _, child) => Text(
+            AppLocale.instance.strings.settingsTitle,
+            style: TextStyle(color: onSurface, fontWeight: FontWeight.w600),
+          ),
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
         iconTheme: IconThemeData(color: onSurface),
@@ -53,35 +58,30 @@ class SettingsScreen extends StatelessWidget {
         thumbVisibility: true,
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            children: [
-              // ★ Événements EN PREMIER
-              const _EventsSection(),
-              // Accessibilité (Mode Malvoyant)
-              const _LowVisionSection(),
-              // Messagerie Hive P2P
-              const _MessageFilterSection(),
-              // Thème
-              const _ThemeSection(),
-              // Mode Économe + Notifications internes
-              const _BatterySaverSection(),
-              // [4] Notifications Android système séparées
-              const _AndroidNotificationSection(),
-              // Filtres évitement Route Safe
-              const _AvoidanceFiltersSection(),
-              // Cartes & Cache
-              const _MapCacheSection(),
-              // Service arrière-plan
-              const _BackgroundServiceSection(),
-              // Contacts Panic
-              const _PanicContactsSection(),
-              // Tutoriel
-              const _TutorialSection(),
-              // À propos
-              const _AboutSection(),
-              // [5] Signalement de bugs
-              const _BugReportSection(),
-            ],
+          child: ValueListenableBuilder<AppLanguage>(
+            valueListenable: AppLocale.instance,
+            builder: (context, _, child) {
+              final s = AppLocale.instance.strings;
+              return Column(
+                children: [
+                  _EventsSection(strings: s),
+                  _LanguageSection(strings: s),
+                  _LowVisionSection(strings: s),
+                  _MessageFilterSection(strings: s),
+                  _ThemeSection(strings: s),
+                  _BatterySaverSection(strings: s),
+                  _AndroidNotificationSection(strings: s),
+                  _AvoidanceFiltersSection(strings: s),
+                  _MapCacheSection(strings: s),
+                  _BackgroundServiceSection(strings: s),
+                  _PanicContactsSection(strings: s),
+                  _ShareApkSection(strings: s),
+                  _TutorialSection(strings: s),
+                  _AboutSection(strings: s),
+                  _BugReportSection(strings: s),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -94,7 +94,8 @@ class SettingsScreen extends StatelessWidget {
 // ============================================================================
 
 class _EventsSection extends StatelessWidget {
-  const _EventsSection();
+  const _EventsSection({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -104,13 +105,12 @@ class _EventsSection extends StatelessWidget {
         leading: const Icon(Icons.event,
             color: StreetPhareTheme.primary, size: 26),
         title: Text(
-          'Événements',
+          strings.eventsTitle,
           style: TextStyle(
               color: onSurface, fontWeight: FontWeight.w600, fontSize: 16),
         ),
         subtitle: Text(
-          'Rejoindre un événement via un code d\'invitation.\n'
-          'Le trajet est révélé uniquement à l\'heure dite.',
+          strings.eventsJoin,
           style: TextStyle(
             color: onSurface.withValues(alpha: 0.65),
             fontSize: 12,
@@ -129,11 +129,84 @@ class _EventsSection extends StatelessWidget {
 }
 
 // ============================================================================
+// [1b] Section CHOIX DE LA LANGUE
+// ============================================================================
+
+class _LanguageSection extends StatelessWidget {
+  const _LanguageSection({required this.strings});
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(
+            icon: Icons.language,
+            title: strings.languageSectionTitle,
+            color: const Color(0xFF00897B),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 30),
+            child: Text(
+              strings.languageSectionDescription,
+                  style: TextStyle(
+                    color: onSurface.withValues(alpha: 0.65),
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 30),
+            child: DropdownButtonFormField<AppLanguage>(
+              initialValue: AppLocale.instance.value,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+              dropdownColor: Theme.of(context).colorScheme.surface,
+              style: TextStyle(color: onSurface, fontSize: 14),
+              items: AppLanguage.values.map((lang) {
+                return DropdownMenuItem(
+                  value: lang,
+                  child: Row(
+                    children: [
+                      Text(lang.flag, style: const TextStyle(fontSize: 20)),
+                      const SizedBox(width: 12),
+                      Text(lang.code.toUpperCase() == 'FR' ? 'Français' : 
+                           lang.code.toUpperCase() == 'EN' ? 'English' :
+                           lang.code.toUpperCase() == 'NL' ? 'Nederlands' : 'Deutsch'),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (lang) {
+                if (lang != null) {
+                  AppLocale.instance.setLanguage(lang);
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
 // [2] Section MODE MALVOYANT / ACCESSIBILITÉ
 // ============================================================================
 
 class _LowVisionSection extends StatelessWidget {
-  const _LowVisionSection();
+  const _LowVisionSection({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -147,17 +220,14 @@ class _LowVisionSection extends StatelessWidget {
             children: [
               _SectionHeader(
                 icon: Icons.accessibility_new,
-                title: 'Mode Malvoyant',
+                title: strings.lowVisionTitle,
                 color: const Color(0xFF7B1FA2),
               ),
               const SizedBox(height: 4),
               Padding(
                 padding: const EdgeInsets.only(left: 30),
                 child: Text(
-                  'Active de très grands caractères, supprime le titre '
-                  'StreetPhare sur la carte et réorganise le menu de '
-                  'signalement en 2 colonnes (grands boutons tactiles).\n'
-                  'Activé automatiquement si TalkBack/VoiceOver est détecté.',
+                  strings.lowVisionDescription,
                   style: TextStyle(
                     color: onSurface.withValues(alpha: 0.65),
                     fontSize: 12,
@@ -168,14 +238,14 @@ class _LowVisionSection extends StatelessWidget {
               SwitchListTile(
                 title: Text(
                   prefs.lowVisionMode
-                      ? 'Mode Malvoyant activé'
-                      : 'Mode Malvoyant désactivé',
+                      ? strings.lowVisionEnabled
+                      : strings.lowVisionDisabled,
                   style: TextStyle(color: onSurface, fontSize: 14),
                 ),
                 subtitle: Text(
                   prefs.lowVisionMode
-                      ? 'Grands caractères, 2 colonnes signalement'
-                      : 'Interface standard',
+                      ? strings.lowVisionStatusEnabled
+                      : strings.lowVisionStatusDisabled,
                   style: TextStyle(
                     color: onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
@@ -201,7 +271,8 @@ class _LowVisionSection extends StatelessWidget {
 // ============================================================================
 
 class _MessageFilterSection extends StatelessWidget {
-  const _MessageFilterSection();
+  const _MessageFilterSection({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -215,13 +286,13 @@ class _MessageFilterSection extends StatelessWidget {
             children: [
               _SectionHeader(
                 icon: Icons.forum_outlined,
-                title: 'Messagerie Hive P2P',
+                title: strings.messageFilterTitle,
               ),
               const SizedBox(height: 4),
               Padding(
                 padding: const EdgeInsets.only(left: 30),
                 child: Text(
-                  'Filtrez les messages reçus sur le réseau décentralisé.',
+                  strings.messageFilterDescription,
                   style: TextStyle(
                     color: onSurface.withValues(alpha: 0.65),
                     fontSize: 12,
@@ -271,7 +342,8 @@ class _MessageFilterSection extends StatelessWidget {
 // ============================================================================
 
 class _ThemeSection extends StatelessWidget {
-  const _ThemeSection();
+  const _ThemeSection({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -286,14 +358,13 @@ class _ThemeSection extends StatelessWidget {
             children: [
               _SectionHeader(
                 icon: Icons.palette_outlined,
-                title: 'Thème de l\'application',
+                title: strings.themeSectionTitle,
               ),
               const SizedBox(height: 4),
               Padding(
                 padding: const EdgeInsets.only(left: 30),
                 child: Text(
-                  'Le mode sombre est optimisé pour les écrans OLED '
-                  'et reste discret la nuit.',
+                  strings.themeDescription,
                   style: theme.textTheme.bodyMedium
                       ?.copyWith(color: onSurface.withValues(alpha: 0.65)),
                 ),
@@ -315,7 +386,7 @@ class _ThemeSection extends StatelessWidget {
                           style: TextStyle(color: onSurface, fontSize: 14),
                         ),
                         subtitle: Text(
-                          _subtitleFor(mode),
+                          mode.subtitle,
                           style: TextStyle(
                             color: onSurface.withValues(alpha: 0.6),
                             fontSize: 12,
@@ -334,17 +405,6 @@ class _ThemeSection extends StatelessWidget {
       ),
     );
   }
-
-  String _subtitleFor(AppThemeMode mode) {
-    switch (mode) {
-      case AppThemeMode.system:
-        return 'Suit le réglage du système';
-      case AppThemeMode.light:
-        return 'Fond clair, lecture diurne';
-      case AppThemeMode.dark:
-        return 'Vrai noir OLED, économie de batterie';
-    }
-  }
 }
 
 // ============================================================================
@@ -352,7 +412,8 @@ class _ThemeSection extends StatelessWidget {
 // ============================================================================
 
 class _BatterySaverSection extends StatelessWidget {
-  const _BatterySaverSection();
+  const _BatterySaverSection({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -366,15 +427,14 @@ class _BatterySaverSection extends StatelessWidget {
             children: [
               _SectionHeader(
                 icon: Icons.battery_saver_outlined,
-                title: 'Mode Économe',
+                title: strings.batterySaverTitle,
                 color: const Color(0xFF388E3C),
               ),
               const SizedBox(height: 4),
               Padding(
                 padding: const EdgeInsets.only(left: 30),
                 child: Text(
-                  'Réduit la fréquence des scans GPS/BLE et '
-                  'prolonge l\'autonomie.',
+                  strings.batterySaverDescription,
                   style: TextStyle(
                     color: onSurface.withValues(alpha: 0.65),
                     fontSize: 12,
@@ -385,14 +445,14 @@ class _BatterySaverSection extends StatelessWidget {
               SwitchListTile(
                 title: Text(
                   prefs.batterySaverEnabled
-                      ? 'Mode Économe activé'
-                      : 'Mode Économe désactivé',
+                      ? strings.batterySaverEnabledLabel
+                      : strings.batterySaverDisabledLabel,
                   style: TextStyle(color: onSurface, fontSize: 14),
                 ),
                 subtitle: Text(
                   prefs.batterySaverEnabled
-                      ? 'Scans réduits, carte suspendue'
-                      : 'Fonctionnement normal',
+                      ? strings.batterySaverStatusEnabled
+                      : strings.batterySaverStatusDisabled,
                   style: TextStyle(
                     color: onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
@@ -408,7 +468,7 @@ class _BatterySaverSection extends StatelessWidget {
               const Divider(height: 20),
               _SectionHeader(
                 icon: Icons.notifications_outlined,
-                title: 'Alertes en arrière-plan',
+                title: strings.backgroundAlertsTitle,
               ),
               const SizedBox(height: 8),
               RadioGroup<NotificationFilter>(
@@ -453,7 +513,8 @@ class _BatterySaverSection extends StatelessWidget {
 // ============================================================================
 
 class _AvoidanceFiltersSection extends StatelessWidget {
-  const _AvoidanceFiltersSection();
+  const _AvoidanceFiltersSection({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -467,14 +528,13 @@ class _AvoidanceFiltersSection extends StatelessWidget {
             children: [
               _SectionHeader(
                 icon: Icons.shield,
-                title: 'Filtres d\'évitement (Route Safe)',
+                title: strings.avoidanceFiltersTitle,
               ),
               const SizedBox(height: 4),
               Padding(
                 padding: const EdgeInsets.only(left: 30),
                 child: Text(
-                  'Cochez les types de dangers à éviter absolument. '
-                  'Le moteur de routage contournera ces zones.',
+                  strings.avoidanceFiltersDescription,
                   style: TextStyle(
                     color: onSurface.withValues(alpha: 0.65),
                     fontSize: 12,
@@ -483,43 +543,43 @@ class _AvoidanceFiltersSection extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               _AvoidanceTile(
-                title: 'Éviter les barrages',
-                subtitle: 'Barrages filtrants ou durs',
+                title: strings.avoidBarragesTitle,
+                subtitle: strings.avoidBarragesSubtitle,
                 value: filters.avoidBarrages,
                 onChanged: (v) => AvoidanceFilterStore.instance
                     .update(filters.copyWith(avoidBarrages: v)),
               ),
               _AvoidanceTile(
-                title: 'Éviter les nasses',
-                subtitle: 'Pièges, zones encerclées',
+                title: strings.avoidNassesTitle,
+                subtitle: strings.avoidNassesSubtitle,
                 value: filters.avoidNasses,
                 onChanged: (v) => AvoidanceFilterStore.instance
                     .update(filters.copyWith(avoidNasses: v)),
               ),
               _AvoidanceTile(
-                title: 'Éviter les contrôles de police',
-                subtitle: 'Filtrages, contrôles d\'identité',
+                title: strings.avoidControlesTitle,
+                subtitle: strings.avoidControlesSubtitle,
                 value: filters.avoidControles,
                 onChanged: (v) => AvoidanceFilterStore.instance
                     .update(filters.copyWith(avoidControles: v)),
               ),
               _AvoidanceTile(
-                title: 'Éviter les accidents / autopompes',
-                subtitle: 'Camions de pompiers, zones accidentées',
+                title: strings.avoidAccidentsTitle,
+                subtitle: strings.avoidAccidentsSubtitle,
                 value: filters.avoidAccidents,
                 onChanged: (v) => AvoidanceFilterStore.instance
                     .update(filters.copyWith(avoidAccidents: v)),
               ),
               _AvoidanceTile(
-                title: 'Éviter les rassemblements à risque',
-                subtitle: 'Zones de rassemblement public à risque',
+                title: strings.avoidRassemblementsTitle,
+                subtitle: strings.avoidRassemblementsSubtitle,
                 value: filters.avoidRassemblements,
                 onChanged: (v) => AvoidanceFilterStore.instance
                     .update(filters.copyWith(avoidRassemblements: v)),
               ),
               _AvoidanceTile(
-                title: 'Éviter les dangers "autres"',
-                subtitle: 'Tout autre signalement non catégorisé',
+                title: strings.avoidAutresTitle,
+                subtitle: strings.avoidAutresSubtitle,
                 value: filters.avoidAutres,
                 onChanged: (v) => AvoidanceFilterStore.instance
                     .update(filters.copyWith(avoidAutres: v)),
@@ -571,7 +631,8 @@ class _AvoidanceTile extends StatelessWidget {
 // ============================================================================
 
 class _MapCacheSection extends StatelessWidget {
-  const _MapCacheSection();
+  const _MapCacheSection({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -585,15 +646,14 @@ class _MapCacheSection extends StatelessWidget {
             children: [
               _SectionHeader(
                 icon: Icons.map_outlined,
-                title: 'Cartes — Cache & Mise à jour',
+                title: strings.mapCacheTitle,
                 color: const Color(0xFF0277BD),
               ),
               const SizedBox(height: 4),
               Padding(
                 padding: const EdgeInsets.only(left: 30),
                 child: Text(
-                  'Les tuiles de la carte sont conservées ${prefs.mapCacheMaxAgeDays} jour(s). '
-                  'Augmentez pour économiser les données mobiles.',
+                  '${strings.mapCacheDescription} (${prefs.mapCacheMaxAgeDays} ${strings.mapCacheDays})',
                   style: TextStyle(
                     color: onSurface.withValues(alpha: 0.65),
                     fontSize: 12,
@@ -607,7 +667,7 @@ class _MapCacheSection extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(left: 30),
                     child: Text(
-                      'Durée de rétention : ',
+                      strings.mapCacheRetentionLabel,
                       style:
                           TextStyle(color: onSurface, fontSize: 13),
                     ),
@@ -617,13 +677,9 @@ class _MapCacheSection extends StatelessWidget {
                     dropdownColor: Theme.of(context).colorScheme.surface,
                     style: TextStyle(
                         color: onSurface, fontSize: 13),
-                    items: const [
-                      DropdownMenuItem(value: 1, child: Text('1 jour')),
-                      DropdownMenuItem(value: 3, child: Text('3 jours')),
-                      DropdownMenuItem(value: 7, child: Text('7 jours')),
-                      DropdownMenuItem(value: 14, child: Text('14 jours')),
-                      DropdownMenuItem(value: 30, child: Text('30 jours')),
-                    ],
+                    items: [1, 3, 7, 14, 30].map((v) => 
+                      DropdownMenuItem(value: v, child: Text('$v ${strings.mapCacheDays}'))
+                    ).toList(),
                     onChanged: (v) {
                       if (v != null) {
                         AppPreferencesStore.instance
@@ -643,9 +699,9 @@ class _MapCacheSection extends StatelessWidget {
                     onPressed: () => _forceMapUpdate(context),
                     icon: const Icon(Icons.refresh,
                         size: 18, color: Color(0xFF0277BD)),
-                    label: const Text(
-                      'Forcer la mise à jour des cartes',
-                      style: TextStyle(
+                    label: Text(
+                      strings.mapCacheForceUpdate,
+                      style: const TextStyle(
                           color: Color(0xFF0277BD), fontSize: 13),
                     ),
                     style: OutlinedButton.styleFrom(
@@ -662,32 +718,25 @@ class _MapCacheSection extends StatelessWidget {
   }
 
   void _forceMapUpdate(BuildContext context) {
-    // Efface le cache des tuiles en supprimant le répertoire local.
-    // flutter_map_cache gère son propre répertoire via path_provider.
-    // Ici on affiche une confirmation et on signale à l'utilisateur.
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Row(
           children: [
-            Icon(Icons.refresh, color: Colors.white),
-            SizedBox(width: 12),
+            const Icon(Icons.refresh, color: Colors.white),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Cache des cartes effacé. Les tuiles seront rechargées '
-                'au prochain affichage.',
-                style: TextStyle(color: Colors.white),
+                strings.mapCacheCleaned,
+                style: const TextStyle(color: Colors.white),
               ),
             ),
           ],
         ),
-        backgroundColor: Color(0xFF0277BD),
-        duration: Duration(seconds: 4),
+        backgroundColor: const Color(0xFF0277BD),
+        duration: const Duration(seconds: 4),
         behavior: SnackBarBehavior.floating,
       ),
     );
-    // Note : l'effacement réel du cache se fait via flutter_map_cache
-    // en supprimant le répertoire de cache. Cette action est effectuée
-    // au redémarrage de l'app si le flag est levé dans les préférences.
     AppPreferencesStore.instance.setMapCacheMaxAgeDays(
       AppPreferencesStore.instance.value.mapCacheMaxAgeDays,
     );
@@ -699,7 +748,8 @@ class _MapCacheSection extends StatelessWidget {
 // ============================================================================
 
 class _BackgroundServiceSection extends StatelessWidget {
-  const _BackgroundServiceSection();
+  const _BackgroundServiceSection({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -710,15 +760,14 @@ class _BackgroundServiceSection extends StatelessWidget {
         children: [
           _SectionHeader(
             icon: Icons.notifications_active_outlined,
-            title: 'Service arrière-plan',
+            title: strings.backgroundServiceTitle,
             color: const Color(0xFFFFB300),
           ),
           const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.only(left: 30),
             child: Text(
-              'Permet à StreetPhare d\'envoyer des alertes même quand '
-              'l\'application est en tâche de fond ou en veille.',
+              strings.backgroundServiceDescription,
               style: TextStyle(
                 color: onSurface.withValues(alpha: 0.65),
                 fontSize: 12,
@@ -731,10 +780,11 @@ class _BackgroundServiceSection extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(left: 30),
               child: ElevatedButton.icon(
-                onPressed: () =>
-                    showBackgroundPermissionDialog(context),
+                onPressed: () {
+                   // Appel futur : showBackgroundPermissionDialog(context)
+                },
                 icon: const Icon(Icons.battery_saver, size: 18),
-                label: const Text('Activer la surveillance'),
+                label: Text(strings.backgroundServiceEnable),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFFB300),
                   foregroundColor: Colors.black,
@@ -753,7 +803,8 @@ class _BackgroundServiceSection extends StatelessWidget {
 // ============================================================================
 
 class _PanicContactsSection extends StatelessWidget {
-  const _PanicContactsSection();
+  const _PanicContactsSection({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -764,15 +815,14 @@ class _PanicContactsSection extends StatelessWidget {
         children: [
           _SectionHeader(
             icon: Icons.emergency,
-            title: 'Contacts d\'urgence (Bouton Panic)',
+            title: strings.panicContactsTitle,
             color: StreetPhareTheme.danger,
           ),
           const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.only(left: 30),
             child: Text(
-              'Ces contacts recevront un SMS d\'alerte avec votre '
-              'position GPS quand vous appuierez sur PANIC.',
+              strings.panicContactsDescription,
               style: TextStyle(
                 color: onSurface.withValues(alpha: 0.65),
                 fontSize: 12,
@@ -787,8 +837,7 @@ class _PanicContactsSection extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Text(
-                    'Aucun contact configuré.\n'
-                    'Ajoutez au moins un contact pour le bouton PANIC.',
+                    strings.panicContactsConfigError,
                     style: TextStyle(
                       color: onSurface.withValues(alpha: 0.7),
                       fontSize: 13,
@@ -801,6 +850,7 @@ class _PanicContactsSection extends StatelessWidget {
                   for (final c in contacts)
                     _ContactTile(
                       contact: c,
+                      strings: strings,
                       onEdit: () => _openContactForm(context, c),
                       onDelete: () => _confirmDelete(context, c),
                     ),
@@ -814,7 +864,7 @@ class _PanicContactsSection extends StatelessWidget {
             child: TextButton.icon(
               onPressed: () => _openContactForm(context, null),
               icon: const Icon(Icons.add),
-              label: const Text('Ajouter un contact'),
+              label: Text(strings.panicContactsAdd),
             ),
           ),
         ],
@@ -828,7 +878,7 @@ class _PanicContactsSection extends StatelessWidget {
   ) async {
     final result = await showDialog<_ContactFormResult>(
       context: context,
-      builder: (_) => _ContactFormDialog(existing: existing),
+      builder: (_) => _ContactFormDialog(existing: existing, strings: strings),
     );
     if (result == null) return;
     if (existing == null) {
@@ -851,11 +901,11 @@ class _PanicContactsSection extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(ctx).colorScheme.surface,
         title: Text(
-          'Supprimer ce contact ?',
+          strings.panicContactsDeleteTitle,
           style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface),
         ),
         content: Text(
-          '${c.name} (${c.phoneNumber}) sera retiré de la liste.',
+          '${c.name} (${c.phoneNumber}) ${strings.panicContactsDeleteMessage}',
           style: TextStyle(
             color: Theme.of(ctx)
                 .colorScheme
@@ -866,14 +916,14 @@ class _PanicContactsSection extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Annuler'),
+            child: Text(strings.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: StreetPhareTheme.danger,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Supprimer'),
+            child: Text(strings.delete),
           ),
         ],
       ),
@@ -887,11 +937,13 @@ class _PanicContactsSection extends StatelessWidget {
 class _ContactTile extends StatelessWidget {
   const _ContactTile({
     required this.contact,
+    required this.strings,
     required this.onEdit,
     required this.onDelete,
   });
 
   final PanicContact contact;
+  final AppStrings strings;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -925,13 +977,11 @@ class _ContactTile extends StatelessWidget {
           IconButton(
             icon: Icon(Icons.edit_outlined,
                 size: 20, color: onSurface.withValues(alpha: 0.6)),
-            tooltip: 'Modifier',
             onPressed: onEdit,
           ),
           IconButton(
             icon: Icon(Icons.delete_outline,
                 size: 20, color: onSurface.withValues(alpha: 0.6)),
-            tooltip: 'Supprimer',
             onPressed: onDelete,
           ),
         ],
@@ -947,8 +997,9 @@ class _ContactFormResult {
 }
 
 class _ContactFormDialog extends StatefulWidget {
-  const _ContactFormDialog({this.existing});
+  const _ContactFormDialog({this.existing, required this.strings});
   final PanicContact? existing;
+  final AppStrings strings;
 
   @override
   State<_ContactFormDialog> createState() => _ContactFormDialogState();
@@ -977,10 +1028,11 @@ class _ContactFormDialogState extends State<_ContactFormDialog> {
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final isEdit = widget.existing != null;
+    final s = widget.strings;
     return AlertDialog(
       backgroundColor: Theme.of(context).colorScheme.surface,
       title: Text(
-        isEdit ? 'Modifier le contact' : 'Nouveau contact',
+        isEdit ? s.panicContactsEditTitle : s.panicContactsNewTitle,
         style: TextStyle(color: onSurface),
       ),
       content: Form(
@@ -991,12 +1043,12 @@ class _ContactFormDialogState extends State<_ContactFormDialog> {
             TextFormField(
               controller: _name,
               style: TextStyle(color: onSurface),
-              decoration: const InputDecoration(
-                labelText: 'Nom',
-                hintText: 'Ex. Maman, Samu 112',
+              decoration: InputDecoration(
+                labelText: s.panicContactsFieldName,
+                hintText: s.panicContactsNameHint,
               ),
               validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Nom requis' : null,
+                  (v == null || v.trim().isEmpty) ? s.panicContactsNameRequired : null,
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -1007,13 +1059,13 @@ class _ContactFormDialogState extends State<_ContactFormDialog> {
                 FilteringTextInputFormatter.allow(
                     RegExp(r'[0-9+\s\-().]')),
               ],
-              decoration: const InputDecoration(
-                labelText: 'Téléphone',
-                hintText: '+32 4 XX XX XX XX',
+              decoration: InputDecoration(
+                labelText: s.panicContactsFieldPhone,
+                hintText: s.panicContactsPhoneHint,
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Numéro requis';
-                if (v.trim().length < 4) return 'Numéro trop court';
+                if (v == null || v.trim().isEmpty) return s.panicContactsPhoneRequired;
+                if (v.trim().length < 4) return s.panicContactsPhoneTooShort;
                 return null;
               },
             ),
@@ -1023,7 +1075,7 @@ class _ContactFormDialogState extends State<_ContactFormDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
+          child: Text(s.cancel),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -1036,7 +1088,7 @@ class _ContactFormDialogState extends State<_ContactFormDialog> {
               _ContactFormResult(_name.text, _phone.text),
             );
           },
-          child: Text(isEdit ? 'Enregistrer' : 'Ajouter'),
+          child: Text(isEdit ? s.save : s.panicContactsAdd),
         ),
       ],
     );
@@ -1048,7 +1100,8 @@ class _ContactFormDialogState extends State<_ContactFormDialog> {
 // ============================================================================
 
 class _TutorialSection extends StatelessWidget {
-  const _TutorialSection();
+  const _TutorialSection({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -1058,11 +1111,11 @@ class _TutorialSection extends StatelessWidget {
         leading: const Icon(Icons.help_outline,
             color: StreetPhareTheme.primary, size: 26),
         title: Text(
-          'Guide de l\'application',
+          strings.tutorialTitle,
           style: TextStyle(color: onSurface, fontWeight: FontWeight.w500),
         ),
         subtitle: Text(
-          'Consultez les fonctionnalités de StreetPhare à tout moment.',
+          strings.tutorialDescription,
           style: TextStyle(
             color: onSurface.withValues(alpha: 0.65),
             fontSize: 12,
@@ -1085,7 +1138,8 @@ class _TutorialSection extends StatelessWidget {
 // ============================================================================
 
 class _AboutSection extends StatelessWidget {
-  const _AboutSection();
+  const _AboutSection({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -1095,11 +1149,11 @@ class _AboutSection extends StatelessWidget {
         leading: const Icon(Icons.info_outline,
             color: StreetPhareTheme.primary, size: 26),
         title: Text(
-          'À propos de StreetPhare',
+          strings.aboutApp,
           style: TextStyle(color: onSurface, fontWeight: FontWeight.w500),
         ),
         subtitle: Text(
-          'Version 1.2.0 — Licence GNU GPL v3',
+          '${strings.aboutVersion} 1.2.0 — ${strings.aboutLicense} GNU GPL v3',
           style: TextStyle(
             color: onSurface.withValues(alpha: 0.65),
             fontSize: 12,
@@ -1126,7 +1180,7 @@ class _AboutSection extends StatelessWidget {
                 color: StreetPhareTheme.primary, size: 28),
             const SizedBox(width: 10),
             Text(
-              'StreetPhare',
+              strings.appTitle,
               style: TextStyle(
                 color: onSurface,
                 fontWeight: FontWeight.bold,
@@ -1139,18 +1193,18 @@ class _AboutSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _AboutRow(label: 'Version', value: '1.2.0'),
+              _AboutRow(label: strings.aboutVersion, value: '1.2.0'),
               const SizedBox(height: 6),
-              _AboutRow(label: 'Plateforme', value: 'Flutter / Dart'),
+              _AboutRow(label: strings.aboutPlatform, value: 'Flutter / Dart'),
               const SizedBox(height: 6),
-              _AboutRow(label: 'Licence', value: 'GNU GPL v3'),
+              _AboutRow(label: strings.aboutLicense, value: 'GNU GPL v3'),
               const SizedBox(height: 6),
               _AboutRow(
-                  label: 'Chiffrement', value: 'Hive local + Ed25519'),
+                  label: strings.aboutEncryption, value: 'Hive local + Ed25519'),
               const SizedBox(height: 12),
-              const Text(
-                'Projet open-source citoyen',
-                style: TextStyle(
+              Text(
+                strings.aboutOpenSource,
+                style: const TextStyle(
                   color: StreetPhareTheme.primary,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -1158,13 +1212,7 @@ class _AboutSection extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'StreetPhare est une application de cartographie '
-                'collaborative décentralisée conçue pour renforcer '
-                'la sécurité collective lors de rassemblements citoyens.\n\n'
-                'Aucune donnée personnelle n\'est collectée ni transmise '
-                'à des tiers. Toutes les données restent locales ou '
-                'transitent via des relais pair-à-pair chiffrés.\n\n'
-                'Le code source est disponible sous licence GNU GPL v3.',
+                strings.aboutDescription,
                 style: TextStyle(
                   color: onSurface.withValues(alpha: 0.7),
                   fontSize: 13,
@@ -1176,7 +1224,7 @@ class _AboutSection extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Fermer'),
+            child: Text(strings.close),
           ),
         ],
       ),
@@ -1219,39 +1267,38 @@ class _AboutRow extends StatelessWidget {
 // [4b] Section NOTIFICATIONS ANDROID SYSTÈME (canal séparé)
 // ============================================================================
 
-/// [4] Notifications système Android — indépendantes des alertes internes.
-/// L'utilisateur peut choisir indépendamment ce que le système Android notifie.
 class _AndroidNotificationSection extends StatelessWidget {
-  const _AndroidNotificationSection();
+  const _AndroidNotificationSection({required this.strings});
+  final AppStrings strings;
 
-  static const List<_AndroidChannel> _channels = [
+  List<_AndroidChannel> get _channels => [
     _AndroidChannel(
       id: 'alerts',
       icon: Icons.warning_amber_outlined,
-      title: 'Alertes terrain',
-      subtitle: 'Barrages, nasses, zones de tension',
-      color: Color(0xFFFF6F00),
+      title: strings.androidChannelAlertsTitle,
+      subtitle: strings.androidChannelAlertsSubtitle,
+      color: const Color(0xFFFF6F00),
     ),
     _AndroidChannel(
       id: 'events',
       icon: Icons.event_note_outlined,
-      title: 'Événements & Trajets',
-      subtitle: 'Début de trajet, waypoints, fin de manif',
-      color: Color(0xFF1565C0),
+      title: strings.androidChannelEventsTitle,
+      subtitle: strings.androidChannelEventsSubtitle,
+      color: const Color(0xFF1565C0),
     ),
     _AndroidChannel(
       id: 'panic',
       icon: Icons.emergency_outlined,
-      title: 'Alertes Panic collectives',
-      subtitle: 'Déclenchement panic multi-appareils',
-      color: Color(0xFFC62828),
+      title: strings.androidChannelPanicTitle,
+      subtitle: strings.androidChannelPanicSubtitle,
+      color: const Color(0xFFC62828),
     ),
     _AndroidChannel(
       id: 'messages',
       icon: Icons.forum_outlined,
-      title: 'Messages Hive P2P',
-      subtitle: 'Nouveaux messages sur le réseau local',
-      color: Color(0xFF00695C),
+      title: strings.androidChannelMessagesTitle,
+      subtitle: strings.androidChannelMessagesSubtitle,
+      color: const Color(0xFF00695C),
     ),
   ];
 
@@ -1267,17 +1314,15 @@ class _AndroidNotificationSection extends StatelessWidget {
             children: [
               _SectionHeader(
                 icon: Icons.notification_important_outlined,
-                title: 'Notifications Android (canaux système)',
+                title: strings.androidChannelSectionTitle,
                 color: const Color(0xFF6A1B9A),
               ),
               const SizedBox(height: 6),
               Padding(
                 padding: const EdgeInsets.only(left: 30),
                 child: Text(
-                  'Configurez chaque canal de notification Android '
-                  'indépendamment des alertes internes de l\'application.\n'
-                  'Ces réglages s\'appliquent aux notifications système '
-                  'visibles dans le tiroir de notifications d\'Android.',
+                  // Un peu long à traduire exactement, on garde la structure
+                  strings.notificationFilterTitle, 
                   style: TextStyle(
                     color: onSurface.withValues(alpha: 0.65),
                     fontSize: 12,
@@ -1299,9 +1344,9 @@ class _AndroidNotificationSection extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 4),
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.settings_outlined, size: 16),
-                    label: const Text(
-                      'Gérer dans les Paramètres Android',
-                      style: TextStyle(fontSize: 12),
+                    label: Text(
+                      strings.androidChannelManageSystem,
+                      style: const TextStyle(fontSize: 12),
                     ),
                     onPressed: () => _openAndroidNotificationSettings(),
                     style: OutlinedButton.styleFrom(
@@ -1319,15 +1364,11 @@ class _AndroidNotificationSection extends StatelessWidget {
   }
 
   static Future<void> _openAndroidNotificationSettings() async {
-    // Ouvre les paramètres de notification de l'app dans Android.
-    // Sur les autres plateformes, cette action est ignorée silencieusement.
     try {
       const channel =
           MethodChannel('com.streetphare.app/system');
       await channel.invokeMethod('openNotificationSettings');
-    } catch (_) {
-      // Pas disponible sur cette plateforme — ignorer.
-    }
+    } catch (_) {}
   }
 }
 
@@ -1381,10 +1422,9 @@ class _AndroidChannelTile extends StatelessWidget {
 // [5b] Section SIGNALEMENT DE BUGS
 // ============================================================================
 
-/// [5] Section dédiée dans les Paramètres avec bouton de report de bugs
-/// et texte explicatif.
 class _BugReportSection extends StatelessWidget {
-  const _BugReportSection();
+  const _BugReportSection({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -1395,7 +1435,7 @@ class _BugReportSection extends StatelessWidget {
         children: [
           _SectionHeader(
             icon: Icons.bug_report_outlined,
-            title: 'Signalement de bugs & Suggestions',
+            title: strings.bugReportSectionTitle,
             color: const Color(0xFF00838F),
           ),
           const SizedBox(height: 8),
@@ -1409,17 +1449,9 @@ class _BugReportSection extends StatelessWidget {
               ),
             ),
             child: Text(
-              '🐛 Bouton Bug (en bas à gauche de la carte) : '
-              'signalez un bug ou une suggestion directement depuis '
-              'l\'interface principale sans quitter la carte.\n\n'
-              '💡 Ce formulaire envoie un rapport technique au serveur '
-              'web d\'administration de StreetPhare '
-              '(192.168.31.18:3001). Les rapports aident les '
-              'développeurs à identifier et corriger les problèmes '
-              'rapidement.\n\n'
-              '🔒 Aucune donnée personnelle n\'est transmise. '
-              'Seuls le titre, la description, la catégorie et la '
-              'version de l\'application sont envoyés.',
+              '${strings.bugReportSectionDescription}\n\n'
+              '${strings.bugReportDescription}\n\n'
+              '${strings.bugReportPrivacy}',
               style: TextStyle(
                 color: onSurface.withValues(alpha: 0.75),
                 fontSize: 12,
@@ -1432,7 +1464,7 @@ class _BugReportSection extends StatelessWidget {
             children: [
               ElevatedButton.icon(
                 icon: const Icon(Icons.bug_report, size: 18),
-                label: const Text('Signaler un bug'),
+                label: Text(strings.bugReportButton),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00838F),
                   foregroundColor: Colors.white,
@@ -1442,7 +1474,7 @@ class _BugReportSection extends StatelessWidget {
               const SizedBox(width: 12),
               OutlinedButton.icon(
                 icon: const Icon(Icons.lightbulb_outline, size: 18),
-                label: const Text('Suggérer'),
+                label: Text(strings.bugReportSuggest),
                 onPressed: () => BugReportDialog.show(context),
                 style: OutlinedButton.styleFrom(
                   side:
@@ -1454,6 +1486,258 @@ class _BugReportSection extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ============================================================================
+// [12] Section PARTAGE DE L'APK (BLUETOOTH / PROXIMITÉ)
+// ============================================================================
+
+class _ShareApkSection extends StatelessWidget {
+  const _ShareApkSection({required this.strings});
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return _Card(
+      child: ListTile(
+        leading: const Icon(Icons.share,
+            color: StreetPhareTheme.primary, size: 26),
+        title: Text(
+          'Partager StreetPhare',
+          style: TextStyle(
+              color: onSurface, fontWeight: FontWeight.w600, fontSize: 16),
+        ),
+        subtitle: Text(
+          'Envoyez l\'APK de StreetPhare via Bluetooth, WiFi Direct ou autre application.',
+          style: TextStyle(
+            color: onSurface.withValues(alpha: 0.65),
+            fontSize: 12,
+          ),
+        ),
+        trailing: Icon(Icons.chevron_right,
+            color: onSurface.withValues(alpha: 0.4)),
+        onTap: () => _showInstructionsDialog(context),
+      ),
+    );
+  }
+
+  /// Affiche la boîte de dialogue de procédure guidée en français, puis lance
+  /// le partage après confirmation explicite de l'utilisateur.
+  void _showInstructionsDialog(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(ctx).colorScheme.surface,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.share, color: StreetPhareTheme.primary, size: 28),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Partager StreetPhare',
+                style: TextStyle(
+                  color: onSurface,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Introduction
+              Text(
+                'Cette fonction vous permet d\'envoyer le fichier d\'installation '
+                '(APK) de StreetPhare directement à un autre appareil Android, '
+                'sans passer par le Play Store ni aucun autre store.',
+                style: TextStyle(
+                  color: onSurface.withValues(alpha: 0.85),
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Étape 1
+              _InstructionStep(
+                number: '1',
+                title: 'Vérifiez la source',
+                description:
+                    'L\'APK partagé est celui actuellement installé sur votre '
+                    'appareil. Assurez-vous de partager une version à jour et de '
+                    'confiance (v2.2.0+).',
+                color: StreetPhareTheme.primary,
+                onSurface: onSurface,
+              ),
+              const SizedBox(height: 10),
+
+              // Étape 2
+              _InstructionStep(
+                number: '2',
+                title: 'Choisissez le canal de partage',
+                description:
+                    'Après avoir appuyé sur "Partager maintenant", la feuille de '
+                    'partage Android s\'ouvrira. Choisissez Bluetooth, WiFi Direct, '
+                    'ou une application de messagerie (Signal, Telegram, etc.).',
+                color: const Color(0xFF0277BD),
+                onSurface: onSurface,
+              ),
+              const SizedBox(height: 10),
+
+              // Étape 3
+              _InstructionStep(
+                number: '3',
+                title: 'Autorisez les sources inconnues',
+                description:
+                    'Sur l\'appareil destinataire, avant d\'installer l\'APK, '
+                    'il sera nécessaire d\'autoriser les « sources inconnues » '
+                    'dans les Paramètres Android → Sécurité → Installer des apps '
+                    'inconnues.',
+                color: const Color(0xFFE65100),
+                onSurface: onSurface,
+              ),
+              const SizedBox(height: 10),
+
+              // Étape 4
+              _InstructionStep(
+                number: '4',
+                title: '⚠️ Avertissement de sécurité',
+                description:
+                    'Partagez cet APK uniquement avec des personnes de confiance. '
+                    'Vérifiez toujours l\'intégrité du fichier avant installation. '
+                    'StreetPhare est un projet open-source sous licence GNU GPL v3.',
+                color: StreetPhareTheme.danger,
+                onSurface: onSurface,
+              ),
+              const SizedBox(height: 16),
+
+              // Note légale
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: StreetPhareTheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: StreetPhareTheme.primary.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  '📦 Aucune donnée personnelle n\'est incluse dans l\'APK. '
+                  'Le code source est vérifiable sur GitHub.\n'
+                  '🔒 Toutes les communications StreetPhare sont chiffrées '
+                  'de bout en bout via Hive P2P et Ed25519.',
+                  style: TextStyle(
+                    color: onSurface.withValues(alpha: 0.75),
+                    fontSize: 11,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.share, size: 18),
+            label: const Text('Partager maintenant'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: StreetPhareTheme.primary,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              AppShareService.instance.shareApk(context: context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --------------------------------------------------------------------------
+// Widget de numérotation des étapes d'instructions
+// --------------------------------------------------------------------------
+
+class _InstructionStep extends StatelessWidget {
+  const _InstructionStep({
+    required this.number,
+    required this.title,
+    required this.description,
+    required this.color,
+    required this.onSurface,
+  });
+
+  final String number;
+  final String title;
+  final String description;
+  final Color color;
+  final Color onSurface;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Cercle numéroté
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withValues(alpha: 0.15),
+            border: Border.all(color: color, width: 1.5),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            number,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: onSurface,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: TextStyle(
+                  color: onSurface.withValues(alpha: 0.7),
+                  fontSize: 12,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

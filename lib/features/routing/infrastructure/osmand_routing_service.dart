@@ -40,6 +40,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -359,9 +360,6 @@ class OsmAndRoutingService {
     final host = NetworkConfig.primaryServer
         .replaceAll(RegExp(r':3000|:3001'), ':$_kGraphHopperPort');
 
-    // Construit l'URL de base avec les deux points et le profil piéton.
-    // Les zones à éviter (block_area) sont ajoutées conditionnellement
-    // afin d'être réellement transmises à GraphHopper.
     final uriBuffer = StringBuffer(
       '$host/route'
       '?point=${start.latitude},${start.longitude}'
@@ -372,8 +370,6 @@ class OsmAndRoutingService {
       '&instructions=false',
     );
 
-    // Zones bloquées (dangers validés ≥ 3 votes, <30 m).
-    // Format GraphHopper : "lat,lon|lat,lon|..."
     if (avoidPoints.isNotEmpty) {
       final blockArea = avoidPoints
           .map((p) => '${p.latitude},${p.longitude}')
@@ -383,20 +379,16 @@ class OsmAndRoutingService {
 
     final uri = Uri.parse(uriBuffer.toString());
 
-    final client = HttpClient()
-      ..connectionTimeout = _kHttpTimeout;
-
     try {
-      final req = await client.getUrl(uri);
-      req.headers.set('X-StreetPhare-Client', 'OsmAndBridge/1.3');
-      final resp = await req.close().timeout(_kHttpTimeout);
-      final body = await resp.transform(utf8.decoder).join();
+      final resp = await http.get(uri, headers: {
+        'X-StreetPhare-Client': 'OsmAndBridge/1.3',
+      }).timeout(_kHttpTimeout);
 
       if (resp.statusCode != 200) return [];
 
-      return _parseGraphHopperResponse(body);
-    } finally {
-      client.close(force: true);
+      return _parseGraphHopperResponse(resp.body);
+    } catch (_) {
+      return [];
     }
   }
 
@@ -455,20 +447,16 @@ class OsmAndRoutingService {
       '?overview=full&geometries=geojson&alternatives=true',
     );
 
-    final client = HttpClient()
-      ..connectionTimeout = _kHttpTimeout;
-
     try {
-      final req = await client.getUrl(uri);
-      req.headers.set('User-Agent', 'StreetPhare/1.3 OsmAndBridge');
-      final resp = await req.close().timeout(_kHttpTimeout);
-      final body = await resp.transform(utf8.decoder).join();
+      final resp = await http.get(uri, headers: {
+        'User-Agent': 'StreetPhare/1.3 OsmAndBridge',
+      }).timeout(_kHttpTimeout);
 
       if (resp.statusCode != 200) return [];
 
-      return _parseOsrmResponse(body);
-    } finally {
-      client.close(force: true);
+      return _parseOsrmResponse(resp.body);
+    } catch (_) {
+      return [];
     }
   }
 

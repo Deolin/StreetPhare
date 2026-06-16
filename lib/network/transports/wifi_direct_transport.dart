@@ -17,11 +17,16 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../p2p_mesh_service.dart';
 
 /// Transport Wi-Fi (LAN multicast).
-class WifiDirectMeshTransport implements MeshTransport {
+///
+/// Implémente [WidgetsBindingObserver] pour suspendre la socket UDP
+/// lorsque l'application passe en arrière-plan (Android 15+ coupe les
+/// privilèges d'émission réseau → SocketException errno=1).
+class WifiDirectMeshTransport with WidgetsBindingObserver implements MeshTransport {
   WifiDirectMeshTransport({
     this.multicastAddress = '239.255.42.42',
     this.port = 42424,
@@ -51,16 +56,22 @@ class WifiDirectMeshTransport implements MeshTransport {
   @override
   bool get isAvailable {
     if (kIsWeb) return false; // UDP multicast non dispo sur le web
-    return Platform.isAndroid ||
-        Platform.isIOS ||
-        Platform.isMacOS ||
-        Platform.isWindows ||
-        Platform.isLinux;
+    final platform = defaultTargetPlatform;
+    return platform == TargetPlatform.android ||
+        platform == TargetPlatform.iOS ||
+        platform == TargetPlatform.macOS ||
+        platform == TargetPlatform.windows ||
+        platform == TargetPlatform.linux;
   }
 
   @override
   Future<void> start() async {
     if (_socket != null) return;
+
+    // ── Enregistrement comme observateur du cycle de vie ──────────
+    // Permet de suspendre/reprendre la socket UDP lors des
+    // transitions app en arrière-plan / premier plan.
+    WidgetsBinding.instance.addObserver(this);
 
     _mcastGroup = InternetAddress(multicastAddress);
     _socket = await RawDatagramSocket.bind(
@@ -92,6 +103,9 @@ class WifiDirectMeshTransport implements MeshTransport {
 
   @override
   Future<void> stop() async {
+    // ── Désenregistrement de l'observateur du cycle de vie ────────
+    WidgetsBinding.instance.removeObserver(this);
+
     if (_mcastGroup != null && _socket != null) {
       try {
         _socket!.leaveMulticast(_mcastGroup!);
@@ -106,9 +120,26 @@ class WifiDirectMeshTransport implements MeshTransport {
   @override
   Future<void> broadcast(String payload) async {
     if (_socket == null) return;
+    // ── Protection anti-crash arrière-plan ────────────────────────
+    // Android 15+ coupe les privilèges d'émission réseau quand
+    // l'app passe en arrière-plan. On intercepte SocketException
+    // pour éviter que l'exception ne remonte et ne tue la boucle
+    // de microtâches Dart (_startMicrotaskLoop).
     try {
       final bytes = utf8.encode(payload);
       _socket!.send(bytes, _mcastGroup!, port);
+    } on SocketException catch (e) {
+      // Socket coupée par l'OS (errno=1 Operation not permitted).
+      // On ferme silencieusement : la socket sera recréée au retour
+      // au premier plan via didChangeAppLifecycleState.
+      if (kDebugMode) {
+        debugPrint('[WiFi] SocketException (arrière-plan probable) : $e');
+      }
+      // Fermeture propre pour éviter les fuites
+      await _sub?.cancel();
+      _sub = null;
+      try { _socket?.close(); } catch (_) {}
+      _socket = null;
     } catch (e) {
       if (kDebugMode) debugPrint('[WiFi] send error: $e');
     }
@@ -120,8 +151,57 @@ class WifiDirectMeshTransport implements MeshTransport {
     await broadcast(payload);
   }
 
+  // ── WidgetsBindingObserver : gestion du cycle de vie ──────────────
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (kDebugMode) {
+      debugPrint('[WiFi] AppLifecycleState → $state');
+    }
+
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      // ── Suspension de la socket UDP ────────────────────────────
+      // Android 15+ coupe les privilèges réseau en arrière-plan.
+      // On ferme la socket pour éviter SocketException errno=1.
+      _suspendSocket();
+    } else if (state == AppLifecycleState.resumed) {
+      // ── Reprise de la socket UDP ───────────────────────────────
+      // On recrée la socket multicast au retour au premier plan.
+      _resumeSocket();
+    }
+  }
+
+  /// Ferme la socket UDP proprement (appelé en arrière-plan).
+  void _suspendSocket() {
+    if (_socket == null) return;
+    if (kDebugMode) {
+      debugPrint('[WiFi] Suspension socket UDP (arrière-plan)');
+    }
+    _sub?.cancel();
+    _sub = null;
+    try { _socket?.close(); } catch (_) {}
+    _socket = null;
+  }
+
+  /// Recrée la socket UDP (appelé au retour au premier plan).
+  Future<void> _resumeSocket() async {
+    if (_socket != null) return;
+    if (kDebugMode) {
+      debugPrint('[WiFi] Reprise socket UDP (premier plan)');
+    }
+    try {
+      await start();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[WiFi] Échec reprise socket : $e');
+      }
+    }
+  }
+
   /// Libère les ressources internes (canal broadcast).
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _incomingController.close();
   }
 

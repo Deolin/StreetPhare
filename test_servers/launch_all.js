@@ -58,14 +58,15 @@ startServer('Backup:3001', path.join(HERE, 'server_secondary_v2.js'), {
 }, 'secondary_live');
 
 // ── 3. Admin Dashboard :4000 ──────────────────────────────────────────────
-startServer('Admin:4000', path.join(HERE, 'admin_dashboard.js'), {
+startServer('Admin:4000', path.join(HERE, 'admin_dashboard_v2.js'), {
   ADMIN_PORT:   '4000',
   PRIMARY_URL:  'http://localhost:3000',
   NODE_ENV:     'development',
 }, 'admin_live');
 
 // ── 4. Mini-site Vitrine :5000 ────────────────────────────────────────────
-const VITRINE_DIR = path.join(ROOT, 'web_vitrine');
+// La vitrine est servie depuis le dossier web/ Flutter (web_vitrine/ supprimé)
+const VITRINE_DIR = path.join(ROOT, 'web');
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css':  'text/css',

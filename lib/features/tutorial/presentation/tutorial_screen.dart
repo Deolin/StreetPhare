@@ -324,7 +324,7 @@ class _TutorialTable extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       itemCount: entries.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      separatorBuilder: (_, o) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final entry = entries[index];
         final color = _catColor(entry.category);

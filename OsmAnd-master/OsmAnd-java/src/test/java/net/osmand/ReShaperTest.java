@@ -1,7 +1,5 @@
 package net.osmand;
 
-import java.text.Normalizer;
-
 import org.junit.Test;
 
 import com.ibm.icu.text.ArabicShaping;

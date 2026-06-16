@@ -66,6 +66,9 @@ const dash = (() => {
   return require('./logger');
 })();
 
+// ── Moniteur Temps Réel (WebSocket) ─────────────────────────────────────
+const liveMonitor = require('./modules/live_monitor');
+
 // ── Configuration ────────────────────────────────────────────────────────
 const PORT              = parseInt(process.env.PORT  || '3000', 10);
 const ROLE              = (process.env.ROLE           || 'primary').trim();
@@ -80,6 +83,25 @@ dash.init({ role: ROLE, port: PORT, name: 'Principal', url: SELF_URL });
 // ── Application Express ──────────────────────────────────────────────────
 const app = express();
 app.use(express.json({ limit: '2mb' }));
+
+// ── Middleware de monitoring — capture TOUTES les requêtes HTTP entrantes ─
+app.use((req, _res, next) => {
+  const start = Date.now();
+  // Capture la réponse une fois émise
+  const originalJson = _res.json.bind(_res);
+  _res.json = function (body) {
+    liveMonitor.logHttpRequest({
+      method: req.method,
+      path: req.path,
+      clientIp: req.ip || req.socket.remoteAddress || '127.0.0.1',
+      server: `primary:${PORT}`,
+      statusCode: _res.statusCode,
+      durationMs: Date.now() - start,
+    });
+    return originalJson(body);
+  };
+  next();
+});
 
 // ── Logger horodaté ──────────────────────────────────────────────────────
 function log(...args) {
@@ -415,19 +437,27 @@ const httpServer = http.createServer(app);
 
 // Ensemble des clients WebSocket connectés au relay /mesh
 const meshClients = new Set();
-const wss = new WebSocketServer({ noServer: true });
+const meshWss = new WebSocketServer({ noServer: true });
 
-// Intercepte l'upgrade HTTP → WebSocket uniquement sur /mesh
+// ── Initialisation du LiveMonitor en mode noServer ──────────────────────
+liveMonitor.configureNoServer();
+const monitorWss = liveMonitor.getWss();
+
+// ── Handler upgrade UNIFIÉ (/mesh + /_monitor) ──────────────────────────
+// Node.js n'accepte qu'un seul écouteur 'upgrade'. On fusionne les deux
+// chemins WebSocket dans un dispatch unique.
 httpServer.on('upgrade', (req, socket, head) => {
   const pathname = new URL(req.url, `http://localhost:${PORT}`).pathname;
-  if (pathname === '/mesh') {
-    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+  if (pathname === '/mesh' && meshWss) {
+    meshWss.handleUpgrade(req, socket, head, (ws) => meshWss.emit('connection', ws, req));
+  } else if (pathname === '/_monitor' && monitorWss) {
+    monitorWss.handleUpgrade(req, socket, head, (ws) => monitorWss.emit('connection', ws, req));
   } else {
     socket.destroy();
   }
 });
 
-wss.on('connection', (ws, req) => {
+meshWss.on('connection', (ws, req) => {
   const qs     = new URL(req.url, `http://localhost:${PORT}`).searchParams;
   const peerId = qs.get('peerId') || 'unknown';
   meshClients.add(ws);
@@ -467,9 +497,13 @@ app.get('/mesh/status', (_req, res) => {
 //  DÉMARRAGE
 // ════════════════════════════════════════════════════════════════════════
 
+// ── Heartbeat initial dans le moniteur ──────────────────────────────────
+liveMonitor.logHeartbeat({ server: 'primary', role: ROLE, port: PORT });
+
 httpServer.listen(PORT, () => {
   log(`✅ SERVEUR PRINCIPAL v2 démarré sur ${SELF_URL}`);
   log(`   WebSocket relay : ws://localhost:${PORT}/mesh`);
+  log(`   Moniteur temps réel : ws://localhost:${PORT}/_monitor`);
   log(`   next_backup = ${NEXT_BACKUP_CLEAR}`);
   log(`   Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz`);
 });

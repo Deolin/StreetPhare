@@ -80,7 +80,7 @@ public abstract class GeneratedMessageLite extends AbstractMessageLite
 
   @SuppressWarnings("unchecked")
   public abstract static class Builder<MessageType extends GeneratedMessageLite,
-                                       BuilderType extends Builder>
+                                       BuilderType extends Builder<MessageType, BuilderType>>
       extends AbstractMessageLite.Builder<BuilderType> {
     protected Builder() {}
 

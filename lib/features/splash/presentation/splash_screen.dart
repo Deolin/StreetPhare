@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/cache/cache_manager.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../map/presentation/map_screen.dart';
+import '../../start_screen/data/start_screen_store.dart';
+import '../../start_screen/presentation/start_screen.dart';
 import '../../tutorial/data/tutorial_store.dart';
 import '../../tutorial/presentation/tutorial_screen.dart';
 import '../../../services/version_check_service.dart';
@@ -98,8 +100,18 @@ class _SplashScreenState extends State<SplashScreen>
       // puis on navigue vers MapScreen quand l'utilisateur le ferme.
       if (!mounted) return;
 
-      if (TutorialStore.instance.isFirstLaunch) {
-        // Premier démarrage : on remplace le splash par le tutoriel,
+      // Étape 4 : Vérifier si c'est le tout premier lancement
+      // (StartScreen d'abord, puis tutoriel si applicable)
+      if (StartScreenStore.instance.isFirstLaunch) {
+        // Premier lancement : on affiche le StartScreen (choix de langue),
+        // qui redirigera vers MapScreen (ou tutorial selon le flag).
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const _StartScreenBridge(),
+          ),
+        );
+      } else if (TutorialStore.instance.isFirstLaunch) {
+        // Premier démarrage (tutoriel non vu) : on affiche le tutoriel,
         // puis le tutoriel redirige vers MapScreen une fois fermé.
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
@@ -249,6 +261,59 @@ class _TutorialThenMapBridgeState extends State<_TutorialThenMapBridge> {
       ),
     );
     // Une fois le tutoriel fermé, on navigue vers MapScreen.
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const MapScreen()),
+    );
+  }
+
+  /// Fond neutre pendant la transition (pas de flash blanc/noir).
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: StreetPhareTheme.background,
+      body: Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(StreetPhareTheme.primary),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// Bridge StartScreen → MapScreen (tout premier lancement)
+// ============================================================================
+
+/// Widget intermédiaire affiché lors du tout premier lancement.
+///
+/// Il affiche le [StartScreen] pour le choix de la langue.
+/// Lorsque l'utilisateur clique sur "Commencer",
+/// [StartScreen] redirige automatiquement vers [MapScreen].
+class _StartScreenBridge extends StatefulWidget {
+  const _StartScreenBridge();
+
+  @override
+  State<_StartScreenBridge> createState() => _StartScreenBridgeState();
+}
+
+class _StartScreenBridgeState extends State<_StartScreenBridge> {
+  @override
+  void initState() {
+    super.initState();
+    // On pousse le StartScreen immédiatement après le premier build.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showStartScreen());
+  }
+
+  Future<void> _showStartScreen() async {
+    if (!mounted) return;
+    // Attend que l'utilisateur ferme le StartScreen (pop).
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const StartScreen(),
+      ),
+    );
+    // Une fois le StartScreen fermé, on navigue vers MapScreen.
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const MapScreen()),

@@ -7,7 +7,8 @@
 // pour des raisons de compatibilité ou de sécurité.
 
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' as io;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -112,10 +113,11 @@ class VersionCheckService {
   }
 
   void _quitApp() {
-    if (Platform.isAndroid) {
+    if (kIsWeb) return;
+    if (io.Platform.isAndroid) {
       SystemNavigator.pop();
     } else {
-      exit(0);
+      io.exit(0);
     }
   }
 }

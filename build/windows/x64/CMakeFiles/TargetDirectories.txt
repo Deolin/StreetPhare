@@ -8,9 +8,15 @@ C:/Projets/StreetPhare/build/windows/x64/flutter/CMakeFiles/INSTALL.dir
 C:/Projets/StreetPhare/build/windows/x64/runner/CMakeFiles/flutter_streetphare.dir
 C:/Projets/StreetPhare/build/windows/x64/runner/CMakeFiles/INSTALL.dir
 C:/Projets/StreetPhare/build/windows/x64/runner/CMakeFiles/ALL_BUILD.dir
+C:/Projets/StreetPhare/build/windows/x64/plugins/connectivity_plus/CMakeFiles/connectivity_plus_plugin.dir
+C:/Projets/StreetPhare/build/windows/x64/plugins/connectivity_plus/CMakeFiles/INSTALL.dir
+C:/Projets/StreetPhare/build/windows/x64/plugins/connectivity_plus/CMakeFiles/ALL_BUILD.dir
 C:/Projets/StreetPhare/build/windows/x64/plugins/geolocator_windows/CMakeFiles/geolocator_windows_plugin.dir
 C:/Projets/StreetPhare/build/windows/x64/plugins/geolocator_windows/CMakeFiles/INSTALL.dir
 C:/Projets/StreetPhare/build/windows/x64/plugins/geolocator_windows/CMakeFiles/ALL_BUILD.dir
+C:/Projets/StreetPhare/build/windows/x64/plugins/objectbox_flutter_libs/CMakeFiles/objectbox_flutter_libs_plugin.dir
+C:/Projets/StreetPhare/build/windows/x64/plugins/objectbox_flutter_libs/CMakeFiles/INSTALL.dir
+C:/Projets/StreetPhare/build/windows/x64/plugins/objectbox_flutter_libs/CMakeFiles/ALL_BUILD.dir
 C:/Projets/StreetPhare/build/windows/x64/plugins/permission_handler_windows/CMakeFiles/permission_handler_windows_plugin.dir
 C:/Projets/StreetPhare/build/windows/x64/plugins/permission_handler_windows/CMakeFiles/INSTALL.dir
 C:/Projets/StreetPhare/build/windows/x64/plugins/permission_handler_windows/CMakeFiles/ALL_BUILD.dir

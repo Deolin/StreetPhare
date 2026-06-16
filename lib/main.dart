@@ -8,7 +8,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'core/i18n/app_locale.dart';
 import 'core/theme/streetphare_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'debug/client_debug_logger.dart';
@@ -20,15 +22,19 @@ import 'features/routing/data/avoidance_filter_store.dart';
 import 'features/settings/data/app_preferences_store.dart';
 import 'features/settings/data/panic_contact_store.dart';
 import 'features/splash/presentation/splash_screen.dart';
+import 'features/start_screen/data/start_screen_store.dart';
 import 'features/tutorial/data/tutorial_store.dart';
 import 'network/bootstrap.dart';
 import 'network/network_config.dart';
 import 'network/network_coordinator.dart';
 import 'services/connectivity_service.dart';
 import 'services/notification_service.dart';
+import 'core/network/url_strategy_noop.dart'
+    if (dart.library.js_util) 'package:flutter_streetphare/core/network/url_strategy_web.dart';
 
 /// Point d'entrée principal de l'application StreetPhare
 void main() async {
+  configureUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
 
   // Orientation verrouillée en portrait
@@ -51,11 +57,13 @@ void main() async {
   await Future.wait([
     ClientDebugLogger.instance.init(),
     NotificationService.instance.init(),
+    AppLocale.instance.load(),
     ThemeController.instance.load(),
     PanicContactStore.instance.load(),
     AvoidanceFilterStore.instance.load(),
     AppPreferencesStore.instance.load(),
     TutorialStore.instance.load(),
+    StartScreenStore.instance.load(),
     orientationFuture,
   ]);
 
@@ -117,7 +125,7 @@ void main() async {
     );
   }
 
-  runApp(const StreetPhareApp());
+  runApp(StreetPhareApp());
 }
 
 Future<List<String>> _seedSingleBackup(
@@ -136,19 +144,40 @@ class StreetPhareApp extends StatelessWidget {
     return ValueListenableBuilder<AppThemeMode>(
       valueListenable: ThemeController.instance,
       builder: (context, mode, _) {
-        return MaterialApp(
-          title: 'StreetPhare',
-          debugShowCheckedModeBanner: false,
+        return ValueListenableBuilder<AppLanguage>(
+          valueListenable: AppLocale.instance,
+          builder: (context, language, _) {
+            return MaterialApp(
+              title: 'StreetPhare',
+              debugShowCheckedModeBanner: false,
 
-          // Thèmes clair & sombre.
-          theme: StreetPhareTheme.lightTheme(),
-          darkTheme: StreetPhareTheme.darkTheme(),
+              // Thèmes clair & sombre.
+              theme: StreetPhareTheme.lightTheme(),
+              darkTheme: StreetPhareTheme.darkTheme(),
 
-          // ThemeMode est piloté par le ThemeController
-          // (système / clair / sombre, persistant).
-          themeMode: mode.toThemeMode(),
+              // ThemeMode est piloté par le ThemeController
+              // (système / clair / sombre, persistant).
+              themeMode: mode.toThemeMode(),
 
-          home: const SplashScreen(),
+              // Support multilingue
+              locale: language.locale,
+              // Ajout des délégués requis pour les composants Material (comme DropdownButton)
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              // Déclaration des locales supportées par la Ruche et la vitrine
+              supportedLocales: const [
+                Locale('fr', ''),
+                Locale('en', ''),
+                Locale('nl', ''),
+                Locale('de', ''),
+              ],
+
+              home: const SplashScreen(),
+            );
+          },
         );
       },
     );

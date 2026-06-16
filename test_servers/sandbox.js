@@ -20,6 +20,14 @@ const express = require('express');
 const { EventEmitter } = require('events');
 const router = express.Router();
 
+// ── Référence vers le reports_store pour la modification de version ──────────
+let _reportsStore = null;
+try {
+  _reportsStore = require('./modules/reports_store');
+} catch (_) {
+  // silent
+}
+
 // ── Bus d'événements interne (SSE) ───────────────────────────────────────────
 const sandboxBus = new EventEmitter();
 sandboxBus.setMaxListeners(50);
@@ -406,6 +414,7 @@ router.get('/events/stream', (req, res) => {
     sandboxBus.off('log', onLog);
     sandboxBus.off('alert', onAlert);
     sandboxBus.off('panic', onPanic);
+    sandboxBus.off('version_change');
     sandboxBus.off('hive_message', onHive);
     sandboxBus.off('user_move', onUserMove);
     clearInterval(hb);
@@ -613,6 +622,30 @@ function sandboxHtml() {
     <div class="result" id="r-panic"></div>
   </div>
 
+  <!-- Kill Switch / Obsolescence -->
+  <div class="panel">
+    <h2>⚠️ Simulation d'obsolescence (Kill Switch)</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
+      Modifie la version minimale requise pour déclencher le verrouillage applicatif
+      sur les clients dont la version est inférieure à <code>min_required</code>.
+    </p>
+    <div class="form-row">
+      <input type="text" id="v-latest" value="1.5.0" placeholder="Dernière version (latest)">
+      <input type="text" id="v-min" value="1.3.0" placeholder="Version min. requise"
+             title="Si > 1.2.0, les clients en version 1.2.0 seront verrouillés">
+      <input type="text" id="v-url" value="https://streetphare.org/download" placeholder="URL téléchargement">
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-danger" onclick="simulateObsolete()">🔒 Verrouiller (min > 1.2.0)</button>
+      <button class="btn-primary" onclick="resetVersion()">✅ Réinitialiser (min = 1.1.0)</button>
+      <button class="btn-muted" onclick="checkVersion()">🔍 Vérifier la version courante</button>
+    </div>
+    <div class="result" id="r-version" style="display:block">
+      Version courante de l'app : <strong>1.2.0</strong><br>
+      <span id="version-status">Chargement…</span>
+    </div>
+  </div>
+
   <!-- Journal en temps réel -->
   <div class="panel" id="log-panel">
     <h2><span class="live-dot"></span>&nbsp; Journal temps réel (SSE)</h2>
@@ -715,6 +748,73 @@ async function resetSandbox() {
   refreshStats();
   alert(r.message);
 }
+
+// ── Kill Switch simulation ───────────────────────────────────────────────
+async function simulateObsolete() {
+  const info = {
+    latest: document.getElementById('v-latest').value.trim() || '1.5.0',
+    min_required: document.getElementById('v-min').value.trim() || '1.3.0',
+    url: document.getElementById('v-url').value.trim() || 'https://streetphare.org/download',
+  };
+  const showResult = (data) => {
+    const el = document.getElementById('r-version');
+    el.textContent = JSON.stringify(data, null, 2);
+    el.style.display = 'block';
+  };
+  try {
+    const r = await api('/simulate-obsolete', 'POST', info);
+    showResult(r);
+    if (r.success) {
+      alert(r.message + '\n\nRedémarrez l\'application client pour tester le verrouillage.');
+    }
+    refreshStats();
+  } catch(e) {
+    showResult({ success: false, error: e.message });
+  }
+}
+
+async function resetVersion() {
+  const info = { latest: '1.2.0', min_required: '1.1.0', url: 'https://streetphare.org/download' };
+  const r = await api('/simulate-obsolete', 'POST', info);
+  document.getElementById('v-latest').value = '1.2.0';
+  document.getElementById('v-min').value = '1.1.0';
+  document.getElementById('v-url').value = 'https://streetphare.org/download';
+  const el = document.getElementById('r-version');
+  el.textContent = JSON.stringify(r, null, 2);
+  el.style.display = 'block';
+  refreshStats();
+}
+
+async function checkVersion() {
+  try {
+    const r = await api('/version-info');
+    const el = document.getElementById('version-status');
+    if (r.success) {
+      el.innerHTML =
+        'Version latest : <strong>' + r.info.latest + '</strong> | ' +
+        'Min required : <strong>' + r.info.min_required + '</strong> | ' +
+        'App courant : <strong>' + r.current_app_version + '</strong> | ' +
+        'Verrouillage : <strong>' + (compareVersions(r.current_app_version, r.info.min_required) < 0 ? '⚠️ ACTIF' : '✅ OK') + '</strong>';
+    } else {
+      el.textContent = 'Erreur : ' + (r.error || 'réponse invalide');
+    }
+  } catch(e) {
+    document.getElementById('version-status').textContent = 'Erreur : ' + e.message;
+  }
+}
+
+function compareVersions(a, b) {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+  }
+  return 0;
+}
+
+// Vérification initiale
+setTimeout(checkVersion, 500);
 
 // ── SSE temps réel ────────────────────────────────────────────────────────
 const logList = document.getElementById('log-list');

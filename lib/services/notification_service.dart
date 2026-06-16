@@ -8,7 +8,7 @@
 //   3. Dialogue pédagogique d'autorisation arrière-plan.
 //   4. Multiplateforme : Android, iOS, Windows (graceful fallback).
 
-import 'dart:io' show Platform;
+import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -46,7 +46,7 @@ class NotificationService {
     // Sur Windows, macOS et Linux, flutter_local_notifications requiert
     // des réglages spécifiques. On les fournit ici ; en cas d'échec
     // (runtime non supporté) on dégrade proprement.
-    if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
+    if (!kIsWeb && (io.Platform.isWindows || io.Platform.isMacOS || io.Platform.isLinux)) {
       try {
         const windowsSettings = WindowsInitializationSettings(
           appName: 'StreetPhare',
@@ -112,7 +112,7 @@ class NotificationService {
 
   Future<void> showPersistentNotification() async {
     if (!_initialized) await init();
-    if (kIsWeb || !(Platform.isAndroid || Platform.isIOS || Platform.isMacOS)) return;
+    if (kIsWeb || !(io.Platform.isAndroid || io.Platform.isIOS || io.Platform.isMacOS)) return;
 
     const androidDetails = AndroidNotificationDetails(
       'streetphare_persistent',
@@ -174,7 +174,7 @@ class NotificationService {
     int id = 0,
   }) async {
     if (!_initialized) await init();
-    if (!(Platform.isAndroid || Platform.isIOS)) return;
+    if (kIsWeb || !(io.Platform.isAndroid || io.Platform.isIOS)) return;
 
     final notifId = _kAlertNotifBaseId + (id % 100);
 
@@ -230,14 +230,14 @@ class NotificationService {
   Future<bool> requestPermissions() async {
     if (!_initialized) await init();
 
-    if (Platform.isAndroid) {
+    if (!kIsWeb && io.Platform.isAndroid) {
       final impl = _plugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();
       final granted = await impl?.requestNotificationsPermission();
       return granted ?? false;
     }
 
-    if (Platform.isIOS) {
+    if (!kIsWeb && io.Platform.isIOS) {
       final impl = _plugin.resolvePlatformSpecificImplementation<
           IOSFlutterLocalNotificationsPlugin>();
       final granted = await impl?.requestPermissions(

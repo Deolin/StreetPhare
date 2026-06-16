@@ -86,12 +86,11 @@ class BleMeshTransport implements MeshTransport {
 
   @override
   bool get isAvailable {
-    // On considère BLE dispo partout sauf sur les cibles desktop
-    // classiques (Windows / Linux) tant que la lib n'est pas testée.
-    if (kIsWeb) return true; // Web BLE
-    return defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS ||
-        defaultTargetPlatform == TargetPlatform.macOS;
+    if (kIsWeb) return true;
+    final platform = defaultTargetPlatform;
+    return platform == TargetPlatform.android ||
+        platform == TargetPlatform.iOS ||
+        platform == TargetPlatform.macOS;
   }
 
   @override

@@ -1,2 +1,28 @@
-flutter_streetphare/SERVER_STATUS_3000.md
-flutter_streetphare/SERVER_STATUS_3001.md
+# Fichiers générés par les serveurs de test
+SERVER_STATUS.md
+SERVER_STATUS_3000.md
+SERVER_STATUS_3001.md
+CLIENT_DEBUG.md
+
+# Logs serveur
+primary_live.log
+primary_live_err.log
+secondary_live.log
+secondary_live_err.log
+admin_live.log
+admin_live_err.log
+
+# Fichiers admin persistants
+test_servers/admin_data.json
+test_servers/events_admin.json
+test_servers/logs/
+test_servers/.server-pids.json
+
+node_modules
+
+# Fichiers de build et outils Flutter/Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies

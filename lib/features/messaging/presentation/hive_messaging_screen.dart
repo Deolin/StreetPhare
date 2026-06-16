@@ -239,10 +239,10 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen> {
           if (!isThreadView)
             ValueListenableBuilder<AppPreferences>(
               valueListenable: AppPreferencesStore.instance,
-              builder: (_, prefs, _) {
+              builder: (_, prefs, o) {
                 return PopupMenuButton<MessageFilter>(
                   icon:
-                      Icon(Icons.filter_list, color: StreetPhareTheme.primary),
+                      const Icon(Icons.filter_list, color: StreetPhareTheme.primary),
                   tooltip: 'Filtrer les messages',
                   onSelected: (filter) async {
                     await AppPreferencesStore.instance.setMessageFilter(filter);
@@ -290,7 +290,7 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen> {
           if (!isThreadView)
             ValueListenableBuilder<AppPreferences>(
               valueListenable: AppPreferencesStore.instance,
-              builder: (_, prefs, _) {
+              builder: (_, prefs, o) {
                 return Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 6),
@@ -333,7 +333,7 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen> {
           Expanded(
             child: ValueListenableBuilder<List<HiveMessage>>(
               valueListenable: HiveMessagingService.instance,
-              builder: (_, allMessages, _) {
+              builder: (_, allMessages, o) {
                 // Filtre par threadId si on est dans un fil.
                 final messages = isThreadView
                     ? allMessages
@@ -755,7 +755,7 @@ class _MessageContextMenu extends StatelessWidget {
               isBlocked
                   ? 'Débloquer cet utilisateur'
                   : 'Bloquer cet utilisateur',
-              style: TextStyle(
+              style: const TextStyle(
                 color: StreetPhareTheme.danger,
                 fontWeight: FontWeight.w500,
               ),

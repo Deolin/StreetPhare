@@ -14,20 +14,44 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../i18n/app_locale.dart';
+
 /// Wrapper typé autour du mode de thème pour pouvoir l'utiliser
 /// dans des `Radio` lists et le sérialiser facilement.
 enum AppThemeMode {
-  system('system', 'Mode Système'),
-  light('light', 'Mode Clair'),
-  dark('dark', 'Mode Sombre');
+  system('system'),
+  light('light'),
+  dark('dark');
 
-  const AppThemeMode(this.id, this.label);
+  const AppThemeMode(this.id);
 
   /// Identifiant sérialisé dans SharedPreferences.
   final String id;
 
   /// Libellé affiché dans l'UI des paramètres.
-  final String label;
+  String get label {
+    final s = AppLocale.instance.strings;
+    switch (this) {
+      case AppThemeMode.system:
+        return s.themeSystem;
+      case AppThemeMode.light:
+        return s.themeLight;
+      case AppThemeMode.dark:
+        return s.themeDark;
+    }
+  }
+
+  String get subtitle {
+    final s = AppLocale.instance.strings;
+    switch (this) {
+      case AppThemeMode.system:
+        return s.themeSystemSubtitle;
+      case AppThemeMode.light:
+        return s.themeLightSubtitle;
+      case AppThemeMode.dark:
+        return s.themeDarkSubtitle;
+    }
+  }
 
   /// Convertit la valeur stockée en enum. Fallback sur `system`.
   static AppThemeMode fromId(String? id) {

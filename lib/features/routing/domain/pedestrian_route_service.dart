@@ -24,9 +24,9 @@
 //      Ligne droite A→B avec interpolation, utilisé si tout échoue.
 
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../../../network/network_config.dart';
@@ -252,32 +252,30 @@ class PedestrianRouteService {
     final serverUrl = NetworkConfig.primaryServer;
     final uri = Uri.parse('$serverUrl/v1/events/$eventId/route');
 
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 10);
-
     try {
-      final req = await client.postUrl(uri);
-      req.headers.set('Content-Type', 'application/json');
-      req.headers.set('X-StreetPhare-Route', 'pedestrian');
-      req.add(utf8.encode(jsonEncode({
-        'from': {'lat': start.latitude, 'lon': start.longitude},
-        'to': {'lat': end.latitude, 'lon': end.longitude},
-        'avoid_filters': {
-          'barrage': filters.avoidBarrages,
-          'nasse': filters.avoidNasses,
-          'controle': filters.avoidControles,
-          'accident': filters.avoidAccidents,
-          'rassemblement': filters.avoidRassemblements,
-          'autres': filters.avoidAutres,
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-StreetPhare-Route': 'pedestrian',
         },
-      })));
+        body: jsonEncode({
+          'from': {'lat': start.latitude, 'lon': start.longitude},
+          'to': {'lat': end.latitude, 'lon': end.longitude},
+          'avoid_filters': {
+            'barrage': filters.avoidBarrages,
+            'nasse': filters.avoidNasses,
+            'controle': filters.avoidControles,
+            'accident': filters.avoidAccidents,
+            'rassemblement': filters.avoidRassemblements,
+            'autres': filters.avoidAutres,
+          },
+        }),
+      ).timeout(const Duration(seconds: 15));
 
-      final resp = await req.close().timeout(const Duration(seconds: 15));
-      final body = await resp.transform(utf8.decoder).join();
+      if (response.statusCode != 200) return [];
 
-      if (resp.statusCode != 200) return [];
-
-      final parsed = jsonDecode(body) as Map<String, dynamic>;
+      final parsed = jsonDecode(response.body) as Map<String, dynamic>;
       final routesJson = parsed['routes'] as List<dynamic>? ?? [];
 
       final results = <RouteResult>[];
@@ -303,8 +301,6 @@ class PedestrianRouteService {
       return results;
     } catch (e) {
       return [];
-    } finally {
-      client.close(force: true);
     }
   }
 }

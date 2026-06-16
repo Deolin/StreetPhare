@@ -44,13 +44,13 @@ echo "============================================"
 echo
 
 PORT=3000 ROLE=primary NEXT_BACKUP_URL=http://localhost:3001 \
-  node server_primary.js &
+  node server_primary_v2.js &
 PID_PRIMARY=$!
 
 sleep 1
 
 PORT=3001 ROLE=secondary NEXT_BACKUP_URL=http://localhost:3002 \
-  node server_secondary.js &
+  node server_secondary_v2.js &
 PID_SECONDARY=$!
 
 wait

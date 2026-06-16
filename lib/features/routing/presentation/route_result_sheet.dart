@@ -15,6 +15,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/i18n/app_locale.dart';
+import '../../../core/i18n/strings.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../domain/models/route_result.dart';
 import '../infrastructure/osmand_routing_service.dart';
@@ -82,6 +84,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
   /// Charge les alternatives à la demande (JIT) lorsque l'utilisateur
   /// appuie sur "Routes alternatives".
   Future<void> _loadAlternatives() async {
+    final s = AppLocale.instance.strings;
     if (_loadingAlternatives) return;
 
     final loader = widget.onRequestAlternatives;
@@ -108,9 +111,9 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
       if (!mounted) return;
       setState(() => _loadingAlternatives = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Impossible de calculer les alternatives.'),
-          duration: Duration(seconds: 3),
+        SnackBar(
+          content: Text(s.routeAlternativesError),
+          duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -119,16 +122,15 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppLocale.instance.strings;
     if (widget.routes.isEmpty) {
       return _wrap(
-        const Padding(
-          padding: EdgeInsets.all(20),
+        Padding(
+          padding: const EdgeInsets.all(20),
           child: Text(
-            'Aucun itinéraire trouvé.\n'
-            'Les blocages actifs empêchent tout passage, ou '
-            'la position est trop proche de la destination.',
+            s.routeNotFound,
             textAlign: TextAlign.center,
-            style: TextStyle(color: StreetPhareTheme.textSecondary),
+            style: const TextStyle(color: StreetPhareTheme.textSecondary),
           ),
         ),
       );
@@ -149,9 +151,9 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                 const Icon(Icons.shield,
                     color: StreetPhareTheme.primary, size: 22),
                 const SizedBox(width: 8),
-                const Text(
-                  'Route Safe',
-                  style: TextStyle(
+                Text(
+                  s.routeTitle,
+                  style: const TextStyle(
                     color: StreetPhareTheme.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -174,9 +176,10 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
             // ── Itinéraire recommandé ────────────────────────────────────
             _RouteTile(
               route: recommended,
+              strings: s,
               isSelected: _selected?.id == recommended.id,
               onTap: () => setState(() => _selected = recommended),
-              badge: 'Recommandé',
+              badge: s.routeRecommended,
             ),
             const SizedBox(height: 8),
 
@@ -189,21 +192,21 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                   onPressed: _loadAlternatives,
                   icon: const Icon(Icons.alt_route,
                       color: StreetPhareTheme.primary),
-                  label: const Text(
-                    'Voir les routes alternatives',
-                    style: TextStyle(color: StreetPhareTheme.primary),
+                  label: Text(
+                    s.routeShowAlternatives,
+                    style: const TextStyle(color: StreetPhareTheme.primary),
                   ),
                 ),
             ],
 
             // ── Indicateur de chargement des alternatives ────────────────
             if (_loadingAlternatives)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SizedBox(
+                    const SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
@@ -212,10 +215,10 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                             StreetPhareTheme.primary),
                       ),
                     ),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Text(
-                      'Calcul des alternatives en cours…',
-                      style: TextStyle(
+                      s.routeCalculatingAlternatives,
+                      style: const TextStyle(
                         color: StreetPhareTheme.textSecondary,
                         fontSize: 13,
                       ),
@@ -231,6 +234,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                   padding: const EdgeInsets.only(top: 8),
                   child: _RouteTile(
                     route: r,
+                    strings: s,
                     isSelected: _selected?.id == r.id,
                     onTap: () => setState(() => _selected = r),
                   ),
@@ -240,7 +244,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
             const SizedBox(height: 8),
 
             // ── Bouton "Ouvrir dans OsmAnd" (Mode Externe) ───────────────
-            _OsmAndLaunchButton(route: _selected ?? recommended),
+            _OsmAndLaunchButton(route: _selected ?? recommended, strings: s),
 
             const SizedBox(height: 12),
 
@@ -252,7 +256,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                     Navigator.of(context).pop(_selected ?? recommended),
                 icon: const Icon(Icons.check, color: Colors.black),
                 label: Text(
-                  'Accepter : ${(_selected ?? recommended).distanceLabel}',
+                  '${s.routeAccept} : ${(_selected ?? recommended).distanceLabel}',
                   style: const TextStyle(
                     color: Colors.black,
                     fontWeight: FontWeight.bold,
@@ -285,12 +289,14 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
 class _RouteTile extends StatelessWidget {
   const _RouteTile({
     required this.route,
+    required this.strings,
     required this.isSelected,
     required this.onTap,
     this.badge,
   });
 
   final RouteResult route;
+  final AppStrings strings;
   final bool isSelected;
   final VoidCallback onTap;
   final String? badge;
@@ -335,7 +341,7 @@ class _RouteTile extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            route.label.isEmpty ? 'Itinéraire' : route.label,
+                            route.label.isEmpty ? strings.routeItinerary : route.label,
                             style: const TextStyle(
                               color: StreetPhareTheme.textPrimary,
                               fontWeight: FontWeight.w600,
@@ -367,7 +373,7 @@ class _RouteTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${route.distanceLabel} • risque ${route.totalRiskScore.toStringAsFixed(0)}',
+                      '${route.distanceLabel} \u2022 ${strings.routeRisk} ${route.totalRiskScore.toStringAsFixed(0)}',
                       style: const TextStyle(
                         color: StreetPhareTheme.textSecondary,
                         fontSize: 12,
@@ -388,14 +394,11 @@ class _RouteTile extends StatelessWidget {
 // _OsmAndLaunchButton — Bouton "Ouvrir dans OsmAnd"
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// Bouton secondaire qui propose à l'utilisateur d'ouvrir l'itinéraire
-/// directement dans OsmAnd (Mode Externe — navigation guidée vocale).
-///
-/// Si OsmAnd n'est pas installé, affiche [OsmAndNotInstalledDialog].
 class _OsmAndLaunchButton extends StatelessWidget {
-  const _OsmAndLaunchButton({required this.route});
+  const _OsmAndLaunchButton({required this.route, required this.strings});
 
   final RouteResult route;
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -404,7 +407,7 @@ class _OsmAndLaunchButton extends StatelessWidget {
     return OutlinedButton.icon(
       onPressed: () => _launch(context),
       icon: const Icon(Icons.map_outlined, size: 18),
-      label: const Text('Ouvrir dans OsmAnd'),
+      label: Text(strings.routeOpenInOsmAnd),
       style: OutlinedButton.styleFrom(
         foregroundColor: StreetPhareTheme.primary,
         side: BorderSide(
@@ -422,7 +425,7 @@ class _OsmAndLaunchButton extends StatelessWidget {
     final svc = OsmAndRoutingService.instance;
     final start = route.points.first;
     final end = route.points.last;
-    final destName = route.label.isNotEmpty ? route.label : 'Destination';
+    final destName = route.label.isNotEmpty ? route.label : strings.routeDestination;
 
     final success = await svc.launchExternalNavigation(
       start: start,
@@ -437,12 +440,10 @@ class _OsmAndLaunchButton extends StatelessWidget {
               // Ferme la feuille et laisse le routage interne (déjà affiché).
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Itinéraire calculé via OSM — affiché sur la carte.',
-                    ),
+                  SnackBar(
+                    content: Text(strings.routeOsmAndSuccess),
                     behavior: SnackBarBehavior.floating,
-                    duration: Duration(seconds: 3),
+                    duration: const Duration(seconds: 3),
                   ),
                 );
               }
@@ -455,10 +456,10 @@ class _OsmAndLaunchButton extends StatelessWidget {
     if (!success && context.mounted) {
       // Feedback si le lancement a échoué pour une autre raison
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Impossible de lancer OsmAnd.'),
+        SnackBar(
+          content: Text(strings.routeOsmAndError),
           behavior: SnackBarBehavior.floating,
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         ),
       );
     }

@@ -9,7 +9,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -104,13 +104,15 @@ class BugReportService {
         debugPrint('[BugReport] erreur serveur: ${response.statusCode}');
         return BugReportResult.serverError;
       }
-    } on SocketException {
-      debugPrint('[BugReport] pas de connexion réseau');
-      return BugReportResult.networkError;
-    } on TimeoutException {
-      debugPrint('[BugReport] timeout lors de l\'envoi');
-      return BugReportResult.networkError;
     } catch (e) {
+      if (!kIsWeb && e is io.SocketException) {
+        debugPrint('[BugReport] pas de connexion réseau');
+        return BugReportResult.networkError;
+      }
+      if (e is TimeoutException) {
+        debugPrint('[BugReport] timeout lors de l\'envoi');
+        return BugReportResult.networkError;
+      }
       debugPrint('[BugReport] erreur inattendue: $e');
       return BugReportResult.unknownError;
     }
@@ -120,11 +122,11 @@ class BugReportService {
   static String get currentPlatform {
     if (kIsWeb) return 'web';
     try {
-      if (Platform.isAndroid) return 'android';
-      if (Platform.isIOS) return 'ios';
-      if (Platform.isWindows) return 'windows';
-      if (Platform.isMacOS) return 'macos';
-      if (Platform.isLinux) return 'linux';
+      if (io.Platform.isAndroid) return 'android';
+      if (io.Platform.isIOS) return 'ios';
+      if (io.Platform.isWindows) return 'windows';
+      if (io.Platform.isMacOS) return 'macos';
+      if (io.Platform.isLinux) return 'linux';
     } catch (_) {}
     return 'unknown';
   }

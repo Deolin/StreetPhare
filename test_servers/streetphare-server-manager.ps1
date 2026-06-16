@@ -67,7 +67,7 @@ $Script:Servers = @(
     },
     @{
         Name    = "Admin Dashboard"
-        Script  = "admin_dashboard.js"
+        Script  = "admin_dashboard_v2.js"
         Port    = 4000
         EnvVars = @{
             ADMIN_PORT    = "4000"
@@ -207,7 +207,6 @@ function Stop-Server($server, $pids) {
                 if ($pidFromNet -match '^\d+$') {
                     try {
                         Stop-Process -Id ([int]$pidFromNet) -Force -ErrorAction SilentlyContinue
-                        $stopped = $true
                     } catch { }
                 }
             }

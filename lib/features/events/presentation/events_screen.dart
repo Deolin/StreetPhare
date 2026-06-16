@@ -12,6 +12,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_locale.dart';
+import '../../../core/i18n/strings.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../domain/models/event_model.dart';
 import 'event_manager.dart';
@@ -47,9 +49,10 @@ class _EventsScreenState extends State<EventsScreen> {
   // --------------------------------------------------------------------------
 
   Future<void> _loadCode() async {
+    final s = AppLocale.instance.strings;
     final code = _codeController.text.trim().toUpperCase();
     if (code.isEmpty) {
-      setState(() => _error = 'Veuillez saisir un code d\'invitation.');
+      setState(() => _error = s.eventsEnterCodeError);
       return;
     }
 
@@ -61,9 +64,7 @@ class _EventsScreenState extends State<EventsScreen> {
     if (EventManager.instance.count >= EventManager.maxEvents) {
       setState(() {
         _loading = false;
-        _error =
-            'Maximum ${EventManager.maxEvents} événements simultanés. '
-            'Supprimez-en un avant d\'en ajouter un nouveau.';
+        _error = s.eventsMaxReachedError;
       });
       return;
     }
@@ -74,8 +75,7 @@ class _EventsScreenState extends State<EventsScreen> {
     setState(() {
       _loading = false;
             if (!ok) {
-                _error = 'Code inconnu ou événement introuvable.\n'
-                    'Codes Fleurus : FLEURUS-TOUR, FLEURUS-ECOLES, FLEURUS-CORTEGE.';
+                _error = '${s.eventsUnknownCodeError}\n${s.eventsFleurusCodes}';
       } else {
         _codeController.clear();
       }
@@ -83,13 +83,11 @@ class _EventsScreenState extends State<EventsScreen> {
   }
 
   Future<void> _openQrScanner() async {
+    final s = AppLocale.instance.strings;
     if (EventManager.instance.count >= EventManager.maxEvents) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Maximum ${EventManager.maxEvents} événements simultanés. '
-            'Supprimez-en un d\'abord.',
-          ),
+          content: Text(s.eventsQrMaxReached),
           backgroundColor: StreetPhareTheme.danger,
         ),
       );
@@ -108,18 +106,15 @@ class _EventsScreenState extends State<EventsScreen> {
 
     if (!ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Impossible d\'ajouter l\'événement (déjà présent ou limite '
-            'de 3 événements atteinte).',
-          ),
+        SnackBar(
+          content: Text(s.eventsQrAddError),
           backgroundColor: StreetPhareTheme.danger,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Événement ajouté depuis le QR Code !'),
+        SnackBar(
+          content: Text(s.eventsQrAddSuccess),
         ),
       );
     }
@@ -129,9 +124,9 @@ class _EventsScreenState extends State<EventsScreen> {
     EventManager.instance.removeByCode(code);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Événement retiré.'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(AppLocale.instance.strings.eventsRemoved),
+          duration: const Duration(seconds: 2),
         ),
       );
     }
@@ -143,89 +138,91 @@ class _EventsScreenState extends State<EventsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Événements'),
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).colorScheme.onSurface,
-        ),
-      ),
-      body: ValueListenableBuilder<List<EventModel>>(
-        valueListenable: EventManager.instance,
-        builder: (context, events, _) {
-          return ListView(
-            padding: const EdgeInsets.all(12),
-            children: [
-              // ── Section : Mes événements ─────────────────────────────────
-              _SectionHeader(
-                icon: Icons.event_note,
-                color: StreetPhareTheme.primary,
-                title: 'Mes événements (${events.length}/${EventManager.maxEvents})',
-              ),
-              const SizedBox(height: 8),
+    return ValueListenableBuilder<AppLanguage>(
+      valueListenable: AppLocale.instance,
+      builder: (context, _, child) {
+        final s = AppLocale.instance.strings;
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(s.eventsTitle),
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            iconTheme: IconThemeData(
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          body: ValueListenableBuilder<List<EventModel>>(
+            valueListenable: EventManager.instance,
+            builder: (context, events, _) {
+              return ListView(
+                padding: const EdgeInsets.all(12),
+                children: [
+                  // ── Section : Mes événements ─────────────────────────────────
+                  _SectionHeader(
+                    icon: Icons.event_note,
+                    color: StreetPhareTheme.primary,
+                    title: '${s.eventsMyEvents} (${events.length}/${EventManager.maxEvents})',
+                  ),
+                  const SizedBox(height: 8),
 
-              if (events.isEmpty)
-                _EmptyEventsCard()
-              else
-                ...events.asMap().entries.map(
-                  (e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _EventCard(
-                      event: e.value,
-                      color: _kEventColors[e.key % _kEventColors.length],
-                      onRemove: () => _removeEvent(e.value.code),
+                  if (events.isEmpty)
+                    _EmptyEventsCard(strings: s)
+                  else
+                    ...events.asMap().entries.map(
+                      (e) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _EventCard(
+                          event: e.value,
+                          color: _kEventColors[e.key % _kEventColors.length],
+                          strings: s,
+                          onRemove: () => _removeEvent(e.value.code),
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  // ── Section : Rejoindre un événement ─────────────────────────
+                  if (events.length < EventManager.maxEvents) ...[
+                    _SectionHeader(
+                      icon: Icons.add_circle_outline,
+                      color: StreetPhareTheme.primary,
+                      title: s.eventsJoinTitle,
+                    ),
+                    const SizedBox(height: 8),
+                    _JoinCard(
+                      codeController: _codeController,
+                      loading: _loading,
+                      error: _error,
+                      strings: s,
+                      onLoadCode: _loadCode,
+                      onScanQr: _openQrScanner,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ── Section : Sécurité juste-à-temps ─────────────────────────
+                  _SectionHeader(
+                    icon: Icons.lock_clock,
+                    color: StreetPhareTheme.accent,
+                    title: s.eventsSecurityTitle,
+                  ),
+                  const SizedBox(height: 8),
+                  _InfoCard(
+                    child: Text(
+                      s.eventsSecurityDescription,
+                      style: const TextStyle(
+                        color: StreetPhareTheme.textSecondary,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
-                ),
-
-              const SizedBox(height: 16),
-
-              // ── Section : Rejoindre un événement ─────────────────────────
-              if (events.length < EventManager.maxEvents) ...[
-                _SectionHeader(
-                  icon: Icons.add_circle_outline,
-                  color: StreetPhareTheme.primary,
-                  title: 'Rejoindre un événement',
-                ),
-                const SizedBox(height: 8),
-                _JoinCard(
-                  codeController: _codeController,
-                  loading: _loading,
-                  error: _error,
-                  onLoadCode: _loadCode,
-                  onScanQr: _openQrScanner,
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // ── Section : Sécurité juste-à-temps ─────────────────────────
-              _SectionHeader(
-                icon: Icons.lock_clock,
-                color: StreetPhareTheme.accent,
-                title: 'Sécurité juste-à-temps',
-              ),
-              const SizedBox(height: 8),
-              _InfoCard(
-                child: const Text(
-                  'Pour éviter que le tracé d\'un événement ne soit '
-                  'détourné en amont, StreetPhare ne révèle le trajet '
-                  'qu\'à l\'heure paramétrée par les organisateurs.\n\n'
-                  'De plus, chaque étape (point de rassemblement) '
-                  'disparaît automatiquement de la carte dès que son '
-                  'heure est dépassée de 5 minutes, ou que vous vous '
-                  'trouvez à moins de 30 m de ce point.',
-                  style: TextStyle(
-                    color: StreetPhareTheme.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          );
-        },
-      ),
+                  const SizedBox(height: 16),
+                ],
+              );
+            },
+          ),
+        );
+      }
     );
   }
 }
@@ -281,33 +278,35 @@ class _InfoCard extends StatelessWidget {
 // ── Carte "aucun événement" ──────────────────────────────────────────────────
 
 class _EmptyEventsCard extends StatelessWidget {
+  const _EmptyEventsCard({required this.strings});
+  final AppStrings strings;
+
   @override
   Widget build(BuildContext context) {
     return Card(
       color: Theme.of(context).colorScheme.surface,
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: const Padding(
-        padding: EdgeInsets.all(20),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Icon(Icons.event_busy,
+            const Icon(Icons.event_busy,
                 size: 48, color: StreetPhareTheme.textSecondary),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
-              'Aucun événement chargé',
-              style: TextStyle(
+              strings.eventsEmptyTitle,
+              style: const TextStyle(
                 color: StreetPhareTheme.textPrimary,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            SizedBox(height: 6),
+            const SizedBox(height: 6),
             Text(
-              'Saisissez un code d\'invitation ou scannez un QR Code '
-              'pour rejoindre jusqu\'à 3 événements simultanément.',
+              strings.eventsEmptySubtitle,
               textAlign: TextAlign.center,
               style:
-                  TextStyle(color: StreetPhareTheme.textSecondary, fontSize: 13),
+                  const TextStyle(color: StreetPhareTheme.textSecondary, fontSize: 13),
             ),
           ],
         ),
@@ -322,11 +321,13 @@ class _EventCard extends StatelessWidget {
   const _EventCard({
     required this.event,
     required this.color,
+    required this.strings,
     required this.onRemove,
   });
 
   final EventModel event;
   final Color color;
+  final AppStrings strings;
   final VoidCallback onRemove;
 
   @override
@@ -373,7 +374,7 @@ class _EventCard extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.close,
                       size: 18, color: StreetPhareTheme.textSecondary),
-                  tooltip: 'Retirer l\'événement',
+                  tooltip: strings.eventsRemoveTooltip,
                   onPressed: onRemove,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -384,12 +385,12 @@ class _EventCard extends StatelessWidget {
 
             // ── Infos basiques ───────────────────────────────────────────
             Text(
-              'Code : ${event.code}',
+              '${strings.eventsCodeLabel} : ${event.code}',
               style: const TextStyle(
                   color: StreetPhareTheme.textSecondary, fontSize: 11),
             ),
             Text(
-              'Début : ${_fmt(event.startAt)}',
+              '${strings.eventsStartLabel} : ${_fmt(event.startAt)}',
               style: const TextStyle(
                   color: StreetPhareTheme.textSecondary, fontSize: 11),
             ),
@@ -404,9 +405,9 @@ class _EventCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Trajet masqué — révélation dans :',
-                      style: TextStyle(
+                    Text(
+                      strings.eventsRouteHidden,
+                      style: const TextStyle(
                         color: StreetPhareTheme.textPrimary,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
@@ -435,7 +436,7 @@ class _EventCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Étape ${activeStep + 1}/${event.waypoints.length} active :',
+                      strings.eventsStepActive.replaceFirst('{index}', '${activeStep + 1}').replaceFirst('{total}', '${event.waypoints.length}'),
                       style: const TextStyle(
                         color: StreetPhareTheme.textSecondary,
                         fontSize: 12,
@@ -452,7 +453,7 @@ class _EventCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Heure prévue : '
+                      '${strings.eventsStepTime} '
                       '${event.waypoints[activeStep].formattedTime}',
                       style: TextStyle(color: color, fontSize: 12),
                     ),
@@ -464,10 +465,9 @@ class _EventCard extends StatelessWidget {
                 icon: Icons.check_circle,
                 iconColor: StreetPhareTheme.primary,
                 bgColor: StreetPhareTheme.primary.withValues(alpha: 0.12),
-                child: const Text(
-                  'Trajet visible — toutes les étapes complétées ou '
-                  'événement sans étapes.',
-                  style: TextStyle(
+                child: Text(
+                  strings.eventsRouteVisible,
+                  style: const TextStyle(
                     color: StreetPhareTheme.textPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
@@ -530,6 +530,7 @@ class _JoinCard extends StatelessWidget {
     required this.codeController,
     required this.loading,
     required this.error,
+    required this.strings,
     required this.onLoadCode,
     required this.onScanQr,
   });
@@ -537,6 +538,7 @@ class _JoinCard extends StatelessWidget {
   final TextEditingController codeController;
   final bool loading;
   final String? error;
+  final AppStrings strings;
   final VoidCallback onLoadCode;
   final VoidCallback onScanQr;
 
@@ -551,10 +553,9 @@ class _JoinCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Saisissez le code d\'invitation (ex. MANIF-123) '
-              'ou scannez un QR Code.',
-              style: TextStyle(
+            Text(
+              strings.eventsJoinSubtitle,
+              style: const TextStyle(
                 color: StreetPhareTheme.textSecondary,
                 fontSize: 13,
               ),
@@ -605,7 +606,7 @@ class _JoinCard extends StatelessWidget {
                                 AlwaysStoppedAnimation(Colors.black),
                           ),
                         )
-                      : const Text('Charger'),
+                      : Text(strings.eventsLoadButton),
                 ),
               ],
             ),
@@ -616,7 +617,7 @@ class _JoinCard extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: onScanQr,
               icon: const Icon(Icons.qr_code_scanner),
-              label: const Text('Scanner un QR Code'),
+              label: Text(strings.eventsQrScan),
               style: OutlinedButton.styleFrom(
                 foregroundColor: StreetPhareTheme.primary,
                 side: const BorderSide(color: StreetPhareTheme.primary),
@@ -625,9 +626,9 @@ class _JoinCard extends StatelessWidget {
             ),
 
             const SizedBox(height: 8),
-            const Text(
-              'Codes Fleurus : FLEURUS-TOUR · FLEURUS-ECOLES · FLEURUS-CORTEGE',
-              style: TextStyle(
+            Text(
+              strings.eventsFleurusCodes,
+              style: const TextStyle(
                   color: StreetPhareTheme.textSecondary, fontSize: 11),
             ),
           ],

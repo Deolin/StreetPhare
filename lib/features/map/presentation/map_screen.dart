@@ -29,6 +29,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/i18n/app_locale.dart';
+import '../../../core/i18n/strings.dart';
 import '../../../core/network/peer_counter_service.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
@@ -48,6 +50,8 @@ import '../../../services/connectivity_service.dart';
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/presentation/route_result_sheet.dart';
 import '../../routing/presentation/safe_path_engine.dart';
+import '../../routing/core/routing_engine.dart';
+import '../../routing/core/models/routing_profile.dart';
 import 'widgets/safe_route_layer.dart';
 import 'widgets/user_heading_marker.dart';
 
@@ -154,6 +158,7 @@ class _MapScreenState extends State<MapScreen> {
   // --------------------------------------------------------------------------
 
   Future<void> _initUserLocation() async {
+    final s = AppLocale.instance.strings;
     setState(() {
       _locating = true;
       _positionError = null;
@@ -162,7 +167,7 @@ class _MapScreenState extends State<MapScreen> {
       if (!await Geolocator.isLocationServiceEnabled()) {
         setState(() {
           _locating = false;
-          _positionError = 'Service GPS désactivé';
+          _positionError = s.mapGpsOff;
         });
         return;
       }
@@ -172,7 +177,7 @@ class _MapScreenState extends State<MapScreen> {
         if (perm == LocationPermission.denied) {
           setState(() {
             _locating = false;
-            _positionError = 'Autorisation GPS refusée';
+            _positionError = s.mapGpsDenied;
           });
           return;
         }
@@ -180,7 +185,7 @@ class _MapScreenState extends State<MapScreen> {
       if (perm == LocationPermission.deniedForever) {
         setState(() {
           _locating = false;
-          _positionError = 'Autorisation GPS refusée définitivement';
+          _positionError = s.mapGpsDeniedForever;
         });
         return;
       }
@@ -241,7 +246,7 @@ class _MapScreenState extends State<MapScreen> {
       if (mounted) {
         setState(() {
           _locating = false;
-          _positionError = 'Erreur GPS : $e';
+          _positionError = '${s.mapGpsError} $e';
         });
       }
     }
@@ -261,7 +266,7 @@ class _MapScreenState extends State<MapScreen> {
     debugPrint('[MapScreen] tracking arrêté, marqueur effacé.');
   }
 
-  /// Recentre la carte sur la position GPS avec zoom ≈ 100 m.
+  /// Recentre la carte sur la position GPS with zoom ≈ 100 m.
   void _animateToUser() {
     final pos = _userPosition;
     if (pos == null) return;
@@ -285,11 +290,6 @@ class _MapScreenState extends State<MapScreen> {
 
   /// [2] Affiche la flèche directionnelle uniquement si l'appareil a
   /// effectivement bougé de plus de 5 m (seuil effectif anti-oscillations GPS).
-  ///
-  /// Règles :
-  ///   - _hasMovedBeyondThreshold = true → déplacement réel ≥ 5 m → flèche.
-  ///   - _hasMovedBeyondThreshold = false → surplace / micro-oscillations → point.
-  ///   - Cap < 0 ou vitesse < 0.5 m/s ET pas de seuil franchi → point.
   bool get _shouldShowArrow =>
       _hasMovedBeyondThreshold &&
       _userHeading >= 0 &&
@@ -357,6 +357,7 @@ class _MapScreenState extends State<MapScreen> {
   // --------------------------------------------------------------------------
 
   void _onMapLongPress(TapPosition tapPos, LatLng latlng) {
+    final s = AppLocale.instance.strings;
     HapticFeedback.heavyImpact();
     AppPreferencesStore.instance.setUserPoint(
       latlng.latitude,
@@ -379,7 +380,7 @@ class _MapScreenState extends State<MapScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Point utilisateur défini — Route Safe lancée…',
+                  s.mapUserPointDefined,
                   style: const TextStyle(color: StreetPhareTheme.textPrimary),
                 ),
               ),
@@ -395,11 +396,12 @@ class _MapScreenState extends State<MapScreen> {
   // --------------------------------------------------------------------------
 
   Future<void> _triggerRouteSafe({LatLng? overrideDestination}) async {
+    final s = AppLocale.instance.strings;
     final prefs = AppPreferencesStore.instance.value;
     final events = EventManager.instance.value;
 
     LatLng? destination = overrideDestination;
-    String destinationLabel = 'Point utilisateur';
+    String destinationLabel = s.mapDestinationUserPoint;
 
     if (destination == null) {
       final userLatLng = _userPosition != null
@@ -415,7 +417,7 @@ class _MapScreenState extends State<MapScreen> {
           }
           final idx0 = prefs.activeEventIndex.clamp(0, events.length - 1);
           destination = events[idx0].destination;
-          destinationLabel = 'Point d\'événement (${events[idx0].title})';
+          destinationLabel = '${s.mapDestinationEvent} (${events[idx0].title})';
 
         case RouteDestinationType.safeZoneOrCareCenter:
           // [1] Priorité absolue : Zone Safe OU Centre de soins le plus proche
@@ -424,12 +426,12 @@ class _MapScreenState extends State<MapScreen> {
             final safeZone = events[idx].nearestSafeZone(userLatLng);
             if (safeZone != null) {
               destination = safeZone.position;
-              destinationLabel = '🛡 Zone Safe : ${safeZone.label}';
+              destinationLabel = '🛡 ${s.mapDestinationSafeZone} : ${safeZone.label}';
             } else {
               final center = events[idx].nearestCareCenter(userLatLng);
               if (center != null) {
                 destination = center.position;
-                destinationLabel = '🏥 Centre de soins : ${center.label}';
+                destinationLabel = '🏥 ${s.mapDestinationCareCenter} : ${center.label}';
               }
             }
           }
@@ -440,7 +442,7 @@ class _MapScreenState extends State<MapScreen> {
             final center = events[idx].nearestCareCenter(userLatLng);
             if (center != null) {
               destination = center.position;
-              destinationLabel = 'Centre de soins : ${center.label}';
+              destinationLabel = '${s.mapDestinationCareCenter} : ${center.label}';
             }
           }
 
@@ -450,7 +452,7 @@ class _MapScreenState extends State<MapScreen> {
             final exit = events[idx].nearestExitPoint(userLatLng);
             if (exit != null) {
               destination = exit.position;
-              destinationLabel = 'Sortie : ${exit.label}';
+              destinationLabel = '${s.mapDestinationExit} : ${exit.label}';
             }
           }
 
@@ -461,7 +463,7 @@ class _MapScreenState extends State<MapScreen> {
               prefs.userPointLatitude!,
               prefs.userPointLongitude!,
             );
-            destinationLabel = 'Point utilisateur';
+            destinationLabel = s.mapDestinationUserPoint;
           }
       }
     }
@@ -474,6 +476,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _triggerRouteSafeFailover() async {
+    final s = AppLocale.instance.strings;
     final prefs = AppPreferencesStore.instance.value;
     final events = EventManager.instance.value;
     final userLatLng = _userPosition != null
@@ -492,7 +495,7 @@ class _MapScreenState extends State<MapScreen> {
     if (safeZone != null) {
       await _computeAndShowRoute(
         safeZone.position,
-        'Zone Safe : ${safeZone.label}',
+        '${s.mapDestinationSafeZone} : ${safeZone.label}',
         isFailover: true,
       );
       return;
@@ -502,7 +505,7 @@ class _MapScreenState extends State<MapScreen> {
     if (careCenter != null) {
       await _computeAndShowRoute(
         careCenter.position,
-        'Centre de soins : ${careCenter.label}',
+        '${s.mapDestinationCareCenter} : ${careCenter.label}',
         isFailover: true,
       );
       return;
@@ -556,20 +559,21 @@ class _MapScreenState extends State<MapScreen> {
   // --------------------------------------------------------------------------
 
   void _showEventNoEventWarning() {
+    final s = AppLocale.instance.strings;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: StreetPhareTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.event_busy,
+            const Icon(Icons.event_busy,
                 color: StreetPhareTheme.primary, size: 26),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Flexible(
               child: Text(
-                'Aucun événement chargé',
-                style: TextStyle(
+                s.mapAddEventWarning,
+                style: const TextStyle(
                   color: StreetPhareTheme.textPrimary,
                   fontSize: 16,
                 ),
@@ -577,9 +581,9 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ],
         ),
-        content: const Text(
-          'Veuillez ajouter un événement avant de lancer le suivi.',
-          style: TextStyle(
+        content: Text(
+          s.mapAddEventWarning,
+          style: const TextStyle(
             color: StreetPhareTheme.textSecondary,
             fontSize: 14,
           ),
@@ -595,15 +599,15 @@ class _MapScreenState extends State<MapScreen> {
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
               );
             },
-            child: const Text(
-              'Ajouter un événement',
-              style: TextStyle(color: Colors.black),
+            child: Text(
+              s.mapAddEventButton,
+              style: const TextStyle(color: Colors.black),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Annuler',
-                style: TextStyle(color: StreetPhareTheme.textSecondary)),
+            child: Text(s.cancel,
+                style: const TextStyle(color: StreetPhareTheme.textSecondary)),
           ),
         ],
       ),
@@ -611,24 +615,23 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _showNoDestinationError() {
+    final s = AppLocale.instance.strings;
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        const SnackBar(
+        SnackBar(
           backgroundColor: StreetPhareTheme.danger,
-          duration: Duration(seconds: 4),
+          duration: const Duration(seconds: 4),
           behavior: SnackBarBehavior.floating,
           content: Row(
             children: [
-              Icon(Icons.error_outline, color: Colors.white, size: 20),
-              SizedBox(width: 12),
+              const Icon(Icons.error_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Aucune destination disponible. '
-                  'Rejoignez un événement ou placez un point manuellement '
-                  '(appui long 3 s sur la carte).',
-                  style: TextStyle(color: Colors.white),
+                  s.mapNoDestinationError,
+                  style: const TextStyle(color: Colors.white),
                 ),
               ),
             ],
@@ -646,6 +649,7 @@ class _MapScreenState extends State<MapScreen> {
     String destinationLabel, {
     bool isFailover = false,
   }) async {
+    final s = AppLocale.instance.strings;
     final start = _userPosition != null
         ? LatLng(_userPosition!.latitude, _userPosition!.longitude)
         : null;
@@ -657,27 +661,48 @@ class _MapScreenState extends State<MapScreen> {
 
     _showRouteSafeProgress(
       isFailover
-          ? 'Repli vers $destinationLabel…'
-          : 'Calcul de la Route Safe vers $destinationLabel…',
+          ? s.mapRouteSafeFailover.replaceFirst('{label}', destinationLabel)
+          : s.mapRouteSafeCalculating.replaceFirst('{label}', destinationLabel),
       isFailover: isFailover,
     );
 
     final filters = AvoidanceFilterStore.instance.value;
-    final routes = SafePathEngine.computeRoutes(
+
+    // Tente d'abord via le nouveau RoutingEngine (SPG + cascade).
+    final result = await RoutingEngine.instance.computeRoute(
       start: start,
       end: destination,
-      filters: filters,
+      profile: RoutingProfile.pedestrian,
+      avoidFilters: filters,
     );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
-    if (routes.isEmpty) {
+    if (result.isNotEmpty) {
+      final routes = result.routes;
+      final selected = await RouteResultSheet.show(context, routes: routes);
+
+      if (!mounted || selected == null) return;
+
+      setState(() => _safeRoutePoints = selected.points);
+      _fitRouteBounds(selected.points);
+      return;
+    }
+
+    // Fallback : SafePathEngine (grille Dijkstra).
+    final localRoutes = SafePathEngine.computeRoutes(
+      start: start,
+      end: destination,
+      filters: filters,
+    );
+
+    if (localRoutes.isEmpty) {
       _showNoDestinationError();
       return;
     }
 
-    final selected = await RouteResultSheet.show(context, routes: routes);
+    final selected = await RouteResultSheet.show(context, routes: localRoutes);
 
     if (!mounted || selected == null) return;
 
@@ -686,7 +711,6 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   /// Centre et zoome la carte pour afficher l'INTÉGRALITÉ du trajet.
-  /// Le zoom est calculé dynamiquement à partir de la distance à vol d'oiseau.
   void _fitRouteBounds(List<LatLng> points) {
     if (points.isEmpty) return;
     double minLat = points.first.latitude;
@@ -752,6 +776,7 @@ class _MapScreenState extends State<MapScreen> {
       isScrollControlled: true,
       builder: (_) => _DestinationSelectorSheet(
         events: EventManager.instance.value,
+        strings: AppLocale.instance.strings,
       ),
     );
   }
@@ -781,14 +806,13 @@ class _MapScreenState extends State<MapScreen> {
       );
 
   /// Callback déclenché dès la création locale du signalement.
-  /// Affiche un marqueur immédiat sur la carte de l'émetteur.
   void _onLocalReportCreated(LatLng position, AlertType type) {
     if (!mounted) return;
     setState(() {
       _localReportMarker = position;
       _localReportType = type;
     });
-    // Disparaît après 30 s (le marqueur officiel prend le relai quand ≥3 votes).
+    // Disparaît après 30 s.
     Future.delayed(const Duration(seconds: 30), () {
       if (mounted) {
         setState(() {
@@ -804,6 +828,7 @@ class _MapScreenState extends State<MapScreen> {
   // --------------------------------------------------------------------------
 
   void _showAboutDialog(BuildContext context) {
+    final s = AppLocale.instance.strings;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     showDialog(
       context: context,
@@ -816,7 +841,7 @@ class _MapScreenState extends State<MapScreen> {
                 color: StreetPhareTheme.primary, size: 28),
             const SizedBox(width: 10),
             Text(
-              'StreetPhare',
+              s.appTitle,
               style: TextStyle(
                 color: onSurface,
                 fontWeight: FontWeight.bold,
@@ -829,20 +854,20 @@ class _MapScreenState extends State<MapScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _AboutRow(label: 'Version', value: '1.2.0', ctx: ctx),
+              _AboutRow(label: s.aboutVersion, value: '1.2.0', ctx: ctx),
               const SizedBox(height: 6),
-              _AboutRow(label: 'Plateforme', value: 'Flutter / Dart', ctx: ctx),
+              _AboutRow(label: s.aboutPlatform, value: 'Flutter / Dart', ctx: ctx),
               const SizedBox(height: 6),
-              _AboutRow(label: 'Licence', value: 'GNU GPL v3', ctx: ctx),
+              _AboutRow(label: s.aboutLicense, value: 'GNU GPL v3', ctx: ctx),
               const SizedBox(height: 6),
               _AboutRow(
-                  label: 'Chiffrement',
+                  label: s.aboutEncryption,
                   value: 'Hive local + Ed25519',
                   ctx: ctx),
               const SizedBox(height: 12),
-              const Text(
-                'Projet open-source citoyen',
-                style: TextStyle(
+              Text(
+                s.aboutOpenSource,
+                style: const TextStyle(
                   color: StreetPhareTheme.primary,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -850,14 +875,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'StreetPhare est une application de cartographie '
-                'collaborative décentralisée conçue pour renforcer '
-                'la sécurité collective lors de rassemblements citoyens.\n\n'
-                'Aucune donnée personnelle n\'est collectée ni transmise '
-                'à des tiers. Toutes les données restent locales ou '
-                'transitent via des relais pair-à-pair chiffrés (Hive).\n\n'
-                'Chiffrement : Ed25519 (signatures), AES-CBC (relais). '
-                'Base de données locale Hive chiffrée avec une clé éphémère.',
+                s.aboutDescription,
                 style: TextStyle(
                   color: onSurface.withValues(alpha: 0.7),
                   fontSize: 13,
@@ -869,7 +887,7 @@ class _MapScreenState extends State<MapScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Fermer'),
+            child: Text(s.close),
           ),
         ],
       ),
@@ -882,6 +900,7 @@ class _MapScreenState extends State<MapScreen> {
 
   void _onCollectivePanicAlert(CollectivePanicEvent event) {
     if (!mounted) return;
+    final s = AppLocale.instance.strings;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -890,14 +909,14 @@ class _MapScreenState extends State<MapScreen> {
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: StreetPhareTheme.danger, width: 2),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.emergency, color: StreetPhareTheme.danger, size: 28),
-            SizedBox(width: 10),
+            const Icon(Icons.emergency, color: StreetPhareTheme.danger, size: 28),
+            const SizedBox(width: 10),
             Flexible(
               child: Text(
-                'Alerte Panic Collective',
-                style: TextStyle(
+                s.mapCollectivePanicTitle,
+                style: const TextStyle(
                   color: StreetPhareTheme.textPrimary,
                   fontSize: 17,
                 ),
@@ -906,11 +925,7 @@ class _MapScreenState extends State<MapScreen> {
           ],
         ),
         content: Text(
-          '⚠️ ${event.peerCount} appareils proches ont déclenché une '
-          'alerte Panic simultanément.\n\n'
-          'Un point "Tension importante" a été créé automatiquement '
-          'au centre géographique de ces signaux.\n\n'
-          'Restez vigilant et consultez la carte.',
+          s.mapCollectivePanicMessage.replaceFirst('{count}', '${event.peerCount}'),
           style: const TextStyle(
             color: StreetPhareTheme.textSecondary,
             fontSize: 14,
@@ -927,12 +942,12 @@ class _MapScreenState extends State<MapScreen> {
                 _mapController.move(event.center, 15.0);
               } catch (_) {}
             },
-            child: const Text('Voir sur la carte'),
+            child: Text(s.mapViewOnMap),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Ignorer',
-                style: TextStyle(color: StreetPhareTheme.textSecondary)),
+            child: Text(s.mapIgnore,
+                style: const TextStyle(color: StreetPhareTheme.textSecondary)),
           ),
         ],
       ),
@@ -952,33 +967,33 @@ class _MapScreenState extends State<MapScreen> {
   // --------------------------------------------------------------------------
 
   Future<void> _triggerPanic() async {
+    final s = AppLocale.instance.strings;
     final contacts = PanicContactStore.instance.value;
     if (contacts.isEmpty) {
       final go = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: StreetPhareTheme.surface,
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.warning_amber, color: StreetPhareTheme.danger),
-              SizedBox(width: 12),
-              Text('Aucun contact d\'urgence',
-                  style: TextStyle(color: StreetPhareTheme.textPrimary)),
+              const Icon(Icons.warning_amber, color: StreetPhareTheme.danger),
+              const SizedBox(width: 12),
+              Text(s.mapNoPanicContactTitle,
+                  style: const TextStyle(color: StreetPhareTheme.textPrimary)),
             ],
           ),
-          content: const Text(
-            'Vous devez d\'abord configurer au moins un contact dans '
-            'les Paramètres pour pouvoir utiliser le bouton PANIC.',
-            style: TextStyle(color: StreetPhareTheme.textSecondary),
+          content: Text(
+            s.mapNoPanicContactMessage,
+            style: const TextStyle(color: StreetPhareTheme.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Annuler'),
+              child: Text(s.cancel),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Ouvrir les Paramètres'),
+              child: Text(s.mapOpenSettings),
             ),
           ],
         ),
@@ -1000,31 +1015,30 @@ class _MapScreenState extends State<MapScreen> {
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: StreetPhareTheme.danger, width: 2),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.emergency, color: StreetPhareTheme.danger),
-            SizedBox(width: 12),
-            Text('Mode Panique',
-                style: TextStyle(color: StreetPhareTheme.textPrimary)),
+            const Icon(Icons.emergency, color: StreetPhareTheme.danger),
+            const SizedBox(width: 12),
+            Text(s.mapPanicModeTitle,
+                style: const TextStyle(color: StreetPhareTheme.textPrimary)),
           ],
         ),
         content: Text(
-          'Activer le mode panique enverra un SMS d\'alerte avec votre '
-          'position GPS à ${contacts.length} contact(s) :\n\n'
-          '${contacts.map((c) => '• ${c.name} (${c.phoneNumber})').join('\n')}\n\n'
-          'Continuer ?',
+          s.mapPanicModeMessage
+            .replaceFirst('{count}', '${contacts.length}')
+            .replaceFirst('{list}', contacts.map((c) => '• ${c.name} (${c.phoneNumber})').join('\n')),
           style: const TextStyle(color: StreetPhareTheme.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Annuler'),
+            child: Text(s.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
                 backgroundColor: StreetPhareTheme.danger),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('ACTIVER'),
+            child: Text(s.mapPanicModeActivate),
           ),
         ],
       ),
@@ -1062,23 +1076,22 @@ class _MapScreenState extends State<MapScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: StreetPhareTheme.surface,
-          title: const Row(
+          title: Row(
             children: [
-              Icon(Icons.info_outline, color: StreetPhareTheme.primary),
-              SizedBox(width: 12),
-              Text('SMS préparé',
-                  style: TextStyle(color: StreetPhareTheme.textPrimary)),
+              const Icon(Icons.info_outline, color: StreetPhareTheme.primary),
+              const SizedBox(width: 12),
+              Text(s.mapPanicSmsPreparedTitle,
+                  style: const TextStyle(color: StreetPhareTheme.textPrimary)),
             ],
           ),
           content: Text(
-            'Impossible d\'ouvrir l\'app SMS automatiquement.\n'
-            'Le message a été copié dans le presse-papier :\n\n$message',
+            s.mapPanicSmsPreparedMessage.replaceFirst('{message}', message),
             style: const TextStyle(color: StreetPhareTheme.textSecondary),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('OK'),
+              child: Text(s.ok),
             ),
           ],
         ),
@@ -1092,23 +1105,22 @@ class _MapScreenState extends State<MapScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: StreetPhareTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.check_circle, color: StreetPhareTheme.primary),
-            SizedBox(width: 12),
-            Text('Alerte prête',
-                style: TextStyle(color: StreetPhareTheme.textPrimary)),
+            const Icon(Icons.check_circle, color: StreetPhareTheme.primary),
+            const SizedBox(width: 12),
+            Text(s.mapPanicAlertReadyTitle,
+                style: const TextStyle(color: StreetPhareTheme.textPrimary)),
           ],
         ),
         content: Text(
-          'Un SMS d\'urgence va être envoyé à ${contacts.length} '
-          'contact(s) avec votre position GPS.',
+          s.mapPanicAlertReadyMessage.replaceFirst('{count}', '${contacts.length}'),
           style: const TextStyle(color: StreetPhareTheme.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
+            child: Text(s.ok),
           ),
         ],
       ),
@@ -1137,14 +1149,16 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   String _buildPanicMessage(Position? p) {
+    final s = AppLocale.instance.strings;
     final stamp = DateTime.now().toUtc().toIso8601String();
     final coords = p == null
-        ? 'position GPS indisponible'
+        ? s.mapPanicNoGps
         : 'https://maps.google.com/?q=${p.latitude},${p.longitude} '
             '(${p.latitude.toStringAsFixed(5)}, ${p.longitude.toStringAsFixed(5)})';
-    return '[STREETPHARE] Alerte d\'urgence envoyée le $stamp UTC.\n'
-        'Position : $coords\n'
-        'Merci de me contacter ou de prévenir les secours.';
+    
+    return s.mapPanicMessageBody
+        .replaceFirst('{stamp}', stamp)
+        .replaceFirst('{coords}', coords);
   }
 
   // --------------------------------------------------------------------------
@@ -1152,6 +1166,7 @@ class _MapScreenState extends State<MapScreen> {
   // --------------------------------------------------------------------------
 
   _EventLayers _buildEventLayers(List<EventModel> events) {
+    final s = AppLocale.instance.strings;
     final polylines = <Polyline>[];
     final markers = <Marker>[];
     final now = DateTime.now().toUtc();
@@ -1251,7 +1266,7 @@ class _MapScreenState extends State<MapScreen> {
           width: 36,
           height: 36,
           child: Tooltip(
-            message: 'Sortie : ${ep.label}',
+            message: '${s.mapDestinationExit} : ${ep.label}',
             child: Container(
               decoration: BoxDecoration(
                 color: const Color(0xFF1565C0),
@@ -1271,7 +1286,7 @@ class _MapScreenState extends State<MapScreen> {
           width: 40,
           height: 40,
           child: Tooltip(
-            message: '🛡 Zone Safe : ${sz.label}',
+            message: '🛡 ${s.mapDestinationSafeZone} : ${sz.label}',
             child: Container(
               decoration: BoxDecoration(
                 color: const Color(0xFF2E7D32),
@@ -1308,507 +1323,517 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<AppThemeMode>(
-      valueListenable: ThemeController.instance,
-      builder: (context, themeMode, _) {
-        final brightness = MediaQuery.platformBrightnessOf(context);
-        final isDark = themeMode == AppThemeMode.dark ||
-            (themeMode == AppThemeMode.system &&
-                brightness == Brightness.dark);
-        final tileUrl = isDark ? _kTileUrlDark : _kTileUrlLight;
+    return ValueListenableBuilder<AppLanguage>(
+      valueListenable: AppLocale.instance,
+      builder: (context, _, child) {
+        final s = AppLocale.instance.strings;
+        return ValueListenableBuilder<AppThemeMode>(
+          valueListenable: ThemeController.instance,
+          builder: (context, themeMode, _) {
+            final brightness = MediaQuery.platformBrightnessOf(context);
+            final isDark = themeMode == AppThemeMode.dark ||
+                (themeMode == AppThemeMode.system &&
+                    brightness == Brightness.dark);
+            final tileUrl = isDark ? _kTileUrlDark : _kTileUrlLight;
 
-        return ValueListenableBuilder<List<EventModel>>(
-          valueListenable: EventManager.instance,
-          builder: (context, events, _) {
-            final layers = _buildEventLayers(events);
-            final hasMarkers =
-                layers.markers.isNotEmpty || _userPosition != null;
+            return ValueListenableBuilder<List<EventModel>>(
+              valueListenable: EventManager.instance,
+              builder: (context, events, _) {
+                final layers = _buildEventLayers(events);
+                final hasMarkers =
+                    layers.markers.isNotEmpty || _userPosition != null;
 
-            return Scaffold(
-              body: Stack(
-                children: [
-                  // ── Carte ──────────────────────────────────────────────
-                  FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: _defaultCenter,
-                      initialZoom: _defaultZoom,
-                      minZoom: 3,
-                      maxZoom: 19,
-                      interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.all &
-                            ~InteractiveFlag.rotate,
-                      ),
-                      onLongPress: _onMapLongPress,
-                      onMapReady: () {
-                        if (mounted) {
-                          setState(() => _mapReady = true);
-                        }
-                      },
-                    ),
+                // ── SafeArea global pour Android 15+ (Edge-to-Edge) ──
+                // Android 15 impose le mode Edge-to-Edge par défaut :
+                // l'interface s'affiche derrière les barres système.
+                // Le SafeArea bottom garantit que les FABs et le contenu
+                // restent au-dessus de la barre de navigation gestuelle.
+                return Scaffold(
+                  body: SafeArea(
+                    top: false,
+                    bottom: true,
+                    child: Stack(
                     children: [
-                      TileLayer(
-                        key: ValueKey('tiles_$isDark'),
-                        urlTemplate: tileUrl,
-                        userAgentPackageName: 'com.streetphare.app',
-                        maxNativeZoom: 19,
-                        tileDisplay: TileDisplay.fadeIn(
-                          duration: const Duration(milliseconds: 350),
+                      // ── Carte ──────────────────────────────────────────────
+                      FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: _defaultCenter,
+                          initialZoom: _defaultZoom,
+                          minZoom: 3,
+                          maxZoom: 19,
+                          interactionOptions: const InteractionOptions(
+                            flags: InteractiveFlag.all &
+                                ~InteractiveFlag.rotate,
+                          ),
+                          onLongPress: _onMapLongPress,
+                          onMapReady: () {
+                            if (mounted) {
+                              setState(() => _mapReady = true);
+                            }
+                          },
                         ),
-                      ),
-                      if (layers.polylines.isNotEmpty)
-                        PolylineLayer(polylines: layers.polylines),
-                      if (_safeRoutePoints != null &&
-                          _safeRoutePoints!.length >= 2)
-                        SafeRouteLayer(routePoints: _safeRoutePoints!),
-                      if (hasMarkers)
-                        MarkerLayer(
-                          markers: [
-                            if (_userPosition != null) _buildUserMarker(),
-                            ...layers.markers,
-                          ],
-                        ),
-                      if (_locating)
-                        const Align(
-                          alignment: Alignment.bottomLeft,
-                          child: Padding(
-                            padding: EdgeInsets.only(left: 12, bottom: 24),
-                            child: SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                    StreetPhareTheme.primary),
-                              ),
+                        children: [
+                          TileLayer(
+                            key: ValueKey('tiles_$isDark'),
+                            urlTemplate: tileUrl,
+                            userAgentPackageName: 'com.streetphare.app',
+                            maxNativeZoom: 19,
+                            tileDisplay: TileDisplay.fadeIn(
+                              duration: const Duration(milliseconds: 350),
                             ),
                           ),
-                        ),
-                      if (_positionError != null)
-                        Align(
-                          alignment: Alignment.bottomLeft,
-                          child: Padding(
-                            padding: const EdgeInsets.only(
-                                left: 12, bottom: 24),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: StreetPhareTheme.surface
-                                    .withValues(alpha: 0.85),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.gps_off,
-                                      size: 12,
-                                      color:
-                                          StreetPhareTheme.textSecondary),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _positionError!,
-                                    style: const TextStyle(
-                                        color:
-                                            StreetPhareTheme.textSecondary,
-                                        fontSize: 10),
+                          if (layers.polylines.isNotEmpty)
+                            PolylineLayer(polylines: layers.polylines),
+                          if (_safeRoutePoints != null &&
+                              _safeRoutePoints!.length >= 2)
+                            SafeRouteLayer(routePoints: _safeRoutePoints!),
+                          if (hasMarkers)
+                            MarkerLayer(
+                              markers: [
+                                if (_userPosition != null) _buildUserMarker(),
+                                ...layers.markers,
+                              ],
+                            ),
+                          if (_locating)
+                            const Align(
+                              alignment: Alignment.bottomLeft,
+                              child: Padding(
+                                padding: EdgeInsets.only(left: 12, bottom: 24),
+                                child: SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        StreetPhareTheme.primary),
                                   ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      RichAttributionWidget(
-                        alignment: AttributionAlignment.bottomLeft,
-                        attributions: [
-                          TextSourceAttribution(
-                            isDark
-                                ? 'CartoDB / OpenStreetMap contributors'
-                                : 'OpenStreetMap contributors',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-
-                  // ── Écran de chargement carte ───────────────────────────
-                  if (!_mapReady)
-                    Container(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      child: const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  StreetPhareTheme.primary),
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              'Chargement de la carte en cours…',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  // ── Barre supérieure ────────────────────────────────────
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: StreetPhareTheme.surface
-                                    .withValues(alpha: 0.85),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child:
-                                  ValueListenableBuilder<AppPreferences>(
-                                valueListenable:
-                                    AppPreferencesStore.instance,
-                                builder: (_, prefs, _) {
-                                  if (prefs.lowVisionMode) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return GestureDetector(
-                                    onTap: () =>
-                                        _showAboutDialog(context),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.lightbulb,
-                                            color: StreetPhareTheme.primary,
-                                            size: 18),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'StreetPhare',
-                                          style: TextStyle(
+                          if (_positionError != null)
+                            Align(
+                              alignment: Alignment.bottomLeft,
+                              child: Padding(
+                                padding: const EdgeInsets.only(
+                                    left: 12, bottom: 24),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: StreetPhareTheme.surface
+                                        .withValues(alpha: 0.85),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.gps_off,
+                                          size: 12,
+                                          color:
+                                              StreetPhareTheme.textSecondary),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _positionError!,
+                                        style: const TextStyle(
                                             color:
-                                                StreetPhareTheme.textPrimary,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
+                                                StreetPhareTheme.textSecondary,
+                                            fontSize: 10),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            const _PeerCounterBadge(),
-                            const Spacer(),
-                            _CircleIconButton(
-                              icon: Icons.settings_outlined,
-                              onTap: _openSettings,
-                            ),
-                          ],
-                        ),
+                          RichAttributionWidget(
+                            alignment: AttributionAlignment.bottomLeft,
+                            attributions: [
+                              TextSourceAttribution(
+                                isDark
+                                    ? 'CartoDB / OpenStreetMap contributors'
+                                    : 'OpenStreetMap contributors',
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
 
-                  // ── Chips d'événements (sélection active) ──────────────
-                  if (events.isNotEmpty)
-                    ValueListenableBuilder<AppPreferences>(
-                      valueListenable: AppPreferencesStore.instance,
-                      builder: (context, prefs, _) {
-                        return Positioned(
-                          top: 80,
-                          left: 12,
-                          right: 80,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: events.asMap().entries.map((entry) {
-                                final i = entry.key;
-                                final ev = entry.value;
-                                final col =
-                                    _kEventColors[i % _kEventColors.length];
-                                final isVisible = ev.isRouteVisible();
-                                final isActive = prefs.activeEventIndex == i;
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 6),
-                                  child: GestureDetector(
-                                    onTap: () => AppPreferencesStore.instance
-                                        .setActiveEventIndex(i),
-                                    child: AnimatedContainer(
-                                      duration: const Duration(
-                                          milliseconds: 200),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(
-                                        color: isActive
-                                            ? col
-                                            : col.withValues(alpha: 0.50),
-                                        borderRadius:
-                                            BorderRadius.circular(14),
-                                        border: isActive
-                                            ? Border.all(
-                                                color: Colors.white,
-                                                width: 2)
-                                            : null,
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            isVisible
-                                                ? Icons.navigation
-                                                : Icons.lock_clock,
-                                            color: Colors.white,
-                                            size: 12,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            ev.title,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          if (isActive) ...[
-                                            const SizedBox(width: 4),
-                                            const Icon(Icons.check_circle,
-                                                color: Colors.white,
-                                                size: 12),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-
-                  // ── Bouton GPS Recentrer + Stop Tracking + effacer Route Safe
-                  Positioned(
-                    left: 16,
-                    bottom: 120,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Recentrer sur position GPS
-                        Material(
-                          elevation: 4,
-                          shape: const CircleBorder(),
-                          color:
-                              StreetPhareTheme.surface.withValues(alpha: 0.9),
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: _isTracking
-                                ? _animateToUser
-                                : _initUserLocation,
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Icon(
-                                _isTracking
-                                    ? Icons.gps_fixed
-                                    : Icons.gps_not_fixed,
-                                color: _isTracking
-                                    ? StreetPhareTheme.primary
-                                    : StreetPhareTheme.textSecondary,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // [3] Bouton STOP tracking (X) — cache le marqueur
-                        // instantanément dès le clic
-                        if (_isTracking) ...[
-                          const SizedBox(height: 8),
-                          Tooltip(
-                            message: 'Arrêter le suivi de position',
-                            child: Material(
-                              elevation: 4,
-                              shape: const CircleBorder(),
-                              color: StreetPhareTheme.surface
-                                  .withValues(alpha: 0.9),
-                              child: InkWell(
-                                customBorder: const CircleBorder(),
-                                onTap: _stopTracking,
-                                child: const Padding(
-                                  padding: EdgeInsets.all(12),
-                                  child: Icon(
-                                    Icons.close,
-                                    color: StreetPhareTheme.danger,
-                                    size: 22,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                        // Effacer la Route Safe
-                        if (_safeRoutePoints != null) ...[
-                          const SizedBox(height: 8),
-                          Material(
-                            elevation: 4,
-                            shape: const CircleBorder(),
-                            color: StreetPhareTheme.surface
-                                .withValues(alpha: 0.9),
-                            child: InkWell(
-                              customBorder: const CircleBorder(),
-                              onTap: () =>
-                                  setState(() => _safeRoutePoints = null),
-                              child: const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: Icon(
-                                  Icons.clear,
-                                  color: StreetPhareTheme.danger,
-                                  size: 24,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  // ── Indicateur de destination actuelle ─────────────────
-                  ValueListenableBuilder<AppPreferences>(
-                    valueListenable: AppPreferencesStore.instance,
-                    builder: (context, prefs, _) {
-                      return Positioned(
-                        right: 80,
-                        bottom: 120,
-                        child: GestureDetector(
-                          onTap: _openDestinationSelector,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: StreetPhareTheme.surface
-                                  .withValues(alpha: 0.88),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: StreetPhareTheme.primary
-                                    .withValues(alpha: 0.5),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
+                      // ── Écran de chargement carte ───────────────────────────
+                      if (!_mapReady)
+                        Container(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          child: Center(
+                            child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.my_location,
-                                    size: 13,
-                                    color: StreetPhareTheme.primary),
-                                const SizedBox(width: 5),
+                                const CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      StreetPhareTheme.primary),
+                                ),
+                                const SizedBox(height: 16),
                                 Text(
-                                  prefs.routeDestinationType.label,
+                                  s.mapLoadingTiles,
                                   style: const TextStyle(
-                                    color: StreetPhareTheme.textPrimary,
-                                    fontSize: 11,
+                                    color: Colors.white,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.w500,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(width: 4),
-                                const Icon(Icons.expand_less,
-                                    size: 14,
-                                    color: StreetPhareTheme.textSecondary),
                               ],
                             ),
                           ),
                         ),
-                      );
-                    },
-                  ),
 
-                  // ── FABs actions ────────────────────────────────────────
-                  Positioned(
-                    right: 16,
-                    bottom: 32,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        _ActionFab(
-                          icon: Icons.add_alert,
-                          label: 'Signalement',
-                          backgroundColor: StreetPhareTheme.primary,
-                          foregroundColor: Colors.black,
-                          onPressed: _openReportSheet,
-                        ),
-                        const SizedBox(height: 12),
-                        _ActionFab(
-                          icon: Icons.shield_outlined,
-                          label: 'Route Safe',
-                          backgroundColor: StreetPhareTheme.surface,
-                          foregroundColor: StreetPhareTheme.primary,
-                          borderColor: StreetPhareTheme.primary,
-                          onPressed: () => _triggerRouteSafe(),
-                        ),
-                        const SizedBox(height: 12),
-                        _ActionFab(
-                          icon: Icons.forum_outlined,
-                          label: 'Messages',
-                          backgroundColor: StreetPhareTheme.surface,
-                          foregroundColor: StreetPhareTheme.primary,
-                          borderColor: StreetPhareTheme.primary,
-                          onPressed: _openMessaging,
-                        ),
-                        const SizedBox(height: 12),
-                        _ActionFab(
-                          icon: Icons.emergency,
-                          label: 'PANIC',
-                          backgroundColor: StreetPhareTheme.danger,
-                          foregroundColor: Colors.white,
-                          isExtended: true,
-                          onPressed: _triggerPanic,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ── [DEBUG] Bouton de débogage — PREMIER PLAN ABSOLU ────
-                  // Visible uniquement en kDebugMode.
-                  // Positionné au-dessus de tous les autres widgets (dernier
-                  // enfant du Stack = z-index maximal).
-                  if (kDebugMode)
-                    Positioned(
-                      top: 0,
-                      right: 0,
-                      child: SafeArea(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 64, right: 12),
-                          child: _DebugButton(
-                            userPosition: _userPosition,
-                            safeRoutePoints: _safeRoutePoints,
-                            mapReady: _mapReady,
-                            isTracking: _isTracking,
+                      // ── Barre supérieure ────────────────────────────────────
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: SafeArea(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: StreetPhareTheme.surface
+                                        .withValues(alpha: 0.85),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child:
+                                      ValueListenableBuilder<AppPreferences>(
+                                    valueListenable:
+                                        AppPreferencesStore.instance,
+                                    builder: (_, prefs, o) {
+                                      if (prefs.lowVisionMode) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      return GestureDetector(
+                                        onTap: () =>
+                                            _showAboutDialog(context),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.lightbulb,
+                                                color: StreetPhareTheme.primary,
+                                                size: 18),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              s.appTitle,
+                                              style: const TextStyle(
+                                                color:
+                                                    StreetPhareTheme.textPrimary,
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const _PeerCounterBadge(),
+                                const Spacer(),
+                                _CircleIconButton(
+                                  icon: Icons.settings_outlined,
+                                  onTap: _openSettings,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
 
-                  // ── Bandeau d'isolement critique ──────────────────────────
-                  const _ConnectivityBanner(),
-                ],
-              ),
+                      // ── Chips d'événements (sélection active) ──────────────
+                      if (events.isNotEmpty)
+                        ValueListenableBuilder<AppPreferences>(
+                          valueListenable: AppPreferencesStore.instance,
+                          builder: (context, prefs, _) {
+                            return Positioned(
+                              top: 80,
+                              left: 12,
+                              right: 80,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: events.asMap().entries.map((entry) {
+                                    final i = entry.key;
+                                    final ev = entry.value;
+                                    final col =
+                                        _kEventColors[i % _kEventColors.length];
+                                    final isVisible = ev.isRouteVisible();
+                                    final isActive = prefs.activeEventIndex == i;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(right: 6),
+                                      child: GestureDetector(
+                                        onTap: () => AppPreferencesStore.instance
+                                            .setActiveEventIndex(i),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(
+                                              milliseconds: 200),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 5),
+                                          decoration: BoxDecoration(
+                                            color: isActive
+                                                ? col
+                                                : col.withValues(alpha: 0.50),
+                                            borderRadius:
+                                                BorderRadius.circular(14),
+                                            border: isActive
+                                                ? Border.all(
+                                                    color: Colors.white,
+                                                    width: 2)
+                                                : null,
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                isVisible
+                                                    ? Icons.navigation
+                                                    : Icons.lock_clock,
+                                                color: Colors.white,
+                                                size: 12,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                ev.title,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              if (isActive) ...[
+                                                const SizedBox(width: 4),
+                                                const Icon(Icons.check_circle,
+                                                    color: Colors.white,
+                                                    size: 12),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+
+                      // ── Bouton GPS Recentrer + Stop Tracking + effacer Route Safe
+                      Positioned(
+                        left: 16,
+                        bottom: 120,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Recentrer sur position GPS
+                            Material(
+                              elevation: 4,
+                              shape: const CircleBorder(),
+                              color:
+                                  StreetPhareTheme.surface.withValues(alpha: 0.9),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: _isTracking
+                                    ? _animateToUser
+                                    : _initUserLocation,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Icon(
+                                    _isTracking
+                                        ? Icons.gps_fixed
+                                        : Icons.gps_not_fixed,
+                                    color: _isTracking
+                                        ? StreetPhareTheme.primary
+                                        : StreetPhareTheme.textSecondary,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (_isTracking) ...[
+                              const SizedBox(height: 8),
+                              Tooltip(
+                                message: s.mapRecenterTooltip,
+                                child: Material(
+                                  elevation: 4,
+                                  shape: const CircleBorder(),
+                                  color: StreetPhareTheme.surface
+                                      .withValues(alpha: 0.9),
+                                  child: InkWell(
+                                    customBorder: const CircleBorder(),
+                                    onTap: _stopTracking,
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: Icon(
+                                        Icons.close,
+                                        color: StreetPhareTheme.danger,
+                                        size: 22,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            // Effacer la Route Safe
+                            if (_safeRoutePoints != null) ...[
+                              const SizedBox(height: 8),
+                              Material(
+                                elevation: 4,
+                                shape: const CircleBorder(),
+                                color: StreetPhareTheme.surface
+                                    .withValues(alpha: 0.9),
+                                child: InkWell(
+                                  customBorder: const CircleBorder(),
+                                  onTap: () =>
+                                      setState(() => _safeRoutePoints = null),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: Icon(
+                                      Icons.clear,
+                                      color: StreetPhareTheme.danger,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                      // ── Indicateur de destination actuelle ─────────────────
+                      ValueListenableBuilder<AppPreferences>(
+                        valueListenable: AppPreferencesStore.instance,
+                        builder: (context, prefs, _) {
+                          return Positioned(
+                            right: 80,
+                            bottom: 120,
+                            child: GestureDetector(
+                              onTap: _openDestinationSelector,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: StreetPhareTheme.surface
+                                      .withValues(alpha: 0.88),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: StreetPhareTheme.primary
+                                        .withValues(alpha: 0.5),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.my_location,
+                                        size: 13,
+                                        color: StreetPhareTheme.primary),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      prefs.routeDestinationType.label,
+                                      style: const TextStyle(
+                                        color: StreetPhareTheme.textPrimary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.expand_less,
+                                        size: 14,
+                                        color: StreetPhareTheme.textSecondary),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+
+                      // ── FABs actions ────────────────────────────────────────
+                      Positioned(
+                        right: 16,
+                        bottom: 32,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            _ActionFab(
+                              icon: Icons.add_alert,
+                              label: s.eventsMyEvents, // Example, should probably have its own key
+                              backgroundColor: StreetPhareTheme.primary,
+                              foregroundColor: Colors.black,
+                              onPressed: _openReportSheet,
+                            ),
+                            const SizedBox(height: 12),
+                            _ActionFab(
+                              icon: Icons.shield_outlined,
+                              label: s.routeTitle,
+                              backgroundColor: StreetPhareTheme.surface,
+                              foregroundColor: StreetPhareTheme.primary,
+                              borderColor: StreetPhareTheme.primary,
+                              onPressed: () => _triggerRouteSafe(),
+                            ),
+                            const SizedBox(height: 12),
+                            _ActionFab(
+                              icon: Icons.forum_outlined,
+                              label: s.messagingTitle,
+                              backgroundColor: StreetPhareTheme.surface,
+                              foregroundColor: StreetPhareTheme.primary,
+                              borderColor: StreetPhareTheme.primary,
+                              onPressed: _openMessaging,
+                            ),
+                            const SizedBox(height: 12),
+                            _ActionFab(
+                              icon: Icons.emergency,
+                              label: s.panicButton,
+                              backgroundColor: StreetPhareTheme.danger,
+                              foregroundColor: Colors.white,
+                              isExtended: true,
+                              onPressed: _triggerPanic,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // ── [DEBUG] Bouton de débogage ────
+                      if (kDebugMode)
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: SafeArea(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 64, right: 12),
+                              child: _DebugButton(
+                                userPosition: _userPosition,
+                                safeRoutePoints: _safeRoutePoints,
+                                mapReady: _mapReady,
+                                isTracking: _isTracking,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // ── Bandeau d'isolement critique ──────────────────────────
+                      _ConnectivityBanner(strings: s),
+                    ],
+                  ), // Stack
+                ), // SafeArea
+              );
+              },
             );
-          },
+          }
         );
-      },
+      }
     );
   }
 }
@@ -1818,8 +1843,9 @@ class _MapScreenState extends State<MapScreen> {
 // ============================================================================
 
 class _DestinationSelectorSheet extends StatelessWidget {
-  const _DestinationSelectorSheet({required this.events});
+  const _DestinationSelectorSheet({required this.events, required this.strings});
   final List<EventModel> events;
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -1850,14 +1876,14 @@ class _DestinationSelectorSheet extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.my_location,
+                    const Icon(Icons.my_location,
                         color: StreetPhareTheme.primary, size: 22),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Text(
-                      'Objectif de la Route Safe',
-                      style: TextStyle(
+                      strings.mapDestinationObjective,
+                      style: const TextStyle(
                         color: StreetPhareTheme.textPrimary,
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
@@ -1866,9 +1892,9 @@ class _DestinationSelectorSheet extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Appui long 3 s sur la carte → "Point utilisateur"',
-                  style: TextStyle(
+                Text(
+                  strings.mapDestinationLongPressHint,
+                  style: const TextStyle(
                     color: StreetPhareTheme.textSecondary,
                     fontSize: 12,
                   ),
@@ -1908,9 +1934,9 @@ class _DestinationSelectorSheet extends StatelessWidget {
                 ),
                 if (events.length > 1) ...[
                   const Divider(height: 20),
-                  const Text(
-                    'Événement actif',
-                    style: TextStyle(
+                  Text(
+                    strings.mapActiveEvent,
+                    style: const TextStyle(
                       color: StreetPhareTheme.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -1951,7 +1977,7 @@ class _DestinationSelectorSheet extends StatelessWidget {
                   width: double.infinity,
                   child: TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Fermer'),
+                    child: Text(strings.close),
                   ),
                 ),
               ],
@@ -2064,6 +2090,7 @@ class _PeerCounterBadge extends StatelessWidget {
   const _PeerCounterBadge();
   @override
   Widget build(BuildContext context) {
+    final s = AppLocale.instance.strings;
     return ValueListenableBuilder<int>(
       valueListenable: PeerCounterService.instance,
       builder: (context, count, _) {
@@ -2092,7 +2119,7 @@ class _PeerCounterBadge extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                'Appareils proches : $count',
+                '${s.mapPeersNearby} : $count',
                 style: TextStyle(
                   color: isActive
                       ? StreetPhareTheme.textPrimary
@@ -2234,8 +2261,7 @@ class _AboutRow extends StatelessWidget {
 }
 
 // ============================================================================
-// [DEBUG] Bouton et panneau de débogage — PREMIER PLAN ABSOLU
-// Visible uniquement en kDebugMode.
+// [DEBUG] Bouton et panneau de débogage 
 // ============================================================================
 
 class _DebugButton extends StatelessWidget {
@@ -2310,6 +2336,7 @@ class _DebugOverlaySheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppLocale.instance.strings;
     final now = DateTime.now();
     final ts =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
@@ -2463,7 +2490,7 @@ class _DebugOverlaySheet extends StatelessWidget {
                       backgroundColor: Colors.redAccent,
                     ),
                     icon: const Icon(Icons.close, size: 16),
-                    label: const Text('Fermer'),
+                    label: Text(s.close),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ),
@@ -2511,7 +2538,8 @@ class _DebugOverlaySheet extends StatelessWidget {
 // ============================================================================
 
 class _ConnectivityBanner extends StatelessWidget {
-  const _ConnectivityBanner();
+  const _ConnectivityBanner({required this.strings});
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -2536,24 +2564,23 @@ class _ConnectivityBanner extends StatelessWidget {
                 children: [
                   const Icon(Icons.wifi_off, color: Colors.white, size: 24),
                   const SizedBox(width: 16),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Réseau StreetPhare indisponible',
-                          style: TextStyle(
+                          strings.mapIsolatedTitle,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
-                          'L\'application ne peut pas fonctionner pour le moment '
-                          'faute de connexion serveur ou de pairs (Hive) à proximité.',
-                          style: TextStyle(
+                          strings.mapIsolatedMessage,
+                          style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 12,
                           ),

@@ -1,15 +1,7 @@
-// android.builtInKotlin=false (gradle.properties) → le Flutter Gradle Plugin
-// N'applique PAS automatiquement KGP. On doit le déclarer ici explicitement.
-//
-// NOTE : la migration vers builtInKotlin=true est bloquée par
-// flutter_local_notifications 22.0.0 (et d'autres plugins) qui appliquent
-// encore 'kotlin-android' dans leur propre build.gradle.
-// Cf. commentaire dans gradle.properties pour la procédure de migration.
+// Built-in Kotlin is enabled (AGP 9.0+)
+// Ref: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin
 plugins {
     id("com.android.application")
-    // KGP déclaré explicitement car builtInKotlin=false (voir gradle.properties).
-    // Version épinglée globalement dans settings.gradle.kts (2.4.0 apply false)
-    // → tous les sous-projets utilisent la même version KGP.
     id("org.jetbrains.kotlin.android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin plugins.
     id("dev.flutter.flutter-gradle-plugin")

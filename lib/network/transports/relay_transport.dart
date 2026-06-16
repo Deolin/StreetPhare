@@ -55,7 +55,10 @@ class RelayMeshTransport implements MeshTransport {
   Stream<String> get incoming => _incomingController.stream;
 
   @override
-  bool get isAvailable => true; // dépend d'Internet, géré en interne
+  bool get isAvailable {
+    // dépend d'Internet, géré en interne
+    return true;
+  }
 
   @override
   Future<void> start() async {

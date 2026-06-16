@@ -22,10 +22,10 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../database/crypto_utils.dart';
 import '../debug/client_debug_logger.dart';
@@ -154,7 +154,7 @@ class FailoverManager {
   Timer? _heartbeatTimer;
 
   /// Réutilise un client HTTP unique pour les heartbeats et pings.
-  final HttpClient _httpClient = HttpClient();
+  final http.Client _httpClient = http.Client();
 
   final _activeServerController = StreamController<ServerEndpoint>.broadcast();
   Stream<ServerEndpoint> get activeServer => _activeServerController.stream;
@@ -329,11 +329,9 @@ class FailoverManager {
   Future<bool> _ping(String address) async {
     try {
       final uri = Uri.parse('$address/healthz');
-      _httpClient.connectionTimeout = _config!.pingTimeout;
-      final req = await _httpClient.getUrl(uri);
-      req.headers.add('X-StreetPhare-Heartbeat', '1');
-      final resp = await req.close().timeout(_config!.pingTimeout);
-      await resp.drain<void>();
+      final resp = await _httpClient.get(uri, headers: {
+        'X-StreetPhare-Heartbeat': '1',
+      }).timeout(_config!.pingTimeout);
       return resp.statusCode >= 200 && resp.statusCode < 300;
     } catch (_) {
       return false;
@@ -362,17 +360,17 @@ class FailoverManager {
 
     try {
       final uri = Uri.parse('${_current!.address}/v1/alerts/sync');
-      _httpClient.connectionTimeout = _config!.pingTimeout;
-      final req = await _httpClient.postUrl(uri);
-      req.headers.set('Content-Type', 'application/json');
-      req.add(utf8.encode(jsonEncode({'alerts': alerts})));
-      final resp = await req.close().timeout(_config!.pingTimeout);
-      final body = await resp.transform(utf8.decoder).join();
+      final resp = await _httpClient.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'alerts': alerts}),
+      ).timeout(_config!.pingTimeout);
+
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         // Tente d'extraire un nouveau backup que le serveur nous
         // communiquerait (rotation auto-entretenue).
         try {
-          final parsed = jsonDecode(body) as Map<String, dynamic>;
+          final parsed = jsonDecode(resp.body) as Map<String, dynamic>;
           final next = SyncResponse.fromJson(parsed);
           if (next.nextBackupCipher.isNotEmpty) {
             await _enqueueNextBackup(next.nextBackupCipher);

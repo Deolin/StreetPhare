@@ -48,13 +48,13 @@ echo ============================================
 echo.
 
 REM Ouvre le serveur principal dans une nouvelle fenetre
-start "StreetPhare-PRIMARY-3000" cmd /k "set PORT=3000&& set ROLE=primary&& set NEXT_BACKUP_URL=http://localhost:3001&& node server_primary.js"
+start "StreetPhare-PRIMARY-3000" cmd /k "set PORT=3000&& set ROLE=primary&& set NEXT_BACKUP_URL=http://localhost:3001&& node server_primary_v2.js"
 
 REM Petite pause pour eviter une collision de logs
 timeout /t 1 /nobreak >nul
 
 REM Ouvre le serveur secondaire dans une nouvelle fenetre
-start "StreetPhare-SECONDARY-3001" cmd /k "set PORT=3001&& set ROLE=secondary&& set NEXT_BACKUP_URL=http://localhost:3002&& node server_secondary.js"
+start "StreetPhare-SECONDARY-3001" cmd /k "set PORT=3001&& set ROLE=secondary&& set NEXT_BACKUP_URL=http://localhost:3002&& node server_secondary_v2.js"
 
 echo [OK] Les deux serveurs sont lances.
 echo     Vous pouvez maintenant lancer l'app Flutter en mode debug.

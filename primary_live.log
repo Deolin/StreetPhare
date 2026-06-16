@@ -1,21 +1,100 @@
-[2026-06-12T20:11:46.989Z][primary:3000] ✅ SERVEUR PRINCIPAL v2 démarré sur http://localhost:3000
-[2026-06-12T20:11:46.991Z][primary:3000]    WebSocket relay : ws://localhost:3000/mesh
-[2026-06-12T20:11:46.991Z][primary:3000]    next_backup = http://localhost:3001 
-[2026-06-12T20:11:46.991Z][primary:3000]    Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz
-[2026-06-12T20:15:04.946Z][primary:3000] GET /v1/events — 3 événements
-[2026-06-12T20:15:06.443Z][primary:3000] backup-route demandé → http://localhost:3001  (chiffré)
-[2026-06-12T20:20:01.818Z][primary:3000] ✅ SERVEUR PRINCIPAL v2 démarré sur http://localhost:3000
-[2026-06-12T20:20:01.823Z][primary:3000]    WebSocket relay : ws://localhost:3000/mesh
-[2026-06-12T20:20:01.823Z][primary:3000]    next_backup = http://localhost:3001
-[2026-06-12T20:20:01.823Z][primary:3000]    Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz
-[2026-06-12T20:20:44.102Z][primary:3000] backup-route demandé → http://localhost:3001 (chiffré)
-[2026-06-12T20:33:21.843Z][primary:3000] [mesh] +client peerId=unknown total=1
-[2026-06-12T21:21:22.844Z][primary:3000] [mesh] -client peerId=unknown total=0
-[2026-06-12T21:24:41.612Z][primary:3000] [mesh] +client peerId=unknown total=1
-[2026-06-12T21:33:13.297Z][primary:3000] [mesh] -client peerId=unknown total=0
-[2026-06-12T23:34:22.814Z][primary:3000] [mesh] +client peerId=unknown total=1
-[2026-06-13T00:01:02.402Z][primary:3000] [mesh] -client peerId=unknown total=0
-[2026-06-13T00:01:14.846Z][primary:3000] [mesh] +client peerId=unknown total=1
-[2026-06-13T00:05:48.683Z][primary:3000] [mesh] -client peerId=unknown total=0
-[2026-06-13T00:08:04.032Z][primary:3000] [mesh] +client peerId=unknown total=1
-[2026-06-13T00:14:36.693Z][primary:3000] [mesh] -client peerId=unknown total=0
+[LiveMonitor] ✅ WebSocket attaché sur /_monitor
+[2026-06-15T22:38:18.973Z][primary:3000] ✅ SERVEUR PRINCIPAL v2 démarré sur http://localhost:3000
+[2026-06-15T22:38:18.975Z][primary:3000]    WebSocket relay : ws://localhost:3000/mesh
+[2026-06-15T22:38:18.975Z][primary:3000]    Moniteur temps réel : ws://localhost:3000/_monitor
+[2026-06-15T22:38:18.976Z][primary:3000]    next_backup = http://localhost:3001
+[2026-06-15T22:38:18.976Z][primary:3000]    Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz
+[2026-06-15T22:38:19.408Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:38:19.411Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:38:24.419Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:38:24.420Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:38:29.424Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:38:29.425Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:38:34.429Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:38:34.430Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:38:39.434Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:38:39.435Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:38:44.439Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:38:44.440Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:38:49.445Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:38:49.446Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:38:54.451Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:38:54.452Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:38:59.455Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:38:59.456Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:39:04.460Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:39:04.461Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:39:09.466Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:39:09.467Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:39:14.471Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:39:14.472Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:39:19.476Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:39:19.477Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:39:24.481Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:39:24.482Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:39:29.486Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:39:29.487Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:39:34.492Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:39:34.492Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:39:39.496Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:39:39.497Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:39:44.501Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:39:44.502Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:39:49.506Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:39:49.507Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:39:54.511Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:39:54.512Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:39:59.517Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:39:59.518Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:40:04.522Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:40:04.523Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:40:09.528Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:40:09.529Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:40:14.533Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:40:14.534Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:40:19.539Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:40:19.540Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:40:24.544Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:40:24.545Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:40:29.547Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:40:29.548Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:40:34.553Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:40:34.554Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:40:39.558Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:40:39.559Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:40:44.563Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:40:44.564Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:40:49.569Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:40:49.570Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:40:54.576Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:40:54.577Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:40:59.581Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:40:59.582Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:41:04.586Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:41:04.587Z][primary:3000] [mesh] -client peerId=unknown total=0
+[2026-06-15T22:41:09.592Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-15T22:41:09.592Z][primary:3000] [mesh] -client peerId=unknown total=0
+[LiveMonitor] ✅ WebSocket configuré en mode noServer
+[LiveMonitor] ✅ WebSocket configuré en mode noServer
+[LiveMonitor] ✅ WebSocket configuré en mode noServer
+[2026-06-16T10:49:24.584Z][primary:3000] ✅ SERVEUR PRINCIPAL v2 démarré sur http://localhost:3000
+[2026-06-16T10:49:24.586Z][primary:3000]    WebSocket relay : ws://localhost:3000/mesh
+[2026-06-16T10:49:24.586Z][primary:3000]    Moniteur temps réel : ws://localhost:3000/_monitor
+[2026-06-16T10:49:24.586Z][primary:3000]    next_backup = http://localhost:3001
+[2026-06-16T10:49:24.587Z][primary:3000]    Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz
+[LiveMonitor] +client ::1 (total: 1)
+[2026-06-16T10:51:50.994Z][primary:3000] [mesh] +client peerId=unknown total=1
+[2026-06-16T10:53:11.937Z][primary:3000] POST /v1/reports — type=barrage id=cli_1781607191882 votes=1 distributed=false
+[2026-06-16T10:53:25.579Z][primary:3000] POST /v1/reports — type=barrage id=cli_1781607205575 votes=1 distributed=false
+[2026-06-16T11:05:45.762Z][primary:3000] [mesh] +client peerId=unknown total=2
+[2026-06-16T11:09:49.013Z][primary:3000] POST /v1/reports — type=casseurs id=sim_1781608189011 votes=1 distributed=false
+[2026-06-16T11:14:43.328Z][primary:3000] [mesh] -client peerId=unknown total=1
+[2026-06-16T11:25:20.726Z][primary:3000] POST /v1/reports — type=barrage id=cli_1781609120723 votes=1 distributed=false
+[LiveMonitor] ✅ WebSocket configuré en mode noServer
+[2026-06-16T11:45:47.079Z][primary:3000] ✅ SERVEUR PRINCIPAL v2 démarré sur http://localhost:3000
+[2026-06-16T11:45:47.080Z][primary:3000]    WebSocket relay : ws://localhost:3000/mesh
+[2026-06-16T11:45:47.080Z][primary:3000]    Moniteur temps réel : ws://localhost:3000/_monitor
+[2026-06-16T11:45:47.080Z][primary:3000]    next_backup = http://localhost:3001
+[2026-06-16T11:45:47.080Z][primary:3000]    Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz
+[2026-06-16T11:45:47.553Z][primary:3000] [mesh] +client peerId=unknown total=1
+[LiveMonitor] +client ::1 (total: 1)

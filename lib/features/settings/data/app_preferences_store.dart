@@ -16,6 +16,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/i18n/app_locale.dart';
+
 // ============================================================================
 // Énumérations des préférences
 // ============================================================================
@@ -34,24 +36,26 @@ enum NotificationFilter {
 
 extension NotificationFilterExt on NotificationFilter {
   String get label {
+    final s = AppLocale.instance.strings;
     switch (this) {
       case NotificationFilter.all:
-        return 'Toutes les alertes';
+        return s.notificationFilterAllLabel;
       case NotificationFilter.nearbyDangersOnly:
-        return 'Dangers proches confirmés uniquement';
+        return s.notificationFilterNearbyLabel;
       case NotificationFilter.eventChangesOnly:
-        return 'Changements de points imminents';
+        return s.notificationFilterEventsLabel;
     }
   }
 
   String get description {
+    final s = AppLocale.instance.strings;
     switch (this) {
       case NotificationFilter.all:
-        return 'Notifie chaque micro-événement du réseau';
+        return s.notificationFilterAllDescription;
       case NotificationFilter.nearbyDangersOnly:
-        return 'Filtre : danger ≥3 votes détecté à moins de 100 m';
+        return s.notificationFilterNearbyDescription;
       case NotificationFilter.eventChangesOnly:
-        return 'Notifie si le prochain point est révélé dans <3 min';
+        return s.notificationFilterEventsDescription;
     }
   }
 }
@@ -68,32 +72,34 @@ enum RouteDestinationType {
 
 extension RouteDestinationTypeExt on RouteDestinationType {
   String get label {
+    final s = AppLocale.instance.strings;
     switch (this) {
       case RouteDestinationType.eventPoint:
-        return 'Suivre le point d\'événement actuel';
+        return s.routeDestEventPointLabel;
       case RouteDestinationType.safeZoneOrCareCenter:
-        return 'Vers la Zone Safe / Centre de soins le plus proche';
+        return s.routeDestSafeZoneLabel;
       case RouteDestinationType.careCenter:
-        return 'Centre de soins le plus proche';
+        return s.routeDestCareCenterLabel;
       case RouteDestinationType.exitPoint:
-        return 'Point de sortie le plus proche';
+        return s.routeDestExitPointLabel;
       case RouteDestinationType.userPoint:
-        return 'Point utilisateur';
+        return s.routeDestUserPointLabel;
     }
   }
 
   String get description {
+    final s = AppLocale.instance.strings;
     switch (this) {
       case RouteDestinationType.eventPoint:
-        return 'Destination par défaut de l\'événement actif';
+        return s.routeDestEventPointDescription;
       case RouteDestinationType.safeZoneOrCareCenter:
-        return '⭐ Priorité absolue : zone de sécurité ou médecin de rue le plus proche';
+        return s.routeDestSafeZoneDescription;
       case RouteDestinationType.careCenter:
-        return 'Street-medics ou secours de rue les plus proches';
+        return s.routeDestCareCenterDescription;
       case RouteDestinationType.exitPoint:
-        return 'Zone d\'évacuation définie dans le JSON de l\'événement';
+        return s.routeDestExitPointDescription;
       case RouteDestinationType.userPoint:
-        return 'Point personnalisé placé manuellement (appui long 3s)';
+        return s.routeDestUserPointDescription;
     }
   }
 }
@@ -115,28 +121,30 @@ enum MessageFilter {
 
 extension MessageFilterExt on MessageFilter {
   String get label {
+    final s = AppLocale.instance.strings;
     switch (this) {
       case MessageFilter.all:
-        return 'Tous les messages';
+        return s.messageFilterAllLabel;
       case MessageFilter.nearbyOnly:
-        return 'Messages proches uniquement';
+        return s.messageFilterNearbyLabel;
       case MessageFilter.adminOnly:
-        return 'Administrateurs de l\'événement';
+        return s.messageFilterAdminLabel;
       case MessageFilter.alertOnly:
-        return 'Messages d\'alerte uniquement';
+        return s.messageFilterAlertLabel;
     }
   }
 
   String get description {
+    final s = AppLocale.instance.strings;
     switch (this) {
       case MessageFilter.all:
-        return 'Reçoit tous les messages diffusés sur le réseau';
+        return s.messageFilterAllDescription;
       case MessageFilter.nearbyOnly:
-        return 'Messages émis dans un rayon de 300 m';
+        return s.messageFilterNearbyDescription;
       case MessageFilter.adminOnly:
-        return 'Messages signés par un administrateur de l\'événement';
+        return s.messageFilterAdminDescription;
       case MessageFilter.alertOnly:
-        return 'Uniquement les alertes critiques (type ALERT)';
+        return s.messageFilterAlertDescription;
     }
   }
 }

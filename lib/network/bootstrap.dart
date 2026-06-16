@@ -13,7 +13,6 @@
 // reste simple.
 
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -25,7 +24,14 @@ import 'network_config.dart';
 import 'p2p_mesh_service.dart';
 import 'transports/ble_transport.dart';
 import 'transports/relay_transport.dart';
-import 'transports/wifi_direct_transport.dart';
+import 'transports/wifi_direct_transport_selector.dart';
+
+// Note: Platform access is safe because it's only called when !kIsWeb
+// in describePlatform and buildNetworkBootstrap.
+// However, on Web, dart:io is unavailable.
+// We use conditional imports if necessary, but here we just ensure
+// we don't call dart:io on Web.
+import 'dart:io' as io;
 
 /// Contient la configuration et les services construits.
 class NetworkBootstrap {
@@ -100,7 +106,7 @@ Future<NetworkBootstrap> buildNetworkBootstrap({
   // Les transports Wi-Fi Multicast et WebSocket Relay prennent le relais
   // normalement sur ces plateformes desktop.
   final bleSupported = kIsWeb ||
-      (!kIsWeb && !Platform.isWindows && !Platform.isLinux);
+      (!kIsWeb && !io.Platform.isWindows && !io.Platform.isLinux);
   if (bleSupported) {
     transports.add(BleMeshTransport(peerId: sharedPeerId));
   }
@@ -187,7 +193,7 @@ List<String> deserializeBackupChain(String raw) {
 String describePlatform() {
   if (kIsWeb) return 'web';
   try {
-    return Platform.operatingSystem;
+    return io.Platform.operatingSystem;
   } catch (_) {
     return 'unknown';
   }

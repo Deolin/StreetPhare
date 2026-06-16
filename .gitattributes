@@ -1,2 +1,38 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Normalisation des fins de ligne — tout le projet en LF (standard Flutter/Dart)
+* text=auto eol=lf
+
+# Fichiers Dart
+*.dart text eol=lf
+
+# Fichiers Kotlin / Java (Android)
+*.kt text eol=lf
+*.java text eol=lf
+
+# Fichiers Gradle / Maven
+*.gradle text eol=lf
+*.kts text eol=lf
+*.properties text eol=lf
+*.xml text eol=lf
+
+# YAML / JSON / Config
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+
+# Scripts shell
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Makefile
+Makefile text eol=lf
+
+# Fichiers C/C++ (Linux, Android NDK)
+*.c text eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+
+# Markdown, licence, documentation
+*.md text eol=lf
+LICENSE text eol=lf
+README text eol=lf

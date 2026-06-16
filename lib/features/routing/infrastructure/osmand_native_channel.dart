@@ -12,7 +12,7 @@
 //   2. HTTP GraphHopper local (192.168.31.18:8080) — si moteur non prêt
 //   3. OSRM public (internet) — fallback ultime
 
-import 'dart:io';
+import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -50,7 +50,7 @@ class OsmAndNativeChannel {
   // ── Platform guard ───────────────────────────────────────────────────────
 
   /// Retourne true si le canal natif est disponible (Android seulement).
-  bool get isSupported => !kIsWeb && Platform.isAndroid;
+  bool get isSupported => !kIsWeb && io.Platform.isAndroid;
 
   // ── Vérification de l'état du moteur ─────────────────────────────────────
 

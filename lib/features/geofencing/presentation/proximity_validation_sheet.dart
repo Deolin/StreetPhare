@@ -148,12 +148,12 @@ class ProximityValidationSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             // Question principale — formulation exacte requise
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
               child: Text(
                 'La zone est-elle toujours sans danger ou le danger est-il toujours là ?',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   color: StreetPhareTheme.textPrimary,
                   fontSize: 17,
                   fontWeight: FontWeight.w600,

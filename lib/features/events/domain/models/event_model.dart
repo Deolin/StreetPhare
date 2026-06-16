@@ -486,11 +486,15 @@ class EventModel {
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
     return EventModel(
-      code: json['code'] as String,
-      title: json['title'] as String,
-      startAt: DateTime.parse(json['startAt'] as String).toUtc(),
-      visibleAt: DateTime.parse(json['visibleAt'] as String).toUtc(),
-      routeGeoJson: json['route'] as String,
+      code: (json['code'] as String?) ?? '',
+      title: (json['title'] as String?) ?? 'Événement sans nom',
+      startAt: json['startAt'] != null
+          ? DateTime.parse(json['startAt'] as String).toUtc()
+          : DateTime.now().toUtc(),
+      visibleAt: json['visibleAt'] != null
+          ? DateTime.parse(json['visibleAt'] as String).toUtc()
+          : DateTime.now().toUtc(),
+      routeGeoJson: (json['route'] as String?) ?? '[]',
       waypoints: ((json['waypoints'] as List?) ?? const [])
           .map((w) =>
               EventWaypoint.fromJson(w as Map<String, dynamic>))

@@ -12,7 +12,27 @@
 
   "version": "0.2.0",
   "configurations": [
-
+    {
+      "name": "StreetPhare App (Debug - Test Env)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "--dart-define=ENVIRONMENT=test",
+        "--dart-define=USE_MOCK_SERVER=true"
+      ],
+      "preLaunchTask": "Démarrer Serveur Test (Node)"
+    },
+ // ── 1. Flutter — Client Androidemulateur ──────────────────────────────────────────
+    {
+      "name": "Flutter — AndroidEmulator (debug)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "flutterMode": "debug",
+      "deviceId": "emulator-5554",
+      "args": ["--dart-define=ENV=debug"]
+    },
     // ── 1. Flutter — Client Android ──────────────────────────────────────────
     {
       "name": "Flutter — Android (debug)",
@@ -20,7 +40,7 @@
       "type": "dart",
       "program": "lib/main.dart",
       "flutterMode": "debug",
-      "deviceId": "android",
+      "deviceId": "d2e1c7df0841e3c",
       "args": ["--dart-define=ENV=debug"]
     },
 
@@ -89,7 +109,7 @@
       "name": "Node — Admin Dashboard (4000)",
       "request": "launch",
       "type": "node",
-      "program": "${workspaceFolder}/test_servers/admin_dashboard.js",
+      "program": "${workspaceFolder}/test_servers/admin_dashboard_.js",
       "cwd": "${workspaceFolder}/test_servers",
       "env": {
         "ADMIN_PORT": "4000",
@@ -106,19 +126,10 @@
     // ── Full Stack : Flutter + Serveur Principal + Backup + Admin ─────────────
     // Lance les 4 processus en parallèle avec un seul F5.
     {
-      "name": "StreetPhare — Full Stack (Android)",
+      "name": "🚀 TOUT LANCER (Serveur + Flutter)",
       "configurations": [
-        "Flutter — Android (debug)",
-        "Node — Serveur Principal (3000)",
-        "Node — Serveur Backup (3001)",
-        "Node — Admin Dashboard (4000)"
-      ],
-      "stopAll": true,
-      "presentation": {
-        "hidden": false,
-        "group": "streetphare",
-        "order": 1
-      }
+        "StreetPhare App (Debug - Test Env)"
+      ]
     },
 
     // ── Full Stack : Flutter Web + Serveurs ───────────────────────────────────

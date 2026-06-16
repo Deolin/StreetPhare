@@ -1,6 +1,17 @@
 {
   "kickedUsers": {},
-  "bugReports": [],
+  "bugReports": [
+    {
+      "title": "dsfdsf",
+      "description": "dfdsfdffdsfdsfdsfdfdsfdsfdsfds",
+      "platform": "windows",
+      "app_version": "1.2.0",
+      "category": "bug",
+      "extra_logs": null,
+      "submitted_at": "2026-06-15T23:00:08.887420Z",
+      "receivedAt": "2026-06-15T23:00:08.943Z"
+    }
+  ],
   "broadcastLog": [
     {
       "type": "broadcast",
@@ -25,6 +36,66 @@
       "title": "jjhjh",
       "message": ",h,hh",
       "sentAt": "2026-06-12T23:37:27.776Z"
+    },
+    {
+      "type": "broadcast",
+      "title": "sdfdsf",
+      "message": "dsfdfsf",
+      "sentAt": "2026-06-15T22:27:18.486Z"
+    },
+    {
+      "type": "broadcast",
+      "title": "sdfdsf",
+      "message": "dsfdfsf",
+      "sentAt": "2026-06-15T22:27:29.239Z"
+    },
+    {
+      "type": "broadcast",
+      "title": "sdfdsf",
+      "message": "dsfdfsf",
+      "sentAt": "2026-06-15T22:27:33.134Z"
+    },
+    {
+      "type": "broadcast",
+      "title": "sdfdsfcvxxv",
+      "message": "dsfdfsfvcxv",
+      "sentAt": "2026-06-15T22:27:37.092Z"
+    },
+    {
+      "type": "broadcast",
+      "title": "rtretretrt",
+      "message": "rgfgfdggfdg",
+      "sentAt": "2026-06-15T22:30:05.708Z"
+    },
+    {
+      "type": "broadcast",
+      "title": "cxvcxv",
+      "message": "cvxvcxvc",
+      "sentAt": "2026-06-15T22:59:39.981Z"
+    },
+    {
+      "type": "broadcast",
+      "title": "cxvcxv",
+      "message": "cvxvcxvc",
+      "sentAt": "2026-06-15T23:00:30.749Z"
+    },
+    {
+      "type": "broadcast",
+      "title": "cxvcxv",
+      "message": "cvxvcxvc",
+      "sentAt": "2026-06-15T23:25:31.232Z"
+    },
+    {
+      "type": "broadcast",
+      "title": "cxvcxv",
+      "message": "cvxvcxvc",
+      "sentAt": "2026-06-15T23:25:34.124Z"
+    },
+    {
+      "type": "broadcast",
+      "title": "Coucou",
+      "message": "C'est moi",
+      "sentAt": "2026-06-16T11:38:42.576Z"
     }
   ]
 }

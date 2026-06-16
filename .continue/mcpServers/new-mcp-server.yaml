@@ -1,0 +1,66 @@
+name: Local Config
+version: 1.0.0
+schema: v1
+mcpServers:
+  - name: filesystem
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-filesystem"
+      - "/Users/admin/.continue/index"
+  - name: github
+    command: npx
+    args:
+      - -y
+      - "@modelcontextprotocol/server-github"
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: <Git-hub-token>
+context:
+  - provider: file
+  - provider: codebase  # Optional: Adds @codebase for repository-wide search
+  - provider: diff      # Optional: Adds @diff for git changes
+models:
+  - name: Llama 3.1 8B
+    provider: ollama
+    model: llama3.1:8b
+    roles:
+      - chat
+      - edit
+      - apply
+  - name: Qwen2.5-Coder 1.5B
+    provider: ollama
+    model: qwen2.5-coder:1.5b-base
+    roles:
+      - autocomplete
+  - name: Nomic Embed
+    provider: ollama
+    model: nomic-embed-text:latest
+    roles:
+      - embed
+  - name: DeepSeek-R1 1.5B
+    provider: ollama
+    model: deepseek-r1:1.5b
+    description: Primary reasoning and logic (Fits in 4GB VRAM)
+    roles:
+      - chat
+      - edit
+  - name: Qwen2.5-Coder 1.5B
+    provider: ollama
+    model: qwen2.5-coder:1.5b
+    roles:
+      - autocomplete
+      - apply
+  - name: Llama 3.1 8B
+    provider: ollama
+    model: llama3.1:8b
+    description: High quality but slow on 4GB VRAM (Uses System RAM)
+    roles:
+      - chat
+  - name: Nomic Embed
+    provider: ollama
+    model: nomic-embed-text:latest
+    roles:
+      - embed
+  - name: Autodetect
+    provider: ollama
+    model: AUTODETECT

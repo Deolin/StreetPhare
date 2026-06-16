@@ -30,7 +30,7 @@
 
 import 'dart:async';
 import 'dart:collection';
-import 'dart:io';
+import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
 
@@ -84,7 +84,7 @@ class ClientDebugLogger {
 
   String _platform = 'unknown';
 
-  Directory? _outputDir;
+  io.Directory? _outputDir;
   bool _fileWriteEnabled = true;
 
   Future<void> _writeQueue = Future.value();
@@ -100,14 +100,14 @@ class ClientDebugLogger {
     if (!kDebugMode) return;
 
     try {
-      _platform = Platform.operatingSystem;
+      _platform = kIsWeb ? 'web' : io.Platform.operatingSystem;
     } catch (_) {
       _platform = 'web-or-unknown';
     }
 
     if (_outputDir == null && _isDesktopPlatform(_platform)) {
       try {
-        _outputDir = Directory.current;
+        _outputDir = io.Directory.current;
       } catch (_) {
         _outputDir = null;
       }
@@ -127,7 +127,7 @@ class ClientDebugLogger {
   }
 
   /// Force un répertoire de sortie (à appeler AVANT init()).
-  void setOutputDirectory(Directory dir) {
+  void setOutputDirectory(io.Directory dir) {
     _outputDir = dir;
   }
 
@@ -327,18 +327,18 @@ class ClientDebugLogger {
   }
 
   Future<void> _writeNow() async {
-    if (!_fileWriteEnabled || _outputDir == null) return;
+    if (!_fileWriteEnabled || _outputDir == null || kIsWeb) return;
     final body = _render();
-    final f = File(
-      '${_outputDir!.path}${Platform.pathSeparator}CLIENT_DEBUG.md',
+    final f = io.File(
+      '${_outputDir!.path}${io.Platform.pathSeparator}CLIENT_DEBUG.md',
     );
-    final tmp = File('${f.path}.tmp');
+    final tmp = io.File('${f.path}.tmp');
     try {
       await tmp.writeAsString(body, flush: true);
       await tmp.rename(f.path);
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[ClientDebugLogger] rename/write échoué: $e');
+        debugPrint('[ClientDebugLogger] rename/write échouée: $e');
       }
     }
   }
