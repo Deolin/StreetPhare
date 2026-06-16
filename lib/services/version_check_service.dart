@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../network/network_config.dart';
@@ -20,14 +21,39 @@ class VersionCheckService {
   VersionCheckService._();
   static final VersionCheckService instance = VersionCheckService._();
 
-  /// Version actuelle de l'application (fixée manuellement par rapport au pubspec.yaml).
-  /// TODO : Utiliser package_info_plus pour automatiser cela.
-  static const String currentVersion = '1.2.0';
+  /// Version et build number lus depuis le package natif au démarrage.
+  String _version = '';
+  String _buildNumber = '';
+
+  /// Version actuelle de l'application (format X.Y.Z).
+  String get currentVersion => _version;
+
+  /// Numéro de build (provenant de pubspec.yaml ou du build natif).
+  String get buildNumber => _buildNumber;
+
+  bool _isInitialized = false;
+  bool get isInitialized => _isInitialized;
 
   bool _isObsolete = false;
   bool get isObsolete => _isObsolete;
 
   String _updateUrl = 'https://streetphare.org/download';
+
+  /// Charge la version et le build number depuis [PackageInfo.fromPlatform].
+  /// Doit être appelé une fois au démarrage, avant tout appel à [checkVersion].
+  Future<void> init() async {
+    if (_isInitialized) return;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      _version = info.version;
+      _buildNumber = info.buildNumber;
+      _isInitialized = true;
+      debugPrint('[VersionCheck] version=$_version build=$_buildNumber');
+    } catch (e) {
+      debugPrint('[VersionCheck] Échec lecture PackageInfo : $e');
+      // Fallback : on garde les chaînes vides, le checkVersion ignorera.
+    }
+  }
 
   /// Vérifie la version auprès du serveur principal.
   Future<void> checkVersion(BuildContext context) async {

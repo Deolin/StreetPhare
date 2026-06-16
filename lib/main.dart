@@ -29,6 +29,7 @@ import 'network/network_config.dart';
 import 'network/network_coordinator.dart';
 import 'services/connectivity_service.dart';
 import 'services/notification_service.dart';
+import 'services/version_check_service.dart';
 import 'core/network/url_strategy_noop.dart'
     if (dart.library.js_util) 'package:flutter_streetphare/core/network/url_strategy_web.dart';
 
@@ -57,6 +58,7 @@ void main() async {
   await Future.wait([
     ClientDebugLogger.instance.init(),
     NotificationService.instance.init(),
+    VersionCheckService.instance.init(),
     AppLocale.instance.load(),
     ThemeController.instance.load(),
     PanicContactStore.instance.load(),
