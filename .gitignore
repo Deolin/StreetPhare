@@ -4,20 +4,6 @@ SERVER_STATUS_3000.md
 SERVER_STATUS_3001.md
 CLIENT_DEBUG.md
 
-# Logs serveur
-primary_live.log
-primary_live_err.log
-secondary_live.log
-secondary_live_err.log
-admin_live.log
-admin_live_err.log
-
-# Fichiers admin persistants
-test_servers/admin_data.json
-test_servers/events_admin.json
-test_servers/logs/
-test_servers/.server-pids.json
-
 node_modules
 
 # Fichiers de build et outils Flutter/Dart
@@ -26,3 +12,38 @@ node_modules
 build/
 .flutter-plugins
 .flutter-plugins-dependencies
+
+# ==========================================
+# LOGS & DEBUGGING TEMPORARY FILES
+# ==========================================
+
+# Fichiers de log génériques et spécifiques
+*.log
+*.log.[0-9]
+*.err
+*.out
+
+# Traces du ClientDebugLogger & Crash dumps
+/logs/
+/debug_logs/
+*.stackdump
+crash_report.*
+
+# Répertoire de logs des serveurs de test
+test_servers/logs/
+test_servers/.server-pids.json
+test_servers/admin_data.json
+test_servers/events_admin.json
+
+# Fichiers de cache de développement et d'IDE (VS Code / Android Studio)
+.analytics
+.history/
+.vscode/*
+!.vscode/extensions.json
+.idea/caches/
+.idea/modules.xml
+.idea/workspace.xml
+
+# Fichiers temporaires système et OS
+.DS_Store
+Thumbs.db
