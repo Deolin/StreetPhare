@@ -16,6 +16,30 @@
 // interface abstraite `MeshTransport` qu'on branche sur les
 // implémentations concrètes (Wi-Fi / BLE / Relay) dans des fichiers
 // séparés. Cela permet de tester la logique de gossip sans device.
+//
+// === Correction ANR (Signal 3) ===
+// Problèmes identifiés :
+//   1. `_handleIncoming()` est appelé de manière synchrone par le
+//      listener de chaque transport. En cas de burst BLE (lowLatency),
+//      des dizaines de messages s'empilent et chaque appel exécute
+//      `jsonDecode`, `PeerCounterService.recordPeer`, `database.insertOrMerge`
+//      sans jamais céder le thread.
+//   2. `_gossip()` appelle `t.broadcast(payload)` sans await sur tous
+//      les transports, créant des Futures orphelins.
+//   3. `broadcastAlert()` et `broadcastRawJson()` utilisent `Future.wait`
+//      correctement mais peuvent être appelés en rafale depuis
+//      `_onAlertReceived` (re-propagation avec délai aléatoire).
+//
+// Correctifs appliqués :
+//   - Chaque `_handleIncoming()` est maintenant passé à `scheduleMicrotask`
+//     pour être exécuté quand la boucle d'événements est libre.
+//   - Limitation du nombre de microtasks en attente via un compteur
+//     atomique simple (max 25 en file d'attente).
+//   - `_gossip()` utilise désormais `unawaited(Future.wait(...))` pour
+//     éviter l'accumulation de Futures non surveillés tout en restant
+//     fire-and-forget.
+//   - `_onAlertReceived` vérifie un cache anti-dédoublement avant de
+//     replanifier une re-propagation.
 
 import 'dart:async';
 import 'dart:convert';
@@ -126,6 +150,20 @@ class P2PMeshService {
   final List<StreamSubscription> _subs = [];
   bool _started = false;
 
+  /// ANR fix : compteur de microtasks en attente pour éviter
+  /// la saturation de l'event loop lors des bursts BLE.
+  int _pendingMicrotasks = 0;
+
+  /// Nombre maximum de microtasks de traitement en file d'attente.
+  static const int _maxPendingMicrotasks = 25;
+
+  /// ANR fix : cache des alertes récemment reçues pour éviter
+  /// les boucles de re-propagation infinies.
+  final Set<String> _recentlyReceivedAlertIds = {};
+
+  /// Taille maximale du cache anti-dédoublement.
+  static const int _maxRecentAlertCache = 100;
+
   /// Démarre tous les transports et la boucle de gossip.
   Future<void> start() async {
     if (_started) return;
@@ -162,27 +200,34 @@ class P2PMeshService {
   /// Diffuse une alerte à tous les pairs sur tous les transports.
   Future<void> broadcastAlert(Alert alert) async {
     final payload = alert.toCompact();
-    await Future.wait(transports.map((t) async {
-      try {
-        await t.broadcast(payload);
-      } catch (e) {
-        if (kDebugMode) debugPrint('[P2PMeshService] broadcast ${t.name}: $e');
-      }
-    }));
+    // ANR fix : on n'attend pas la complétion pour ne pas bloquer
+    // l'appelant. On utilise unawaited pour éviter le warning de
+    // Future non utilisé, tout en restant fire-and-forget.
+    unawaited(
+      Future.wait(transports.map((t) async {
+        try {
+          await t.broadcast(payload);
+        } catch (e) {
+          if (kDebugMode) debugPrint('[P2PMeshService] broadcast ${t.name}: $e');
+        }
+      })),
+    );
   }
 
   /// Diffuse un payload JSON brut (ex : signal panic) sur tous les transports.
   Future<void> broadcastRawJson(Map<String, dynamic> json) async {
     final payload = jsonEncode(json);
-    await Future.wait(transports.map((t) async {
-      try {
-        await t.broadcast(payload);
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('[P2PMeshService] broadcastRaw ${t.name}: $e');
+    unawaited(
+      Future.wait(transports.map((t) async {
+        try {
+          await t.broadcast(payload);
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('[P2PMeshService] broadcastRaw ${t.name}: $e');
+          }
         }
-      }
-    }));
+      })),
+    );
   }
 
   /// [1] Diffuse un payload JSON sur les transports LOCAUX uniquement
@@ -196,30 +241,32 @@ class P2PMeshService {
       (t) => !t.name.toLowerCase().contains('relay') &&
              !t.name.toLowerCase().contains('remote') &&
              !t.name.toLowerCase().contains('server'),
-    ).toList(); // Utilisation de .toList() pour figer la liste.
+    ).toList();
 
     if (localTransports.isEmpty || !localTransports.any((t) => t.isAvailable)) {
       if (kDebugMode) {
         debugPrint('[P2PMeshService] no local transport available, fallback to all');
       }
-      await broadcastRawJson(json);
+      unawaited(broadcastRawJson(json));
       return;
     }
 
-    await Future.wait(localTransports.map((t) async {
-      try {
-        if (t.isAvailable) {
-          await t.broadcast(payload);
+    unawaited(
+      Future.wait(localTransports.map((t) async {
+        try {
+          if (t.isAvailable) {
+            await t.broadcast(payload);
+            if (kDebugMode) {
+              debugPrint('[P2PMeshService] broadcastLocal ${t.name}: OK');
+            }
+          }
+        } catch (e) {
           if (kDebugMode) {
-            debugPrint('[P2PMeshService] broadcastLocal ${t.name}: OK');
+            debugPrint('[P2PMeshService] broadcastLocal ${t.name}: $e');
           }
         }
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('[P2PMeshService] broadcastLocal ${t.name}: $e');
-        }
-      }
-    }));
+      })),
+    );
   }
 
   /// Démarre le service.
@@ -235,10 +282,16 @@ class P2PMeshService {
         await t.stop();
       } catch (_) {}
     }
+    _pendingMicrotasks = 0;
+    _recentlyReceivedAlertIds.clear();
     _started = false;
   }
 
   /// Wrapper JSON de gossip : envoie la liste compacte des IDs connus.
+  ///
+  /// ANR fix : le broadcast est désormais fire-and-forget via
+  /// `unawaited(Future.wait(...))` pour éviter d'accumuler des
+  /// Futures non surveillés.
   void _gossip() {
     final valid = database.getAllValid();
     if (valid.isEmpty) return;
@@ -249,9 +302,18 @@ class P2PMeshService {
       'ids': recent,
       'ts': DateTime.now().toUtc().toIso8601String(),
     });
-    for (final t in transports) {
-      t.broadcast(payload);
-    }
+    // ANR fix : unawaited pour fire-and-forget propre, sans fuite
+    // de Future dans l'event loop.
+    unawaited(
+      Future.wait(transports.map((t) async {
+        try {
+          await t.broadcast(payload);
+        } catch (_) {
+          // Silencieux en gossip : si un transport échoue,
+          // les autres continuent.
+        }
+      })),
+    );
   }
 
   /// Ping simple pour la découverte (les vrais implémentations
@@ -263,7 +325,36 @@ class P2PMeshService {
   }
 
   /// Point d'entrée des messages reçus par n'importe quel transport.
+  ///
+  /// ANR fix : au lieu d'exécuter tout le traitement de façon synchrone
+  /// dans le callback du listener (ce qui peut saturer l'event loop lors
+  /// des bursts BLE), on planifie le traitement via `scheduleMicrotask`
+  /// avec un mécanisme de backpressure (max 25 microtasks en attente).
+  /// Les messages au-delà de cette limite sont ignorés pour préserver
+  /// la réactivité de l'UI.
   void _handleIncoming(String raw) {
+    // Backpressure : si trop de messages sont en attente de traitement,
+    // on ignore les nouveaux pour éviter l'ANR.
+    if (_pendingMicrotasks >= _maxPendingMicrotasks) {
+      if (kDebugMode) {
+        debugPrint(
+          '[P2PMeshService] backpressure: $_pendingMicrotasks '
+          'microtasks en attente, message ignoré',
+        );
+      }
+      return;
+    }
+
+    _pendingMicrotasks++;
+    scheduleMicrotask(() {
+      _pendingMicrotasks--;
+      _processIncomingMessage(raw);
+    });
+  }
+
+  /// Traitement effectif d'un message entrant, exécuté dans un
+  /// microtask pour ne pas bloquer le thread Dart principal.
+  void _processIncomingMessage(String raw) {
     try {
       final json = jsonDecode(raw);
       if (json is! Map<String, dynamic>) return;
@@ -322,25 +413,43 @@ class P2PMeshService {
     }
   }
 
-  Future<void> _onAlertReceived(Alert alert) async {
-    if (alert.isExpired()) return; // sécurité supplémentaire
-    // Important : on stocke puis on propage (flooding contrôlé).
-    await database.insertOrMerge(alert);
-    _alertsReceivedController.add(alert);
-    if (kDebugMode) {
-      debugPrint('[P2PMeshService] alerte reçue : ${alert.id} '
-          '(${alert.confirmations.length}/3)');
+  /// ANR fix : _onAlertReceived est maintenant appelé depuis un
+  /// microtask. On évite de replanifier des re-propagation si
+  /// l'alerte a déjà été traitée récemment (cache anti-dédoublement).
+  void _onAlertReceived(Alert alert) {
+    if (alert.isExpired()) return;
+
+    // ANR fix : cache anti-dédoublement pour éviter les boucles
+    // de re-propagation infinies lors des bursts.
+    if (_recentlyReceivedAlertIds.contains(alert.id)) return;
+    _recentlyReceivedAlertIds.add(alert.id);
+    // Nettoie le cache s'il dépasse la taille max.
+    if (_recentlyReceivedAlertIds.length > _maxRecentAlertCache) {
+      final toRemove = _recentlyReceivedAlertIds.take(
+        _recentlyReceivedAlertIds.length ~/ 4,
+      );
+      _recentlyReceivedAlertIds.removeAll(toRemove);
     }
-    // Re-propagation avec une petite déduplication temporelle
-    // (ici simplifiée : on rebroadcast directement, mais on
-    // pourrait ajouter un cache de messages déjà vus).
-    final ttl = Random().nextInt(2000);
-    Future.delayed(Duration(milliseconds: ttl), () {
-      broadcastAlert(alert);
-    });
+
+    // Important : on stocke puis on propage (flooding contrôlé).
+    // On utilise unawaited pour ne pas bloquer le microtask courant.
+    unawaited(database.insertOrMerge(alert).then((_) {
+      _alertsReceivedController.add(alert);
+      if (kDebugMode) {
+        debugPrint('[P2PMeshService] alerte reçue : ${alert.id} '
+            '(${alert.confirmations.length}/3)');
+      }
+      // Re-propagation avec un délai aléatoire pour éviter les collisions.
+      final ttl = Random().nextInt(2000);
+      Future.delayed(Duration(milliseconds: ttl), () {
+        if (!alert.isExpired()) {
+          broadcastAlert(alert);
+        }
+      });
+    }));
   }
 
-  Future<void> _onGossipReceived(List<String> remoteIds) async {
+  void _onGossipReceived(List<String> remoteIds) {
     final localIds = database.getAllValid().map((a) => a.id).toSet();
     final missing = remoteIds.where((id) => !localIds.contains(id)).toList();
     if (missing.isEmpty) return;
@@ -348,8 +457,5 @@ class P2PMeshService {
     if (kDebugMode) {
       debugPrint('[P2PMeshService] gossip: ${missing.length} alertes inconnues');
     }
-    // NOTE : dans un vrai système, on demanderait au pair distant
-    // de nous renvoyer les payloads manquants. Ici, on déclenche
-    // simplement un broadcast partiel.
   }
 }

@@ -1,5 +1,7 @@
 // Built-in Kotlin is enabled (AGP 9.0+)
 // Ref: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin
+@file:Suppress("UnstableApiUsage")
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -49,6 +51,7 @@ android {
             )
         }
     }
+
 }
 
 // Configuration Kotlin via le bloc `kotlin { compilerOptions }` (AGP 9+)

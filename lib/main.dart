@@ -27,6 +27,7 @@ import 'features/tutorial/data/tutorial_store.dart';
 import 'network/bootstrap.dart';
 import 'network/network_config.dart';
 import 'network/network_coordinator.dart';
+import 'services/apk_backup_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/notification_service.dart';
 import 'services/version_check_service.dart';
@@ -52,7 +53,7 @@ void main() async {
     ),
   );
 
-  // === Chargement des préférences locales (thème + contacts PANIC
+  // === Étape 1 : Chargement des préférences locales (thème + contacts PANIC
   //     + filtres d'évitement Safe Path + flag premier démarrage tutoriel)
   // On parallélise le chargement des stores et l'initialisation des services de base.
   await Future.wait([
@@ -68,6 +69,12 @@ void main() async {
     StartScreenStore.instance.load(),
     orientationFuture,
   ]);
+
+  // === Étape 3 : Sauvegarde de l'APK source (premier lancement uniquement) ===
+  // Non-bloquant : s'exécute en arrière-plan sans retarder le démarrage.
+  // Copie l'APK installé vers le stockage Documents persistant pour
+  // la fonctionnalité de distribution P2P (partage sans Play Store).
+  unawaited(ApkBackupService.instance.init());
 
   if (kDebugMode) {
     debugPrint('[main] orientation verrouillée + logger client initialisé');

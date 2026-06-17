@@ -1,5 +1,13 @@
 {
   "dependencies": {
-    "ws": "^8.21.0"
+    "ws": "^8.18.0"
+  },
+  "scripts": {
+    "server": "npm --prefix test_servers run start",
+    "server:dev": "npm --prefix test_servers run dev:server",
+    "server:backup": "npm --prefix test_servers run dev:backup",
+    "dashboard": "npm --prefix test_servers run dev:dashboard",
+    "server:all": "npm --prefix test_servers run dev:all",
+    "sim": "npm --prefix test_servers run sim"
   }
 }

@@ -19,6 +19,13 @@
 // Le logger `ClientDebugLogger` (lib/debug/client_debug_logger.dart)
 // est notifié à chaque étape clé pour produire un fichier
 // `CLIENT_DEBUG.md` (cf. mode kDebugMode).
+//
+// === Correction ANR (Signal 3) ===
+// La boucle `_failover()` itère sur les standbys en appelant `_ping()`
+// séquentiellement, chaque ping ayant un timeout de 2s. Sans yield,
+// N standbys morts bloquent le thread Dart pendant N × 2s. On insère
+// désormais `await Future<void>.delayed(Duration.zero)` entre chaque
+// tentative pour céder la main à la boucle d'événements UI.
 
 import 'dart:async';
 import 'dart:convert';
@@ -268,6 +275,12 @@ class FailoverManager {
 
   /// Marque le serveur courant comme défaillant et bascule sur
   /// le premier standby disponible.
+  ///
+  /// ANR fix : chaque tentative de ping sur un standby est suivie
+  /// d'un `await Future<void>.delayed(Duration.zero)` pour céder
+  /// la main à la boucle d'événements UI. Sans cela, une séquence
+  /// de N standbys injoignables (chacun timeout 2s) bloquerait le
+  /// thread Dart principal pendant N × 2s, déclenchant un ANR.
   Future<void> _failover() async {
     if (_current == null) return;
     final dying = _current!.address;
@@ -283,8 +296,14 @@ class FailoverManager {
 
     while (_standbys.isNotEmpty) {
       final next = _standbys.removeAt(0);
-      if (_deadForSession.contains(next.address)) continue;
-      if (await _ping(next.address)) {
+      if (_deadForSession.contains(next.address)) {
+        // Yield l'event loop même pour les standbys déjà morts,
+        // pour ne jamais monopoliser le thread.
+        await Future<void>.delayed(Duration.zero);
+        continue;
+      }
+      final reachable = await _ping(next.address);
+      if (reachable) {
         _current = next.copyWith(
           status: ServerStatus.active,
           consecutiveFailures: 0,
@@ -310,6 +329,8 @@ class FailoverManager {
             'marqué défaillant',
           );
         }
+        // ANR fix : libère le thread Dart entre deux tentatives.
+        await Future<void>.delayed(Duration.zero);
       }
     }
 

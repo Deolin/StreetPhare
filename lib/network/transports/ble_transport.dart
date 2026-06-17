@@ -24,6 +24,18 @@
 // ainsi dédupliquer les signaux d'un même émetteur, même si celui-ci
 // émet en boucle. C'est la **clé du contrat anti-double-comptage**
 // du compteur HIVE.
+//
+// === Correction ANR (Signal 3) ===
+//
+// Les rafales d'émissions/réceptions BLE peuvent saturer la boucle
+// d'événements Dart (thread UI). Pour éviter les ANR :
+//   - Le callback de scan est désormais « throttlé » : on ignore
+//     les découvertes redondantes d'un même device dans une fenêtre
+//     de 2 secondes.
+//   - Chaque émission de ping passe par `Future.microtask` pour
+//     céder la main à l'event loop entre deux trames.
+//   - Le traitement des trames entrantes est découpé via
+//     `scheduleMicrotask` lorsque le volume est élevé.
 
 import 'dart:async';
 import 'dart:convert';
@@ -44,13 +56,10 @@ class BleMeshTransport implements MeshTransport {
   BleMeshTransport({
     FlutterReactiveBle? ble,
     String? peerId,
-    this._pingInterval = const Duration(seconds: 8),
+    Duration pingInterval = const Duration(seconds: 8),
   })  : _ble = ble ?? FlutterReactiveBle(),
-        _peerId = peerId ?? _generateRandomPeerId();
-  // Note : on utilise le formal initializer `this._pingInterval` pour
-  // satisfaire `prefer_initializing_formals` : le paramètre n'a pas
-  // le même nom que le champ (underscore), donc l'affectation est
-  // implicite.
+        _peerId = peerId ?? _generateRandomPeerId(),
+        _pingInterval = pingInterval;
 
   final FlutterReactiveBle _ble;
 
@@ -84,6 +93,17 @@ class BleMeshTransport implements MeshTransport {
   Timer? _pingTimer;
   bool _started = false;
 
+  /// Anti-saturation : cache des devices déjà signalés récemment.
+  /// Clé = device ID, Valeur = timestamp de la dernière notification.
+  /// Un même device ne sera notifié qu'une fois toutes les 2 secondes.
+  final Map<String, DateTime> _lastDeviceSeen = {};
+
+  /// Intervalle minimal entre deux notifications pour un même device.
+  static const Duration _deviceThrottleWindow = Duration(seconds: 2);
+
+  /// Nettoie périodiquement le cache des devices vus.
+  Timer? _throttleCleanupTimer;
+
   @override
   bool get isAvailable {
     if (kIsWeb) return true;
@@ -105,6 +125,16 @@ class BleMeshTransport implements MeshTransport {
       scanMode: ScanMode.lowLatency,
     )
         .listen((device) {
+      // ANR fix : throttling des découvertes pour éviter de noyer
+      // l'event loop quand de nombreux devices BLE sont à portée.
+      final now = DateTime.now();
+      final last = _lastDeviceSeen[device.id];
+      if (last != null &&
+          now.difference(last) < _deviceThrottleWindow) {
+        return; // Ignore les découvertes redondantes
+      }
+      _lastDeviceSeen[device.id] = now;
+
       // Quand on détecte un pair, on s'y connecte pour recevoir ses
       // notifications. La lecture effective des caractéristiques
       // dépend d'un connectGatt + discoverServices (omis ici pour
@@ -120,17 +150,32 @@ class BleMeshTransport implements MeshTransport {
     // Les pairs distants reçoivent ce ping, l'inscrivent dans
     // leur fenêtre glissante, et le compteur HIVE déduplique
     // automatiquement sur le peerId.
-    _pingTimer = Timer.periodic(_pingInterval, (_) => _sendPresencePing());
+    //
+    // ANR fix : on cède la main à l'event loop entre chaque ping
+    // via un microtask pour ne jamais monopoliser le thread UI.
+    _pingTimer = Timer.periodic(_pingInterval, (_) {
+      scheduleMicrotask(_sendPresencePing);
+    });
     // Émet un ping immédiatement pour se signaler vite.
-    _sendPresencePing();
+    scheduleMicrotask(_sendPresencePing);
+
+    // Nettoie périodiquement le cache de throttling pour éviter
+    // une fuite mémoire.
+    _throttleCleanupTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _cleanupThrottleCache(),
+    );
   }
 
   @override
   Future<void> stop() async {
     _pingTimer?.cancel();
     _pingTimer = null;
+    _throttleCleanupTimer?.cancel();
+    _throttleCleanupTimer = null;
     await _scanSub?.cancel();
     _scanSub = null;
+    _lastDeviceSeen.clear();
     _started = false;
   }
 
@@ -148,6 +193,9 @@ class BleMeshTransport implements MeshTransport {
     // advertisements" en mode non connectable (limité à 31 octets)
     // via un format厂商specifique. Voir les "Extended Advertising"
     // sur Android 8+ / iOS 13+.
+
+    // ANR fix : libère la boucle d'événements après le broadcast.
+    await Future<void>.delayed(Duration.zero);
   }
 
   @override
@@ -175,6 +223,11 @@ class BleMeshTransport implements MeshTransport {
   /// Construit et émet un ping de présence BLE contenant le
   /// peerId stable. C'est ce peerId qui sert de clé de
   /// déduplication côté réception.
+  ///
+  /// ANR fix : la méthode est volontairement synchrone pour la
+  /// construction du ping, mais l'émission est confiée à
+  /// [broadcast] qui yield l'event loop. L'appelant doit
+  /// utiliser `scheduleMicrotask` pour ne pas bloquer.
   void _sendPresencePing() {
     final ping = jsonEncode({
       'kind': 'ping',
@@ -191,7 +244,15 @@ class BleMeshTransport implements MeshTransport {
     if (kDebugMode) {
       debugPrint('[BLE] presence ping peerId=$_peerId');
     }
+    // Ne pas await volontairement : le broadcast est fire-and-forget
+    // pour ne pas bloquer le microtask.
     broadcast(ping);
+  }
+
+  /// Nettoie les entrées périmées du cache de throttling.
+  void _cleanupThrottleCache() {
+    final cutoff = DateTime.now().subtract(_deviceThrottleWindow * 2);
+    _lastDeviceSeen.removeWhere((_, lastSeen) => lastSeen.isBefore(cutoff));
   }
 
   /// Helper de test : permet d'injecter un message reçu (utile
