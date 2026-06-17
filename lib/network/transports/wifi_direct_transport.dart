@@ -200,6 +200,7 @@ class WifiDirectMeshTransport with WidgetsBindingObserver implements MeshTranspo
   }
 
   /// Libère les ressources internes (canal broadcast).
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _incomingController.close();

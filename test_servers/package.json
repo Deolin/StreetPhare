@@ -10,6 +10,7 @@
     "dev:server":         "node server_primary_v2.js",
     "dev:backup":         "node server_secondary_v2.js",
     "dev:dashboard":      "node admin_dashboard_v2.js",
+    "dashboard:alias":    "node admin_dashboard.js",
     "dev:all":            "node launch_all.js",
     "sim":                "node sim.js",
     "sim:reset":          "node sim.js --reset",

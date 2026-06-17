@@ -7,6 +7,7 @@
     "server:dev": "npm --prefix test_servers run dev:server",
     "server:backup": "npm --prefix test_servers run dev:backup",
     "dashboard": "npm --prefix test_servers run dev:dashboard",
+    "dashboard:alias": "npm --prefix test_servers run dashboard:alias",
     "server:all": "npm --prefix test_servers run dev:all",
     "sim": "npm --prefix test_servers run sim"
   }

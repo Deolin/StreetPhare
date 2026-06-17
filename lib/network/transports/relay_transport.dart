@@ -45,6 +45,13 @@ class RelayMeshTransport implements MeshTransport {
   Timer? _reconnectTimer;
   bool _started = false;
   bool _disposed = false;
+  int _reconnectAttempts = 0;
+
+  /// Backoff exponentiel plafonné à 60s (identique à WebSocketTransport).
+  Duration get _nextRetryDelay {
+    final seconds = (1 << _reconnectAttempts).clamp(2, 60);
+    return Duration(seconds: seconds);
+  }
 
   final _incomingController = StreamController<String>.broadcast();
 
@@ -77,6 +84,7 @@ class RelayMeshTransport implements MeshTransport {
       // sur le stream. Sans ce catchError, elles deviennent une
       // "Unhandled Exception" qui fait crasher la zone Dart.
       _channel!.ready.then<void>((_) {
+        _reconnectAttempts = 0; // Reset du backoff en cas de succès
         if (kDebugMode) debugPrint('[Relay] ws connecté à $relayUrl');
       }).catchError((Object err, StackTrace st) {
         if (kDebugMode) debugPrint('[Relay] ws handshake error: $err');
@@ -122,8 +130,15 @@ class RelayMeshTransport implements MeshTransport {
     _sub = null;
     _channel = null;
     if (!_started || _disposed) return;
-    _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 5), _connect);
+    // Évite la planification multiple si un timer est déjà actif.
+    if (_reconnectTimer?.isActive ?? false) return;
+
+    _reconnectAttempts++;
+    final delay = _nextRetryDelay;
+    if (kDebugMode) {
+      debugPrint('[Relay] reconnexion dans ${delay.inSeconds}s (essai #$_reconnectAttempts)');
+    }
+    _reconnectTimer = Timer(delay, _connect);
   }
 
   @override
@@ -152,9 +167,24 @@ class RelayMeshTransport implements MeshTransport {
     await broadcast(payload);
   }
 
-  /// Libère les ressources internes (canal broadcast).
+  /// Libère les ressources internes : timers, WebSocket, StreamController.
+  ///
+  /// Après appel à [dispose], l'instance est inutilisable.
+  @override
   void dispose() {
     _disposed = true;
+    _started = false;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _sub?.cancel();
+    _sub = null;
+    try {
+      _channel?.sink.close();
+    } catch (_) {}
+    _channel = null;
+    _reconnectAttempts = 0;
     _incomingController.close();
   }
 

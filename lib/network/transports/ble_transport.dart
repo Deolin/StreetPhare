@@ -43,6 +43,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../p2p_mesh_service.dart';
 
@@ -56,10 +57,9 @@ class BleMeshTransport implements MeshTransport {
   BleMeshTransport({
     FlutterReactiveBle? ble,
     String? peerId,
-    Duration pingInterval = const Duration(seconds: 8),
+    this._pingInterval = const Duration(seconds: 8),
   })  : _ble = ble ?? FlutterReactiveBle(),
-        _peerId = peerId ?? _generateRandomPeerId(),
-        _pingInterval = pingInterval;
+        _peerId = peerId ?? _generateRandomPeerId();
 
   final FlutterReactiveBle _ble;
 
@@ -117,6 +117,21 @@ class BleMeshTransport implements MeshTransport {
   Future<void> start() async {
     if (_started) return;
     _started = true;
+
+    // Vérification et demande des permissions BLE/Location avant le scan.
+    // Sur Android :
+    //   - API 31+ (Android 12+) : BLUETOOTH_SCAN (runtime) + BLUETOOTH_CONNECT (API 33+)
+    //   - API < 31 : ACCESS_FINE_LOCATION (runtime)
+    // Si les permissions ne sont pas accordées, le scan est désactivé
+    // plutôt que de lever une exception "Location Permission missing".
+    final permissionsOk = await _requestBlePermissions();
+    if (!permissionsOk) {
+      if (kDebugMode) {
+        debugPrint('[BLE] Permissions BLE/Location refusées, scan désactivé');
+      }
+      _started = false;
+      return;
+    }
 
     // Scan : on écoute tous les appareils qui exposent notre service.
     _scanSub = _ble
@@ -249,6 +264,71 @@ class BleMeshTransport implements MeshTransport {
     broadcast(ping);
   }
 
+  /// Vérifie et demande les permissions nécessaires au scan BLE.
+  ///
+  /// Sur Android API 31+ (12+), on demande [Permission.bluetoothScan].
+  /// En fallback (Android < 12), on demande [Permission.locationWhenInUse].
+  /// Retourne `true` si au moins une permission BLE est accordée.
+  Future<bool> _requestBlePermissions() async {
+    // iOS 13+ utilise CoreBluetooth qui gère ses propres dialogues système.
+    // Pas de demande explicite nécessaire côté Dart.
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      return true;
+    }
+
+    try {
+      // ── Android 12+ (API 31+) : BLUETOOTH_SCAN ─────────────────
+      var scanGranted = await Permission.bluetoothScan.isGranted;
+      if (!scanGranted) {
+        final result = await Permission.bluetoothScan.request();
+        scanGranted = result.isGranted;
+      }
+
+      // ── Android 13+ (API 33+) : BLUETOOTH_CONNECT ──────────────
+      var connectGranted = await Permission.bluetoothConnect.isGranted;
+      if (!connectGranted) {
+        final result = await Permission.bluetoothConnect.request();
+        connectGranted = result.isGranted;
+      }
+
+      // Si permissions Bluetooth modernes obtenues, c'est bon.
+      if (scanGranted) {
+        if (kDebugMode) {
+          debugPrint('[BLE] BLUETOOTH_SCAN accordé');
+        }
+        return true;
+      }
+
+      // ── Fallback Android < 12 : location ───────────────────────
+      // Sur Android 11 et inférieur, le scan BLE exige la permission
+      // de localisation fine. On tente de l'obtenir en dernier recours.
+      var locationGranted = await Permission.locationWhenInUse.isGranted;
+      if (!locationGranted) {
+        final result = await Permission.locationWhenInUse.request();
+        locationGranted = result.isGranted;
+      }
+      if (locationGranted) {
+        if (kDebugMode) {
+          debugPrint('[BLE] Location (fallback) accordée');
+        }
+        return true;
+      }
+
+      // ── Échec total ────────────────────────────────────────────
+      if (kDebugMode) {
+        debugPrint('[BLE] Aucune permission BLE/Location accordée');
+      }
+      return false;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BLE] Erreur lors de la demande de permission : $e');
+      }
+      // En cas d'erreur (ex: plateforme non supportée par permission_handler),
+      // on laisse le scan tenter sa chance (il échouera avec un message clair).
+      return true;
+    }
+  }
+
   /// Nettoie les entrées périmées du cache de throttling.
   void _cleanupThrottleCache() {
     final cutoff = DateTime.now().subtract(_deviceThrottleWindow * 2);
@@ -262,6 +342,7 @@ class BleMeshTransport implements MeshTransport {
   }
 
   /// Libère les ressources internes (canal broadcast).
+  @override
   void dispose() {
     _incomingController.close();
   }

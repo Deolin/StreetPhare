@@ -146,7 +146,7 @@ class NetworkCoordinator {
     );
     _uploadTimer = Timer.periodic(
       _kNormalUploadInterval,
-      (_) => _uploadValidatedAlerts(),
+      (_) => unawaited(_uploadValidatedAlerts()),
     );
 
     // [3] Vérification périodique de la disponibilité des serveurs.
@@ -387,7 +387,7 @@ class NetworkCoordinator {
       _uploadTimer?.cancel();
       _uploadTimer = Timer.periodic(
         _kDegradedUploadInterval,
-        (_) => _uploadValidatedAlerts(),
+        (_) => unawaited(_uploadValidatedAlerts()),
       );
       if (kDebugMode) {
         debugPrint(
@@ -403,7 +403,7 @@ class NetworkCoordinator {
       _uploadTimer?.cancel();
       _uploadTimer = Timer.periodic(
         _kNormalUploadInterval,
-        (_) => _uploadValidatedAlerts(),
+        (_) => unawaited(_uploadValidatedAlerts()),
       );
       if (kDebugMode) {
         debugPrint(

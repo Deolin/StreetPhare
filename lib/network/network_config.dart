@@ -62,6 +62,13 @@ class NetworkConfig {
     return 'ws://$_testHost:$_primaryPortDev/mesh';
   }
 
+  /// URL WebSocket du relais d'administration serveur.
+  ///
+  /// ws://192.168.31.18:3000/admin
+  static String get primaryUrl {
+    return 'ws://$_testHost:$_primaryPortDev/admin';
+  }
+
   /// Master passphrase utilisée pour dériver la clé AES
   /// de chiffrement / déchiffrement des adresses de backup.
   static String get masterPassphrase {

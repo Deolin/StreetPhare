@@ -11,4 +11,5 @@ class WifiDirectMeshTransport implements MeshTransport {
   @override Future<void> broadcast(String payload) async {}
   @override Future<void> sendTo(MeshPeer peer, String payload) async {}
   @override Stream<String> get incoming => const Stream.empty();
+  @override void dispose() {}
 }

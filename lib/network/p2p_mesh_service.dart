@@ -97,6 +97,10 @@ abstract class MeshTransport {
 
   /// Flux des messages reçus.
   Stream<String> get incoming;
+
+  /// Libère les ressources internes du transport.
+  /// Après appel, l'instance n'est plus utilisable.
+  void dispose();
 }
 
 /// Service principal de propagation P2P.
@@ -269,7 +273,7 @@ class P2PMeshService {
     );
   }
 
-  /// Démarre le service.
+  /// Arrête le service et libère tous les transports.
   Future<void> stop() async {
     _gossipTimer?.cancel();
     _discoveryTimer?.cancel();
@@ -280,6 +284,9 @@ class P2PMeshService {
     for (final t in transports) {
       try {
         await t.stop();
+      } catch (_) {}
+      try {
+        t.dispose();
       } catch (_) {}
     }
     _pendingMicrotasks = 0;

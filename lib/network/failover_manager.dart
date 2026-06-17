@@ -20,12 +20,11 @@
 // est notifié à chaque étape clé pour produire un fichier
 // `CLIENT_DEBUG.md` (cf. mode kDebugMode).
 //
-// === Correction ANR (Signal 3) ===
-// La boucle `_failover()` itère sur les standbys en appelant `_ping()`
-// séquentiellement, chaque ping ayant un timeout de 2s. Sans yield,
-// N standbys morts bloquent le thread Dart pendant N × 2s. On insère
-// désormais `await Future<void>.delayed(Duration.zero)` entre chaque
-// tentative pour céder la main à la boucle d'événements UI.
+// === Optimisation failover (06/2026) ===
+// La boucle `_failover()` ping désormais tous les standbys en
+// parallèle via `Future.wait`. Le basculement s'effectue en ~2s
+// max quel que soit le nombre de standbys, sans bloquer le
+// pipeline P2P principal.
 
 import 'dart:async';
 import 'dart:convert';
@@ -98,49 +97,56 @@ class SyncResponse {
       );
 }
 
-  /// Configuration du FailoverManager.
-  ///
-  /// Version TEST avec heartbeat accéléré :
-  ///   - heartbeatInterval : 5s (au lieu de 30s)
-  ///   - pingTimeout       : 2s (au lieu de 5s)
-  ///   - maxAttempts       : 3 pings consécutifs
-  ///
-  /// Basculement théorique le plus rapide : 3 × 5s + 2s = ~17s max
-  /// En pratique, le premier ping KO est détecté en 2s.
-  /// Dès le 3ème KO consécutif (15s écoulées), le failover est
-  /// déclenché instantanément.
-  class FailoverConfig {
-    /// URL du serveur principal initial (intégré dans l'app, peut
-    /// être mis à jour via OTA / build flags).
-    final String primaryAddress;
+/// Configuration du FailoverManager.
+///
+/// Version TEST avec heartbeat accéléré :
+///   - heartbeatInterval : 5s (au lieu de 30s)
+///   - pingTimeout       : 2s (au lieu de 5s)
+///   - maxAttempts       : 3 pings consécutifs
+///
+/// Basculement théorique le plus rapide : 3 × 5s + 2s = ~17s max
+/// En pratique, le premier ping KO est détecté en 2s.
+/// Dès le 3ème KO consécutif (15s écoulées), le failover est
+/// déclenché instantanément.
+class FailoverConfig {
+  /// URL du serveur principal initial (intégré dans l'app, peut
+  /// être mis à jour via OTA / build flags).
+  final String primaryAddress;
 
-    /// Liste des adresses de secours chiffrées (AES).
-    /// La première est utilisée en premier lors d'un basculement.
-    final List<String> encryptedBackupChain;
+  /// Liste des adresses de secours chiffrées (AES).
+  /// La première est utilisée en premier lors d'un basculement.
+  final List<String> encryptedBackupChain;
 
-    /// Nombre de tentatives avant de marquer un serveur défaillant.
-    final int maxAttempts;
+  /// Nombre de tentatives avant de marquer un serveur défaillant.
+  final int maxAttempts;
 
-    /// Délai entre deux heartbeats.
-    final Duration heartbeatInterval;
+  /// Délai entre deux heartbeats.
+  final Duration heartbeatInterval;
 
-    /// Timeout d'une tentative individuelle de ping.
-    final Duration pingTimeout;
+  /// Timeout d'une tentative individuelle de ping.
+  final Duration pingTimeout;
 
-    /// Master passphrase pour dériver la clé AES. En production,
-    /// ce devrait être une clé issue du secure-storage iOS/Android
-    /// ou d'un serveur de clés distant.
-    final String masterPassphrase;
+  /// Master passphrase pour dériver la clé AES. En production,
+  /// ce devrait être une clé issue du secure-storage iOS/Android
+  /// ou d'un serveur de clés distant.
+  final String masterPassphrase;
 
-    const FailoverConfig({
-      required this.primaryAddress,
-      required this.encryptedBackupChain,
-      this.maxAttempts = 3,
-      this.heartbeatInterval = const Duration(seconds: 5),
-      this.pingTimeout = const Duration(seconds: 2),
-      required this.masterPassphrase,
-    });
-  }
+  const FailoverConfig({
+    required this.primaryAddress,
+    required this.encryptedBackupChain,
+    this.maxAttempts = 3,
+    this.heartbeatInterval = const Duration(seconds: 5),
+    this.pingTimeout = const Duration(seconds: 2),
+    required this.masterPassphrase,
+  });
+}
+
+/// Résultat d'un ping de standby (utilisé par le failover parallèle).
+class _PingResult {
+  final ServerEndpoint address;
+  final bool reachable;
+  const _PingResult({required this.address, required this.reachable});
+}
 
 /// FailoverManager singleton.
 class FailoverManager {
@@ -233,10 +239,15 @@ class FailoverManager {
         Timer.periodic(_config!.heartbeatInterval, (_) => heartbeat());
   }
 
+  /// Arrête le heartbeat et libère les ressources.
   Future<void> stop() async {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
     _started = false;
+    // Fermeture explicite du StreamController et du client HTTP
+    // pour éviter les fuites mémoire.
+    _activeServerController.close();
+    _httpClient.close();
   }
 
   /// Adresse du serveur central courant.
@@ -276,11 +287,11 @@ class FailoverManager {
   /// Marque le serveur courant comme défaillant et bascule sur
   /// le premier standby disponible.
   ///
-  /// ANR fix : chaque tentative de ping sur un standby est suivie
-  /// d'un `await Future<void>.delayed(Duration.zero)` pour céder
-  /// la main à la boucle d'événements UI. Sans cela, une séquence
-  /// de N standbys injoignables (chacun timeout 2s) bloquerait le
-  /// thread Dart principal pendant N × 2s, déclenchant un ANR.
+  /// Optimisation failover : au lieu de pinger les standbys
+  /// séquentiellement (N × 2s de timeout), on les teste TOUS en
+  /// parallèle et on sélectionne le premier qui répond. Cela réduit
+  /// le temps de basculement de N×2s à 2s maximum, évitant de
+  /// bloquer le pipeline P2P principal.
   Future<void> _failover() async {
     if (_current == null) return;
     final dying = _current!.address;
@@ -294,48 +305,89 @@ class FailoverManager {
     }
     ClientDebugLogger.instance.serverMarkedDead(dying);
 
-    while (_standbys.isNotEmpty) {
-      final next = _standbys.removeAt(0);
-      if (_deadForSession.contains(next.address)) {
-        // Yield l'event loop même pour les standbys déjà morts,
-        // pour ne jamais monopoliser le thread.
-        await Future<void>.delayed(Duration.zero);
-        continue;
+    if (_standbys.isEmpty) {
+      if (kDebugMode) {
+        debugPrint('[FailoverManager] AUCUN serveur de secours disponible !');
       }
-      final reachable = await _ping(next.address);
-      if (reachable) {
-        _current = next.copyWith(
-          status: ServerStatus.active,
-          consecutiveFailures: 0,
-          lastChecked: DateTime.now().toUtc(),
-        );
-        _activeServerController.add(_current!);
-        if (kDebugMode) {
-          debugPrint(
-            '[FailoverManager] basculé vers ${_current!.address}',
-          );
-        }
-        ClientDebugLogger.instance.failoverSucceeded(
-          fromAddress: dying,
-          toAddress: _current!.address,
-        );
-        return;
+      ClientDebugLogger.instance.failoverFailed(fromAddress: dying);
+      _current = _current!.copyWith(
+        status: ServerStatus.failed,
+        markedFailedAt: DateTime.now().toUtc(),
+      );
+      _activeServerController.add(_current!);
+      return;
+    }
+
+    // ── Ping parallèle de tous les standbys ─────────────────────
+    // On filtre les standbys déjà marqués morts pour cette session.
+    final candidates = _standbys
+        .where((s) => !_deadForSession.contains(s.address))
+        .toList();
+
+    if (candidates.isEmpty) {
+      if (kDebugMode) {
+        debugPrint('[FailoverManager] Tous les standbys sont déjà '
+            'marqués défaillants pour cette session.');
+      }
+      ClientDebugLogger.instance.failoverFailed(fromAddress: dying);
+      _current = _current!.copyWith(
+        status: ServerStatus.failed,
+        markedFailedAt: DateTime.now().toUtc(),
+      );
+      _activeServerController.add(_current!);
+      return;
+    }
+
+    // Lance tous les pings en parallèle.
+    final results = await Future.wait(
+      candidates.map((s) async {
+        final ok = await _ping(s.address);
+        return _PingResult(address: s, reachable: ok);
+      }),
+    );
+
+    // Cherche le premier standby joignable.
+    _PingResult? firstReachable;
+    for (final r in results) {
+      if (r.reachable) {
+        firstReachable = r;
+        break;
       } else {
-        _deadForSession.add(next.address);
-        ClientDebugLogger.instance.serverMarkedDead(next.address);
+        _deadForSession.add(r.address.address);
+        _standbys.remove(r.address);
+        ClientDebugLogger.instance.serverMarkedDead(r.address.address);
         if (kDebugMode) {
           debugPrint(
-            '[FailoverManager] standby ${next.address} injoignable, '
-            'marqué défaillant',
+            '[FailoverManager] standby ${r.address.address} '
+            'injoignable, marqué défaillant',
           );
         }
-        // ANR fix : libère le thread Dart entre deux tentatives.
-        await Future<void>.delayed(Duration.zero);
       }
     }
 
+    if (firstReachable != null) {
+      _standbys.remove(firstReachable.address);
+      _current = firstReachable.address.copyWith(
+        status: ServerStatus.active,
+        consecutiveFailures: 0,
+        lastChecked: DateTime.now().toUtc(),
+      );
+      _activeServerController.add(_current!);
+      if (kDebugMode) {
+        debugPrint(
+          '[FailoverManager] basculé vers ${_current!.address}',
+        );
+      }
+      ClientDebugLogger.instance.failoverSucceeded(
+        fromAddress: dying,
+        toAddress: _current!.address,
+      );
+      return;
+    }
+
+    // Tous les standbys sont injoignables.
     if (kDebugMode) {
-      debugPrint('[FailoverManager] AUCUN serveur de secours disponible !');
+      debugPrint('[FailoverManager] AUCUN serveur de secours joignable !');
     }
     ClientDebugLogger.instance.failoverFailed(fromAddress: dying);
     _current = _current!.copyWith(
