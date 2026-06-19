@@ -28,7 +28,6 @@ import 'package:flutter/foundation.dart';
 
 import '../../../database/hive_alert_database.dart';
 import '../../../network/network_coordinator.dart';
-import '../../../services/notification_service.dart';
 import 'geofencing_service.dart';
 import '../domain/models/geofence_event.dart';
 
@@ -69,12 +68,6 @@ class ProximityValidationService {
         }
         return;
       }
-      // Notification Android native pour signalement proche.
-      unawaited(NotificationService.instance.showAlertNotification(
-        title: '⚠️ Signalement à proximité',
-        body: 'Signalement détecté à ${event.distanceMeters.round()} m.',
-        id: event.alert.id.hashCode,
-      ));
       _filteredEventsController.add(event);
     });
   }

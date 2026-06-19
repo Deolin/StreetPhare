@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="À propos de StreetPhare — Application de navigation piétonne sécurisée, 100% libre et gratuit.">
+  <meta name="theme-color" content="#FFB300">
+  <title>À propos — StreetPhare</title>
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --surface: #131929;
+      --border: #1e2d45;
+      --primary: #FFB300;
+      --accent: #00e676;
+      --text: #e8eaf6;
+      --muted: #90a4ae;
+      --danger: #ff1744;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      line-height: 1.7; min-height: 100vh;
+    }
+
+    /* NAV */
+    .nav {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 14px 24px; display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .nav .logo { font-size: 20px; font-weight: 700; color: var(--primary); text-decoration: none; }
+    .nav .logo span { color: var(--text); }
+    .nav-links { display: flex; gap: 20px; align-items: center; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .2s; }
+    .nav-links a:hover { color: var(--primary); }
+    .nav-links a.active { color: var(--primary); }
+
+    .container { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
+    h1 { font-size: 2.2rem; color: var(--primary); margin-bottom: 8px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 40px; }
+    h2 { color: var(--accent); font-size: 1.2rem; margin-top: 36px; margin-bottom: 12px; border-left: 4px solid var(--accent); padding-left: 14px; }
+    h3 { color: var(--primary); font-size: 1rem; margin-top: 24px; margin-bottom: 8px; }
+    p, li { font-size: 15px; margin-bottom: 12px; }
+    ul, ol { padding-left: 24px; }
+    li { margin-bottom: 8px; }
+    a { color: var(--primary); text-decoration: underline; }
+
+    .highlight-box {
+      background: rgba(0,230,118,.06); border: 1px solid rgba(0,230,118,.25);
+      border-radius: var(--radius); padding: 20px 24px; margin: 20px 0;
+    }
+    .highlight-box p { color: var(--accent); font-weight: 600; margin-bottom: 0; }
+
+    .info-box {
+      background: rgba(255,179,0,.06); border: 1px solid rgba(255,179,0,.25);
+      border-radius: var(--radius); padding: 20px 24px; margin: 20px 0;
+    }
+    .info-box p { color: var(--primary); font-weight: 600; margin-bottom: 0; }
+
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 24px 0; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px; transition: border-color .2s;
+    }
+    .card:hover { border-color: var(--primary); }
+    .card h4 { color: var(--primary); margin-bottom: 8px; font-size: 16px; }
+    .card p { color: var(--muted); font-size: 13px; margin-bottom: 0; }
+    .card .icon { font-size: 28px; margin-bottom: 12px; display: block; }
+
+    .tech-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+    .tech-table th { text-align: left; color: var(--primary); padding: 10px 12px; border-bottom: 2px solid var(--border); font-size: 13px; text-transform: uppercase; }
+    .tech-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+
+    .osmand-notice {
+      background: rgba(255,179,0,.08); border-left: 4px solid var(--primary);
+      border-radius: 0 var(--radius) var(--radius) 0; padding: 20px 24px; margin: 24px 0;
+    }
+    .osmand-notice h4 { color: var(--primary); margin-bottom: 8px; }
+    .osmand-notice p { font-size: 13px; color: var(--muted); margin-bottom: 0; }
+    .osmand-notice strong { color: var(--text); }
+
+    .support-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+    .support-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 16px 20px; text-decoration: none; color: var(--text); transition: border-color .2s;
+    }
+    .support-card:hover { border-color: var(--accent); }
+    .support-card h4 { color: var(--accent); font-size: 15px; margin-bottom: 4px; }
+    .support-card p { font-size: 13px; color: var(--muted); margin-bottom: 0; }
+
+    footer { text-align: center; color: var(--muted); font-size: 13px; padding: 32px 24px; border-top: 1px solid var(--border); }
+    @media(max-width:600px) { h1 { font-size: 1.6rem; } .container { padding: 24px 16px 60px; } .support-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="index.html" class="logo">⚡ <span>StreetPhare</span></a>
+  <div class="nav-links">
+    <a href="index.html">Accueil</a>
+    <a href="privacy.html">Confidentialité</a>
+    <a href="about.html" class="active">À propos</a>
+  </div>
+</nav>
+
+<div class="container">
+  <h1>À propos de StreetPhare</h1>
+  <p class="subtitle">Navigation piétonne sécurisée · Solidarité citoyenne · Logiciel 100% libre</p>
+
+  <h2>Notre mission</h2>
+  <div class="highlight-box">
+    <p>🎯 Sécuriser les déplacements piétons en milieu urbain lors d'événements de grande envergure, grâce à la solidarité citoyenne et au réseau décentralisé.</p>
+  </div>
+  <p>
+    StreetPhare est une application de <strong>navigation piétonne sécurisée</strong> conçue pour renforcer la sécurité collective lors d'événements de grande envergure.
+    L'application permet aux utilisateurs de :
+  </p>
+
+  <div class="card-grid">
+    <div class="card">
+      <span class="icon">🗺️</span>
+      <h4>Navigation sécurisée</h4>
+      <p>Calcul d'itinéraires piétons en temps réel en tenant compte des zones de danger signalées collectivement.</p>
+    </div>
+    <div class="card">
+      <span class="icon">🔔</span>
+      <h4>Alertes terrain</h4>
+      <p>Signalement collaboratif des dangers (barrages, nasses, zones de rassemblement à risque) validé par consensus.</p>
+    </div>
+    <div class="card">
+      <span class="icon">📱</span>
+      <h4>Réseau P2P</h4>
+      <p>Communication décentralisée sans serveur central. Aucune donnée personnelle n'est collectée.</p>
+    </div>
+    <div class="card">
+      <span class="icon">🛡️</span>
+      <h4>Anonymat absolu</h4>
+      <p>Identifiants éphémères renouvelés automatiquement. Zéro traçabilité, zéro profilage.</p>
+    </div>
+  </div>
+
+  <h2>Caractéristiques techniques</h2>
+  <table class="tech-table">
+    <thead>
+      <tr>
+        <th>Caractéristique</th>
+        <th>Détails</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Plateforme</td><td>Flutter / Dart — Android, Windows, Linux, macOS</td></tr>
+      <tr><td>Réseau P2P</td><td>Hive — décentralisé, Bluetooth & Wi-Fi Direct</td></tr>
+      <tr><td>Chiffrement</td><td>Ed25519 + AES — authentification sans identité</td></tr>
+      <tr><td>Routage piéton</td><td>Multi-modes : GraphHopper local → OSRM → grille Dijkstra</td></tr>
+      <tr><td>Cartographie</td><td>OpenStreetMap — données libres et ouvertes</td></tr>
+      <tr><td>Licence</td><td>GNU General Public License v3.0 (GPLv3)</td></tr>
+      <tr><td>Vie privée</td><td>Zero-knowledge — aucune donnée collectée</td></tr>
+      <tr><td>Coût</td><td>100% gratuit — aucun achat intégré, aucune publicité</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Logiciel libre — Licence GPLv3</h2>
+  <div class="info-box">
+    <p>📜 StreetPhare est un logiciel 100% libre et gratuit, distribué sous licence GNU General Public License v3.0.</p>
+  </div>
+  <p>
+    Le code source intégral de StreetPhare est disponible publiquement sur GitHub.
+    Vous êtes libre de :
+  </p>
+  <ul>
+    <li><strong>Utiliser</strong> l'application sans aucune restriction</li>
+    <li><strong>Étudier</strong> le code source et le comprendre</li>
+    <li><strong>Modifier</strong> et adapter le code à vos besoins</li>
+    <li><strong>Distribuer</strong> des copies de l'application</li>
+    <li><strong>Améliorer</strong> et contribuer au projet</li>
+  </ul>
+  <p>
+    Sous réserve du respect de la licence GPLv3, qui exige que toute modification ou distribution dérivée soit également distribuée sous GPLv3.
+  </p>
+  <p>
+    <a href="https://github.com/Deolin/StreetPhare" target="_blank" rel="noopener noreferrer">
+      📂 Code source sur GitHub — github.com/Deolin/StreetPhare
+    </a>
+  </p>
+
+  <h2>Attributions et crédits — OsmAnd BV</h2>
+  <div class="osmand-notice">
+    <h4>🧭 Intégration du cœur algorithmique d'OsmAnd Core</h4>
+    <p>
+      StreetPhare utilise le <strong>cœur algorithmique d'OsmAnd Core</strong> pour le routage piéton local.
+      Cette intégration est réalisée en respectant scrupuleusement les termes de la licence GPLv3 sous laquelle
+      OsmAnd est distribué.
+    </p>
+    <br>
+    <p>
+      <strong>IMPORTANT :</strong> StreetPhare est un projet <strong>indépendant</strong>, non affilié, non sponsorisé,
+      et non approuvé par <strong>OsmAnd BV</strong>. L'utilisation du code d'OsmAnd Core est conforme aux
+      dispositions de la licence GPLv3, qui autorise explicitement la réutilisation du code sous la même licence.
+    </p>
+  </div>
+  <p>
+    OsmAnd est une application de cartographie et de navigation open-source. Pour en savoir plus, rendez-vous sur
+    <a href="https://osmand.net/" target="_blank" rel="noopener noreferrer">osmand.net</a>.
+  </p>
+  <p>
+    La couche de routage de StreetPhare utilise le moteur de routage OsmAnd Core en tant que bibliothèque algorithmique,
+    intégrée dans le processus de build de l'application Flutter via le répertoire <code>OsmAnd-master/</code>.
+    Toute modification du code d'OsmAnd intégré dans StreetPhare est publiquement visible dans le dépôt GitHub,
+    conformément aux exigences de la GPLv3.
+  </p>
+
+  <h2>Stack technique</h2>
+  <table class="tech-table">
+    <thead>
+      <tr><th>Composant</th><th>Technologie</th><th>Licence</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Client mobile/desktop</td><td>Flutter / Dart 3.x</td><td>BSD-3-Clause</td></tr>
+      <tr><td>Cartographie</td><td>OpenStreetMap + flutter_map</td><td>ODbL / BSD-3-Clause</td></tr>
+      <tr><td>Server backend</td><td>Node.js / Express</td><td>MIT</td></tr>
+      <tr><td>Réseau P2P</td><td>Hive (Bluetooth / Wi-Fi Direct)</td><td>Apache 2.0</td></tr>
+      <tr><td>Routage piéton</td><td>OsmAnd Core + GraphHopper + OSRM</td><td>GPLv3 / Apache 2.0</td></tr>
+      <tr><td>Chiffrement</td><td>Ed25519 + AES (crypto Dart)</td><td>—</td></tr>
+      <tr><td>Base de données locale</td><td>Hive (KV store Dart)</td><td>Apache 2.0</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Support & Contact</h2>
+  <p>
+    Vous avez trouvé un bug ? Vous avez une suggestion d'amélioration ? Vous souhaitez contribuer au projet ?
+    Voici les moyens de nous contacter :
+  </p>
+  <div class="support-grid">
+    <a href="https://github.com/Deolin/StreetPhare/issues" target="_blank" rel="noopener noreferrer" class="support-card">
+      <h4>🐛 Signaler un bug</h4>
+      <p>Créez une issue sur GitHub avec la description du problème rencontré.</p>
+    </a>
+    <a href="https://github.com/Deolin/StreetPhare/issues" target="_blank" rel="noopener noreferrer" class="support-card">
+      <h4>💡 Suggestion d'amélioration</h4>
+      <p>Proposez vos idées d'amélioration via les issues GitHub.</p>
+    </a>
+    <a href="https://github.com/Deolin/StreetPhare/pulls" target="_blank" rel="noopener noreferrer" class="support-card">
+      <h4>🔧 Contribuer</h4>
+      <p>Les pull requests sont les bienvenues ! Rejoignez le développement.</p>
+    </a>
+    <a href="mailto:contact@streetphare.app" class="support-card">
+      <h4>✉️ Contact email</h4>
+      <p>Pour toute question, écrivez-nous directement.</p>
+    </a>
+  </div>
+
+  <h2>Charte éthique</h2>
+  <p>StreetPhare repose sur les principes suivants :</p>
+  <ul>
+    <li><strong>Sécurité des personnes</strong> : l'objectif premier est la protection physique des utilisateurs.</li>
+    <li><strong>Anonymat</strong> : aucune donnée personnelle n'est collectée, stockée ou transmise.</li>
+    <li><strong>Liberté</strong> : le code est 100% libre sous GPLv3. Toute personne peut l'utiliser, le modifier, le distribuer.</li>
+    <li><strong>Transparence</strong> : le code source est public. Aucune manipulation cachée n'est possible.</li>
+    <li><strong>Solidarité citoyenne</strong> : l'application est un outil de coopération bénévole, non commerciale.</li>
+    <li><strong>Neutralité</strong> : l'application ne prend parti pour aucune cause. Elle est exclusivement un outil de navigation piétonne sécurisée et de prévention des risques physiques.</li>
+  </ul>
+
+</div>
+
+<footer>
+  © 2026 StreetPhare — Logiciel libre sous licence GNU GPL v3 — Conforme au RGPD (Règlement UE 2016/679)
+</footer>
+
+</body>
+</html>
