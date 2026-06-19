@@ -1,11 +1,3 @@
-# Fichiers générés par les serveurs de test
-SERVER_STATUS.md
-SERVER_STATUS_3000.md
-SERVER_STATUS_3001.md
-CLIENT_DEBUG.md
-
-node_modules
-
 # Fichiers de build et outils Flutter/Dart
 .dart_tool/
 .packages
@@ -40,27 +32,13 @@ test_servers/events_admin.json
 .history/
 .vscode/*
 !.vscode/extensions.json
-.idea/caches/
-.idea/modules.xml
-.idea/workspace.xml
+.idea/
+.idea/*
+
 
 # Fichiers temporaires système et OS
 .DS_Store
 Thumbs.db
-.idea/inspectionProfiles/Project_Default.xml
-.idea/libraries/Dart_Packages.xml
-.idea/libraries/Dart_SDK.xml
-.idea/libraries/Flutter_Plugins.xml
-.idea/markdown.xml
-.idea/misc.xml
-.idea/StreetPhare.iml
-.idea/studiobot.xml
-.idea/vcs.xml
-SERVER_STATUS_3000.md
 *.md
 android/build/reports/problems/problems-report.html
-SECURITY.md
 android/.kotlin/sessions/kotlin-compiler-12426433643112611207.salive
-*.md
-SERVER_STATUS_3000.md
-SERVER_STATUS_3001.md

@@ -1058,6 +1058,117 @@ updateClock();
 //  SERVEUR HTTP
 // ════════════════════════════════════════════════════════════════════════
 
+// ── WebSocket Server pour la sandbox Flutter Web ───────────────────────────
+const wss = new WebSocket.Server({ noServer: true });
+
+wss.on('connection', (ws) => {
+  console.log('[Sandbox-WS] Client Flutter Web connecté');
+
+  ws.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      console.log('[Sandbox-WS] Commande reçue:', msg.action);
+
+      // Route les commandes vers les endpoints sandbox correspondants
+      // Les réponses sont renvoyées au client Flutter via WS
+      switch (msg.action) {
+        case 'inject-alerts':
+          // Génère des alertes simulées et les renvoie
+          const alertCount = Math.min(msg.count || 3, 500);
+          const center = { lat: msg.lat || 50.4762, lng: msg.lng || 4.5422 };
+          const alerts = [];
+          for (let i = 0; i < alertCount; i++) {
+            const alert = buildFakeAlert(null, center);
+            alerts.push(alert);
+            injectedAlerts.push(alert);
+          }
+          injectedAlertsCount += alertCount;
+          pushLog('alert_inject', `${alertCount} alertes injectées (WS)`, { count: alertCount });
+          // Envoie chaque alerte au client Flutter
+          alerts.forEach(a => {
+            ws.send(JSON.stringify({ kind: 'alert_injected', alert: a }));
+          });
+          ws.send(JSON.stringify({ kind: 'sandbox_status', active_users: simulatedUsersCount, total_alerts: injectedAlertsCount, total_messages: hiveMessagesCount }));
+          break;
+
+        case 'inject-events':
+          const evtCount = Math.min(msg.count || 1, 50);
+          const evtCenter = { lat: msg.lat || 50.4762, lng: msg.lng || 4.5422 };
+          for (let i = 0; i < evtCount; i++) {
+            const ev = buildFakeEvent(injectedEventsCount + i + 1, evtCenter);
+            injectedEvents.push(ev);
+            ws.send(JSON.stringify({ kind: 'event_injected', event: ev }));
+          }
+          injectedEventsCount += evtCount;
+          pushLog('event_inject', `${evtCount} événements injectés (WS)`, { count: evtCount });
+          break;
+
+        case 'send-hive-messages':
+          const msgCount = Math.min(msg.count || 5, 200);
+          for (let i = 0; i < msgCount; i++) {
+            const hiveMsg = buildFakeHiveMessage(msg.senderId, msg.content);
+            injectedMessages.push(hiveMsg);
+            ws.send(JSON.stringify({ kind: 'hive_message', message: hiveMsg }));
+          }
+          hiveMessagesCount += msgCount;
+          pushLog('hive_inject', `${msgCount} messages Hive injectés (WS)`, { count: msgCount });
+          break;
+
+        case 'start-users':
+          const userCount = Math.min(msg.count || 5, 100);
+          const userCenter = { lat: msg.lat || 50.4762, lng: msg.lng || 4.5422 };
+          for (let i = 0; i < userCount; i++) {
+            const pos = randomAround(userCenter, 300);
+            const user = {
+              id: `sim_user_${randomId(8)}`,
+              lat: pos.lat,
+              lng: pos.lng,
+              heading: Math.random() * 360,
+              speed: 5,
+              startedAt: new Date().toISOString(),
+            };
+            simulatedUsers.push(user);
+            const interval = setInterval(() => {
+              const d = (5 / 3600) / 111320;
+              user.lat += d * Math.cos(user.heading * Math.PI / 180) * 3;
+              user.lng += d * Math.sin(user.heading * Math.PI / 180) * 3;
+              user.heading += (Math.random() - 0.5) * 20;
+              ws.send(JSON.stringify({
+                kind: 'user_move',
+                user_id: user.id,
+                lat: user.lat,
+                lng: user.lng,
+              }));
+            }, 3000);
+            user._interval = interval;
+          }
+          simulatedUsersCount += userCount;
+          pushLog('user_simulate', `${userCount} utilisateurs simulés (WS)`, { count: userCount });
+          ws.send(JSON.stringify({ kind: 'sandbox_status', active_users: simulatedUsersCount }));
+          break;
+
+        case 'stop-users':
+          const stopped = simulatedUsers.length;
+          simulatedUsers.forEach(u => { if (u._interval) clearInterval(u._interval); });
+          simulatedUsers.length = 0;
+          pushLog('user_stop', `${stopped} utilisateurs arrêtés (WS)`);
+          ws.send(JSON.stringify({ kind: 'sandbox_status', active_users: 0 }));
+          break;
+
+        default:
+          ws.send(JSON.stringify({ kind: 'error', message: `Action inconnue: ${msg.action}` }));
+      }
+    } catch (e) {
+      console.error('[Sandbox-WS] Erreur message:', e.message);
+      ws.send(JSON.stringify({ kind: 'error', message: e.message }));
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('[Sandbox-WS] Client Flutter Web déconnecté');
+  });
+});
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = url.pathname;
@@ -1412,6 +1523,19 @@ const server = http.createServer((req, res) => {
 // Liaison à 0.0.0.0 pour accepter les connexions des appareils du réseau
 // local (tablettes, téléphones, autres postes de développement).
 const LISTEN_HOST = '0.0.0.0';
+
+// ── Upgrade WebSocket ─────────────────────────────────────────────────────
+// Les connexions WebSocket vers /sandbox sont upgradées vers le wss.
+server.on('upgrade', (request, socket, head) => {
+  const url = new URL(request.url, `http://localhost:${PORT}`);
+  if (url.pathname === '/sandbox') {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+    return;
+  }
+  socket.destroy();
+});
 
 function startAdminServer(retryCount = 0) {
   server.listen(PORT, LISTEN_HOST, () => {

@@ -81,58 +81,73 @@ void main() async {
   }
 
   // === Étape 3 : Initialisation de la "ruche" réseau décentralisée ===
-  if (kDebugMode) {
-    debugPrint('[main] ${NetworkConfig.describe()}');
-  }
-  ClientDebugLogger.instance.log(
-    'Démarrage app',
-    details: NetworkConfig.describe(),
-    emoji: '🚀',
-  );
-
-  try {
-    final bootstrap = await buildNetworkBootstrap(
-      primaryServer: NetworkConfig.primaryServer,
-      relayUrl: NetworkConfig.relayUrl,
-      masterPassphrase: NetworkConfig.masterPassphrase,
-      initialBackupChain: NetworkConfig.initialSecondaryServer.isEmpty
-          ? const []
-          : await _seedSingleBackup(NetworkConfig.initialSecondaryServer,
-              NetworkConfig.masterPassphrase),
-    );
-
-    await NetworkCoordinator.instance.init(
-      failoverConfig: bootstrap.failoverConfig,
-      transports: bootstrap.transports,
-      localPeerId: bootstrap.peerId,
-    );
-
     if (kDebugMode) {
-      debugPrint('[main] réseau StreetPhare initialisé sur '
-          '${describePlatform()}');
+      try {
+        debugPrint('[main] ${NetworkConfig.describe()}');
+      } catch (_) {
+        debugPrint('[main] NetworkConfig indisponible (master key manquante)');
+      }
     }
 
-    // === Étape 5 : Intelligence StreetPhare ===
-    // Démarre les services "intelligents" : géofencing, validation
-    // de proximité (avec cooldown anti-spam), gestionnaire
-    // d'événements (countdown "juste-à-temps") et messagerie Hive P2P.
-    ConnectivityService.instance.start();
-    GeofencingService.instance.start();
-    ProximityValidationService.instance.start();
-    EventManager.instance.start();
-    HiveMessagingService.instance.start();
-    // Affiche la notification persistante "StreetPhare actif".
-    unawaited(NotificationService.instance.showPersistentNotification());
-  } catch (e, st) {
-    if (kDebugMode) {
-      debugPrint('[main] ERREUR initialisation réseau : $e\n$st');
+    try {
+      // Essaie de récupérer la master passphrase. Sur le Web en
+      // développement, la variable dart-define peut être absente.
+      // On bascule en mode dégradé (réseau désactivé) plutôt que
+      // de planter l'application entière.
+      String masterKey;
+      try {
+        masterKey = NetworkConfig.masterPassphrase;
+      } catch (_) {
+        masterKey = 'streetphare-web-dev-fallback';
+        if (kDebugMode) {
+          debugPrint('[main] ⚠ Master key manquante → fallback web-dev');
+        }
+      }
+
+      ClientDebugLogger.instance.log(
+        'Démarrage app',
+        details: 'Web mode',
+        emoji: '🚀',
+      );
+
+      final bootstrap = await buildNetworkBootstrap(
+        primaryServer: NetworkConfig.primaryServer,
+        relayUrl: NetworkConfig.relayUrl,
+        masterPassphrase: masterKey,
+        initialBackupChain: NetworkConfig.initialSecondaryServer.isEmpty
+            ? const []
+            : await _seedSingleBackup(
+                NetworkConfig.initialSecondaryServer, masterKey),
+      );
+
+      await NetworkCoordinator.instance.init(
+        failoverConfig: bootstrap.failoverConfig,
+        transports: bootstrap.transports,
+        localPeerId: bootstrap.peerId,
+      );
+
+      if (kDebugMode) {
+        debugPrint('[main] réseau StreetPhare initialisé sur '
+            '${describePlatform()}');
+      }
+
+      // === Étape 5 : Intelligence StreetPhare ===
+      ConnectivityService.instance.start();
+      GeofencingService.instance.start();
+      ProximityValidationService.instance.start();
+      EventManager.instance.start();
+      HiveMessagingService.instance.start();
+      unawaited(NotificationService.instance.showPersistentNotification());
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[main] ERREUR initialisation réseau : $e\n$st');
+      }
+      ClientDebugLogger.instance.log(
+        'ERREUR init réseau',
+        details: e.toString(),
+        emoji: '❌',
+      );
     }
-    ClientDebugLogger.instance.log(
-      'ERREUR init réseau',
-      details: e.toString(),
-      emoji: '❌',
-    );
-  }
 
   runApp(StreetPhareApp());
 }

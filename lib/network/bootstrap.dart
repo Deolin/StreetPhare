@@ -23,6 +23,7 @@ import 'failover_manager.dart';
 import 'network_config.dart';
 import 'p2p_mesh_service.dart';
 import 'transports/ble_transport.dart';
+import 'transports/loopback_transport.dart';
 import 'transports/relay_transport.dart';
 import 'transports/wifi_direct_transport_selector.dart';
 
@@ -88,33 +89,42 @@ Future<NetworkBootstrap> buildNetworkBootstrap({
 
   final transports = <MeshTransport>[];
 
-  // Wi-Fi Direct / LAN multicast
+  // ── Transports P2P physiques UNIQUEMENT sur plateformes natives ─────
+  // Sur le Web, les API BLE/Wi-Fi Direct ne sont pas disponibles ou sont
+  // instables. On ne les instancie PAS du tout pour éviter tout crash
+  // natif (UnimplementedError, MissingPluginException, etc.).
+  //
+  // Le Web s'appuie exclusivement sur :
+  //   1. Le Relay WebSocket (relais centralisé pour le mesh virtuel)
+  //   2. Le LoopbackTransport (sandbox locale pour les tests hors-ligne)
+  //
+  // Les plateformes desktop (Windows/Linux) n'ont pas de BLE natif non plus
+  // mais conservent le Wi-Fi Direct multicast.
+
   if (!kIsWeb) {
+    // Wi-Fi Direct / LAN multicast — natif uniquement
     transports.add(
       WifiDirectMeshTransport(peerId: sharedPeerId),
     );
+
+    // BLE — Android, iOS, macOS uniquement (pas Windows/Linux desktop)
+    if (!io.Platform.isWindows && !io.Platform.isLinux) {
+      transports.add(BleMeshTransport(peerId: sharedPeerId));
+    }
   }
 
-  // BLE — Android, iOS, macOS et Web BLE uniquement.
-  //
-  // Sur Windows et Linux, flutter_reactive_ble lève une UnimplementedError
-  // dès la construction de FlutterReactiveBle() (appel natif non implémenté).
-  // On court-circuite AVANT l'instanciation pour :
-  //   1. Éviter le crash/exception au démarrage.
-  //   2. Supprimer le warning "[P2PMeshService] transport ble indisponible"
-  //      dans les logs console (WARN #5).
-  // Les transports Wi-Fi Multicast et WebSocket Relay prennent le relais
-  // normalement sur ces plateformes desktop.
-  final bleSupported = kIsWeb ||
-      (!kIsWeb && !io.Platform.isWindows && !io.Platform.isLinux);
-  if (bleSupported) {
-    transports.add(BleMeshTransport(peerId: sharedPeerId));
-  }
-
-  // Relay via WebSocket
+  // Relay via WebSocket (cross-platform, y compris Web)
   transports.add(
     RelayMeshTransport(relayUrl: relayUrl, peerId: sharedPeerId),
   );
+
+  // Sur le Web, on ajoute un transport loopback pour la sandbox
+  // (permet l'injection de paquets simulés sans hardware physique).
+  if (kIsWeb) {
+    // Import dynamique pour éviter la compilation conditionnelle
+    // Le fichier loopback_transport.dart n'importe aucune dépendance native.
+    transports.add(LoopbackMeshTransport(peerId: sharedPeerId));
+  }
 
   return NetworkBootstrap(
     failoverConfig: cfg,
