@@ -42,10 +42,10 @@
   // ════════════════════════════════════════════════════════════════
 
   function loadTranslations(lang) {
-    // Détermine le chemin relatif selon la page
-    const base = (document.location.pathname.includes('/')
-      && !document.location.pathname.endsWith('/'))
-      ? '../' : '';
+    // Chemin relatif vers le dossier locales/
+    // Si la page est dans un sous-dossier (ex: /sub/page.html), on remonte
+    const path = document.location.pathname;
+    const base = (path.lastIndexOf('/') > 0) ? '../' : '';
     const url = `${base}${LOCALES_DIR}/${lang}.json`;
 
     // Cache-breaker en dev
