@@ -44,6 +44,7 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final ScrollController _scrollController = ScrollController();
+  // ignore: unused_field
   LoopbackMeshTransport? _loopback;
 
   @override
