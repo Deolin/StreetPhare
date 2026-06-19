@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "ws": "^8.18.0"
+    "ws": "^8.21.0"
   },
   "scripts": {
     "server": "npm --prefix test_servers run start",
