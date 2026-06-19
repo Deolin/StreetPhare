@@ -47,3 +47,15 @@ test_servers/events_admin.json
 # Fichiers temporaires système et OS
 .DS_Store
 Thumbs.db
+.idea/inspectionProfiles/Project_Default.xml
+.idea/libraries/Dart_Packages.xml
+.idea/libraries/Dart_SDK.xml
+.idea/libraries/Flutter_Plugins.xml
+.idea/markdown.xml
+.idea/misc.xml
+.idea/StreetPhare.iml
+.idea/studiobot.xml
+.idea/vcs.xml
+SERVER_STATUS_3000.md
+*.md
+android/build/reports/problems/problems-report.html

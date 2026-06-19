@@ -77,7 +77,7 @@ if [ -f "android/gradlew" ]; then
   }
 else
   log "${JAUNE}⚠ android/gradlew introuvable — génération via Flutter...${NC}"
-  cd android && gradle wrapper --gradle-version 9.1.0 && cd ..
+  cd android && gradle wrapper --gradle-version 9.3.0 && cd ..
   run_step "Gradle clean (après génération)" "cd android && ./gradlew clean --no-daemon" || true
 fi
 
