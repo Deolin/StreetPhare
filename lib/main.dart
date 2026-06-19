@@ -70,7 +70,7 @@ void main() async {
     orientationFuture,
   ]);
 
-  // === Étape 3 : Sauvegarde de l'APK source (premier lancement uniquement) ===
+  // === Étape 2 : Sauvegarde de l'APK source (premier lancement uniquement) ===
   // Non-bloquant : s'exécute en arrière-plan sans retarder le démarrage.
   // Copie l'APK installé vers le stockage Documents persistant pour
   // la fonctionnalité de distribution P2P (partage sans Play Store).
@@ -80,7 +80,7 @@ void main() async {
     debugPrint('[main] orientation verrouillée + logger client initialisé');
   }
 
-  // === Initialisation de la "ruche" réseau décentralisée ===
+  // === Étape 3 : Initialisation de la "ruche" réseau décentralisée ===
   if (kDebugMode) {
     debugPrint('[main] ${NetworkConfig.describe()}');
   }
@@ -112,7 +112,7 @@ void main() async {
           '${describePlatform()}');
     }
 
-    // === Phase 2 : Intelligence StreetPhare ===
+    // === Étape 5 : Intelligence StreetPhare ===
     // Démarre les services "intelligents" : géofencing, validation
     // de proximité (avec cooldown anti-spam), gestionnaire
     // d'événements (countdown "juste-à-temps") et messagerie Hive P2P.

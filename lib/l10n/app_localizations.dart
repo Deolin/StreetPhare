@@ -12,12 +12,12 @@ import 'app_localizations_nl.dart';
 
 // ignore_for_file: type=lint
 
-/// Callers can lookup localized strings with an instance of AppLocalizations
-/// returned by `AppLocalizations.of(context)`.
+/// Permet de récupérer les chaînes localisées via une instance
+/// de AppLocalizations retournée par `AppLocalizations.of(context)`.
 ///
-/// Applications need to include `AppLocalizations.delegate()` in their app's
-/// `localizationDelegates` list, and the locales they support in the app's
-/// `supportedLocales` list. For example:
+/// Les applications doivent inclure `AppLocalizations.delegate()` dans
+/// leur liste `localizationDelegates` et les locales supportées dans
+/// leur liste `supportedLocales`. Par exemple :
 ///
 /// ```dart
 /// import 'l10n/app_localizations.dart';
@@ -29,34 +29,35 @@ import 'app_localizations_nl.dart';
 /// );
 /// ```
 ///
-/// ## Update pubspec.yaml
+/// ## Mise à jour de pubspec.yaml
 ///
-/// Please make sure to update your pubspec.yaml to include the following
-/// packages:
+/// Assurez-vous de mettre à jour votre pubspec.yaml pour inclure
+/// les paquets suivants :
 ///
 /// ```yaml
 /// dependencies:
-///   # Internationalization support.
+///   # Support de l'internationalisation.
 ///   flutter_localizations:
 ///     sdk: flutter
-///   intl: any # Use the pinned version from flutter_localizations
+///   intl: any # Utiliser la version épinglée de flutter_localizations
 ///
-///   # Rest of dependencies
+///   # Reste des dépendances
 /// ```
 ///
-/// ## iOS Applications
+/// ## Applications iOS
 ///
-/// iOS applications define key application metadata, including supported
-/// locales, in an Info.plist file that is built into the application bundle.
-/// To configure the locales supported by your app, you’ll need to edit this
-/// file.
+/// Les applications iOS définissent des métadonnées clés, y compris les
+/// locales supportées, dans un fichier Info.plist intégré au bundle de
+/// l'application. Pour configurer les locales supportées par votre
+/// application, vous devez modifier ce fichier.
 ///
-/// First, open your project’s ios/Runner.xcworkspace Xcode workspace file.
-/// Then, in the Project Navigator, open the Info.plist file under the Runner
-/// project’s Runner folder.
+/// Ouvrez d'abord l'espace de travail Xcode ios/Runner.xcworkspace de
+/// votre projet. Ensuite, dans le Navigateur de projet, ouvrez le fichier
+/// Info.plist sous le dossier Runner du projet Runner.
 ///
-/// Next, select the Information Property List item, select Add Item from the
-/// Editor menu, then select Localizations from the pop-up menu.
+/// Puis, sélectionnez l'élément Information Property List, choisissez
+/// Add Item dans le menu Editor, puis sélectionnez Localizations dans
+/// le menu contextuel.
 ///
 /// Select and expand the newly-created Localizations item then, for each
 /// locale your application supports, add a new item and select the locale
@@ -1252,7 +1253,7 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
 AppLocalizations lookupAppLocalizations(Locale locale) {
 
 
-  // Lookup logic when only language code is specified.
+  // Logique de recherche lorsque seul le code langue est spécifié.
   switch (locale.languageCode) {
     case 'de': return AppLocalizationsDe();
     case 'en': return AppLocalizationsEn();
@@ -1261,9 +1262,9 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   }
 
   throw FlutterError(
-    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-    'an issue with the localizations generation tool. Please file an issue '
-    'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.'
+    'AppLocalizations.delegate n\'a pas pu charger la locale non supportée "$locale". '
+    'Il s\'agit probablement d\'un problème avec l\'outil de génération de localisations. '
+    'Veuillez signaler le problème sur GitHub avec un exemple reproductible et la '
+    'configuration gen-l10n utilisée.'
   );
 }

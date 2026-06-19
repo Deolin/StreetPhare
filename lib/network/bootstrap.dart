@@ -26,11 +26,11 @@ import 'transports/ble_transport.dart';
 import 'transports/relay_transport.dart';
 import 'transports/wifi_direct_transport_selector.dart';
 
-// Note: Platform access is safe because it's only called when !kIsWeb
-// in describePlatform and buildNetworkBootstrap.
-// However, on Web, dart:io is unavailable.
-// We use conditional imports if necessary, but here we just ensure
-// we don't call dart:io on Web.
+// Note : L'accès à Platform est sûr car il n'est appelé que quand
+// !kIsWeb, dans describePlatform() et buildNetworkBootstrap().
+// Sur Web, dart:io est indisponible. On utilise des imports
+// conditionnels si nécessaire, mais ici on s'assure simplement
+// de ne pas appeler dart:io sur Web.
 import 'dart:io' as io;
 
 /// Contient la configuration et les services construits.

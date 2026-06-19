@@ -71,11 +71,19 @@ class NetworkConfig {
 
   /// Master passphrase utilisée pour dériver la clé AES
   /// de chiffrement / déchiffrement des adresses de backup.
+  /// DOIT être fournie via la variable d'environnement
+  /// `STREETPHARE_MASTER_KEY` au moment de la compilation.
+  /// Aucune valeur par défaut n'est acceptée en production.
   static String get masterPassphrase {
-    return const String.fromEnvironment(
-      'STREETPHARE_MASTER_KEY',
-      defaultValue: 'streetphare-dev-key-CHANGE_ME_IN_PROD',
-    );
+    const key = String.fromEnvironment('STREETPHARE_MASTER_KEY');
+    if (key.isEmpty) {
+      throw StateError(
+        'STREETPHARE_MASTER_KEY non définie. '
+        'Passez --dart-define=STREETPHARE_MASTER_KEY=... '
+        'à la compilation.',
+      );
+    }
+    return key;
   }
 
   // ---------------------------------------------------------------------------
