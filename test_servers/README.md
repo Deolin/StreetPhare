@@ -19,7 +19,6 @@ permet de tester localement, sans déploiement cloud :
 | `server_primary_v2.js`     | **Serveur PRINCIPAL v2** — port 3000 + WebSocket /mesh + LiveMonitor     |
 | `server_secondary_v2.js`   | **Serveur SECONDAIRE v2** (backup #1) — port 3001 + HeartbeatMonitor     |
 | `admin_dashboard_v2.js`    | **🆕 NOC Dashboard v5.0** — port 4000, flux WebSocket temps réel + CLI   |
-| `admin_dashboard.js`       | Dashboard v3/v4 historique (conservé pour rétrocompatibilité)            |
 | `modules/live_monitor.js`  | **🆕 Hub WebSocket central** — diffuse tous les événements en temps réel |
 | `modules/reports_store.js` | Store v2 des signalements (TTL, votes, Panic Collectif)                  |
 | `modules/events_manager.js`| Gestionnaire d'événements et calcul Safe Route                           |
@@ -39,7 +38,7 @@ permet de tester localement, sans déploiement cloud :
 
 Double-cliquez sur `start_tests.bat`, OU depuis un terminal :
 
-```
+```bash
 test_servers\start_tests.bat
 ```
 

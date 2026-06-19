@@ -26,7 +26,7 @@
 //   - un mode "agrégé" (env STREETPHARE_DASHBOARD_AGGREGATE=1)
 //     permet à UN process coordinateur (start_servers.js) de
 //     recevoir l'état de tous les nœuds et de produire LE
-//     fichier canonique `SERVER_STATUS.md`汇总.
+//     fichier canonique `SERVER_STATUS.md` .
 'use strict';
 
 const fs = require('fs');
