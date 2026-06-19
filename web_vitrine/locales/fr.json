@@ -1,0 +1,218 @@
+{
+  "lang": "fr",
+  "lang_name": "Français",
+  "nav": {
+    "why": "Pourquoi",
+    "features": "Fonctionnalités",
+    "download": "Télécharger",
+    "legal": "Légal",
+    "credits": "Crédits",
+    "download_free": "⬇ Télécharger gratuitement"
+  },
+  "hero": {
+    "pill": "Open Source · Gratuit · Sans traçage",
+    "title": "Votre <span class=\"grad\">balise de sécurité</span> en événement",
+    "sub": "StreetPhare sécurise vos trajets lors des rassemblements grâce à un réseau décentralisé pair-à-pair (P2P), des signalements communautaires en temps réel et une navigation intelligente vers les zones sûres — sans serveur central, sans publicité, sans traçage commercial.",
+    "cta_download": "⬇ Télécharger maintenant",
+    "cta_github": "⭐ GitHub",
+    "stat1_val": "100%",
+    "stat1_lbl": "Gratuit & sans pub",
+    "stat2_val": "0",
+    "stat2_lbl": "Données vendues",
+    "stat3_val": "P2P",
+    "stat3_lbl": "Réseau décentralisé",
+    "phone_status1": "🟢 Hive actif",
+    "phone_status1b": "3 pairs · BLE",
+    "phone_status2": "✓ Zone safe",
+    "phone_status2b": "Route calculée",
+    "phone_map_label": "Carte OpenStreetMap"
+  },
+  "why": {
+    "tag": "Le pourquoi",
+    "title": "Conçu pour vous protéger,<br>pas pour vous surveiller",
+    "lead": "En rassemblement public, l'information circule mal, les réseaux mobiles saturent et les forces de l'ordre peuvent bloquer les accès. StreetPhare répond à ces réalités de terrain.",
+    "cards": [
+      {
+        "icon": "📡",
+        "title": "Réseau pair-à-pair décentralisé",
+        "desc": "Même sans connexion internet, StreetPhare maintient un réseau maillé local via Bluetooth Low Energy (BLE) entre les participants. Aucun serveur central n'est requis pour fonctionner."
+      },
+      {
+        "icon": "🔐",
+        "title": "Vie privée par conception",
+        "desc": "Aucun compte, aucune inscription. Les identifiants sont éphémères et rotatifs. Zéro donnée personnelle collectée ou transmise. Chiffrement de bout en bout. Aucun traçage commercial. Jamais."
+      },
+      {
+        "icon": "🗺️",
+        "title": "Cartes hors-ligne OpenStreetMap",
+        "desc": "Les cartes OSM sont embarquées localement. La navigation fonctionne intégralement sans réseau : calcul de route vers les zones sûres, centres de soins, sorties de secours."
+      },
+      {
+        "icon": "🚨",
+        "title": "Signalements communautaires",
+        "desc": "Signalez et recevez en temps réel : barrages, nassages, zones dangereuses, centres de soins. Chaque signalement est validé par consensus (≥3 confirmations) avant d'être visible de tous."
+      },
+      {
+        "icon": "🆘",
+        "title": "Bouton Panic collectif",
+        "desc": "En cas d'urgence collective, déclenchez un signal d'alerte propagé instantanément à tous les participants à proximité via le maillage P2P, même sans connexion internet."
+      },
+      {
+        "icon": "⚡",
+        "title": "100% gratuit, pour toujours",
+        "desc": "Aucune publicité. Aucun achat intégré. Aucun abonnement. Aucune monétisation de vos données. StreetPhare est un outil militant open source sous licence GPLv3."
+      }
+    ]
+  },
+  "features": {
+    "tag": "Fonctionnalités",
+    "title": "Tout ce dont vous avez besoin,<br>sur le terrain",
+    "screenshot_label": "📸 Capture d'écran app",
+    "items": [
+      {
+        "pill": "Carte & Navigation",
+        "title": "Navigation intelligente vers la sécurité",
+        "desc": "La carte affiche en temps réel les signalements de danger validés par la communauté, tracés sur fond OpenStreetMap avec un thème sombre optimisé pour une lecture parfaite même en plein soleil.",
+        "img_title": "Carte interactive en temps réel",
+        "img_desc": "Visualisez votre position, les alertes communautaires, la route sûre et les zones safe directement sur la carte OSM sombre haute-visibilité.",
+        "points": [
+          "Route Safe calculée et affichée avec flèches directionnelles",
+          "Destination prioritaire : Zone Safe / Centre de soins le plus proche",
+          "Thème sombre haute-visibilité (lisible en extérieur)",
+          "Fonctionne hors-ligne avec cartes OSM embarquées",
+          "Boussole et GPS optimisés (seuil 5m pour masquer les oscillations)"
+        ]
+      },
+      {
+        "pill": "Communication",
+        "title": "Messagerie décentralisée Hive",
+        "desc": "Communiquez avec les autres participants via un système de messagerie pair-à-pair chiffré de bout en bout. Les messages sont propagés sur le maillage BLE local sans passer par aucun serveur.",
+        "img_title": "Messagerie Hive P2P",
+        "img_desc": "Échangez des messages chiffrés avec les participants à proximité, même sans connexion internet, via le maillage Bluetooth.",
+        "points": [
+          "Chiffrement de bout en bout (AES-256 + signature)",
+          "Fonctionne sans connexion internet (BLE mesh)",
+          "Identifiants éphémères automatiquement rotatifs",
+          "Système de blocs & signalement de contenu indésirable",
+          "Compteur de pairs actifs (fenêtre glissante 5 minutes)"
+        ]
+      },
+      {
+        "pill": "Événements",
+        "title": "Suivi de trajet de rassemblement public",
+        "desc": "Chargez un événement via QR Code et suivez le cortège en temps réel. Les waypoints sont révélés progressivement pour des raisons de sécurité opérationnelle. Les zones safe, sorties de secours et centres de soins sont affichés directement sur la carte.",
+        "img_title": "Suivi de rassemblement public",
+        "img_desc": "Suivez le point de rassemblement en temps réel, les waypoints révélés progressivement et les zones de rassemblement sécurisées.",
+        "points": [
+          "Chargement via QR Code sécurisé",
+          "Waypoints révélés progressivement",
+          "Zones safe, sorties de secours, street-médics sur la carte",
+          "Suivi verrouillé si aucun événement chargé (protection)",
+          "Mode autonome si serveurs inaccessibles (Hive pur)"
+        ]
+      }
+    ]
+  },
+  "download": {
+    "tag": "Téléchargement",
+    "badge": "✅ Gratuit — Aucune publicité — Aucun traçage",
+    "title": "Téléchargez StreetPhare<br>sur votre plateforme",
+    "sub": "Disponible sur Android, iOS et Windows Desktop. Entièrement gratuit, sans abonnement, sans achat intégré, pour toujours.",
+    "pledge_title": "🔒 Notre engagement de transparence",
+    "pledge_items": [
+      "Aucune publicité, jamais",
+      "Aucun achat intégré",
+      "Aucun traçage commercial",
+      "Aucune donnée personnelle collectée",
+      "Aucun compte requis",
+      "Code source 100% ouvert (GPLv3)",
+      "Auditable par quiconque",
+      "Fonctionne sans serveur (P2P)"
+    ],
+    "android_req": "Android 8.0+ (API 26+)",
+    "ios_req": "iOS 14+ (iPhone & iPad)",
+    "windows_req": "Windows 10/11 (64-bit)",
+    "btn_download": "⬇ Télécharger",
+    "note": "Les binaires sont compilés depuis le code source public. Vous pouvez également compiler l'application vous-même depuis GitHub en suivant les instructions d'installation."
+  },
+  "legal": {
+    "tag": "Légal & Sources",
+    "title": "Transparence totale",
+    "lead": "StreetPhare est un projet open source militant. Tout le code, la documentation et les politiques sont publics et auditables.",
+    "cards": [
+      {
+        "icon": "🔐",
+        "title": "Politique de confidentialité",
+        "desc": "Aucune donnée personnelle collectée. Aucun serveur de tracking. Les identifiants sont éphémères et rotatifs. Aucune télémétrie commerciale.",
+        "link": "Lire la politique →",
+        "href": "privacy.html"
+      },
+      {
+        "icon": "⚖️",
+        "title": "Licence GPLv3",
+        "desc": "StreetPhare est distribué sous licence GNU General Public License v3. Vous êtes libre d'utiliser, étudier, modifier et redistribuer le code.",
+        "link": "Voir la licence →",
+        "href": "https://github.com/Deolin/StreetPhare/blob/main/LICENSE"
+      },
+      {
+        "icon": "📂",
+        "title": "Code source",
+        "desc": "L'intégralité du code Flutter, des serveurs Node.js et de la documentation technique est disponible publiquement sur GitHub.",
+        "link": "Voir sur GitHub →",
+        "href": "https://github.com/Deolin/StreetPhare"
+      },
+      {
+        "icon": "📖",
+        "title": "Documentation technique",
+        "desc": "Architecture P2P, protocole Hive, guide d'installation des serveurs, API et documentation développeur complète.",
+        "link": "Lire la documentation →",
+        "href": "https://github.com/Deolin/StreetPhare/blob/main/README.md"
+      },
+      {
+        "icon": "👤",
+        "title": "À propos du projet",
+        "desc": "StreetPhare est né du besoin concret de sécuriser les trajets lors des grands événements. C'est un outil pour les participants aux rassemblements publics, par les participants.",
+        "link": "En savoir plus →",
+        "href": "about.html"
+      },
+      {
+        "icon": "🐛",
+        "title": "Signaler un bug",
+        "desc": "Trouvé un problème ? Signalez-le directement via l'application (bouton Bug Report) ou ouvrez une issue sur GitHub. Toute contribution est bienvenue.",
+        "link": "Ouvrir une issue →",
+        "href": "https://github.com/Deolin/StreetPhare/issues"
+      }
+    ]
+  },
+  "credits": {
+    "tag": "Remerciements & Crédits",
+    "title": "StreetPhare existe grâce<br>à ces projets",
+    "lead": "StreetPhare repose sur des bibliothèques open source remarquables. Voici les remerciements et crédits explicites à leurs auteurs.",
+    "box_title": "📦 Bibliothèques et frameworks utilisés",
+    "libraries": [
+      { "name": "Flutter & Dart SDK", "desc": "Framework UI multiplateforme (Google). Base de l'application mobile et desktop.", "license": "BSD-3-Clause" },
+      { "name": "flutter_map", "desc": "Cartographie interactive basée sur Leaflet.js pour Flutter. Affichage des tuiles OSM et des couches de données.", "license": "MIT" },
+      { "name": "OsmAnd Core / osmand_flutter", "desc": "Moteur de routage et données cartographiques OpenStreetMap hors-ligne. Calcul de la Route Safe.", "license": "GPLv3" },
+      { "name": "flutter_reactive_ble", "desc": "Bibliothèque BLE réactive pour Flutter. Communication Bluetooth Low Energy du maillage P2P.", "license": "MIT" },
+      { "name": "Hive (hive_flutter)", "desc": "Base de données locale légère et rapide pour Flutter. Stockage des alertes, préférences et messages.", "license": "Apache-2.0" },
+      { "name": "geolocator", "desc": "Accès au GPS et à la géolocalisation multiplateforme. Position en temps réel et calcul de distance.", "license": "MIT" },
+      { "name": "latlong2", "desc": "Calculs géodésiques (distances, bearings, conversions). Utilisé pour la navigation et les géofences.", "license": "MIT" },
+      { "name": "flutter_compass", "desc": "Accès à la boussole matérielle. Orientation directionnelle et flèche de navigation.", "license": "MIT" },
+      { "name": "pointycastle / cryptography", "desc": "Chiffrement AES-256, signatures ECDSA et dérivation de clés. Sécurité des messages et alertes Hive.", "license": "MIT / MPL-2.0" },
+      { "name": "Node.js + Express", "desc": "Serveurs de relais chiffrés (Port 3000/3001) et tableau de bord d'administration web.", "license": "MIT" },
+      { "name": "OpenStreetMap contributors", "desc": "Données cartographiques mondiales libres et collaboratives. Tuiles fournies par CartoDB / OSM.", "license": "ODbL 1.0" }
+    ],
+    "authors": "<strong style=\"color:var(--text)\">Auteurs du projet StreetPhare</strong><br>Développé avec ❤️ par la communauté contributrice. Projet initié en 2026 comme outil militant open source.<br>Contributions bienvenues via <a href=\"https://github.com/Deolin/StreetPhare\" target=\"_blank\" rel=\"noopener\">GitHub</a>."
+  },
+  "footer": {
+    "links": {
+      "why": "Pourquoi",
+      "features": "Fonctionnalités",
+      "download": "Télécharger",
+      "privacy": "Confidentialité",
+      "license": "GPLv3",
+      "github": "GitHub"
+    },
+    "copy": "© 2026 StreetPhare Contributors · Distribué sous licence <a href=\"https://github.com/Deolin/StreetPhare/blob/main/LICENSE\" target=\"_blank\" rel=\"noopener\">GNU GPLv3</a> · Aucune publicité · Aucune donnée vendue · <a href=\"https://github.com/Deolin/StreetPhare\" target=\"_blank\" rel=\"noopener\">Code source ouvert</a>"
+  }
+}

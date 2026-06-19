@@ -30,6 +30,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(10,14,26,.92
 .nav-links a:hover{color:var(--text);opacity:1}
 .btn-nav{background:var(--primary);color:#000!important;padding:8px 20px;border-radius:999px;font-weight:700!important}
 .btn-nav:hover{background:var(--primary-d);opacity:1!important}
+/* LANG SWITCH */
+.lang-selector{display:flex;align-items:center;gap:6px;margin-left:14px}
+.lang-switch{background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.72rem;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;transition:all var(--tr)}
+.lang-switch:hover{color:var(--text);border-color:var(--primary)}
+.lang-switch.active{background:var(--primary);color:#000;border-color:var(--primary)}
 .hamburger{display:none;background:none;border:none;cursor:pointer;color:var(--text);font-size:1.5rem;padding:8px}
 @media(max-width:768px){
   .nav-links{display:none;position:fixed;inset:64px 0 0 0;background:var(--bg2);flex-direction:column;gap:0;padding:24px 0;z-index:99;overflow-y:auto}
@@ -175,12 +180,18 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
     <span>💡</span> StreetPhare
   </div>
   <div class="nav-links" id="nav-links">
-    <a href="#why">Pourquoi</a>
-    <a href="#features">Fonctionnalités</a>
-    <a href="#download">Télécharger</a>
-    <a href="#legal">Légal</a>
-    <a href="#credits">Crédits</a>
-    <a href="#download" class="btn-nav">⬇ Télécharger gratuitement</a>
+    <a href="#why" data-i18n="nav.why">Pourquoi</a>
+    <a href="#features" data-i18n="nav.features">Fonctionnalités</a>
+    <a href="#download" data-i18n="nav.download">Télécharger</a>
+    <a href="#legal" data-i18n="nav.legal">Légal</a>
+    <a href="#credits" data-i18n="nav.credits">Crédits</a>
+    <a href="#download" class="btn-nav" data-i18n="nav.download_free">⬇ Télécharger gratuitement</a>
+  </div>
+  <div class="lang-selector">
+    <button class="lang-switch active" data-lang="fr" aria-label="Français" aria-pressed="true">FR</button>
+    <button class="lang-switch" data-lang="en" aria-label="English" aria-pressed="false">EN</button>
+    <button class="lang-switch" data-lang="nl" aria-label="Nederlands" aria-pressed="false">NL</button>
+    <button class="lang-switch" data-lang="de" aria-label="Deutsch" aria-pressed="false">DE</button>
   </div>
   <button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
 </nav>
@@ -190,34 +201,34 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
   <div class="hero-inner">
     <div class="hero-text">
       <div class="eyebrow">
-        <span class="pill">🔒 Open Source · Gratuit · Sans traçage</span>
+        <span class="pill" data-i18n="hero.pill">🔒 Open Source · Gratuit · Sans traçage</span>
       </div>
-      <h1 class="hero-title">
+      <h1 class="hero-title" data-i18n="hero.title">
         Votre <span class="grad">balise de sécurité</span><br>
         en événement
       </h1>
-      <p class="hero-sub">
+      <p class="hero-sub" data-i18n="hero.sub">
         StreetPhare sécurise vos trajets lors des rassemblements grâce à un réseau 
         décentralisé pair-à-pair (P2P), des signalements communautaires en temps réel 
         et une navigation intelligente vers les zones sûres — sans serveur central, 
         sans publicité, sans traçage commercial.
       </p>
       <div class="hero-actions">
-        <a href="#download" class="btn btn-p">⬇ Télécharger maintenant</a>
-        <a href="https://github.com/Deolin/StreetPhare" target="_blank" rel="noopener" class="btn btn-o">⭐ GitHub</a>
+        <a href="#download" class="btn btn-p" data-i18n="hero.cta_download">⬇ Télécharger maintenant</a>
+        <a href="https://github.com/Deolin/StreetPhare" target="_blank" rel="noopener" class="btn btn-o" data-i18n="hero.cta_github">⭐ GitHub</a>
       </div>
       <div class="hero-stats">
         <div class="stat">
-          <div class="val">100%</div>
-          <div class="lbl">Gratuit &amp; sans pub</div>
+          <div class="val" data-i18n="hero.stat1_val">100%</div>
+          <div class="lbl" data-i18n="hero.stat1_lbl">Gratuit & sans pub</div>
         </div>
         <div class="stat">
-          <div class="val">0</div>
-          <div class="lbl">Données vendues</div>
+          <div class="val" data-i18n="hero.stat2_val">0</div>
+          <div class="lbl" data-i18n="hero.stat2_lbl">Données vendues</div>
         </div>
         <div class="stat">
-          <div class="val">P2P</div>
-          <div class="lbl">Réseau décentralisé</div>
+          <div class="val" data-i18n="hero.stat3_val">P2P</div>
+          <div class="lbl" data-i18n="hero.stat3_lbl">Réseau décentralisé</div>
         </div>
       </div>
     </div>
@@ -225,19 +236,19 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
       <div class="phone">
         <div class="pscreen">
           <div class="pstatus">
-            <span>🟢 Hive actif</span>
-            <span>3 pairs · BLE</span>
+            <span data-i18n="hero.phone_status1">🟢 Hive actif</span>
+            <span data-i18n="hero.phone_status1b">3 pairs · BLE</span>
           </div>
           <div class="pbeacon">💡</div>
           <div class="pmap">
             <div class="dot dot1"></div>
             <div class="dot dot2"></div>
             <div class="dot dot3"></div>
-            <span class="map-label">Carte OpenStreetMap</span>
+            <span class="map-label" data-i18n="hero.phone_map_label">Carte OpenStreetMap</span>
           </div>
           <div class="pstatus">
-            <span style="color:var(--accent)">✓ Zone safe</span>
-            <span>Route calculée</span>
+            <span style="color:var(--accent)" data-i18n="hero.phone_status2">✓ Zone safe</span>
+            <span data-i18n="hero.phone_status2b">Route calculée</span>
           </div>
         </div>
       </div>
@@ -249,9 +260,9 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
 <section id="why">
   <div class="container">
     <div class="reveal">
-      <p class="section-tag">Le pourquoi</p>
-      <h2 class="section-title">Conçu pour vous protéger,<br>pas pour vous surveiller</h2>
-      <p class="section-lead">
+      <p class="section-tag" data-i18n="why.tag">Le pourquoi</p>
+      <h2 class="section-title" data-i18n="why.title">Conçu pour vous protéger,<br>pas pour vous surveiller</h2>
+      <p class="section-lead" data-i18n="why.lead">
         En rassemblement public, l'information circule mal, les réseaux mobiles saturent et les 
         forces de l'ordre peuvent bloquer les accès. StreetPhare répond à ces réalités de terrain.
       </p>
@@ -259,43 +270,43 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
     <div class="why-grid">
       <div class="why-card reveal">
         <div class="why-icon">📡</div>
-        <h3>Réseau pair-à-pair décentralisé</h3>
-        <p>Même sans connexion internet, StreetPhare maintient un réseau maillé local 
+        <h3 data-i18n="why.cards.0.title">Réseau pair-à-pair décentralisé</h3>
+        <p data-i18n="why.cards.0.desc">Même sans connexion internet, StreetPhare maintient un réseau maillé local 
         via Bluetooth Low Energy (BLE) entre les participants. Aucun serveur central 
         n'est requis pour fonctionner.</p>
       </div>
       <div class="why-card reveal">
         <div class="why-icon">🔐</div>
-        <h3>Vie privée par conception</h3>
-        <p>Aucun compte, aucune inscription. Les identifiants sont éphémères et rotatifs. 
+        <h3 data-i18n="why.cards.1.title">Vie privée par conception</h3>
+        <p data-i18n="why.cards.1.desc">Aucun compte, aucune inscription. Les identifiants sont éphémères et rotatifs. 
         Zéro donnée personnelle collectée ou transmise. Chiffrement de bout en bout. 
         Aucun traçage commercial. Jamais.</p>
       </div>
       <div class="why-card reveal">
         <div class="why-icon">🗺️</div>
-        <h3>Cartes hors-ligne OpenStreetMap</h3>
-        <p>Les cartes OSM sont embarquées localement. La navigation fonctionne 
+        <h3 data-i18n="why.cards.2.title">Cartes hors-ligne OpenStreetMap</h3>
+        <p data-i18n="why.cards.2.desc">Les cartes OSM sont embarquées localement. La navigation fonctionne 
         intégralement sans réseau : calcul de route vers les zones sûres, centres 
         de soins, sorties de secours.</p>
       </div>
       <div class="why-card reveal">
         <div class="why-icon">🚨</div>
-        <h3>Signalements communautaires</h3>
-        <p>Signalez et recevez en temps réel : barrages, nassages, zones dangereuses, 
+        <h3 data-i18n="why.cards.3.title">Signalements communautaires</h3>
+        <p data-i18n="why.cards.3.desc">Signalez et recevez en temps réel : barrages, nassages, zones dangereuses, 
         centres de soins. Chaque signalement est validé par consensus (≥3 confirmations) 
         avant d'être visible de tous.</p>
       </div>
       <div class="why-card reveal">
         <div class="why-icon">🆘</div>
-        <h3>Bouton Panic collectif</h3>
-        <p>En cas d'urgence collective, déclenchez un signal d'alerte propagé 
+        <h3 data-i18n="why.cards.4.title">Bouton Panic collectif</h3>
+        <p data-i18n="why.cards.4.desc">En cas d'urgence collective, déclenchez un signal d'alerte propagé 
         instantanément à tous les participants à proximité via le maillage P2P, 
         même sans connexion internet.</p>
       </div>
       <div class="why-card reveal">
         <div class="why-icon">⚡</div>
-        <h3>100% gratuit, pour toujours</h3>
-        <p>Aucune publicité. Aucun achat intégré. Aucun abonnement. Aucune monétisation 
+        <h3 data-i18n="why.cards.5.title">100% gratuit, pour toujours</h3>
+        <p data-i18n="why.cards.5.desc">Aucune publicité. Aucun achat intégré. Aucun abonnement. Aucune monétisation 
         de vos données. StreetPhare est un outil militant open source sous licence GPLv3.</p>
       </div>
     </div>
@@ -306,8 +317,8 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
 <section id="features" style="background:var(--bg)">
   <div class="container">
     <div class="reveal">
-      <p class="section-tag">Fonctionnalités</p>
-      <h2 class="section-title">Tout ce dont vous avez besoin,<br>sur le terrain</h2>
+      <p class="section-tag" data-i18n="features.tag">Fonctionnalités</p>
+      <h2 class="section-title" data-i18n="features.title">Tout ce dont vous avez besoin,<br>sur le terrain</h2>
     </div>
 
     <div class="feat-list">
@@ -315,27 +326,27 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
       <!-- Feat 1 : Carte en temps réel -->
       <div class="feat-item reveal">
         <div class="feat-img-box">
-          <div class="screenshot-label">📸 Capture d'écran app</div>
+          <div class="screenshot-label" data-i18n="features.screenshot_label">📸 Capture d'écran app</div>
           <div class="feat-img-placeholder">
             <div class="icon">🗺️</div>
-            <p><strong style="color:var(--text)">Carte interactive en temps réel</strong><br><br>
+            <p><strong style="color:var(--text)" data-i18n="features.items.0.img_title">Carte interactive en temps réel</strong><br><br data-i18n="features.items.0.img_desc">
               Visualisez votre position, les alertes communautaires, la route sûre et 
               les zones safe directement sur la carte OSM sombre haute-visibilité.
             </p>
           </div>
         </div>
         <div class="feat-content">
-          <span class="pill">Carte &amp; Navigation</span>
-          <h3>Navigation intelligente vers la sécurité</h3>
-          <p>La carte affiche en temps réel les signalements de danger validés par la communauté,
+          <span class="pill" data-i18n="features.items.0.pill">Carte & Navigation</span>
+          <h3 data-i18n="features.items.0.title">Navigation intelligente vers la sécurité</h3>
+          <p data-i18n="features.items.0.desc">La carte affiche en temps réel les signalements de danger validés par la communauté,
             tracés sur fond OpenStreetMap avec un thème sombre optimisé pour une lecture 
             parfaite même en plein soleil.</p>
           <ul class="feat-points">
-            <li>Route Safe calculée et affichée avec flèches directionnelles</li>
-            <li>Destination prioritaire : Zone Safe / Centre de soins le plus proche</li>
-            <li>Thème sombre haute-visibilité (lisible en extérieur)</li>
-            <li>Fonctionne hors-ligne avec cartes OSM embarquées</li>
-            <li>Boussole et GPS optimisés (seuil 5m pour masquer les oscillations)</li>
+            <li data-i18n="features.items.0.points.0">Route Safe calculée et affichée avec flèches directionnelles</li>
+            <li data-i18n="features.items.0.points.1">Destination prioritaire : Zone Safe / Centre de soins le plus proche</li>
+            <li data-i18n="features.items.0.points.2">Thème sombre haute-visibilité (lisible en extérieur)</li>
+            <li data-i18n="features.items.0.points.3">Fonctionne hors-ligne avec cartes OSM embarquées</li>
+            <li data-i18n="features.items.0.points.4">Boussole et GPS optimisés (seuil 5m pour masquer les oscillations)</li>
           </ul>
         </div>
       </div>
@@ -343,27 +354,27 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
       <!-- Feat 2 : Messagerie Hive -->
       <div class="feat-item reverse reveal">
         <div class="feat-img-box">
-          <div class="screenshot-label">📸 Capture d'écran app</div>
+          <div class="screenshot-label" data-i18n="features.screenshot_label">📸 Capture d'écran app</div>
           <div class="feat-img-placeholder">
             <div class="icon">💬</div>
-            <p><strong style="color:var(--text)">Messagerie Hive P2P</strong><br><br>
+            <p><strong style="color:var(--text)" data-i18n="features.items.1.img_title">Messagerie Hive P2P</strong><br><br data-i18n="features.items.1.img_desc">
               Échangez des messages chiffrés avec les participants à proximité, 
               même sans connexion internet, via le maillage Bluetooth.
             </p>
           </div>
         </div>
         <div class="feat-content">
-          <span class="pill">Communication</span>
-          <h3>Messagerie décentralisée Hive</h3>
-          <p>Communiquez avec les autres participants via un système de messagerie 
+          <span class="pill" data-i18n="features.items.1.pill">Communication</span>
+          <h3 data-i18n="features.items.1.title">Messagerie décentralisée Hive</h3>
+          <p data-i18n="features.items.1.desc">Communiquez avec les autres participants via un système de messagerie 
             pair-à-pair chiffré de bout en bout. Les messages sont propagés sur le 
             maillage BLE local sans passer par aucun serveur.</p>
           <ul class="feat-points">
-            <li>Chiffrement de bout en bout (AES-256 + signature)</li>
-            <li>Fonctionne sans connexion internet (BLE mesh)</li>
-            <li>Identifiants éphémères automatiquement rotatifs</li>
-            <li>Système de blocs &amp; signalement de contenu indésirable</li>
-            <li>Compteur de pairs actifs (fenêtre glissante 5 minutes)</li>
+            <li data-i18n="features.items.1.points.0">Chiffrement de bout en bout (AES-256 + signature)</li>
+            <li data-i18n="features.items.1.points.1">Fonctionne sans connexion internet (BLE mesh)</li>
+            <li data-i18n="features.items.1.points.2">Identifiants éphémères automatiquement rotatifs</li>
+            <li data-i18n="features.items.1.points.3">Système de blocs & signalement de contenu indésirable</li>
+            <li data-i18n="features.items.1.points.4">Compteur de pairs actifs (fenêtre glissante 5 minutes)</li>
           </ul>
         </div>
       </div>
@@ -371,28 +382,28 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
       <!-- Feat 3 : Suivi d'événement -->
       <div class="feat-item reveal">
         <div class="feat-img-box">
-          <div class="screenshot-label">📸 Capture d'écran app</div>
+          <div class="screenshot-label" data-i18n="features.screenshot_label">📸 Capture d'écran app</div>
           <div class="feat-img-placeholder">
             <div class="icon">📅</div>
-            <p><strong style="color:var(--text)">Suivi de rassemblement public</strong><br><br>
+            <p><strong style="color:var(--text)" data-i18n="features.items.2.img_title">Suivi de rassemblement public</strong><br><br data-i18n="features.items.2.img_desc">
               Suivez le point de rassemblement en temps réel, les waypoints révélés 
               progressivement et les zones de rassemblement sécurisées.
             </p>
           </div>
         </div>
         <div class="feat-content">
-          <span class="pill">Événements</span>
-          <h3>Suivi de trajet de rassemblement public</h3>
-          <p>Chargez un événement via QR Code et suivez le cortège en temps réel.
+          <span class="pill" data-i18n="features.items.2.pill">Événements</span>
+          <h3 data-i18n="features.items.2.title">Suivi de trajet de rassemblement public</h3>
+          <p data-i18n="features.items.2.desc">Chargez un événement via QR Code et suivez le cortège en temps réel.
             Les waypoints sont révélés progressivement pour des raisons de sécurité 
             opérationnelle. Les zones safe, sorties de secours et centres de soins 
             sont affichés directement sur la carte.</p>
           <ul class="feat-points">
-            <li>Chargement via QR Code sécurisé</li>
-            <li>Waypoints révélés progressivement</li>
-            <li>Zones safe, sorties de secours, street-médics sur la carte</li>
-            <li>Suivi verrouillé si aucun événement chargé (protection)</li>
-            <li>Mode autonome si serveurs inaccessibles (Hive pur)</li>
+            <li data-i18n="features.items.2.points.0">Chargement via QR Code sécurisé</li>
+            <li data-i18n="features.items.2.points.1">Waypoints révélés progressivement</li>
+            <li data-i18n="features.items.2.points.2">Zones safe, sorties de secours, street-médics sur la carte</li>
+            <li data-i18n="features.items.2.points.3">Suivi verrouillé si aucun événement chargé (protection)</li>
+            <li data-i18n="features.items.2.points.4">Mode autonome si serveurs inaccessibles (Hive pur)</li>
           </ul>
         </div>
       </div>
@@ -405,26 +416,26 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
 <section id="download" style="background:var(--bg2)">
   <div class="container" style="text-align:center">
     <div class="reveal">
-      <p class="section-tag">Téléchargement</p>
-      <div class="dl-free-badge">✅ Gratuit — Aucune publicité — Aucun traçage</div>
-      <h2 class="section-title">Téléchargez StreetPhare<br>sur votre plateforme</h2>
-      <p class="dl-sub">
+      <p class="section-tag" data-i18n="download.tag">Téléchargement</p>
+      <div class="dl-free-badge" data-i18n="download.badge">✅ Gratuit — Aucune publicité — Aucun traçage</div>
+      <h2 class="section-title" data-i18n="download.title">Téléchargez StreetPhare<br>sur votre plateforme</h2>
+      <p class="dl-sub" data-i18n="download.sub">
         Disponible sur Android, iOS et Windows Desktop. 
         Entièrement gratuit, sans abonnement, sans achat intégré, pour toujours.
       </p>
     </div>
 
     <div class="dl-pledge reveal">
-      <h3>🔒 Notre engagement de transparence</h3>
+      <h3 data-i18n="download.pledge_title">🔒 Notre engagement de transparence</h3>
       <ul class="pledge-list">
-        <li>Aucune publicité, jamais</li>
-        <li>Aucun achat intégré</li>
-        <li>Aucun traçage commercial</li>
-        <li>Aucune donnée personnelle collectée</li>
-        <li>Aucun compte requis</li>
-        <li>Code source 100% ouvert (GPLv3)</li>
-        <li>Auditable par quiconque</li>
-        <li>Fonctionne sans serveur (P2P)</li>
+        <li data-i18n="download.pledge_items.0">Aucune publicité, jamais</li>
+        <li data-i18n="download.pledge_items.1">Aucun achat intégré</li>
+        <li data-i18n="download.pledge_items.2">Aucun traçage commercial</li>
+        <li data-i18n="download.pledge_items.3">Aucune donnée personnelle collectée</li>
+        <li data-i18n="download.pledge_items.4">Aucun compte requis</li>
+        <li data-i18n="download.pledge_items.5">Code source 100% ouvert (GPLv3)</li>
+        <li data-i18n="download.pledge_items.6">Auditable par quiconque</li>
+        <li data-i18n="download.pledge_items.7">Fonctionne sans serveur (P2P)</li>
       </ul>
     </div>
 
@@ -432,30 +443,30 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
       <div class="dl-card">
         <div class="platform-icon">🤖</div>
         <div class="platform-name">Android</div>
-        <div class="platform-sub">Android 8.0+ (API 26+)</div>
-        <a href="https://github.com/Deolin/StreetPhare/releases" target="_blank" rel="noopener" class="dl-btn">
-          ⬇ Télécharger APK
+        <div class="platform-sub" data-i18n="download.android_req">Android 8.0+ (API 26+)</div>
+        <a href="https://github.com/Deolin/StreetPhare/releases" target="_blank" rel="noopener" class="dl-btn" data-i18n="download.btn_download">
+          ⬇ Télécharger
         </a>
       </div>
       <div class="dl-card">
         <div class="platform-icon">🍎</div>
         <div class="platform-name">iOS</div>
-        <div class="platform-sub">iOS 14+ (iPhone &amp; iPad)</div>
-        <a href="https://github.com/Deolin/StreetPhare/releases" target="_blank" rel="noopener" class="dl-btn">
-          ⬇ Télécharger IPA
+        <div class="platform-sub" data-i18n="download.ios_req">iOS 14+ (iPhone & iPad)</div>
+        <a href="https://github.com/Deolin/StreetPhare/releases" target="_blank" rel="noopener" class="dl-btn" data-i18n="download.btn_download">
+          ⬇ Télécharger
         </a>
       </div>
       <div class="dl-card">
         <div class="platform-icon">🖥️</div>
         <div class="platform-name">Windows Desktop</div>
-        <div class="platform-sub">Windows 10/11 (64-bit)</div>
-        <a href="https://github.com/Deolin/StreetPhare/releases" target="_blank" rel="noopener" class="dl-btn">
-          ⬇ Télécharger EXE
+        <div class="platform-sub" data-i18n="download.windows_req">Windows 10/11 (64-bit)</div>
+        <a href="https://github.com/Deolin/StreetPhare/releases" target="_blank" rel="noopener" class="dl-btn" data-i18n="download.btn_download">
+          ⬇ Télécharger
         </a>
       </div>
     </div>
 
-    <p class="dl-note reveal">
+    <p class="dl-note reveal" data-i18n="download.note">
       Les binaires sont compilés depuis le code source public. 
       Vous pouvez également compiler l'application vous-même depuis 
       <a href="https://github.com/Deolin/StreetPhare" target="_blank" rel="noopener">GitHub</a> 
@@ -468,9 +479,9 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
 <section id="legal" style="background:var(--bg)">
   <div class="container">
     <div class="reveal">
-      <p class="section-tag">Légal &amp; Sources</p>
-      <h2 class="section-title">Transparence totale</h2>
-      <p class="section-lead">
+      <p class="section-tag" data-i18n="legal.tag">Légal & Sources</p>
+      <h2 class="section-title" data-i18n="legal.title">Transparence totale</h2>
+      <p class="section-lead" data-i18n="legal.lead">
         StreetPhare est un projet open source militant. Tout le code, la documentation 
         et les politiques sont publics et auditables.
       </p>
@@ -478,46 +489,46 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
     <div class="legal-grid">
       <div class="legal-card reveal">
         <div class="icon">🔐</div>
-        <h3>Politique de confidentialité</h3>
-        <p>Aucune donnée personnelle collectée. Aucun serveur de tracking. 
+        <h3 data-i18n="legal.cards.0.title">Politique de confidentialité</h3>
+        <p data-i18n="legal.cards.0.desc">Aucune donnée personnelle collectée. Aucun serveur de tracking. 
            Les identifiants sont éphémères et rotatifs. Aucune télémétrie commerciale.</p>
-        <a href="privacy.html">Lire la politique →</a>
+        <a href="privacy.html" data-i18n="legal.cards.0.link">Lire la politique →</a>
       </div>
       <div class="legal-card reveal">
         <div class="icon">⚖️</div>
-        <h3>Licence GPLv3</h3>
-        <p>StreetPhare est distribué sous licence GNU General Public License v3. 
+        <h3 data-i18n="legal.cards.1.title">Licence GPLv3</h3>
+        <p data-i18n="legal.cards.1.desc">StreetPhare est distribué sous licence GNU General Public License v3. 
            Vous êtes libre d'utiliser, étudier, modifier et redistribuer le code.</p>
-        <a href="https://github.com/Deolin/StreetPhare/blob/main/LICENSE" target="_blank" rel="noopener">Voir la licence →</a>
+        <a href="https://github.com/Deolin/StreetPhare/blob/main/LICENSE" target="_blank" rel="noopener" data-i18n="legal.cards.1.link">Voir la licence →</a>
       </div>
       <div class="legal-card reveal">
         <div class="icon">📂</div>
-        <h3>Code source</h3>
-        <p>L'intégralité du code Flutter, des serveurs Node.js et de la documentation 
+        <h3 data-i18n="legal.cards.2.title">Code source</h3>
+        <p data-i18n="legal.cards.2.desc">L'intégralité du code Flutter, des serveurs Node.js et de la documentation 
            technique est disponible publiquement sur GitHub.</p>
-        <a href="https://github.com/Deolin/StreetPhare" target="_blank" rel="noopener">Voir sur GitHub →</a>
+        <a href="https://github.com/Deolin/StreetPhare" target="_blank" rel="noopener" data-i18n="legal.cards.2.link">Voir sur GitHub →</a>
       </div>
       <div class="legal-card reveal">
         <div class="icon">📖</div>
-        <h3>Documentation technique</h3>
-        <p>Architecture P2P, protocole Hive, guide d'installation des serveurs, 
+        <h3 data-i18n="legal.cards.3.title">Documentation technique</h3>
+        <p data-i18n="legal.cards.3.desc">Architecture P2P, protocole Hive, guide d'installation des serveurs, 
            API et documentation développeur complète.</p>
-        <a href="https://github.com/Deolin/StreetPhare/blob/main/README.md" target="_blank" rel="noopener">Lire la documentation →</a>
+        <a href="https://github.com/Deolin/StreetPhare/blob/main/README.md" target="_blank" rel="noopener" data-i18n="legal.cards.3.link">Lire la documentation →</a>
       </div>
       <div class="legal-card reveal">
         <div class="icon">👤</div>
-        <h3>À propos du projet</h3>
-        <p>StreetPhare est né du besoin concret de sécuriser les trajets lors des 
+        <h3 data-i18n="legal.cards.4.title">À propos du projet</h3>
+        <p data-i18n="legal.cards.4.desc">StreetPhare est né du besoin concret de sécuriser les trajets lors des 
            grands événements. C'est un outil pour les participants aux rassemblements publics,
            par les participants.</p>
-        <a href="about.html">En savoir plus →</a>
+        <a href="about.html" data-i18n="legal.cards.4.link">En savoir plus →</a>
       </div>
       <div class="legal-card reveal">
         <div class="icon">🐛</div>
-        <h3>Signaler un bug</h3>
-        <p>Trouvé un problème ? Signalez-le directement via l'application (bouton Bug Report) 
+        <h3 data-i18n="legal.cards.5.title">Signaler un bug</h3>
+        <p data-i18n="legal.cards.5.desc">Trouvé un problème ? Signalez-le directement via l'application (bouton Bug Report) 
            ou ouvrez une issue sur GitHub. Toute contribution est bienvenue.</p>
-        <a href="https://github.com/Deolin/StreetPhare/issues" target="_blank" rel="noopener">Ouvrir une issue →</a>
+        <a href="https://github.com/Deolin/StreetPhare/issues" target="_blank" rel="noopener" data-i18n="legal.cards.5.link">Ouvrir une issue →</a>
       </div>
     </div>
   </div>
@@ -527,73 +538,73 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
 <section id="credits" style="background:var(--bg2)">
   <div class="container">
     <div class="reveal">
-      <p class="section-tag">Remerciements &amp; Crédits</p>
-      <h2 class="section-title">StreetPhare existe grâce<br>à ces projets</h2>
-      <p class="section-lead" style="margin:0 auto">
+      <p class="section-tag" data-i18n="credits.tag">Remerciements & Crédits</p>
+      <h2 class="section-title" data-i18n="credits.title">StreetPhare existe grâce<br>à ces projets</h2>
+      <p class="section-lead" style="margin:0 auto" data-i18n="credits.lead">
         StreetPhare repose sur des bibliothèques open source remarquables. 
         Voici les remerciements et crédits explicites à leurs auteurs.
       </p>
     </div>
     <div class="credits-box reveal">
-      <h3>📦 Bibliothèques et frameworks utilisés</h3>
+      <h3 data-i18n="credits.box_title">📦 Bibliothèques et frameworks utilisés</h3>
       <ul class="credits-list">
         <li>
-          <span class="lib">Flutter &amp; Dart SDK</span>
-          <span>Framework UI multiplateforme (Google). Base de l'application mobile et desktop.</span>
+          <span class="lib">Flutter & Dart SDK</span>
+          <span data-i18n="credits.libraries.0.desc">Framework UI multiplateforme (Google). Base de l'application mobile et desktop.</span>
           <span class="lic">BSD-3-Clause</span>
         </li>
         <li>
           <span class="lib">flutter_map</span>
-          <span>Cartographie interactive basée sur Leaflet.js pour Flutter. Affichage des tuiles OSM et des couches de données.</span>
+          <span data-i18n="credits.libraries.1.desc">Cartographie interactive basée sur Leaflet.js pour Flutter. Affichage des tuiles OSM et des couches de données.</span>
           <span class="lic">MIT</span>
         </li>
         <li>
           <span class="lib">OsmAnd Core / osmand_flutter</span>
-          <span>Moteur de routage et données cartographiques OpenStreetMap hors-ligne. Calcul de la Route Safe.</span>
+          <span data-i18n="credits.libraries.2.desc">Moteur de routage et données cartographiques OpenStreetMap hors-ligne. Calcul de la Route Safe.</span>
           <span class="lic">GPLv3</span>
         </li>
         <li>
           <span class="lib">flutter_reactive_ble</span>
-          <span>Bibliothèque BLE réactive pour Flutter. Communication Bluetooth Low Energy du maillage P2P.</span>
+          <span data-i18n="credits.libraries.3.desc">Bibliothèque BLE réactive pour Flutter. Communication Bluetooth Low Energy du maillage P2P.</span>
           <span class="lic">MIT</span>
         </li>
         <li>
           <span class="lib">Hive (hive_flutter)</span>
-          <span>Base de données locale légère et rapide pour Flutter. Stockage des alertes, préférences et messages.</span>
+          <span data-i18n="credits.libraries.4.desc">Base de données locale légère et rapide pour Flutter. Stockage des alertes, préférences et messages.</span>
           <span class="lic">Apache-2.0</span>
         </li>
         <li>
           <span class="lib">geolocator</span>
-          <span>Accès au GPS et à la géolocalisation multiplateforme. Position en temps réel et calcul de distance.</span>
+          <span data-i18n="credits.libraries.5.desc">Accès au GPS et à la géolocalisation multiplateforme. Position en temps réel et calcul de distance.</span>
           <span class="lic">MIT</span>
         </li>
         <li>
           <span class="lib">latlong2</span>
-          <span>Calculs géodésiques (distances, bearings, conversions). Utilisé pour la navigation et les géofences.</span>
+          <span data-i18n="credits.libraries.6.desc">Calculs géodésiques (distances, bearings, conversions). Utilisé pour la navigation et les géofences.</span>
           <span class="lic">MIT</span>
         </li>
         <li>
           <span class="lib">flutter_compass</span>
-          <span>Accès à la boussole matérielle. Orientation directionnelle et flèche de navigation.</span>
+          <span data-i18n="credits.libraries.7.desc">Accès à la boussole matérielle. Orientation directionnelle et flèche de navigation.</span>
           <span class="lic">MIT</span>
         </li>
         <li>
           <span class="lib">pointycastle / cryptography</span>
-          <span>Chiffrement AES-256, signatures ECDSA et dérivation de clés. Sécurité des messages et alertes Hive.</span>
+          <span data-i18n="credits.libraries.8.desc">Chiffrement AES-256, signatures ECDSA et dérivation de clés. Sécurité des messages et alertes Hive.</span>
           <span class="lic">MIT / MPL-2.0</span>
         </li>
         <li>
           <span class="lib">Node.js + Express</span>
-          <span>Serveurs de relais chiffrés (Port 3000/3001) et tableau de bord d'administration web.</span>
+          <span data-i18n="credits.libraries.9.desc">Serveurs de relais chiffrés (Port 3000/3001) et tableau de bord d'administration web.</span>
           <span class="lic">MIT</span>
         </li>
         <li>
           <span class="lib">OpenStreetMap contributors</span>
-          <span>Données cartographiques mondiales libres et collaboratives. Tuiles fournies par CartoDB / OSM.</span>
+          <span data-i18n="credits.libraries.10.desc">Données cartographiques mondiales libres et collaboratives. Tuiles fournies par CartoDB / OSM.</span>
           <span class="lic">ODbL 1.0</span>
         </li>
       </ul>
-      <div class="authors">
+      <div class="authors" data-i18n="credits.authors">
         <strong style="color:var(--text)">Auteurs du projet StreetPhare</strong><br>
         Développé avec ❤️ par la communauté contributrice. 
         Projet initié en 2026 comme outil militant open source.<br>
@@ -608,14 +619,14 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
 <footer>
   <div class="footer-logo">💡 StreetPhare</div>
   <div class="footer-links">
-    <a href="#why">Pourquoi</a>
-    <a href="#features">Fonctionnalités</a>
-    <a href="#download">Télécharger</a>
-    <a href="privacy.html">Confidentialité</a>
-    <a href="https://github.com/Deolin/StreetPhare/blob/main/LICENSE" target="_blank" rel="noopener">GPLv3</a>
-    <a href="https://github.com/Deolin/StreetPhare" target="_blank" rel="noopener">GitHub</a>
+    <a href="#why" data-i18n="footer.links.why">Pourquoi</a>
+    <a href="#features" data-i18n="footer.links.features">Fonctionnalités</a>
+    <a href="#download" data-i18n="footer.links.download">Télécharger</a>
+    <a href="privacy.html" data-i18n="footer.links.privacy">Confidentialité</a>
+    <a href="https://github.com/Deolin/StreetPhare/blob/main/LICENSE" target="_blank" rel="noopener" data-i18n="footer.links.license">GPLv3</a>
+    <a href="https://github.com/Deolin/StreetPhare" target="_blank" rel="noopener" data-i18n="footer.links.github">GitHub</a>
   </div>
-  <div class="footer-copy">
+  <div class="footer-copy" data-i18n="footer.copy">
     © 2026 StreetPhare Contributors · 
     Distribué sous licence <a href="https://github.com/Deolin/StreetPhare/blob/main/LICENSE" target="_blank" rel="noopener">GNU GPLv3</a> · 
     Aucune publicité · Aucune donnée vendue · 
@@ -623,6 +634,7 @@ footer{background:#060A13;border-top:1px solid var(--border);padding:40px 5vw;di
   </div>
 </footer>
 
+<script src="js/i18n.js"></script>
 <script>
 // ── Menu hamburger
 const ham = document.getElementById('hamburger');

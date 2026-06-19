@@ -385,10 +385,8 @@ function render() {
   lines.push('');
 
   const body = lines.join('\n');
-  const tmp = state.outputFile + '.tmp';
   try {
-    fs.writeFileSync(tmp, body, 'utf8');
-    fs.renameSync(tmp, state.outputFile);
+    fs.writeFileSync(state.outputFile, body, 'utf8');
   } catch (e) {
     console.error('[logger] écriture échouée:', e);
   }

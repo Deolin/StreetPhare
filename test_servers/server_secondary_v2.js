@@ -417,16 +417,35 @@ app.post('/_debug/demote', (req, res) => {
 //  DÉMARRAGE
 // ════════════════════════════════════════════════════════════════════════
 
-app.listen(PORT, () => {
-  log(`✅ SERVEUR BACKUP v2 démarré sur ${SELF_URL}`);
-  log(`   Surveillance du principal : ${PRIMARY_URL}`);
-  log(`   Failover threshold : ${HB_FAIL_THRESHOLD} échecs | Intervalle : ${HB_INTERVAL_MS}ms`);
-  log(`   Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz`);
+function startServer(retryCount = 0) {
+  const server = app.listen(PORT, () => {
+    log(`✅ SERVEUR BACKUP v2 démarré sur ${SELF_URL}`);
+    log(`   Surveillance du principal : ${PRIMARY_URL}`);
+    log(`   Failover threshold : ${HB_FAIL_THRESHOLD} échecs | Intervalle : ${HB_INTERVAL_MS}ms`);
+    log(`   Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz`);
 
-  // Démarrer le monitoring APRÈS que le serveur soit bien initialisé
-  monitor.start();
-  log(`   HeartbeatMonitor démarré → ${PRIMARY_URL}/healthz`);
-});
+    // Démarrer le monitoring APRÈS que le serveur soit bien initialisé
+    monitor.start();
+    log(`   HeartbeatMonitor démarré → ${PRIMARY_URL}/healthz`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      if (retryCount < 5) {
+        log(`⚠ Port ${PORT} occupé, nouvelle tentative dans 2s… (${retryCount + 1}/5)`);
+        setTimeout(() => startServer(retryCount + 1), 2000);
+      } else {
+        console.error(`❌ Impossible de démarrer sur le port ${PORT} après 5 tentatives.`);
+        process.exit(1);
+      }
+    } else {
+      console.error('❌ Erreur serveur:', err);
+      process.exit(1);
+    }
+  });
+}
+
+startServer();
 
 // ── Arrêt propre ─────────────────────────────────────────────────────────
 function gracefulShutdown(signal) {

@@ -36,6 +36,11 @@
     .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .2s; }
     .nav-links a:hover { color: var(--primary); }
     .nav-links a.active { color: var(--primary); }
+    /* LANG SWITCH */
+    .lang-selector{display:flex;align-items:center;gap:6px;margin-left:14px}
+    .lang-switch{background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.72rem;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;transition:all .2s}
+    .lang-switch:hover{color:var(--text);border-color:var(--primary)}
+    .lang-switch.active{background:var(--primary);color:#000;border-color:var(--primary)}
 
     .container { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
     h1 { font-size: 2.2rem; color: var(--primary); margin-bottom: 8px; }
@@ -102,6 +107,12 @@
     <a href="index.html">Accueil</a>
     <a href="privacy.html">Confidentialité</a>
     <a href="about.html" class="active">À propos</a>
+  </div>
+  <div class="lang-selector">
+    <button class="lang-switch active" data-lang="fr" aria-label="Français" aria-pressed="true">FR</button>
+    <button class="lang-switch" data-lang="en" aria-label="English" aria-pressed="false">EN</button>
+    <button class="lang-switch" data-lang="nl" aria-label="Nederlands" aria-pressed="false">NL</button>
+    <button class="lang-switch" data-lang="de" aria-label="Deutsch" aria-pressed="false">DE</button>
   </div>
 </nav>
 
@@ -268,5 +279,6 @@
   © 2026 StreetPhare — Logiciel libre sous licence GNU GPL v3 — Conforme au RGPD (Règlement UE 2016/679)
 </footer>
 
+<script src="js/i18n.js"></script>
 </body>
 </html>

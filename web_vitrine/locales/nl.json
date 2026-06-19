@@ -1,0 +1,218 @@
+{
+  "lang": "nl",
+  "lang_name": "Nederlands",
+  "nav": {
+    "why": "Waarom",
+    "features": "Functies",
+    "download": "Downloaden",
+    "legal": "Juridisch",
+    "credits": "Credits",
+    "download_free": "⬇ Gratis downloaden"
+  },
+  "hero": {
+    "pill": "Open Source · Gratis · Geen tracking",
+    "title": "Uw <span class=\"grad\">veiligheidsbaken</span> bij evenementen",
+    "sub": "StreetPhare beveiligt uw reizen tijdens bijeenkomsten via een gedecentraliseerd peer-to-peer (P2P) netwerk, realtime meldingen van de gemeenschap en intelligente navigatie naar veilige zones — geen centrale server, geen reclame, geen commerciële tracking.",
+    "cta_download": "⬇ Nu downloaden",
+    "cta_github": "⭐ GitHub",
+    "stat1_val": "100%",
+    "stat1_lbl": "Gratis & reclamevrij",
+    "stat2_val": "0",
+    "stat2_lbl": "Data verkocht",
+    "stat3_val": "P2P",
+    "stat3_lbl": "Gedecentraliseerd netwerk",
+    "phone_status1": "🟢 Hive actief",
+    "phone_status1b": "3 peers · BLE",
+    "phone_status2": "✓ Veilige zone",
+    "phone_status2b": "Route berekend",
+    "phone_map_label": "OpenStreetMap"
+  },
+  "why": {
+    "tag": "Het waarom",
+    "title": "Ontworpen om u te beschermen,<br>niet om u te bewaken",
+    "lead": "Tijdens openbare bijeenkomsten circuleert informatie slecht, raken mobiele netwerken overbelast en kunnen autoriteiten toegangspunten blokkeren. StreetPhare beantwoordt deze realiteit op het terrein.",
+    "cards": [
+      {
+        "icon": "📡",
+        "title": "Gedecentraliseerd peer-to-peer netwerk",
+        "desc": "Zelfs zonder internetverbinding onderhoudt StreetPhare een lokaal mesh-netwerk via Bluetooth Low Energy (BLE) tussen deelnemers. Geen centrale server vereist om te functioneren."
+      },
+      {
+        "icon": "🔐",
+        "title": "Privacy by design",
+        "desc": "Geen account, geen registratie. Identificatoren zijn tijdelijk en roterend. Nul persoonlijke gegevens verzameld of verzonden. End-to-end encryptie. Geen commerciële tracking. Nooit."
+      },
+      {
+        "icon": "🗺️",
+        "title": "Offline OpenStreetMap-kaarten",
+        "desc": "OSM-kaarten zijn lokaal ingebed. Navigatie werkt volledig zonder netwerk: routeberekening naar veilige zones, medische posten, nooduitgangen."
+      },
+      {
+        "icon": "🚨",
+        "title": "Meldingen van de gemeenschap",
+        "desc": "Meld en ontvang in realtime: wegversperringen, kettling, gevaarlijke zones, medische posten. Elke melding wordt gevalideerd door consensus (≥3 bevestigingen) voordat deze voor iedereen zichtbaar is."
+      },
+      {
+        "icon": "🆘",
+        "title": "Collectieve paniekknop",
+        "desc": "Activeer bij een collectieve noodsituatie een alarmsignaal dat direct wordt verspreid naar alle deelnemers in de buurt via het P2P-mesh, zelfs zonder internetverbinding."
+      },
+      {
+        "icon": "⚡",
+        "title": "100% gratis, voor altijd",
+        "desc": "Geen reclame. Geen in-app aankopen. Geen abonnementen. Geen geld verdienen aan uw gegevens. StreetPhare is een activistische open-source tool onder GPLv3-licentie."
+      }
+    ]
+  },
+  "features": {
+    "tag": "Functies",
+    "title": "Alles wat u nodig heeft,<br>op het terrein",
+    "screenshot_label": "📸 App screenshot",
+    "items": [
+      {
+        "pill": "Kaart & Navigatie",
+        "title": "Intelligente navigatie naar veiligheid",
+        "desc": "De kaart toont realtime gevalideerde gevaarmeldingen van de gemeenschap, weergegeven op OpenStreetMap met een donker thema geoptimaliseerd voor perfecte leesbaarheid, zelfs in direct zonlicht.",
+        "img_title": "Realtime interactieve kaart",
+        "img_desc": "Bekijk uw positie, gemeenschapswaarschuwingen, veilige route en veilige zones direct op de hoog-contrast donkere OSM-kaart.",
+        "points": [
+          "Veilige route berekend en weergegeven met richtingspijlen",
+          "Prioritaire bestemming: dichtstbijzijnde veilige zone / medische post",
+          "Hoog-contrast donker thema (leesbaar buiten)",
+          "Werkt offline met ingebedde OSM-kaarten",
+          "Kompas en GPS geoptimaliseerd (5m drempel om oscillaties te maskeren)"
+        ]
+      },
+      {
+        "pill": "Communicatie",
+        "title": "Gedecentraliseerde Hive-berichten",
+        "desc": "Communiceer met andere deelnemers via een end-to-end versleuteld peer-to-peer berichtensysteem. Berichten worden verspreid via het lokale BLE-mesh zonder via een server te gaan.",
+        "img_title": "Hive P2P-berichten",
+        "img_desc": "Wissel versleutelde berichten uit met deelnemers in de buurt, zelfs zonder internet, via Bluetooth-mesh.",
+        "points": [
+          "End-to-end encryptie (AES-256 + handtekening)",
+          "Werkt zonder internet (BLE-mesh)",
+          "Automatisch roterende tijdelijke identificatoren",
+          "Blokkade- & meldingssysteem voor ongewenste inhoud",
+          "Actieve peer-teller (5-minuten schuifvenster)"
+        ]
+      },
+      {
+        "pill": "Evenementen",
+        "title": "Route volgen bij openbare bijeenkomsten",
+        "desc": "Laad een evenement via QR-code en volg de optocht in realtime. Waypoints worden geleidelijk onthuld om operationele veiligheidsredenen. Veilige zones, nooduitgangen en medische posten worden direct op de kaart weergegeven.",
+        "img_title": "Volgen van openbare bijeenkomsten",
+        "img_desc": "Volg het verzamelpunt in realtime, geleidelijk onthulde waypoints en beveiligde verzamelgebieden.",
+        "points": [
+          "Veilige QR-code laden",
+          "Geleidelijk onthulde waypoints",
+          "Veilige zones, nooduitgangen, straat-medici op de kaart",
+          "Vergrendelde tracking als er geen evenement geladen is (bescherming)",
+          "Autonome modus als servers onbereikbaar zijn (Pure Hive)"
+        ]
+      }
+    ]
+  },
+  "download": {
+    "tag": "Downloaden",
+    "badge": "✅ Gratis — Geen reclame — Geen tracking",
+    "title": "Download StreetPhare<br>op uw platform",
+    "sub": "Beschikbaar op Android, iOS en Windows Desktop. Volledig gratis, geen abonnement, geen in-app aankopen, voor altijd.",
+    "pledge_title": "🔒 Onze transparantiebelofte",
+    "pledge_items": [
+      "Nooit reclame",
+      "Geen in-app aankopen",
+      "Geen commerciële tracking",
+      "Geen persoonlijke gegevens verzameld",
+      "Geen account vereist",
+      "100% open source code (GPLv3)",
+      "Door iedereen te controleren",
+      "Werkt zonder server (P2P)"
+    ],
+    "android_req": "Android 8.0+ (API 26+)",
+    "ios_req": "iOS 14+ (iPhone & iPad)",
+    "windows_req": "Windows 10/11 (64-bit)",
+    "btn_download": "⬇ Downloaden",
+    "note": "Binaire bestanden worden gecompileerd vanuit openbare broncode. U kunt de applicatie ook zelf compileren vanaf GitHub door de bouwinstructies te volgen."
+  },
+  "legal": {
+    "tag": "Juridisch & Bronnen",
+    "title": "Volledige transparantie",
+    "lead": "StreetPhare is een activistisch open-source project. Alle code, documentatie en beleid zijn openbaar en controleerbaar.",
+    "cards": [
+      {
+        "icon": "🔐",
+        "title": "Privacybeleid",
+        "desc": "Geen persoonlijke gegevens verzameld. Geen trackingserver. Identificatoren zijn tijdelijk en roterend. Geen commerciële telemetrie.",
+        "link": "Lees het beleid →",
+        "href": "privacy.html"
+      },
+      {
+        "icon": "⚖️",
+        "title": "GPLv3-licentie",
+        "desc": "StreetPhare wordt gedistribueerd onder de GNU General Public License v3. U bent vrij om de code te gebruiken, te bestuderen, te wijzigen en te herdistribueren.",
+        "link": "Licentie bekijken →",
+        "href": "https://github.com/Deolin/StreetPhare/blob/main/LICENSE"
+      },
+      {
+        "icon": "📂",
+        "title": "Broncode",
+        "desc": "Alle Flutter-code, Node.js-servers en technische documentatie zijn openbaar beschikbaar op GitHub.",
+        "link": "Bekijk op GitHub →",
+        "href": "https://github.com/Deolin/StreetPhare"
+      },
+      {
+        "icon": "📖",
+        "title": "Technische documentatie",
+        "desc": "P2P-architectuur, Hive-protocol, serverinstallatiegids, API en volledige ontwikkelaarsdocumentatie.",
+        "link": "Documentatie lezen →",
+        "href": "https://github.com/Deolin/StreetPhare/blob/main/README.md"
+      },
+      {
+        "icon": "👤",
+        "title": "Over het project",
+        "desc": "StreetPhare is ontstaan uit de concrete behoefte om reizen tijdens grote evenementen te beveiligen. Het is een tool voor deelnemers aan openbare bijeenkomsten, door deelnemers.",
+        "link": "Meer weten →",
+        "href": "about.html"
+      },
+      {
+        "icon": "🐛",
+        "title": "Een bug melden",
+        "desc": "Een probleem gevonden? Meld het rechtstreeks via de app (Bug Report-knop) of open een issue op GitHub. Alle bijdragen zijn welkom.",
+        "link": "Open een issue →",
+        "href": "https://github.com/Deolin/StreetPhare/issues"
+      }
+    ]
+  },
+  "credits": {
+    "tag": "Dankbetuigingen & Credits",
+    "title": "StreetPhare bestaat dankzij<br>deze projecten",
+    "lead": "StreetPhare vertrouwt op opmerkelijke open-source bibliotheken. Hier zijn de dankbetuigingen en expliciete credits aan hun auteurs.",
+    "box_title": "📦 Gebruikte bibliotheken en frameworks",
+    "libraries": [
+      { "name": "Flutter & Dart SDK", "desc": "Multi-platform UI-framework (Google). Basis van de mobiele en desktop applicatie.", "license": "BSD-3-Clause" },
+      { "name": "flutter_map", "desc": "Interactieve kaarten gebaseerd op Leaflet.js voor Flutter. Weergave van OSM-tegels en datalagen.", "license": "MIT" },
+      { "name": "OsmAnd Core / osmand_flutter", "desc": "Routeringsengine en offline OpenStreetMap-kaartgegevens. Berekening van de veilige route.", "license": "GPLv3" },
+      { "name": "flutter_reactive_ble", "desc": "Reactieve BLE-bibliotheek voor Flutter. Bluetooth Low Energy-communicatie voor P2P-mesh.", "license": "MIT" },
+      { "name": "Hive (hive_flutter)", "desc": "Lichtgewicht en snelle lokale database voor Flutter. Opslag van waarschuwingen, voorkeuren en berichten.", "license": "Apache-2.0" },
+      { "name": "geolocator", "desc": "Cross-platform GPS en geolocatietoegang. Realtime positie en afstandsberekening.", "license": "MIT" },
+      { "name": "latlong2", "desc": "Geodetische berekeningen (afstanden, peilingen, conversies). Gebruikt voor navigatie en geofences.", "license": "MIT" },
+      { "name": "flutter_compass", "desc": "Toegang tot hardwarekompas. Richtingsoriëntatie en navigatiepijl.", "license": "MIT" },
+      { "name": "pointycastle / cryptography", "desc": "AES-256 encryptie, ECDSA-handtekeningen en sleutelafleiding. Beveiliging van Hive-berichten en waarschuwingen.", "license": "MIT / MPL-2.0" },
+      { "name": "Node.js + Express", "desc": "Versleutelde relayservers (poort 3000/3001) en webbeheer-dashboard.", "license": "MIT" },
+      { "name": "OpenStreetMap contributors", "desc": "Vrije en collaboratieve wereldwijde kaartgegevens. Tegels geleverd door CartoDB / OSM.", "license": "ODbL 1.0" }
+    ],
+    "authors": "<strong style=\"color:var(--text)\">Auteurs van het StreetPhare-project</strong><br>Ontwikkeld met ❤️ door de bijdragersgemeenschap. Project geïnitieerd in 2026 als activistische open-source tool.<br>Bijdragen welkom via <a href=\"https://github.com/Deolin/StreetPhare\" target=\"_blank\" rel=\"noopener\">GitHub</a>."
+  },
+  "footer": {
+    "links": {
+      "why": "Waarom",
+      "features": "Functies",
+      "download": "Downloaden",
+      "privacy": "Privacy",
+      "license": "GPLv3",
+      "github": "GitHub"
+    },
+    "copy": "© 2026 StreetPhare Contributors · Gedistribueerd onder <a href=\"https://github.com/Deolin/StreetPhare/blob/main/LICENSE\" target=\"_blank\" rel=\"noopener\">GNU GPLv3</a> · Geen reclame · Geen data verkocht · <a href=\"https://github.com/Deolin/StreetPhare\" target=\"_blank\" rel=\"noopener\">Open source code</a>"
+  }
+}

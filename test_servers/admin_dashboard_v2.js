@@ -1412,30 +1412,50 @@ const server = http.createServer((req, res) => {
 // Liaison à 0.0.0.0 pour accepter les connexions des appareils du réseau
 // local (tablettes, téléphones, autres postes de développement).
 const LISTEN_HOST = '0.0.0.0';
-server.listen(PORT, LISTEN_HOST, () => {
-  // Récupération de l'adresse IP locale pour l'afficher dans les logs
-  const os = require('os');
-  const localIps = [];
-  const nets = os.networkInterfaces();
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) {
-        localIps.push(net.address);
+
+function startAdminServer(retryCount = 0) {
+  server.listen(PORT, LISTEN_HOST, () => {
+    // Récupération de l'adresse IP locale pour l'afficher dans les logs
+    const os = require('os');
+    const localIps = [];
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        if (net.family === 'IPv4' && !net.internal) {
+          localIps.push(net.address);
+        }
       }
     }
-  }
 
-  console.log(`\n🌐 [NOC Dashboard] StreetPhare v5.0`);
-  console.log(`   URL locale : http://localhost:${PORT}`);
-  if (localIps.length > 0) {
-    console.log(`   URL réseau : http://${localIps[0]}:${PORT}`);
-    console.log(`   Adresses   : ${localIps.join(', ')}`);
-  }
-  console.log(`   LiveMonitor : ${LIVE_MONITOR_WS}`);
-  console.log(`   Fonctionnalités : Flux temps réel | CLI | Simulateurs | QR | Kick/Ban | Kill Switch\n`);
+    console.log(`\n🌐 [NOC Dashboard] StreetPhare v5.0`);
+    console.log(`   URL locale : http://localhost:${PORT}`);
+    if (localIps.length > 0) {
+      console.log(`   URL réseau : http://${localIps[0]}:${PORT}`);
+      console.log(`   Adresses   : ${localIps.join(', ')}`);
+    }
+    console.log(`   LiveMonitor : ${LIVE_MONITOR_WS}`);
+    console.log(`   Fonctionnalités : Flux temps réel | CLI | Simulateurs | QR | Kick/Ban | Kill Switch\n`);
 
-  // Connexion au LiveMonitor
-  connectToLiveMonitor();
-});
+    // Connexion au LiveMonitor
+    connectToLiveMonitor();
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      if (retryCount < 5) {
+        console.log(`⚠ Port ${PORT} occupé, nouvelle tentative dans 2s… (${retryCount + 1}/5)`);
+        setTimeout(() => startAdminServer(retryCount + 1), 2000);
+      } else {
+        console.error(`❌ Impossible de démarrer l'admin sur le port ${PORT} après 5 tentatives.`);
+        process.exit(1);
+      }
+    } else {
+      console.error('❌ Erreur serveur admin:', err);
+      process.exit(1);
+    }
+  });
+}
+
+startAdminServer();
 
 module.exports = { kickUser };

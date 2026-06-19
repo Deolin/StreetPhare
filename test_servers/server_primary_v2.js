@@ -500,10 +500,32 @@ app.get('/mesh/status', (_req, res) => {
 // ── Heartbeat initial dans le moniteur ──────────────────────────────────
 liveMonitor.logHeartbeat({ server: 'primary', role: ROLE, port: PORT });
 
-httpServer.listen(PORT, () => {
-  log(`✅ SERVEUR PRINCIPAL v2 démarré sur ${SELF_URL}`);
-  log(`   WebSocket relay : ws://localhost:${PORT}/mesh`);
-  log(`   Moniteur temps réel : ws://localhost:${PORT}/_monitor`);
-  log(`   next_backup = ${NEXT_BACKUP_CLEAR}`);
-  log(`   Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz`);
-});
+function startServer(retryCount = 0) {
+  httpServer.listen(PORT, () => {
+    log(`✅ SERVEUR PRINCIPAL v2 démarré sur ${SELF_URL}`);
+    log(`   WebSocket relay : ws://localhost:${PORT}/mesh`);
+    log(`   Moniteur temps réel : ws://localhost:${PORT}/_monitor`);
+    log(`   next_backup = ${NEXT_BACKUP_CLEAR}`);
+    log(`   Endpoints : /v1/events | /v1/reports | /v1/alerts/sync | /status | /healthz`);
+  });
+
+  httpServer.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      if (retryCount < 5) {
+        log(`⚠ Port ${PORT} occupé, nouvelle tentative dans 2s… (${retryCount + 1}/5)`);
+        setTimeout(() => {
+          httpServer.close();
+          startServer(retryCount + 1);
+        }, 2000);
+      } else {
+        console.error(`❌ Impossible de démarrer sur le port ${PORT} après 5 tentatives.`);
+        process.exit(1);
+      }
+    } else {
+      console.error('❌ Erreur serveur:', err);
+      process.exit(1);
+    }
+  });
+}
+
+startServer();

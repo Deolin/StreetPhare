@@ -36,6 +36,11 @@
     .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .2s; }
     .nav-links a:hover { color: var(--primary); }
     .nav-links a.active { color: var(--primary); }
+    /* LANG SWITCH */
+    .lang-selector{display:flex;align-items:center;gap:6px;margin-left:14px}
+    .lang-switch{background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.72rem;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;transition:all .2s}
+    .lang-switch:hover{color:var(--text);border-color:var(--primary)}
+    .lang-switch.active{background:var(--primary);color:#000;border-color:var(--primary)}
 
     .container { max-width: 900px; margin: 0 auto; padding: 48px 24px 80px; }
     h1 { font-size: 2.2rem; color: var(--primary); margin-bottom: 8px; }
@@ -72,6 +77,12 @@
     <a href="privacy.html" class="active">Confidentialité</a>
     <a href="about.html">À propos</a>
   </div>
+  <div class="lang-selector">
+    <button class="lang-switch active" data-lang="fr" aria-label="Français" aria-pressed="true">FR</button>
+    <button class="lang-switch" data-lang="en" aria-label="English" aria-pressed="false">EN</button>
+    <button class="lang-switch" data-lang="nl" aria-label="Nederlands" aria-pressed="false">NL</button>
+    <button class="lang-switch" data-lang="de" aria-label="Deutsch" aria-pressed="false">DE</button>
+  </div>
 </nav>
 
 <div class="container">
@@ -83,7 +94,7 @@
   </div>
 
   <h2>1. Objet et responsable du traitement</h2>
-  <p>La présente politique de confidentialité s'applique à l'application <strong>StreetPhare</strong>, application de navigation piétonne sécurisée, ainsi qu'au site vitrine hébergé au sous-domaine街StreetPhare.</p>
+   <p>La présente politique de confidentialité s'applique à l'application <strong>StreetPhare</strong>, application de navigation piétonne sécurisée, ainsi qu'au site vitrine hébergé sur <strong>GitHub Pages</strong>.</p>
   <p>StreetPhare est un logiciel libre, distribué sous licence GNU GPL v3, développé de manière bénévole. Aucune entité commerciale n'en tire profit. Aucune donnée n'est collectée à l'insu de l'utilisateur.</p>
 
   <h2>2. Données collectées</h2>
@@ -139,14 +150,14 @@
     <dd><strong>Jamais collectées</strong> (aucun stockage)</dd>
   </dl>
 
-  <h2>5. Réseau P2P décentralisé ettechnologie</h2>
+   <h2>5. Réseau P2P décentralisé et technologie</h2>
   <h3>5.1 Réseau Hive P2P</h3>
   <p>StreetPhare utilise un réseau P2P (pair-à-pair) décentralisé dont les caractéristiques sont :</p>
   <ul>
     <li><strong>Décentralisé</strong> : aucun serveur central n'est impliqué dans la transmission des données</li>
     <li><strong>Chiffré</strong> : les données transitent via des relais chiffrés (Ed25519, AES)</li>
     <li><strong>Anonyme</strong> : les identifiants éphémères garantissent l'anonymat absolu des utilisateurs</li>
-    <li><strong>Pas de serveur de集中</strong> : les données ne sont pas stockées sur un serveur central</li>
+     <li><strong>Pas de serveur central</strong> : les données ne sont pas stockées sur un serveur central</li>
   </ul>
 
   <h3>5.2 Données transmises au serveur</h3>
@@ -162,22 +173,22 @@
     <li><strong>Droit de restriction</strong> : les utilisateurs peuvent limiter les données transmises via les paramètres de l'application</li>
     <li><strong>Droit d'opposition</strong> : les utilisateurs peuvent refuser la transmission de données de signalement</li>
   </ul>
-  <p>Cependant, comme <strong>aucune donnée personnelle n'est collectée</strong>, ces droits ne s'appliquent pas de manière pratique. Les utilisateurs restent anonymes et ninguna trace ne persiste après la fermeture de l'application.</p>
+   <p>Cependant, comme <strong>aucune donnée personnelle n'est collectée</strong>, ces droits ne s'appliquent pas de manière pratique. Les utilisateurs restent anonymes et aucune trace ne persiste après la fermeture de l'application.</p>
 
   <h2>7. Partage des données avec des tiers</h2>
-  <p><strong>Aucune donnée personnelle n'est partagée avec des tiers.</strong> Le réseau P2P décentralisé garantit que les données de signalement sont transmises uniquement entre les pairs (utilisateurs) de manière chiffrée. Le serveur central (Node.js) n'est utilis&acute; que pour :</p>
+   <p><strong>Aucune donnée personnelle n'est partagée avec des tiers.</strong> Le réseau P2P décentralisé garantit que les données de signalement sont transmises uniquement entre les pairs (utilisateurs) de manière chiffrée. Le serveur central (Node.js) n'est utilisé que pour :</p>
   <ul>
     <li>Assurer le routage des itinéraires via les moteurs de routage OSM</li>
     <li>Stocker temporairement les données de signalement (anonymes, TTL 1-10 min)</li>
     <li>Faciliter les échanges peer-to-peer Hive (messages temps réel)</li>
   </ul>
 
-  <h2>8. Cookies et technologies de trace :</h2>
-  <p><strong>Aucun cookie n'est utilisé.</strong> L'application neinstalle pas de cookies, ne persiste pas des données de session, et n'utilise pas de technologies de trace.</p>
-  <p>Le site vitrine de StreetPhare utilise(session cookies) uniquement pour le fonctionnement de la navigation (navigation entre pages). Aucun cookie d'analyse, de publicité ou de personnalisation n'est utilisé.</p>
+   <h2>8. Cookies et technologies de traçage</h2>
+   <p><strong>Aucun cookie n'est utilisé.</strong> L'application n'installe pas de cookies, ne conserve pas de données de session, et n'utilise pas de technologies de traçage.</p>
+   <p>Le site vitrine de StreetPhare peut utiliser des cookies de session uniquement pour le fonctionnement de la navigation (navigation entre pages). Aucun cookie d'analyse, de publicité ou de personnalisation n'est utilisé.</p>
 
   <h2>9. Sécurité</h2>
-  <p>Les données sont protégées par le chiffrement end-to-end (Ed25519 + AES) dans le réseau P2P. Le serveur central utilise les protocoles HTTP/HTTPS suitable. Aucune donnée sensible n'est stockée sur le serveur.</p>
+   <p>Les données sont protégées par le chiffrement de bout en bout (Ed25519 + AES) dans le réseau P2P. Le serveur central utilise les protocoles HTTP/HTTPS appropriés. Aucune donnée sensible n'est stockée sur le serveur.</p>
 
   <h2>10. Modifications de la politique de confidentialité</h2>
   <p>La présente politique de confidentialité peut être modifiée sans préavis. Les utilisateurs sont invités à consulter régulièrement cette page. La date de la dernière mise à jour est indiquée en début de cette page.</p>
@@ -194,5 +205,6 @@
   © 2026 StreetPhare — Logiciel libre sous licence GNU GPL v3 — Conforme au RGPD (Règlement UE 2016/679)
 </footer>
 
+<script src="js/i18n.js"></script>
 </body>
 </html>
