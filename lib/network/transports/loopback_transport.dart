@@ -39,6 +39,7 @@ class LoopbackMeshTransport implements MeshTransport {
   LoopbackMeshTransport({String? peerId})
       : _peerId = peerId ?? 'sp-loopback-${DateTime.now().millisecondsSinceEpoch}';
 
+  // ignore: unused_field
   final String _peerId;
 
   final _incomingController = StreamController<String>.broadcast();
