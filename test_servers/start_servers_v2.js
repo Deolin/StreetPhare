@@ -35,7 +35,8 @@ const PORT_BACKUP    = parseInt(process.env.PORT_BACKUP  || '3001', 10);
 const MAX_RESTARTS   = 3;   // tentatives de redémarrage automatique
 const RESTART_DELAY  = 2000; // délai entre redémarrages (ms)
 const PROJECT_ROOT   = path.resolve(__dirname, '..');
-const STATUS_FILE    = path.join(PROJECT_ROOT, 'SERVER_STATUS.md');
+const STATUS_DIR     = path.join(PROJECT_ROOT, 'status');
+const STATUS_FILE    = path.join(STATUS_DIR, 'SERVER_STATUS.md');
 
 // ── État de l'orchestrateur ───────────────────────────────────────────────
 const state = {
@@ -172,7 +173,7 @@ function writeDashboard() {
     '',
     '---',
     '',
-    `> ℹ️ Pour suivre en direct : \`tail -f SERVER_STATUS.md\``,
+    `> ℹ️ Pour suivre en direct : \`tail -f status/SERVER_STATUS.md\``,
     `> Orchestrateur démarré le : **${fmt(state.startedAt)}**`,
     '',
   ];

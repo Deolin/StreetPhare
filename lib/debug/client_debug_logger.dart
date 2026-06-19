@@ -330,7 +330,7 @@ class ClientDebugLogger {
     if (!_fileWriteEnabled || _outputDir == null || kIsWeb) return;
     final body = _render();
     final f = io.File(
-      '${_outputDir!.path}${io.Platform.pathSeparator}CLIENT_DEBUG.md',
+      '${_outputDir!.path}${io.Platform.pathSeparator}status${io.Platform.pathSeparator}CLIENT_DEBUG.md',
     );
     final tmp = io.File('${f.path}.tmp');
     try {
@@ -445,7 +445,7 @@ class ClientDebugLogger {
     buf.writeln('---');
     buf.writeln();
     buf.writeln(
-      '> ℹ️ Pour suivre en direct : `tail -f CLIENT_DEBUG.md` '
+      '> ℹ️ Pour suivre en direct : `tail -f status/CLIENT_DEBUG.md` '
       '(le fichier est réécrit à chaque évènement).',
     );
     buf.writeln();

@@ -3,8 +3,8 @@
 // Module de journalisation "ultra-lisible" pour le tableau de bord
 // de débogage StreetPhare.
 //
-// Génère (et écrase/complète) un fichier `SERVER_STATUS.md` à la
-// racine du projet. Le fichier est mis à jour dynamiquement à
+// Génère (et écrase/complète) un fichier `status/SERVER_STATUS.md`.
+// Le fichier est mis à jour dynamiquement à
 // chaque action (Ping, Alerte reçue, niveau de consensus atteint,
 // basculement, etc.) pour permettre de suivre visuellement les
 // tests de basculement (failover) et de consensus P2P.
@@ -22,7 +22,7 @@
 //
 // Stratégie d'écriture (anti-race entre primary + secondary) :
 //   - chaque serveur écrit dans SON PROPRE fichier
-//     `SERVER_STATUS_<port>.md` à la racine du projet ;
+//     `status/SERVER_STATUS_<port>.md` ;
 //   - un mode "agrégé" (env STREETPHARE_DASHBOARD_AGGREGATE=1)
 //     permet à UN process coordinateur (start_servers.js) de
 //     recevoir l'état de tous les nœuds et de produire LE
@@ -34,7 +34,8 @@ const path = require('path');
 
 // ----- Configuration interne -----
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-const STATUS_FILE = path.join(PROJECT_ROOT, 'SERVER_STATUS.md');
+const STATUS_DIR = path.join(PROJECT_ROOT, 'status');
+const STATUS_FILE = path.join(STATUS_DIR, 'SERVER_STATUS.md');
 const MAX_RECENT_ALERTS = 15;
 const MAX_RECENT_EVENTS = 25;
 
@@ -118,7 +119,7 @@ function init(opts = {}) {
     state.outputFile = STATUS_FILE;
   } else {
     state.outputFile = state.port
-      ? path.join(PROJECT_ROOT, `SERVER_STATUS_${state.port}.md`)
+      ? path.join(STATUS_DIR, `SERVER_STATUS_${state.port}.md`)
       : STATUS_FILE;
   }
 
@@ -379,7 +380,7 @@ function render() {
   lines.push('---');
   lines.push('');
   lines.push(
-    '> ℹ️ Pour suivre en direct : `tail -f SERVER_STATUS.md` ' +
+    '> ℹ️ Pour suivre en direct : `tail -f status/SERVER_STATUS.md` ' +
     '(le fichier est réécrit à chaque évènement).',
   );
   lines.push('');
