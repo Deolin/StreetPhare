@@ -258,6 +258,40 @@ class _LowVisionSection extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 dense: true,
               ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.text_fields, size: 20, color: Color(0xFF7B1FA2)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Slider(
+                        value: prefs.textScaleFactor,
+                        min: 1.0,
+                        max: 2.0,
+                        divisions: 10,
+                        activeColor: const Color(0xFF7B1FA2),
+                        label: '${prefs.textScaleFactor.toStringAsFixed(1)}×',
+                        onChanged: (v) =>
+                            AppPreferencesStore.instance.setTextScaleFactor(v),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 40,
+                      child: Text(
+                        '${prefs.textScaleFactor.toStringAsFixed(1)}×',
+                        style: TextStyle(
+                          color: onSurface,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
             ],
           );
         },

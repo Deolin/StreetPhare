@@ -715,7 +715,7 @@ class AppStrings {
         bugReportPrivacy:
             '🔒 Aucune donnée personnelle n\'est transmise. Seuls le titre, la description, la catégorie et la version de l\'application sont envoyés.',
         bugReportSectionTitle: 'Signalement de bugs & Suggestions',
-        bugReportSectionDescription: 'Bouton Bug (en bas à gauche de la carte) : signalez un bug ou une suggestion directement depuis l\'interface principale sans quitter la carte.',
+        bugReportSectionDescription: 'Bouton Bug (en haut à droite de la carte) : signalez un bug ou une suggestion directement depuis l\'interface principale sans quitter la carte.',
         eventsJoin: 'Rejoindre un événement',
         eventsNoEvent: 'Aucun événement actif pour le moment',
         eventsQrScan: 'Scanner un QR Code',
@@ -988,7 +988,7 @@ class AppStrings {
         bugReportPrivacy:
             '🔒 No personal data is transmitted. Only the title, description, category, and app version are sent.',
         bugReportSectionTitle: 'Bug Reporting & Suggestions',
-        bugReportSectionDescription: 'Bug Button (bottom left of the map): report a bug or suggestion directly from the main interface without leaving the map.',
+        bugReportSectionDescription: 'Bug Button (top right of the map): report a bug or suggestion directly from the main interface without leaving the map.',
         eventsJoin: 'Join an event',
         eventsNoEvent: 'No active events at the moment',
         eventsQrScan: 'Scan QR Code',

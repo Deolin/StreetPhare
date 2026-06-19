@@ -189,9 +189,7 @@ class StreetPhareApp extends StatelessWidget {
 
                   // Facteur d'échelle du texte global (accessibilité / malvoyant).
                   builder: (context, child) {
-                    final factor = prefs.lowVisionMode
-                        ? prefs.textScaleFactor
-                        : prefs.textScaleFactor;
+                    final factor = prefs.textScaleFactor;
                     return MediaQuery(
                       data: MediaQuery.of(context).copyWith(
                         textScaler: TextScaler.linear(factor),

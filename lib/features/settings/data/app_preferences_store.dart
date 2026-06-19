@@ -162,6 +162,7 @@ class AppPreferences {
     this.userPointLatitude,
     this.userPointLongitude,
     this.lowVisionMode = false,
+    this.textScaleFactor = 1.0,
     this.messageFilter = MessageFilter.all,
     this.mapCacheMaxAgeDays = 7,
     this.androidChannelSettings = const {},
@@ -176,6 +177,11 @@ class AppPreferences {
 
   /// Mode Malvoyant : grand texte, interface adaptée, signalement 2 colonnes.
   final bool lowVisionMode;
+
+  /// Facteur d'échelle du texte (1.0 = normal, 2.0 = max).
+  /// Persiste indépendamment du mode malvoyant pour une
+  /// accessibilité fine.
+  final double textScaleFactor;
 
   /// Filtre des messages Hive P2P.
   final MessageFilter messageFilter;
@@ -199,6 +205,7 @@ class AppPreferences {
     double? userPointLatitude,
     double? userPointLongitude,
     bool? lowVisionMode,
+    double? textScaleFactor,
     MessageFilter? messageFilter,
     int? mapCacheMaxAgeDays,
     Map<String, bool>? androidChannelSettings,
@@ -211,6 +218,7 @@ class AppPreferences {
       userPointLatitude: userPointLatitude ?? this.userPointLatitude,
       userPointLongitude: userPointLongitude ?? this.userPointLongitude,
       lowVisionMode: lowVisionMode ?? this.lowVisionMode,
+      textScaleFactor: textScaleFactor ?? this.textScaleFactor,
       messageFilter: messageFilter ?? this.messageFilter,
       mapCacheMaxAgeDays: mapCacheMaxAgeDays ?? this.mapCacheMaxAgeDays,
       androidChannelSettings:
@@ -226,6 +234,7 @@ class AppPreferences {
         'userLat': userPointLatitude,
         'userLng': userPointLongitude,
         'lowVisionMode': lowVisionMode,
+        'textScaleFactor': textScaleFactor,
         'messageFilter': messageFilter.name,
         'mapCacheMaxAgeDays': mapCacheMaxAgeDays,
         'androidChannels': androidChannelSettings,
@@ -252,6 +261,7 @@ class AppPreferences {
       userPointLongitude: (json['userLng'] as num?)?.toDouble(),
       androidChannelSettings: channels,
       lowVisionMode: (json['lowVisionMode'] as bool?) ?? false,
+      textScaleFactor: (json['textScaleFactor'] as num?)?.toDouble() ?? 1.0,
       messageFilter: MessageFilter.values.firstWhere(
         (e) => e.name == json['messageFilter'],
         orElse: () => MessageFilter.all,
@@ -323,6 +333,10 @@ class AppPreferencesStore extends ValueNotifier<AppPreferences> {
   /// Active/désactive le Mode Malvoyant.
   Future<void> setLowVisionMode(bool enabled) =>
       update(value.copyWith(lowVisionMode: enabled));
+
+  /// Règle le facteur d'échelle du texte (1.0 → 2.0).
+  Future<void> setTextScaleFactor(double factor) =>
+      update(value.copyWith(textScaleFactor: factor.clamp(1.0, 2.0)));
 
   /// Modifie le filtre messagerie Hive P2P.
   Future<void> setMessageFilter(MessageFilter filter) =>

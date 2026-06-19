@@ -41,6 +41,7 @@ import '../core/network/peer_counter_service.dart';
 import 'collective_panic_service.dart';
 import 'failover_manager.dart';
 import 'p2p_mesh_service.dart';
+import '../services/notification_service.dart';
 
 /// Coordinateur réseau singleton.
 class NetworkCoordinator {
@@ -367,6 +368,38 @@ class NetworkCoordinator {
     if (local.confirmations.contains(_ephemeralUserId)) return;
     local.addConfirmation(_ephemeralUserId);
     _db.upsert(local);
+
+    // Déclenche une notification native immédiate pour
+    // l'utilisateur, même si l'application est en arrière-plan.
+    NotificationService.instance.showAlertNotification(
+      title: 'Alerte StreetPhare',
+      body: '${_describeAlertType(alert.type)} signalé à proximité.',
+      id: alert.id.hashCode,
+    );
+  }
+
+  /// Retourne une description lisible du type d'alerte.
+  String _describeAlertType(AlertType type) {
+    switch (type) {
+      case AlertType.barrage:
+        return 'Barrage';
+      case AlertType.nasse:
+        return 'Nasse';
+      case AlertType.controle:
+        return 'Contrôle policier';
+      case AlertType.accident:
+        return 'Accident / canon à eau';
+      case AlertType.rassemblement:
+        return 'Rassemblement à risque';
+      case AlertType.zoneSafe:
+        return 'Zone sûre';
+      case AlertType.panicCollectif:
+        return 'Alerte Panic Collective';
+      case AlertType.density:
+        return 'Densité élevée';
+      case AlertType.autre:
+        return 'Autre danger';
+    }
   }
 
   // --------------------------------------------------------------------------

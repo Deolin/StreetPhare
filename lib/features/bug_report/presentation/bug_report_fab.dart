@@ -2,7 +2,7 @@
 //
 // [5] FAB persistant de signalement de bugs — StreetPhare
 //
-// S'affiche en bas à gauche au-dessus de tous les éléments de l'interface.
+// S'affiche en haut à droite au-dessus de tous les éléments de l'interface.
 // Ouvre un dialogue de saisie du rapport.
 
 import 'package:flutter/material.dart';
@@ -20,8 +20,8 @@ class BugReportFab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      left: 16,
-      bottom: 32,
+      right: 16,
+      top: 32,
       child: Tooltip(
         message: 'Signaler un bug ou une suggestion',
         child: Material(
