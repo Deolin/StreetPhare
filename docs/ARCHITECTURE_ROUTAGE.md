@@ -618,12 +618,12 @@ class RoutingIsolate {
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ computeRoute(start, end)                                                 │
 ├──────────────────────────────────────────────────────────────────────────┤
-│ 0. Graphe .spg chargé + Isolate → A* bidirectionnel → ~50 ms ●●●●●●●●●● │ ← MVP
-│ 1. MethodChannel Android (GraphHopper embarqué)  → ~200 ms  ●●●●●○○○○○ │ ← Legacy
-│ 2. GraphHopper HTTP local (192.168.31.18:8080)   → ~500 ms  ●●●○○○○○○○ │ ← Legacy
-│ 3. OSRM public (router.project-osrm.org)         → ~2 s     ●●○○○○○○○○ │ ← Legacy
-│ 4. SafePathEngine (grille Dijkstra)              → ~100 ms  ●●●●●●●●○○ │ ← Fallback
-│ 5. Ligne droite                                  → ~1 ms    ●○○○○○○○○○ │ ← Ultime
+│ 0. Graphe .spg chargé + Isolate → A* bidirectionnel → ~50 ms ●●●●●●●●●●  │ ← MVP
+│ 1. MethodChannel Android (GraphHopper embarqué)  → ~200 ms   ●●●●●○○○○○  │ ← Legacy
+│ 2. GraphHopper HTTP local (192.168.31.18:8080)   → ~500 ms   ●●●○○○○○○○  │ ← Legacy
+│ 3. OSRM public (router.project-osrm.org)         → ~2 s      ●●○○○○○○○○  │ ← Legacy
+│ 4. SafePathEngine (grille Dijkstra)              → ~100 ms   ●●●●●●●●○○  │ ← Fallback
+│ 5. Ligne droite                                  → ~1 ms     ●○○○○○○○○○  │ ← Ultime
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
