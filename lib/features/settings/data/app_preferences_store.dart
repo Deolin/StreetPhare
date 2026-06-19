@@ -165,6 +165,7 @@ class AppPreferences {
     this.messageFilter = MessageFilter.all,
     this.mapCacheMaxAgeDays = 7,
     this.androidChannelSettings = const {},
+    this.textScaleFactor = 1.0,
   });
 
   final bool batterySaverEnabled;
@@ -187,6 +188,11 @@ class AppPreferences {
   /// Clés : 'alerts', 'events', 'panic', 'messages'
   final Map<String, bool> androidChannelSettings;
 
+  /// Facteur d'échelle du texte (mode malvoyant / accessibilité).
+  /// 1.0 = taille normale, 1.15 = 15% plus grand, 1.3 = 30% etc.
+  /// Plage autorisée : 0.8 à 2.0.
+  final double textScaleFactor;
+
   /// Retourne si un canal Android est activé (actif par défaut).
   bool isAndroidChannelEnabled(String channelId) =>
       androidChannelSettings[channelId] ?? true;
@@ -202,6 +208,7 @@ class AppPreferences {
     MessageFilter? messageFilter,
     int? mapCacheMaxAgeDays,
     Map<String, bool>? androidChannelSettings,
+    double? textScaleFactor,
   }) {
     return AppPreferences(
       batterySaverEnabled: batterySaverEnabled ?? this.batterySaverEnabled,
@@ -215,6 +222,7 @@ class AppPreferences {
       mapCacheMaxAgeDays: mapCacheMaxAgeDays ?? this.mapCacheMaxAgeDays,
       androidChannelSettings:
           androidChannelSettings ?? this.androidChannelSettings,
+      textScaleFactor: textScaleFactor ?? this.textScaleFactor,
     );
   }
 
@@ -229,6 +237,7 @@ class AppPreferences {
         'messageFilter': messageFilter.name,
         'mapCacheMaxAgeDays': mapCacheMaxAgeDays,
         'androidChannels': androidChannelSettings,
+        'textScaleFactor': textScaleFactor,
       };
 
   factory AppPreferences.fromJson(Map<String, dynamic> json) {
@@ -257,6 +266,7 @@ class AppPreferences {
         orElse: () => MessageFilter.all,
       ),
       mapCacheMaxAgeDays: (json['mapCacheMaxAgeDays'] as int?) ?? 7,
+      textScaleFactor: (json['textScaleFactor'] as num?)?.toDouble() ?? 1.0,
     );
   }
 }
@@ -338,4 +348,8 @@ class AppPreferencesStore extends ValueNotifier<AppPreferences> {
       ..[channelId] = enabled;
     return update(value.copyWith(androidChannelSettings: updated));
   }
+
+  /// Définit le facteur d'échelle du texte (0.8 à 2.0).
+  Future<void> setTextScaleFactor(double factor) =>
+      update(value.copyWith(textScaleFactor: factor.clamp(0.8, 2.0)));
 }

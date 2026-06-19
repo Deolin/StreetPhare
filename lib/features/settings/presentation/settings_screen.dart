@@ -258,6 +258,39 @@ class _LowVisionSection extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 dense: true,
               ),
+              const Divider(height: 16),
+              // Slider de taille du texte
+              Padding(
+                padding: const EdgeInsets.only(left: 30),
+                child: Row(
+                  children: [
+                    Icon(Icons.text_fields,
+                        size: 18,
+                        color: onSurface.withValues(alpha: 0.7)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${strings.lowVisionTitle} : ${(prefs.textScaleFactor * 100).round()}%',
+                        style: TextStyle(
+                          color: onSurface,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Slider(
+                value: prefs.textScaleFactor,
+                min: 0.8,
+                max: 2.0,
+                divisions: 24,
+                activeColor: const Color(0xFF7B1FA2),
+                label: '${(prefs.textScaleFactor * 100).round()}%',
+                onChanged: (v) =>
+                    AppPreferencesStore.instance.setTextScaleFactor(v),
+              ),
             ],
           );
         },

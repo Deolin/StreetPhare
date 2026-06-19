@@ -629,7 +629,7 @@ class AppStrings {
         lowVisionTitle: 'Mode Malvoyant',
         lowVisionSubtitle: 'Grand texte et interface adaptée pour une meilleure lisibilité',
         lowVisionDescription:
-            'Active de très grands caractères, supprime le titre StreetPhare sur la carte et réorganise le menu de signalement en 2 colonnes (grands boutons tactiles). Activé automatiquement si TalkBack/VoiceOver est détecté.',
+            'Active de très grands caractères, réorganise le menu de signalement en 2 colonnes (grands boutons tactiles). Activé automatiquement si TalkBack/VoiceOver est détecté.',
         lowVisionEnabled: 'Mode Malvoyant activé',
         lowVisionDisabled: 'Mode Malvoyant désactivé',
         lowVisionStatusEnabled: 'Grands caractères, 2 colonnes signalement',
@@ -641,7 +641,7 @@ class AppStrings {
         messageFilterNearbyLabel: 'Messages proches uniquement',
         messageFilterNearbyDescription: 'Messages émis dans un rayon de 300 m',
         messageFilterAdminLabel: 'Administrateurs de l\'événement',
-        messageFilterAdminDescription: 'Messages signés par un administrateur de l\'événement',
+        messageFilterAdminDescription: 'Messages administrateur de l\'événement',
         messageFilterAlertLabel: 'Messages d\'alerte uniquement',
         messageFilterAlertDescription: 'Uniquement les alertes critiques (type ALERT)',
         avoidanceFiltersTitle: 'Filtres d\'évitement (Route Safe)',
@@ -715,7 +715,7 @@ class AppStrings {
         bugReportPrivacy:
             '🔒 Aucune donnée personnelle n\'est transmise. Seuls le titre, la description, la catégorie et la version de l\'application sont envoyés.',
         bugReportSectionTitle: 'Signalement de bugs & Suggestions',
-        bugReportSectionDescription: 'Bouton Bug (en bas à gauche de la carte) : signalez un bug ou une suggestion directement depuis l\'interface principale sans quitter la carte.',
+        bugReportSectionDescription: 'Bouton Bug (en haut à droite de la carte) : signalez un bug ou une suggestion directement depuis l\'interface principale sans quitter la carte.',
         eventsJoin: 'Rejoindre un événement',
         eventsNoEvent: 'Aucun événement actif pour le moment',
         eventsQrScan: 'Scanner un QR Code',

@@ -372,7 +372,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get bugReportSectionTitle => 'Signalement de bugs & Suggestions';
 
   @override
-  String get bugReportSectionDescription => 'Bouton Bug (en bas à gauche de la carte) : signalez un bug ou une suggestion directement depuis l\'interface principale sans quitter la carte.';
+  String get bugReportSectionDescription => 'Bouton Bug (en haut à droite de la carte) : signalez un bug ou une suggestion directement depuis l\'interface principale sans quitter la carte.';
 
   @override
   String get eventsJoin => 'Rejoindre un événement';

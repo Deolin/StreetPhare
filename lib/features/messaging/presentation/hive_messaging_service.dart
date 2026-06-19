@@ -19,6 +19,7 @@ import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../network/network_coordinator.dart';
+import '../../../services/notification_service.dart';
 import '../../settings/data/app_preferences_store.dart';
 import '../data/hive_block_service.dart';
 import '../domain/models/hive_message.dart';
@@ -187,6 +188,17 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
       _allMessages[msg.id] = msg;
       _trimToLimit();
       _emitFiltered(userPosition: localPosition);
+
+      // Notification Android native pour les messages d'alerte.
+      if (msg.type == HiveMessageType.alert) {
+        unawaited(NotificationService.instance.showAlertNotification(
+          title: '🚨 Message d\'alerte',
+          body: msg.content.length > 100
+              ? '${msg.content.substring(0, 100)}…'
+              : msg.content,
+          id: msg.id.hashCode,
+        ));
+      }
     } catch (e) {
       debugPrint('[HiveMessaging] erreur réception: $e');
     }
