@@ -42,3 +42,4 @@ Thumbs.db
 *.md
 android/build/reports/problems/problems-report.html
 android/.kotlin/sessions/kotlin-compiler-12426433643112611207.salive
+CLIENT_DEBUG.md.tmp
