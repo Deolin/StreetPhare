@@ -18,12 +18,42 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
 import '../../../core/theme/streetphare_theme.dart';
+import '../../settings/data/settings_store.dart';
 import '../domain/models/route_result.dart';
 import '../infrastructure/osmand_routing_service.dart';
 import 'widgets/route_calculation_overlay.dart';
 
 /// Callback asynchrone pour charger les alternatives à la demande.
 typedef AlternativesLoader = Future<List<RouteResult>> Function();
+
+/// Mode de transport pour le calcul d'itinéraire.
+enum TransportMode {
+  pedestrian,
+  car,
+  transit;
+
+  IconData get icon {
+    switch (this) {
+      case TransportMode.pedestrian:
+        return Icons.directions_walk;
+      case TransportMode.car:
+        return Icons.directions_car;
+      case TransportMode.transit:
+        return Icons.directions_bus;
+    }
+  }
+
+  String label(AppStrings s) {
+    switch (this) {
+      case TransportMode.pedestrian:
+        return s.transportModePedestrian;
+      case TransportMode.car:
+        return s.transportModeCar;
+      case TransportMode.transit:
+        return s.transportModeTransit;
+    }
+  }
+}
 
 class RouteResultSheet extends StatefulWidget {
   const RouteResultSheet({
@@ -70,6 +100,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
   bool _loadingAlternatives = false;
   RouteResult? _selected;
   List<RouteResult> _alternatives = const [];
+  TransportMode _transportMode = TransportMode.pedestrian;
 
   @override
   void initState() {
@@ -146,11 +177,13 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // ── En-tête ─────────────────────────────────────────────────
-            Row(
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8.0,
+              runSpacing: 4.0,
               children: [
                 const Icon(Icons.shield,
                     color: StreetPhareTheme.primary, size: 22),
-                const SizedBox(width: 8),
                 Text(
                   s.routeTitle,
                   style: const TextStyle(
@@ -159,15 +192,60 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 0), // absorbé par spacing
                 IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                   icon: const Icon(Icons.close,
-                      color: StreetPhareTheme.textSecondary),
+                      color: StreetPhareTheme.textSecondary, size: 22),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
             const SizedBox(height: 8),
+
+            // ── Sélecteur de mode de transport ──────────────────────────
+            ValueListenableBuilder<bool>(
+              valueListenable: VisualImpairedStore.instance,
+              builder: (context, isVisualImpaired, _) {
+                return Wrap(
+                  spacing: 8.0,
+                  runSpacing: 8.0,
+                  children: TransportMode.values.map((mode) {
+                    final isSelected = _transportMode == mode;
+                    return ChoiceChip(
+                      label: Text(
+                        mode.label(s),
+                        style: TextStyle(
+                          color: isSelected
+                              ? Colors.black
+                              : StreetPhareTheme.textPrimary,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 13,
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedColor: StreetPhareTheme.primary,
+                      backgroundColor: StreetPhareTheme.darkSurfaceVariant
+                          .withValues(alpha: 0.5),
+                      side: BorderSide(
+                        color: isSelected
+                            ? StreetPhareTheme.primary
+                            : StreetPhareTheme.textSecondary
+                                .withValues(alpha: 0.3),
+                      ),
+                      onSelected: (sel) {
+                        if (sel) {
+                          setState(() => _transportMode = mode);
+                        }
+                      },
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
 
             // ── Mini-carte ───────────────────────────────────────────────
             _MiniRouteMap(route: _selected ?? recommended),

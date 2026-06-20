@@ -252,20 +252,6 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  /// [3] Arrête le tracking GPS et SUPPRIME INSTANTANÉMENT le marqueur
-  /// de position de la carte.
-  void _stopTracking() {
-    _positionSub?.cancel();
-    _positionSub = null;
-    setState(() {
-      _isTracking = false;
-      _userPosition = null; // ← Suppression instantanée du marqueur
-      _userHeading = 0.0;
-      _userSpeed = 0.0;
-    });
-    debugPrint('[MapScreen] tracking arrêté, marqueur effacé.');
-  }
-
   /// Recentre la carte sur la position GPS with zoom ≈ 100 m.
   void _animateToUser() {
     final pos = _userPosition;
@@ -1659,30 +1645,6 @@ class _MapScreenState extends State<MapScreen> {
                                 ),
                               ),
                             ),
-                            if (_isTracking) ...[
-                              const SizedBox(height: 8),
-                              Tooltip(
-                                message: s.mapRecenterTooltip,
-                                child: Material(
-                                  elevation: 4,
-                                  shape: const CircleBorder(),
-                                  color: StreetPhareTheme.surface
-                                      .withValues(alpha: 0.9),
-                                  child: InkWell(
-                                    customBorder: const CircleBorder(),
-                                    onTap: _stopTracking,
-                                    child: const Padding(
-                                      padding: EdgeInsets.all(12),
-                                      child: Icon(
-                                        Icons.close,
-                                        color: StreetPhareTheme.danger,
-                                        size: 22,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
                             // Effacer la Route Safe
                             if (_safeRoutePoints != null) ...[
                               const SizedBox(height: 8),

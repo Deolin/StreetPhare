@@ -36,8 +36,21 @@ import '../data/panic_contact_store.dart';
 // SettingsScreen
 // ============================================================================
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,8 +68,10 @@ class SettingsScreen extends StatelessWidget {
         iconTheme: IconThemeData(color: onSurface),
       ),
       body: Scrollbar(
+        controller: _scrollController,
         thumbVisibility: true,
         child: SingleChildScrollView(
+          controller: _scrollController,
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: ValueListenableBuilder<AppLanguage>(
             valueListenable: AppLocale.instance,

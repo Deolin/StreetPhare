@@ -24,6 +24,9 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        // ── Configuration native des canaux de notification ──────────────────
+        NotificationChannelSetup.createAllChannels(applicationContext)
+
         // ── Canal GraphHopper / OsmAnd routing ──────────────────────────────
         val plugin = OsmAndBridgePlugin(applicationContext)
         bridge = plugin

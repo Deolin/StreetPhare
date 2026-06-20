@@ -278,6 +278,7 @@ class EventModel {
     this.careCenters = const [],
     this.exitPoints = const [],
     this.safeZones = const [],
+    this.generalZone,
   });
 
   /// Code d'invitation (ex: "MANIF-123").
@@ -314,6 +315,13 @@ class EventModel {
   /// Coordonnées du point d'arrivée B.
   final double destinationLatitude;
   final double destinationLongitude;
+
+  /// Commune / zone générale où se déroule l'événement.
+  ///
+  /// Exemples : "Bruxelles", "Liège", "Namur".
+  /// Utilisé pour le préchargement des tuiles cartographiques
+  /// de la zone concernée via [MapCacheManager.preloadZone].
+  final String? generalZone;
 
   LatLng get destination =>
       LatLng(destinationLatitude, destinationLongitude);
@@ -482,6 +490,7 @@ class EventModel {
         'safeZones': safeZones.map((z) => z.toJson()).toList(),
         'destLat': destinationLatitude,
         'destLng': destinationLongitude,
+        if (generalZone != null) 'generalZone': generalZone,
       };
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
@@ -513,6 +522,7 @@ class EventModel {
           .toList(),
       destinationLatitude: (json['destLat'] as num).toDouble(),
       destinationLongitude: (json['destLng'] as num).toDouble(),
+      generalZone: json['generalZone'] as String?,
     );
   }
 }

@@ -41,6 +41,7 @@ import '../core/network/peer_counter_service.dart';
 import 'collective_panic_service.dart';
 import 'failover_manager.dart';
 import 'p2p_mesh_service.dart';
+import '../services/connectivity_service.dart';
 import '../services/notification_service.dart';
 
 /// Coordinateur réseau singleton.
@@ -105,6 +106,17 @@ class NetworkCoordinator {
       transports: transports,
       localPeerId: localPeerId ?? _ephemeralUserId,
     );
+
+    // ── Priorité de découverte P2P : BLE → Wi-Fi → WebSocket ──────
+    await _discoverPeersInPriorityOrder(transports);
+
+    // Notifie ConnectivityService que les transports sont initialisés.
+    ConnectivityService.instance.updateLayerState(
+        'websocket', TransportLayerState.active);
+    ConnectivityService.instance.updateLayerState(
+        'wifi', TransportLayerState.active);
+    ConnectivityService.instance.updateLayerState(
+        'ble', TransportLayerState.active);
 
     // À chaque mutation locale, on tente l'upload si l'alerte
     // vient d'être validée par consensus.
@@ -173,6 +185,80 @@ class NetworkCoordinator {
       debugPrint('[NetworkCoordinator] initialisé. euid=$_ephemeralUserId');
       debugPrint('[NetworkCoordinator] Messagerie Hive P2P branchée '
           'sur ${transports.length} transport(s)');
+    }
+  }
+
+  /// Découvre les pairs dans l'ordre de priorité défini :
+  /// 1. BLE (Bluetooth Low Energy) — priorité absolue, décentralisé.
+  /// 2. Wi-Fi Direct / LAN — réseau local sans Internet.
+  /// 3. WebSocket / Relay — connexion au serveur distant.
+  ///
+  /// Si un transport échoue, le suivant est activé automatiquement.
+  /// L'état de chaque couche est notifié via [ConnectivityService].
+  Future<void> _discoverPeersInPriorityOrder(
+      List<MeshTransport> transports) async {
+    if (kDebugMode) {
+      debugPrint('[NetworkCoordinator] Découverte P2P : BLE → Wi-Fi → Web');
+    }
+
+    // Étape 1 : Tente le BLE (priorité absolue).
+    bool bleOk = false;
+    try {
+      final bleTransport = transports.firstWhere(
+        (t) => t.name == 'ble',
+        orElse: () => transports.first,
+      );
+      if (bleTransport.name == 'ble') {
+        bleOk = bleTransport.isAvailable;
+        if (kDebugMode) {
+          debugPrint('[NetworkCoordinator] BLE disponible : $bleOk');
+        }
+      }
+    } catch (_) {
+      bleOk = false;
+    }
+
+    if (!bleOk) {
+      ConnectivityService.instance.updateLayerState(
+          'ble', TransportLayerState.disabled);
+      if (kDebugMode) {
+        debugPrint('[NetworkCoordinator] BLE indisponible → Wi-Fi Direct');
+      }
+
+      // Étape 2 : Bascule sur Wi-Fi Direct.
+      bool wifiOk = false;
+      try {
+        final wifiTransport = transports.firstWhere(
+          (t) => t.name == 'wifi',
+          orElse: () => transports.first,
+        );
+        if (wifiTransport.name == 'wifi') {
+          wifiOk = wifiTransport.isAvailable;
+          if (kDebugMode) {
+            debugPrint('[NetworkCoordinator] Wi-Fi Direct disponible : $wifiOk');
+          }
+        }
+      } catch (_) {
+        wifiOk = false;
+      }
+
+      if (!wifiOk) {
+        ConnectivityService.instance.updateLayerState(
+            'wifi', TransportLayerState.disabled);
+        if (kDebugMode) {
+          debugPrint('[NetworkCoordinator] Wi-Fi Direct indisponible → WebSocket');
+        }
+
+        // Étape 3 : Bascule sur le serveur Web (dernier recours).
+        ConnectivityService.instance.updateLayerState(
+            'websocket', TransportLayerState.active);
+      } else {
+        ConnectivityService.instance.updateLayerState(
+            'wifi', TransportLayerState.active);
+      }
+    } else {
+      ConnectivityService.instance.updateLayerState(
+          'ble', TransportLayerState.active);
     }
   }
 

@@ -12,12 +12,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'dart:async';
+
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
 import '../../../core/theme/streetphare_theme.dart';
+import '../../map/map_cache_manager.dart';
 import '../domain/models/event_model.dart';
 import 'event_manager.dart';
 import 'qr_scanner_screen.dart';
+
+/// Seuil d'avertissement : événement planifié à plus de 30 jours.
+const int _maxAdvanceDays = 30;
 
 /// Couleurs distinctives pour les 3 événements simultanés.
 const _kEventColors = [
@@ -78,8 +84,22 @@ class _EventsScreenState extends State<EventsScreen> {
                 _error = '${s.eventsUnknownCodeError}\n${s.eventsFleurusCodes}';
       } else {
         _codeController.clear();
+        _preloadEventZone();
       }
     });
+  }
+
+  void _preloadEventZone() {
+    final events = EventManager.instance.value;
+    for (final event in events) {
+      final zone = event.generalZone;
+      if (zone == null) continue;
+      unawaited(MapCacheManager.instance.preloadZone(
+        zoneLabel: zone,
+        centerLat: event.destinationLatitude,
+        centerLng: event.destinationLongitude,
+      ));
+    }
   }
 
   Future<void> _openQrScanner() async {
@@ -117,6 +137,7 @@ class _EventsScreenState extends State<EventsScreen> {
           content: Text(s.eventsQrAddSuccess),
         ),
       );
+      _preloadEventZone();
     }
   }
 
@@ -335,6 +356,8 @@ class _EventCard extends StatelessWidget {
     final now = DateTime.now().toUtc();
     final isVisible = event.isRouteVisible(now);
     final remaining = event.remainingBeforeReveal(now);
+    final daysUntilEvent = event.startAt.toUtc().difference(now).inDays;
+    final isTooFarAhead = daysUntilEvent > _maxAdvanceDays;
     final activeStep = event.waypoints.isNotEmpty
         ? event.activeStepIndex(now: now)
         : null;
@@ -394,7 +417,47 @@ class _EventCard extends StatelessWidget {
               style: const TextStyle(
                   color: StreetPhareTheme.textSecondary, fontSize: 11),
             ),
-            const SizedBox(height: 10),
+            if (event.generalZone != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Commune : ${event.generalZone}',
+                style: const TextStyle(
+                    color: StreetPhareTheme.textSecondary, fontSize: 11),
+              ),
+            ],
+            const SizedBox(height: 8),
+
+            // ── Avertissement > 30 jours ─────────────────────────────────
+            if (isTooFarAhead)
+              _StatusBlock(
+                icon: Icons.warning_amber,
+                iconColor: const Color(0xFFFF6F00),
+                bgColor: const Color(0xFFFF6F00).withValues(alpha: 0.12),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Attention, cet événement a lieu dans plus de 30 jours.',
+                      style: TextStyle(
+                        color: StreetPhareTheme.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'La carte risque de ne pas être disponible hors-ligne. '
+                      'Veuillez ne pas télécharger la carte plus de 30 jours '
+                      'à l\'avance.',
+                      style: TextStyle(
+                        color: StreetPhareTheme.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            if (isTooFarAhead) const SizedBox(height: 10),
 
             // ── Statut du tracé ──────────────────────────────────────────
             if (!isVisible)

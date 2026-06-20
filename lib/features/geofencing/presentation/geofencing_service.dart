@@ -24,6 +24,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -123,7 +124,14 @@ class GeofencingService {
 
   void _onPositionUpdate(Position pos) {
     _lastPosition = pos;
-    _checkProximity(pos);
+    // ═══ Dispatch sur le thread principal via addPostFrameCallback ═══
+    // Le callback natif de Geolocator (getPositionStream) peut arriver
+    // depuis un thread secondaire (Kotlin/Native). Pour éviter les
+    // conflits de threads et les crashs natifs, on force l'exécution
+    // sur le prochain frame du thread UI.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _checkProximity(pos);
+    });
   }
 
   void _checkProximity(Position pos) {

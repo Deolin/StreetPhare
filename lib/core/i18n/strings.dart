@@ -271,6 +271,9 @@ class AppStrings {
     required this.androidChannelMessagesSubtitle,
     required this.androidChannelSectionTitle,
     required this.androidChannelManageSystem,
+    required this.transportModePedestrian,
+    required this.transportModeCar,
+    required this.transportModeTransit,
   });
 
   // Général
@@ -586,6 +589,9 @@ class AppStrings {
   final String androidChannelMessagesSubtitle;
   final String androidChannelSectionTitle;
   final String androidChannelManageSystem;
+  final String transportModePedestrian;
+  final String transportModeCar;
+  final String transportModeTransit;
 
   // ==========================================================================
   // Français (langue par défaut)
@@ -858,6 +864,9 @@ class AppStrings {
         androidChannelMessagesSubtitle: 'Nouveaux messages sur le réseau local',
         androidChannelSectionTitle: 'Notifications Android par canal',
         androidChannelManageSystem: 'Gérer dans les Paramètres Android',
+        transportModePedestrian: 'Piéton',
+        transportModeCar: 'Voiture',
+        transportModeTransit: 'Transports',
       );
 
   // ==========================================================================
@@ -1131,6 +1140,9 @@ class AppStrings {
         androidChannelMessagesSubtitle: 'New messages on the local network',
         androidChannelSectionTitle: 'Android Notifications by Channel',
         androidChannelManageSystem: 'Manage in Android Settings',
+        transportModePedestrian: 'Walking',
+        transportModeCar: 'Car',
+        transportModeTransit: 'Transit',
       );
 
   // ==========================================================================
@@ -1404,6 +1416,9 @@ class AppStrings {
         androidChannelMessagesSubtitle: 'Nieuwe berichten op het lokale netwerk',
         androidChannelSectionTitle: 'Android-meldingen per kanaal',
         androidChannelManageSystem: 'Beheren in Android-instellingen',
+        transportModePedestrian: 'Te voet',
+        transportModeCar: 'Auto',
+        transportModeTransit: 'OV',
       );
 
   // ==========================================================================
@@ -1677,5 +1692,8 @@ class AppStrings {
         androidChannelMessagesSubtitle: 'Neue Nachrichten im lokalen Netzwerk',
         androidChannelSectionTitle: 'Android-Benachrichtigungen nach Kanal',
         androidChannelManageSystem: 'In Android-Einstellungen verwalten',
+        transportModePedestrian: 'Zu Fuß',
+        transportModeCar: 'Auto',
+        transportModeTransit: 'ÖPNV',
       );
 }
