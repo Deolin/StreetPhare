@@ -11,35 +11,29 @@ import 'dart:convert';
 import 'package:latlong2/latlong.dart';
 
 /// Statut d'une alerte dans son cycle de vie local + réseau.
+/// Doit correspondre au contrat serveur Node.js (reports_store).
 enum AlertStatus {
   /// Alerte créée localement, pas encore confirmée.
   pending,
 
-  /// Alerte reçue via P2P et en attente de consensus.
-  propagated,
+  /// Alerte confirmée par consensus (≥3 votes) et visible.
+  active,
 
-  /// Alerte confirmée par au moins 3 utilisateurs distincts.
-  validated,
-
-  /// Alerte téléversée avec succès sur le serveur central.
-  uploaded,
-
-  /// Alerte expirée (TTL > 24h) et purgée du stockage local.
-  expired,
+  /// Alerte rejetée (quorum insuffisant, TTL expiré avant validation).
+  rejected,
 }
 
-/// Type d'alerte (barrage, nasse, contrôle, accident, etc.).
+/// Type d'alerte aligné sur le contrat serveur Node.js
+/// (reports_store.js TTL_BY_TYPE).
 enum AlertType {
   barrage,
-  nasse,
-  controle,
-  accident,
-  rassemblement,
-  /// Zone safe signalée par un utilisateur. Sert de point de repli.
-  zoneSafe,
-  /// Alerte panic collective automatique (5 appareils / 2 min).
-  panicCollectif,
-  /// Rapport de densité Bluetooth locale.
+  casseurs,
+  danger,
+  policiers,
+  autopompes,
+  filtre,
+  panic,
+  dangerCollectif,
   density,
   autre,
 }
@@ -119,61 +113,68 @@ class Alert {
     return reference.isAfter(expiresAt);
   }
 
-  /// Indique si l'alerte a atteint le seuil de consensus (3
-  /// utilisateurs uniques distincts).
+  /// Indique si l'alerte a atteint le seuil de consensus (≥3
+  /// confirmations distinctes).
   bool get isValidatedByConsensus => confirmations.length >= 3;
 
-  /// Ajoute une confirmation d'un utilisateur éphémère. Retourne
-  /// `true` si cette confirmation a fait passer le compteur à 3.
+  /// Ajoute une confirmation. Passe le statut à [AlertStatus.active]
+  /// dès que le seuil de consensus est atteint.
   bool addConfirmation(String ephemeralUserId) {
     if (confirmations.add(ephemeralUserId)) {
-      if (isValidatedByConsensus && status == AlertStatus.propagated) {
-        status = AlertStatus.validated;
+      if (isValidatedByConsensus && status == AlertStatus.pending) {
+        status = AlertStatus.active;
       }
       return isValidatedByConsensus;
     }
     return false;
   }
 
+  /// Sérialisation alignée sur le contrat serveur Node.js
+  /// (POST /v1/reports + POST /alerts).
   Map<String, dynamic> toJson() => {
         'id': id,
-        'euid': ephemeralUserId,
-        'sig': signature,
+        'reporter_id': ephemeralUserId,
         'type': type.name,
         'lat': latitude,
-        'lng': longitude,
-        'desc': description,
-        if (densityValue != null) 'dv': densityValue,
-        'ca': createdAt.toIso8601String(),
-        'ttl': ttlHours,
-        'st': status.name,
-        'conf': confirmations.toList(),
-        'up': uploadedTo,
+        'lon': longitude,
+        if (description.isNotEmpty) 'description': description,
+        if (densityValue != null) 'density_value': densityValue,
+        'timestamp': createdAt.toUtc().toIso8601String(),
+        'ttl_hours': ttlHours,
+        'status': status.name,
+        'confirmations': confirmations.toList(),
+        'signature': signature,
       };
 
+  /// Désérialisation depuis le format JSON serveur Node.js
+  /// (GET /v1/reports + POST /alerts).
   factory Alert.fromJson(Map<String, dynamic> json) {
+    final statusStr = (json['status'] as String?) ?? 'pending';
+    final typeStr = (json['type'] as String?) ?? 'autre';
     return Alert(
       id: json['id'] as String,
-      ephemeralUserId: json['euid'] as String,
-      signature: json['sig'] as String,
+      ephemeralUserId: (json['reporter_id'] as String?) ?? '',
+      signature: (json['signature'] as String?) ?? '',
       type: AlertType.values.firstWhere(
-        (t) => t.name == json['type'],
+        (t) => t.name == typeStr,
         orElse: () => AlertType.autre,
       ),
       latitude: (json['lat'] as num).toDouble(),
-      longitude: (json['lng'] as num).toDouble(),
-      description: (json['desc'] as String?) ?? '',
-      densityValue: json['dv'] as int?,
-      createdAt: DateTime.parse(json['ca'] as String).toUtc(),
-      ttlHours: (json['ttl'] as int?) ?? 24,
+      longitude: (json['lon'] as num).toDouble(),
+      description: (json['description'] as String?) ?? '',
+      densityValue: json['density_value'] as int?,
+      createdAt: json['timestamp'] != null
+          ? DateTime.parse(json['timestamp'] as String).toUtc()
+          : DateTime.now().toUtc(),
+      ttlHours: (json['ttl_hours'] as int?) ?? 24,
       status: AlertStatus.values.firstWhere(
-        (s) => s.name == json['st'],
+        (s) => s.name == statusStr,
         orElse: () => AlertStatus.pending,
       ),
-      confirmations: ((json['conf'] as List?) ?? const [])
+      confirmations: ((json['confirmations'] as List?) ?? const [])
           .map((e) => e.toString())
           .toSet(),
-      uploadedTo: (json['up'] as String?) ?? '',
+      uploadedTo: (json['uploaded_to'] as String?) ?? '',
     );
   }
 

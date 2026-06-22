@@ -206,7 +206,7 @@ class CollectivePanicService {
     // Crée l'alerte via le coordinator.
     try {
       final alert = await cb(
-        type: AlertType.panicCollectif,
+        type: AlertType.dangerCollectif,
         latitude: center.latitude,
         longitude: center.longitude,
         description:

@@ -31,7 +31,7 @@ class AlertVisibilityPolicy {
   ///   2. OU statut `validated` par consensus.
   static bool isVisible(Alert alert, {DateTime? now}) {
     // Règle 1 : consensus collectif atteint.
-    if (alert.status == AlertStatus.validated) return true;
+    if (alert.status == AlertStatus.active) return true;
     if (alert.isValidatedByConsensus) return true;
 
     // Règle 2 : seuil de 3 votes atteint.

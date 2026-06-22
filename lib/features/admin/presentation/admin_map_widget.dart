@@ -78,17 +78,17 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
     switch (type) {
       case AlertType.barrage:
         return Colors.red;
-      case AlertType.nasse:
+      case AlertType.barrage:
         return Colors.orange;
-      case AlertType.controle:
+      case AlertType.policiers:
         return Colors.blue;
-      case AlertType.accident:
+      case AlertType.danger:
         return Colors.purple;
-      case AlertType.rassemblement:
+      case AlertType.casseurs:
         return Colors.amber;
-      case AlertType.zoneSafe:
+      case AlertType.autre:
         return Colors.green;
-      case AlertType.panicCollectif:
+      case AlertType.dangerCollectif:
         return Colors.redAccent;
       case AlertType.density:
         return Colors.cyanAccent;
@@ -102,17 +102,17 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
     switch (type) {
       case AlertType.barrage:
         return Icons.block;
-      case AlertType.nasse:
+      case AlertType.barrage:
         return Icons.safety_check;
-      case AlertType.controle:
+      case AlertType.policiers:
         return Icons.local_police;
-      case AlertType.accident:
+      case AlertType.danger:
         return Icons.warning_amber;
-      case AlertType.rassemblement:
+      case AlertType.casseurs:
         return Icons.groups;
-      case AlertType.zoneSafe:
+      case AlertType.autre:
         return Icons.shield;
-      case AlertType.panicCollectif:
+      case AlertType.dangerCollectif:
         return Icons.campaign;
       case AlertType.density:
         return Icons.people;
@@ -124,7 +124,7 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
   /// Construit la liste des marqueurs à partir du flux d'alertes.
   List<Marker> _buildMarkers(List<Alert> alerts) {
     return alerts
-        .where((a) => a.status == AlertStatus.validated ||
+        .where((a) => a.status == AlertStatus.active ||
             a.status == AlertStatus.pending)
         .map((alert) {
       final color = _colorForAlertType(alert.type);
@@ -163,17 +163,17 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
     switch (type) {
       case AlertType.barrage:
         return 'Barrage';
-      case AlertType.nasse:
+      case AlertType.barrage:
         return 'Nasse';
-      case AlertType.controle:
+      case AlertType.policiers:
         return 'Contrôle';
-      case AlertType.accident:
+      case AlertType.danger:
         return 'Accident';
-      case AlertType.rassemblement:
+      case AlertType.casseurs:
         return 'Rassemblement';
-      case AlertType.zoneSafe:
+      case AlertType.autre:
         return 'Zone sûre';
-      case AlertType.panicCollectif:
+      case AlertType.dangerCollectif:
         return 'Panic';
       case AlertType.density:
         return 'Densité';

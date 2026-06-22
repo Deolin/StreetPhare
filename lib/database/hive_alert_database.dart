@@ -136,7 +136,7 @@ class HiveAlertDatabase {
         if (onBeforeDelete != null) {
           await onBeforeDelete(alert);
         }
-        alert.status = AlertStatus.expired;
+        alert.status = AlertStatus.rejected;
         // Effacement systématique (règle de protection de la vie privée).
         await _box!.delete(alert.id);
         if (kDebugMode) {
@@ -157,7 +157,7 @@ class HiveAlertDatabase {
   List<Alert> getPendingUpload() {
     _ensureOpen();
     return _box!.values
-        .where((a) => a.status == AlertStatus.validated && a.uploadedTo.isEmpty)
+        .where((a) => a.status == AlertStatus.active && a.uploadedTo.isEmpty)
         .toList();
   }
 
@@ -166,7 +166,7 @@ class HiveAlertDatabase {
     _ensureOpen();
     final alert = _box!.get(id);
     if (alert == null) return;
-    alert.status = AlertStatus.uploaded;
+    alert.status = AlertStatus.active;
     alert.uploadedTo = server;
     await _box!.put(alert.id, alert);
     _emit();

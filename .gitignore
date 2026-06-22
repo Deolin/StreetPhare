@@ -21,11 +21,17 @@ build/
 *.stackdump
 crash_report.*
 
-# Répertoire de logs des serveurs de test
-test_servers/logs/
-test_servers/.server-pids.json
-test_servers/admin_data.json
-test_servers/events_admin.json
+# Répertoire de logs des serveurs
+server/logs/
+server/.server-pids.json
+server/admin_data.json
+server/events_admin.json
+
+# Fichiers générés Flutter/IDE
+.metadata
+*.iml
+results_clientdebug.txt
+results_kdebug.txt
 
 # Fichiers de cache de développement et d'IDE (VS Code / Android Studio)
 .analytics

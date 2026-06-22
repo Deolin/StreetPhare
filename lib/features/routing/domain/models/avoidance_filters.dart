@@ -105,17 +105,17 @@ class AvoidanceFilters {
     switch (type) {
       case AlertType.barrage:
         return avoidBarrages;
-      case AlertType.nasse:
+      case AlertType.barrage:
         return avoidNasses;
-      case AlertType.controle:
+      case AlertType.policiers:
         return avoidControles;
-      case AlertType.accident:
+      case AlertType.danger:
         return avoidAccidents;
-      case AlertType.rassemblement:
+      case AlertType.casseurs:
         return avoidRassemblements;
-      case AlertType.zoneSafe:
+      case AlertType.autre:
         return false; // Zone Safe n'est jamais évitée
-      case AlertType.panicCollectif:
+      case AlertType.dangerCollectif:
       case AlertType.density:
       case AlertType.autre:
         return avoidAutres;

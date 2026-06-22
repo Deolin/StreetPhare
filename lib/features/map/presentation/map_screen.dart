@@ -209,38 +209,47 @@ class _MapScreenState extends State<MapScreen> {
           distanceFilter: 2, // Ecoute fine pour détecter les micro-mouvements
         ),
       ).listen((p) {
-        if (mounted) {
-          // [2] Seuil GPS 5 m : calcule le déplacement effectif depuis la
-          // dernière position connue. Si < 5 m → cache la flèche directionnelle.
-          final prev = _previousPosition;
-          if (prev != null) {
-            final dist = Geolocator.distanceBetween(
-              prev.latitude, prev.longitude,
-              p.latitude, p.longitude,
-            );
-            _movementAccumulator += dist;
-            if (_movementAccumulator >= 5.0) {
-              _hasMovedBeyondThreshold = true;
-            }
-          } else {
-            // Première position — réinitialise l'accumulateur
-            _movementAccumulator = 0.0;
-            _hasMovedBeyondThreshold = false;
-          }
+        // [Tâche 3] Stabilisation Geolocator Thread :
+        // Le callback natif du plugin peut s'exécuter sur un thread
+        // non-UI (ex. thread Android Binder).
+        // On diffère TOUJOURS le setState au prochain frame via
+        // addPostFrameCallback pour garantir l'exécution sur le
+        // thread principal Flutter (UI Thread).
+        if (!mounted) return;
 
-          // Réinitialise l'accumulateur si l'appareil s'est arrêté (speed ≈ 0)
-          if (p.speed < 0.3) {
-            _movementAccumulator = 0.0;
-            _hasMovedBeyondThreshold = false;
+        // [2] Seuil GPS 5 m : calcule le déplacement effectif depuis la
+        // dernière position connue. Si < 5 m → cache la flèche directionnelle.
+        final prev = _previousPosition;
+        if (prev != null) {
+          final dist = Geolocator.distanceBetween(
+            prev.latitude, prev.longitude,
+            p.latitude, p.longitude,
+          );
+          _movementAccumulator += dist;
+          if (_movementAccumulator >= 5.0) {
+            _hasMovedBeyondThreshold = true;
           }
+        } else {
+          // Première position — réinitialise l'accumulateur
+          _movementAccumulator = 0.0;
+          _hasMovedBeyondThreshold = false;
+        }
 
-          _previousPosition = p;
+        // Réinitialise l'accumulateur si l'appareil s'est arrêté (speed ≈ 0)
+        if (p.speed < 0.3) {
+          _movementAccumulator = 0.0;
+          _hasMovedBeyondThreshold = false;
+        }
+
+        _previousPosition = p;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
           setState(() {
             _userPosition = p;
             _userSpeed = p.speed < 0 ? 0 : p.speed;
             if (p.heading >= 0) _userHeading = p.heading;
           });
-        }
+        });
       });
     } catch (e) {
       if (mounted) {
@@ -303,7 +312,7 @@ class _MapScreenState extends State<MapScreen> {
     final pos = _localReportMarker;
     if (pos == null) return null;
     // Couleur basée sur le type d'alerte (utilise _localReportType).
-    final color = _localReportType == AlertType.zoneSafe
+    final color = _localReportType == AlertType.autre
         ? const Color(0xFF2E7D32)
         : _localReportType == AlertType.barrage
             ? const Color(0xFFD32F2F)

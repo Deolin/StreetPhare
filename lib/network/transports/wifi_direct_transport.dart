@@ -97,7 +97,11 @@ class WifiDirectMeshTransport with WidgetsBindingObserver implements MeshTranspo
     });
 
     if (kDebugMode) {
-      debugPrint('[WiFi] multicast listening on $multicastAddress:$port');
+      debugPrint('[WiFi] multicast listening on $multicastAddress:$port '
+          '(peerId=$peerId TTL=1)');
+      debugPrint('[WiFi] ✅ Recette P2P Multicast active — '
+          'Windows ↔ Android sur le LAN local (port 42424). '
+          'Priorité : BLE → Wi-Fi Direct → Relay Web.');
     }
   }
 

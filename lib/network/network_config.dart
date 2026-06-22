@@ -36,6 +36,15 @@ class NetworkConfig {
   static const int _primaryPort = 3000;
   static const int _secondaryPort = 3001;
 
+  /// Host de production (exposé pour le FailoverManager).
+  static String get productionHost => _productionHost;
+
+  /// Port principal (exposé pour le FailoverManager).
+  static int get primaryPort => _primaryPort;
+
+  /// Port secondaire (exposé pour le FailoverManager).
+  static int get secondaryPort => _secondaryPort;
+
   // ---------------------------------------------------------------------------
   // Adresses RÉSEAU (mode PRODUCTION)
   // ---------------------------------------------------------------------------
@@ -89,6 +98,45 @@ class NetworkConfig {
   // Helpers de debug
   // ---------------------------------------------------------------------------
 
+  // ---------------------------------------------------------------------------
+  // Fallback local (NAT Hairpinning / Loopback)
+  // ---------------------------------------------------------------------------
+  //
+  // Contexte : De nombreuses box internet bloquent le NAT Hairpinning,
+  // empêchant l'application (exécutée sur le même PC que le serveur)
+  // de résoudre `streetphare.ddns.be` → IP publique → rebouclage local.
+  //
+  // Solution : Le FailoverManager tente automatiquement ces adresses
+  // de fallback local lorsque la résolution No-IP échoue.
+
+  /// URL locale du serveur PRINCIPAL (fallback loopback).
+  ///
+  /// http://127.0.0.1:3000
+  static String get localhostPrimaryServer {
+    return 'http://127.0.0.1:$_primaryPort';
+  }
+
+  /// URL locale du serveur SECONDAIRE (fallback loopback).
+  ///
+  /// http://127.0.0.1:3001
+  static String get localhostSecondaryServer {
+    return 'http://127.0.0.1:$_secondaryPort';
+  }
+
+  /// URL locale du relay WebSocket (fallback loopback).
+  ///
+  /// ws://127.0.0.1:3000/mesh
+  static String get localhostRelayUrl {
+    return 'ws://127.0.0.1:$_primaryPort/mesh';
+  }
+
+  /// URL locale WebSocket d'administration (fallback loopback).
+  ///
+  /// ws://127.0.0.1:3000/admin
+  static String get localhostPrimaryUrl {
+    return 'ws://127.0.0.1:$_primaryPort/admin';
+  }
+
   /// Renvoie un résumé lisible de la configuration (à n'utiliser
   /// QUE dans des `debugPrint`). Ne jamais logger les secrets.
   static String describe() {
@@ -96,7 +144,9 @@ class NetworkConfig {
         'host=$_productionHost '
         'primary=$primaryServer '
         'secondary=$initialSecondaryServer '
-        'relay=$relayUrl'
+        'relay=$relayUrl '
+        'localhost_primary=$localhostPrimaryServer '
+        'localhost_secondary=$localhostSecondaryServer'
         '}';
   }
 }

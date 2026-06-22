@@ -42,17 +42,17 @@ class ProximityValidationSheet extends StatelessWidget {
     switch (type) {
       case AlertType.barrage:
         return 'un barrage';
-      case AlertType.nasse:
+      case AlertType.barrage:
         return 'une nasse';
-      case AlertType.controle:
+      case AlertType.policiers:
         return 'un contrôle de police';
-      case AlertType.accident:
+      case AlertType.danger:
         return 'un danger / accident';
-      case AlertType.rassemblement:
+      case AlertType.casseurs:
         return 'un rassemblement à risque';
-      case AlertType.zoneSafe:
+      case AlertType.autre:
         return 'une zone safe';
-      case AlertType.panicCollectif:
+      case AlertType.dangerCollectif:
         return 'une alerte panic collective';
       case AlertType.density:
         return 'un rapport de densité Bluetooth';
@@ -65,17 +65,17 @@ class ProximityValidationSheet extends StatelessWidget {
     switch (type) {
       case AlertType.barrage:
         return Icons.block;
-      case AlertType.nasse:
+      case AlertType.barrage:
         return Icons.crop_square;
-      case AlertType.controle:
+      case AlertType.policiers:
         return Icons.local_police;
-      case AlertType.accident:
+      case AlertType.danger:
         return Icons.warning_amber;
-      case AlertType.rassemblement:
+      case AlertType.casseurs:
         return Icons.groups;
-      case AlertType.zoneSafe:
+      case AlertType.autre:
         return Icons.shield_outlined;
-      case AlertType.panicCollectif:
+      case AlertType.dangerCollectif:
         return Icons.emergency;
       case AlertType.density:
         return Icons.bolt;
@@ -88,17 +88,17 @@ class ProximityValidationSheet extends StatelessWidget {
     switch (type) {
       case AlertType.barrage:
         return const Color(0xFFE53935);
-      case AlertType.nasse:
+      case AlertType.barrage:
         return const Color(0xFFFFB300);
-      case AlertType.controle:
+      case AlertType.policiers:
         return const Color(0xFF3F51B5);
-      case AlertType.accident:
+      case AlertType.danger:
         return const Color(0xFFFF6F00);
-      case AlertType.rassemblement:
+      case AlertType.casseurs:
         return const Color(0xFF7B1FA2);
-      case AlertType.zoneSafe:
+      case AlertType.autre:
         return const Color(0xFF2E7D32);
-      case AlertType.panicCollectif:
+      case AlertType.dangerCollectif:
         return const Color(0xFFE53935);
       case AlertType.density:
         return const Color(0xFFFFB300);
@@ -164,7 +164,7 @@ class ProximityValidationSheet extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
-                '${_labelForType(alert.type)[0].toUpperCase()}${_labelForType(alert.type).substring(1)} signalé${alert.type == AlertType.barrage || alert.type == AlertType.controle ? '' : 'e'} à ${event.distanceMeters.toStringAsFixed(0)} m.',
+                '${_labelForType(alert.type)[0].toUpperCase()}${_labelForType(alert.type).substring(1)} signalé${alert.type == AlertType.barrage || alert.type == AlertType.policiers ? '' : 'e'} à ${event.distanceMeters.toStringAsFixed(0)} m.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: StreetPhareTheme.primary,

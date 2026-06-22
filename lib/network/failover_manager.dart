@@ -28,6 +28,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
@@ -35,6 +36,7 @@ import 'package:http/http.dart' as http;
 
 import '../database/crypto_utils.dart';
 import '../debug/client_debug_logger.dart';
+import 'network_config.dart';
 
 /// Statut d'un serveur connu du FailoverManager.
 enum ServerStatus { active, failed, standby }
@@ -399,6 +401,12 @@ class FailoverManager {
 
   /// Ping HTTP(S) minimaliste. Le serveur central doit exposer
   /// un endpoint /healthz (ou /ping) qui renvoie 2xx.
+  ///
+  /// [Tâche 1] Fallback Loopback : Si le ping vers une adresse No-IP
+  /// (streetphare.ddns.be) échoue avec une SocketException de type
+  /// "Failed host lookup" (NAT Hairpinning bloqué par la box), on
+  /// tente immédiatement un ping sur l'adresse locale correspondante
+  /// (127.0.0.1) avant de déclarer la défaillance.
   Future<bool> _ping(String address) async {
     try {
       final uri = Uri.parse('$address/healthz');
@@ -406,9 +414,64 @@ class FailoverManager {
         'X-StreetPhare-Heartbeat': '1',
       }).timeout(_config!.pingTimeout);
       return resp.statusCode >= 200 && resp.statusCode < 300;
+    } on SocketException catch (e) {
+      // ── Détection NAT Hairpinning / échec résolution DNS ──────────
+      // Si l'adresse contient le host No-IP de production et que
+      // l'erreur est "Failed host lookup" (coupure DNS ou blocage
+      // NAT loopback), on bascule sur le fallback local correspondant.
+      if (address.contains(NetworkConfig.productionHost) ||
+          e.message.contains('Failed host lookup') ||
+          e.osError?.errorCode == 11001) {
+        // Tente l'adresse locale correspondante.
+        final fallback = _resolveLocalFallback(address);
+        if (fallback != null && fallback != address) {
+          if (kDebugMode) {
+            debugPrint(
+              '[FailoverManager] DNS/NAT Hairpinning détecté pour '
+              '$address → tentative fallback local $fallback',
+            );
+          }
+          try {
+            final uri = Uri.parse('$fallback/healthz');
+            final resp = await _httpClient.get(uri, headers: {
+              'X-StreetPhare-Heartbeat': '1',
+            }).timeout(_config!.pingTimeout);
+            if (resp.statusCode >= 200 && resp.statusCode < 300) {
+              // Met à jour l'adresse courante pour pointer
+              // définitivement vers le fallback local.
+              _current = _current?.copyWith(address: fallback);
+              ClientDebugLogger.instance.failoverSucceeded(
+                fromAddress: address,
+                toAddress: fallback,
+              );
+              if (kDebugMode) {
+                debugPrint(
+                  '[FailoverManager] ✓ Fallback local OK → $fallback',
+                );
+              }
+              return true;
+            }
+          } catch (_) {
+            // Même le fallback local échoue.
+          }
+        }
+      }
+      return false;
     } catch (_) {
       return false;
     }
+  }
+
+  /// Résout l'adresse locale correspondant à une URL No-IP distante.
+  /// Retourne `null` si l'adresse fournie n'est pas reconnue.
+  String? _resolveLocalFallback(String remoteAddress) {
+    if (remoteAddress.contains(NetworkConfig.primaryPort.toString())) {
+      return NetworkConfig.localhostPrimaryServer;
+    }
+    if (remoteAddress.contains(NetworkConfig.secondaryPort.toString())) {
+      return NetworkConfig.localhostSecondaryServer;
+    }
+    return null;
   }
 
   /// Tente un upload d'alerte sur le serveur courant. Si le

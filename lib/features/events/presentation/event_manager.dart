@@ -17,6 +17,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/config/fixtures_fleurus.dart';
 import '../../../debug/client_debug_logger.dart';
 import '../domain/models/event_model.dart';
 
@@ -169,30 +170,9 @@ class EventManager extends ValueNotifier<List<EventModel>> {
   // Fixtures réelles — Fleurus (6220), Belgique
   // --------------------------------------------------------------------------
 
-  // ── Coordonnées GPS réelles des lieux-clés de Fleurus ────────────────────
-  //
-  //  Place Albert 1er (centre-ville)     : 50.4762°N, 4.5422°E
-  //  Institut Notre-Dame (Rue Station)   : 50.4770°N, 4.5461°E
-  //  Athénée Royal Jourdan (Rue Digue)   : 50.4742°N, 4.5349°E
-  //  Poste de Police (Square de l'Europe): 50.4752°N, 4.5418°E
-  //  Piscine de Fleurus (Rue Fleurjoux)  : 50.4707°N, 4.5553°E
-  //  St-Medic (Place Albert 1er)         : 50.4762°N, 4.5422°E
-  //
-  //  Toutes les polylines routeGeoJson suivent des voiries piétonnes réelles
-  //  de la commune (pas de ligne droite à travers les bâtiments).
-  //  Format : [[lng, lat], [lng, lat], ...] (GeoJSON standard).
-
-  /// Centre de soins St-Medic — positionné stratégiquement sur la
-  /// Place Albert 1er, au cœur de Fleurus. Utilisé comme point de
-  /// repli automatique par le moteur Route Safe.
-  static const EventCareCenter _stMedic = EventCareCenter(
-    label: 'St-Medic — Place Albert 1er',
-    // Place Albert 1er, Fleurus (6220), Belgique
-    latitude: 50.4762,
-    longitude: 4.5422,
-    contact: '+32 71 82 XX XX',
-    notes: 'Point médical permanent — centre-ville Fleurus.',
-  );
+  // Coordonnées GPS extraites dans lib/core/config/fixtures_fleurus.dart.
+  // Réutilise les constantes FleurusLocations, stMedicCareCenter et
+  // FleurusPolylines pour le mapping des événements de démonstration.
 
   /// Résout un code en `EventModel` de démo. Retourne `null` si inconnu.
   EventModel? _decodeEvent(String code) {
@@ -211,85 +191,72 @@ class EventManager extends ValueNotifier<List<EventModel>> {
           startAt: now.add(const Duration(hours: 1)),
           // Trajet révélé immédiatement (événement de démonstration actif)
           visibleAt: now.subtract(const Duration(minutes: 5)),
-          // Polyline piétonne — suit la voirie réelle autour du centre
-          // de Fleurus. Toutes les coordonnées sont sur des rues publiques.
-          routeGeoJson:
-              '[[4.5422,50.4762],[4.5440,50.4780],[4.5468,50.4790],'
-              '[4.5510,50.4785],[4.5550,50.4760],[4.5535,50.4730],'
-              '[4.5500,50.4710],[4.5450,50.4705],[4.5390,50.4720],'
-              '[4.5370,50.4750],[4.5390,50.4762],[4.5422,50.4762]]',
+          routeGeoJson: FleurusPolylines.tourFleurus,
           waypoints: [
             EventWaypoint(
               label: 'Départ — Place Albert 1er',
-              // Place Albert 1er, Fleurus
-              latitude: 50.4762,
-              longitude: 4.5422,
+              latitude: FleurusLocations.placeAlbertLat,
+              longitude: FleurusLocations.placeAlbertLng,
               scheduledAt: now.add(const Duration(hours: 1)),
             ),
             EventWaypoint(
               label: 'Point eau — Rue de la Station',
-              // Rue de la Station, Fleurus
-              latitude: 50.4790,
-              longitude: 4.5468,
+              latitude: FleurusLocations.rueStationLat,
+              longitude: FleurusLocations.rueStationLng,
               scheduledAt: now.add(const Duration(hours: 1, minutes: 30)),
             ),
             EventWaypoint(
               label: 'Étape — Route de Gosselies',
-              // Route de Gosselies, Fleurus
-              latitude: 50.4705,
-              longitude: 4.5450,
+              latitude: FleurusLocations.routeGosseliesLat,
+              longitude: FleurusLocations.routeGosseliesLng,
               scheduledAt: now.add(const Duration(hours: 2)),
             ),
             EventWaypoint(
               label: 'Arrivée — Place Albert 1er',
-              // Retour Place Albert 1er, Fleurus
-              latitude: 50.4762,
-              longitude: 4.5422,
+              latitude: FleurusLocations.placeAlbertLat,
+              longitude: FleurusLocations.placeAlbertLng,
               scheduledAt: now.add(const Duration(hours: 2, minutes: 30)),
             ),
           ],
           pois: const [
             EventPoi(
               label: 'Place Albert 1er',
-              // Centre-ville Fleurus — point de départ/arrivée
-              latitude: 50.4762,
-              longitude: 4.5422,
+              latitude: FleurusLocations.placeAlbertLat,
+              longitude: FleurusLocations.placeAlbertLng,
               icon: 'flag',
             ),
             EventPoi(
               label: 'Rue de la Station',
-              latitude: 50.4790,
-              longitude: 4.5468,
+              latitude: FleurusLocations.rueStationLat,
+              longitude: FleurusLocations.rueStationLng,
               icon: 'water',
             ),
           ],
-          careCenters: const [_stMedic],
+          careCenters: const [stMedicCareCenter],
           exitPoints: const [
             EventExitPoint(
               label: 'Sortie nord — Rue du Transvaal',
-              // Rue du Transvaal, sortie vers Heppignies
-              latitude: 50.4810,
-              longitude: 4.5440,
+              latitude: FleurusLocations.sortieNordLat,
+              longitude: FleurusLocations.sortieNordLng,
               direction: 'Vers Heppignies / N29',
             ),
             EventExitPoint(
               label: 'Sortie sud — Route de Gosselies',
-              latitude: 50.4705,
-              longitude: 4.5450,
+              latitude: FleurusLocations.routeGosseliesLat,
+              longitude: FleurusLocations.routeGosseliesLng,
               direction: 'Vers Gosselies / E42',
             ),
           ],
           safeZones: const [
             EventSafeZone(
               label: 'Zone de repli — Place Albert 1er',
-              latitude: 50.4762,
-              longitude: 4.5422,
-              radius: 60.0,
+              latitude: FleurusLocations.placeAlbertLat,
+              longitude: FleurusLocations.placeAlbertLng,
+              radius: FleurusLocations.zoneRepliRadius,
             ),
           ],
-          // Arrivée = retour au point de départ (circuit)
-          destinationLatitude: 50.4762,
-          destinationLongitude: 4.5422,
+          destinationLatitude: FleurusLocations.placeAlbertLat,
+          destinationLongitude: FleurusLocations.placeAlbertLng,
         );
 
       // ── FLEURUS-ECOLES : La traversée des écoles ──────────────────────────
@@ -303,71 +270,60 @@ class EventManager extends ValueNotifier<List<EventModel>> {
           startAt: now.add(const Duration(minutes: 15)),
           // Trajet révélé dans 10 minutes (logique juste-à-temps)
           visibleAt: now.add(const Duration(minutes: 10)),
-          // Polyline piétonne : suit la Rue de la Station → Place Albert 1er
-          // → Rue Léopold → Rue de Namur → Rue de la Digue
-          routeGeoJson:
-              '[[4.5461,50.4770],[4.5450,50.4765],[4.5430,50.4762],'
-              '[4.5410,50.4758],[4.5390,50.4752],[4.5375,50.4748],'
-              '[4.5355,50.4745],[4.5349,50.4742]]',
+          routeGeoJson: FleurusPolylines.traverseeEcoles,
           waypoints: [
             EventWaypoint(
               label: 'Départ — Institut Notre-Dame',
-              // Institut Notre-Dame de Fleurus, Rue de la Station
-              latitude: 50.4770,
-              longitude: 4.5461,
+              latitude: FleurusLocations.institutNotreDameLat,
+              longitude: FleurusLocations.institutNotreDameLng,
               scheduledAt: now.add(const Duration(minutes: 15)),
             ),
             EventWaypoint(
               label: 'Étape — Place Albert 1er',
-              // Place Albert 1er, Fleurus (centre de regroupement)
-              latitude: 50.4762,
-              longitude: 4.5430,
+              latitude: FleurusLocations.placeAlbertLat,
+              longitude: FleurusLocations.placeAlbertLng,
               scheduledAt: now.add(const Duration(minutes: 22)),
             ),
             EventWaypoint(
               label: 'Arrivée — Athénée Royal Jourdan',
-              // Athénée Royal Jourdan, Rue de la Digue, Fleurus
-              latitude: 50.4742,
-              longitude: 4.5349,
+              latitude: FleurusLocations.atheneeRoyalLat,
+              longitude: FleurusLocations.atheneeRoyalLng,
               scheduledAt: now.add(const Duration(minutes: 35)),
             ),
           ],
           pois: const [
             EventPoi(
               label: 'Institut Notre-Dame',
-              // Institut Notre-Dame de Fleurus — Rue de la Station
-              latitude: 50.4770,
-              longitude: 4.5461,
+              latitude: FleurusLocations.institutNotreDameLat,
+              longitude: FleurusLocations.institutNotreDameLng,
               icon: 'flag',
             ),
             EventPoi(
               label: 'Athénée Royal Jourdan',
-              // Athénée Royal Jourdan — Rue de la Digue, Fleurus
-              latitude: 50.4742,
-              longitude: 4.5349,
+              latitude: FleurusLocations.atheneeRoyalLat,
+              longitude: FleurusLocations.atheneeRoyalLng,
               icon: 'flag',
             ),
           ],
-          careCenters: const [_stMedic],
+          careCenters: const [stMedicCareCenter],
           exitPoints: const [
             EventExitPoint(
               label: 'Sortie — Rue de Namur',
-              latitude: 50.4752,
-              longitude: 4.5390,
+              latitude: FleurusLocations.sortieRueNamurLat,
+              longitude: FleurusLocations.sortieRueNamurLng,
               direction: 'Vers Namur / N90',
             ),
           ],
           safeZones: const [
             EventSafeZone(
               label: 'Zone de repli — Place Albert 1er',
-              latitude: 50.4762,
-              longitude: 4.5422,
-              radius: 60.0,
+              latitude: FleurusLocations.placeAlbertLat,
+              longitude: FleurusLocations.placeAlbertLng,
+              radius: FleurusLocations.zoneRepliRadius,
             ),
           ],
-          // Arrivée = Athénée Royal Jourdan
-          destinationLatitude: 50.4742,
-          destinationLongitude: 4.5349,
+          destinationLatitude: FleurusLocations.atheneeRoyalLat,
+          destinationLongitude: FleurusLocations.atheneeRoyalLng,
         );
 
       // ── FLEURUS-CORTEGE : Le cortège de la police monté-démonté ───────────
@@ -380,85 +336,72 @@ class EventManager extends ValueNotifier<List<EventModel>> {
           // Événement en cours depuis 10 minutes
           startAt: now.subtract(const Duration(minutes: 10)),
           visibleAt: now.subtract(const Duration(minutes: 10)),
-          // Polyline piétonne : Square de l'Europe → Rue Despars →
-          // Place Albert 1er → Rue de la Chaussée → Rue du Campinaire
-          // → Rue Fleurjoux → Piscine de Fleurus
-          routeGeoJson:
-              '[[4.5418,50.4752],[4.5430,50.4749],[4.5445,50.4745],'
-              '[4.5460,50.4740],[4.5480,50.4730],[4.5505,50.4720],'
-              '[4.5520,50.4714],[4.5535,50.4710],[4.5553,50.4707]]',
+          routeGeoJson: FleurusPolylines.cortegePolice,
           waypoints: [
             EventWaypoint(
               label: 'Départ — Poste de Police',
-              // Poste de Police de Fleurus — Square de l'Europe
-              latitude: 50.4752,
-              longitude: 4.5418,
-              // Étape déjà passée (événement en cours)
+              latitude: FleurusLocations.postePoliceLat,
+              longitude: FleurusLocations.postePoliceLng,
               scheduledAt: now.subtract(const Duration(minutes: 10)),
             ),
             EventWaypoint(
               label: 'Étape — Rue de la Chaussée',
-              // Rue de la Chaussée, Fleurus
-              latitude: 50.4730,
-              longitude: 4.5480,
+              latitude: FleurusLocations.rueChausseeLat,
+              longitude: FleurusLocations.rueChausseeLng,
               scheduledAt: now.add(const Duration(minutes: 15)),
             ),
             EventWaypoint(
               label: 'Arrivée — Piscine de Fleurus',
-              // Piscine de Fleurus — Rue Fleurjoux
-              latitude: 50.4707,
-              longitude: 4.5553,
+              latitude: FleurusLocations.piscineLat,
+              longitude: FleurusLocations.piscineLng,
               scheduledAt: now.add(const Duration(minutes: 35)),
             ),
           ],
           pois: const [
             EventPoi(
               label: 'Poste de Police',
-              // Poste de Police de Fleurus, Square de l'Europe
-              latitude: 50.4752,
-              longitude: 4.5418,
+              latitude: FleurusLocations.postePoliceLat,
+              longitude: FleurusLocations.postePoliceLng,
               icon: 'flag',
             ),
             EventPoi(
               label: 'Piscine de Fleurus',
-              // Piscine de Fleurus, Rue Fleurjoux
-              latitude: 50.4707,
-              longitude: 4.5553,
+              latitude: FleurusLocations.piscineLat,
+              longitude: FleurusLocations.piscineLng,
               icon: 'flag',
             ),
           ],
-          careCenters: const [_stMedic],
+          careCenters: const [stMedicCareCenter],
           exitPoints: const [
             EventExitPoint(
               label: 'Sortie est — Rue Fleurjoux',
-              latitude: 50.4707,
-              longitude: 4.5553,
+              latitude: FleurusLocations.piscineLat,
+              longitude: FleurusLocations.piscineLng,
               direction: 'Vers Wanfercée-Baulet',
             ),
             EventExitPoint(
               label: 'Sortie ouest — Square de l\'Europe',
-              latitude: 50.4752,
-              longitude: 4.5418,
+              latitude: FleurusLocations.postePoliceLat,
+              longitude: FleurusLocations.postePoliceLng,
               direction: 'Vers centre-ville',
             ),
           ],
           safeZones: const [
             EventSafeZone(
               label: 'Zone de repli — Place Albert 1er',
-              latitude: 50.4762,
-              longitude: 4.5422,
-              radius: 60.0,
+              latitude: FleurusLocations.placeAlbertLat,
+              longitude: FleurusLocations.placeAlbertLng,
+              radius: FleurusLocations.zoneRepliRadius,
             ),
             EventSafeZone(
               label: 'Zone de repli — Piscine de Fleurus',
-              latitude: 50.4707,
-              longitude: 4.5553,
-              radius: 50.0,
+              latitude: FleurusLocations.piscineLat,
+              longitude: FleurusLocations.piscineLng,
+              radius: FleurusLocations.zoneRepliPiscineRadius,
             ),
           ],
-          // Arrivée = Piscine de Fleurus
-          destinationLatitude: 50.4707,
-          destinationLongitude: 4.5553,
+          destinationLatitude: FleurusLocations.piscineLat,
+          destinationLongitude: FleurusLocations.piscineLng,
         );
 
       default:

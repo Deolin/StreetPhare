@@ -61,17 +61,17 @@ class AlertTtlPolicy {
   static bool isMobileAlertType(AlertType type) {
     switch (type) {
       case AlertType.barrage:
-      case AlertType.rassemblement:
-      case AlertType.accident:
+      case AlertType.casseurs:
+      case AlertType.danger:
         return true;
-      case AlertType.nasse:
-      case AlertType.controle:
+      case AlertType.policiers:
+      case AlertType.autopompes:
+      case AlertType.filtre:
       case AlertType.autre:
         return false;
-      case AlertType.zoneSafe:
-      case AlertType.panicCollectif:
+      case AlertType.panic:
+      case AlertType.dangerCollectif:
       case AlertType.density:
-        // Les zones safes, alertes panic et densité ne sont pas des dangers mobiles.
         return false;
     }
   }

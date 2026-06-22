@@ -616,7 +616,7 @@ class NetworkCoordinator with WidgetsBindingObserver {
       description: 'Densité locale (Bluetooth)',
       createdAt: DateTime.now().toUtc(),
       ttlHours: 1, // Durée de vie courte
-      status: AlertStatus.validated, // La densité est valide par défaut
+      status: AlertStatus.active, // La densité est valide par défaut
     );
 
     // Diffusion prioritaire HIVE (BLE/Wi-Fi)
@@ -655,7 +655,7 @@ class NetworkCoordinator with WidgetsBindingObserver {
   void _onDatabaseChanged(List<Alert> alerts) {
     final validated = alerts
         .where((a) =>
-            a.status == AlertStatus.validated && a.uploadedTo.isEmpty)
+            a.status == AlertStatus.active && a.uploadedTo.isEmpty)
         .toList();
     if (validated.isNotEmpty) {
       unawaited(_uploadValidatedAlerts());
@@ -685,17 +685,17 @@ class NetworkCoordinator with WidgetsBindingObserver {
     switch (type) {
       case AlertType.barrage:
         return 'Barrage';
-      case AlertType.nasse:
+      case AlertType.barrage:
         return 'Nasse';
-      case AlertType.controle:
+      case AlertType.policiers:
         return 'Contrôle policier';
-      case AlertType.accident:
+      case AlertType.danger:
         return 'Accident / canon à eau';
-      case AlertType.rassemblement:
+      case AlertType.casseurs:
         return 'Rassemblement à risque';
-      case AlertType.zoneSafe:
+      case AlertType.autre:
         return 'Zone sûre';
-      case AlertType.panicCollectif:
+      case AlertType.dangerCollectif:
         return 'Alerte Panic Collective';
       case AlertType.density:
         return 'Densité élevée';
@@ -755,7 +755,7 @@ class NetworkCoordinator with WidgetsBindingObserver {
   /// Purge les alertes expirées.
   Future<void> _purgeAndMaybeSync() async {
     await _db.purgeExpired(onBeforeDelete: (alert) async {
-      if (alert.status == AlertStatus.validated &&
+      if (alert.status == AlertStatus.active &&
           alert.uploadedTo.isEmpty) {
         await _failover.uploadAlerts([alert.toJson()]);
       }
