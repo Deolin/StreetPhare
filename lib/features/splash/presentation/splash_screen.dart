@@ -1,7 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../core/cache/cache_manager.dart';
 import '../../../core/theme/streetphare_theme.dart';
+import '../../map/map_cache_manager.dart';
 import '../../map/presentation/map_screen.dart';
 import '../../start_screen/data/start_screen_store.dart';
 import '../../start_screen/presentation/start_screen.dart';
@@ -17,7 +21,9 @@ import '../../../services/version_check_service.dart';
 ///       - Vérification de la validité du cache (< 24h)
 ///   2. Si le cache a expiré : purge puis téléchargement simulé
 ///      des données initiales (tuiles de la zone locale).
-///   3. Sinon : chargement rapide.
+///   3. Géolocalisation précoce : obtention de la position pour
+///      vérifier que les tuiles locales sont en cache avant de
+///      quitter le loader (bloquant).
 ///   4. Redirection automatique vers `MapScreen`.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -36,9 +42,31 @@ class _SplashScreenState extends State<SplashScreen>
   late final AnimationController _logoController;
   late final Animation<double> _logoAnimation;
 
+  // Index courant du tooltip affiché
+  int _tooltipIndex = 0;
+
+  // Tooltips aléatoires (astuces + messages d'attente)
+  static const List<String> _tooltips = [
+    '💡 Appuyez longuement sur la carte pour définir votre destination.',
+    '📍 Activez le GPS pour une navigation précise en temps réel.',
+    '🛡 La Route Safe vous guide vers la zone sécurisée la plus proche.',
+    '📱 Scannez un QR code pour rejoindre un événement StreetPhare.',
+    '🔒 Toutes vos communications sont chiffrées de bout en bout.',
+    '🚨 En cas d\'urgence, utilisez le bouton PANIC pour alerter vos contacts.',
+    '🗺️ Les tuiles de carte sont mises en cache pour fonctionner hors-ligne.',
+    '👥 StreetPhare fonctionne en P2P, sans dépendre d\'un serveur central.',
+    '🌙 Le mode sombre économise la batterie et préserve votre vision nocturne.',
+    '🔄 Les itinéraires s\'adaptent en temps réel selon les signalements.',
+    '📊 Consultez les statistiques de votre événement depuis le dashboard.',
+    '🔔 Activez les notifications pour recevoir les alertes de proximité.',
+  ];
+
   @override
   void initState() {
     super.initState();
+
+    // Tooltip aléatoire au lancement
+    _tooltipIndex = math.Random().nextInt(_tooltips.length);
 
     // Animation du logo : pulsation continue
     _logoController = AnimationController(
@@ -76,43 +104,46 @@ class _SplashScreenState extends State<SplashScreen>
 
       // Étape 2 : Si le cache a expiré, on le purge
       if (status == CacheStatus.expired) {
-        _updateProgress(0.35, 'Cache expiré, purge en cours…');
+        _updateProgress(0.25, 'Cache expiré, purge en cours…');
         await CacheManager.instance.purge();
-        // Petite pause pour donner du sens à l'étape
-        await Future.delayed(const Duration(milliseconds: 600));
+        await Future.delayed(const Duration(milliseconds: 400));
       }
 
-      // Étape 3 : Téléchargement / chargement des données initiales
-      _updateProgress(0.55, 'Chargement de la carte locale…');
-      await _loadInitialData();
+      // Étape 3 : Géolocalisation précoce (bloquante pour le loader)
+      _updateProgress(0.35, 'Recherche de votre position…');
+      _tooltipIndex = (_tooltipIndex + 1) % _tooltips.length;
+      final position = await _getInitialPosition();
 
-      _updateProgress(0.85, 'Mise en cache des tuiles…');
-      // Les tuiles OpenStreetMap sont mises en cache automatiquement
-      // par `flutter_map_cache` lors de leur premier affichage.
-      // Ici, on simule le temps de mise en cache.
-      await Future.delayed(const Duration(milliseconds: 700));
+      // Étape 4 : Vérification des tuiles en cache autour de la position
+      _updateProgress(0.55, 'Vérification des tuiles locales…');
+      _tooltipIndex = (_tooltipIndex + 1) % _tooltips.length;
+      final tilesReady = await _ensureLocalTilesReady(position);
+
+      if (!tilesReady) {
+        _updateProgress(0.70, 'Téléchargement des tuiles de votre zone…');
+        _tooltipIndex = (_tooltipIndex + 1) % _tooltips.length;
+        // Le téléchargement effectif sera fait par flutter_map au premier
+        // affichage. On laisse un délai pour que le cache manager s'initialise.
+        await Future.delayed(const Duration(milliseconds: 1200));
+      }
+
+      _updateProgress(0.85, 'Finalisation…');
+      _tooltipIndex = (_tooltipIndex + 1) % _tooltips.length;
+      await Future.delayed(const Duration(milliseconds: 500));
 
       _updateProgress(1.0, 'Prêt !');
       await Future.delayed(const Duration(milliseconds: 400));
 
-      // Étape 4 : Redirection vers l'écran principal.
-      // Si c'est le premier démarrage, on affiche d'abord le tutoriel,
-      // puis on navigue vers MapScreen quand l'utilisateur le ferme.
+      // Étape 5 : Redirection vers l'écran principal.
       if (!mounted) return;
 
-      // Étape 4 : Vérifier si c'est le tout premier lancement
-      // (StartScreen d'abord, puis tutoriel si applicable)
       if (StartScreenStore.instance.isFirstLaunch) {
-        // Premier lancement : on affiche le StartScreen (choix de langue),
-        // qui redirigera vers MapScreen (ou tutorial selon le flag).
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => const _StartScreenBridge(),
           ),
         );
       } else if (TutorialStore.instance.isFirstLaunch) {
-        // Premier démarrage (tutoriel non vu) : on affiche le tutoriel,
-        // puis le tutoriel redirige vers MapScreen une fois fermé.
         await Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => const _TutorialThenMapBridge(),
@@ -132,13 +163,106 @@ class _SplashScreenState extends State<SplashScreen>
     }
   }
 
-  /// Simule le téléchargement des données initiales (zone locale).
+  /// Obtient la position GPS initiale de manière sécurisée.
+  /// En cas d'échec, retourne une position par défaut (Paris).
+  Future<Position> _getInitialPosition() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        debugPrint('[Splash] GPS désactivé, position par défaut.');
+        return Position(
+          latitude: 48.8566,
+          longitude: 2.3522,
+          timestamp: DateTime.now(),
+          accuracy: 999,
+          altitude: 0,
+          altitudeAccuracy: 999,
+          heading: 0,
+          headingAccuracy: 999,
+          speed: 0,
+          speedAccuracy: 999,
+        );
+      }
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+        if (perm == LocationPermission.denied) {
+          debugPrint('[Splash] Permission GPS refusée.');
+          return Position(
+            latitude: 48.8566,
+            longitude: 2.3522,
+            timestamp: DateTime.now(),
+            accuracy: 999,
+            altitude: 0,
+            altitudeAccuracy: 999,
+            heading: 0,
+            headingAccuracy: 999,
+            speed: 0,
+            speedAccuracy: 999,
+          );
+        }
+      }
+      if (perm == LocationPermission.deniedForever) {
+        return Position(
+          latitude: 48.8566,
+          longitude: 2.3522,
+          timestamp: DateTime.now(),
+          accuracy: 999,
+          altitude: 0,
+          altitudeAccuracy: 999,
+          heading: 0,
+          headingAccuracy: 999,
+          speed: 0,
+          speedAccuracy: 999,
+        );
+      }
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.low,
+          timeLimit: Duration(seconds: 7),
+        ),
+      );
+    } catch (e) {
+      debugPrint('[Splash] Erreur GPS : $e');
+      return Position(
+        latitude: 48.8566,
+        longitude: 2.3522,
+        timestamp: DateTime.now(),
+        accuracy: 999,
+        altitude: 0,
+        altitudeAccuracy: 999,
+        heading: 0,
+        headingAccuracy: 999,
+        speed: 0,
+        speedAccuracy: 999,
+      );
+    }
+  }
+
+  /// Vérifie que les tuiles autour de la position sont présentes dans
+  /// le cache local. Initialise le [MapCacheManager] au passage.
   ///
-  /// Pour le MVP, on se contente d'un délai. Une version ultérieure
-  /// pourra déclencher un téléchargement réel de tuiles OSM via
-  /// `flutter_map_cache` ou précharger des données via l'API.
-  Future<void> _loadInitialData() async {
-    await Future.delayed(const Duration(milliseconds: 900));
+  /// Retourne `true` si des tuiles sont déjà en cache, `false` sinon.
+  Future<bool> _ensureLocalTilesReady(Position position) async {
+    try {
+      await MapCacheManager.instance.init();
+      final hasTiles = await MapCacheManager.instance.hasCachedTiles();
+
+      // Marque la zone comme préchargée (centre sur la position)
+      if (!hasTiles) {
+        await MapCacheManager.instance.preloadZone(
+          zoneLabel: 'Position actuelle',
+          centerLat: position.latitude,
+          centerLng: position.longitude,
+          radiusKm: 2.0,
+        );
+      }
+
+      debugPrint('[Splash] Tuiles en cache : $hasTiles');
+      return hasTiles;
+    } catch (e) {
+      debugPrint('[Splash] Erreur vérification tuiles : $e');
+      return false;
+    }
   }
 
   void _updateProgress(double value, String message) {
@@ -146,6 +270,14 @@ class _SplashScreenState extends State<SplashScreen>
     setState(() {
       _progress = value;
       _statusMessage = message;
+    });
+  }
+
+  /// Change le tooltip affiché (appelé périodiquement).
+  void _nextTooltip() {
+    if (!mounted) return;
+    setState(() {
+      _tooltipIndex = (_tooltipIndex + 1) % _tooltips.length;
     });
   }
 
@@ -187,7 +319,32 @@ class _SplashScreenState extends State<SplashScreen>
                   textAlign: TextAlign.center,
                 ),
 
-                const SizedBox(height: 64),
+                const SizedBox(height: 24),
+
+                // --- Tooltip aléatoire (astuce / message d'attente) ---
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 600),
+                  child: Container(
+                    key: ValueKey(_tooltipIndex),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: StreetPhareTheme.surface.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _tooltips[_tooltipIndex],
+                      style: const TextStyle(
+                        color: StreetPhareTheme.textSecondary,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 32),
 
                 // --- Indicateur de chargement ---
                 SizedBox(

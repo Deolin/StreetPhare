@@ -18,34 +18,89 @@ import '../../../../database/alert_model.dart';
 @immutable
 class AvoidanceFilters {
   const AvoidanceFilters({
-    this.avoidBarrages = false,
+    this.avoidBarrages = true,
     this.avoidNasses = true,
-    this.avoidControles = false,
-    this.avoidAccidents = true,
-    this.avoidRassemblements = false,
-    this.avoidAutres = true,
+    this.avoidControles = true,
+    this.avoidAccidents = false,
+    this.avoidRassemblements = true,
+    this.avoidAutres = false,
+    this.masterSwitch = true,
   });
 
-  /// Ne JAMAIS traverser un barrage.
   final bool avoidBarrages;
-
-  /// Ne JAMAIS traverser une nasse (piège).
   final bool avoidNasses;
-
-  /// Ne JAMAIS traverser un contrôle de police.
   final bool avoidControles;
-
-  /// Ne JAMAIS traverser un accident / autopompe.
   final bool avoidAccidents;
-
-  /// Ne JAMAIS traverser une zone de rassemblement à risque.
   final bool avoidRassemblements;
-
-  /// Ne JAMAIS traverser un danger "autre".
   final bool avoidAutres;
 
-  /// Renvoie `true` si le type d'alerte fourni doit être ÉVITÉ
-  /// (donc traité comme une barrière infranchissable dans le graphe).
+  /// Switch maître : si true, tous les sous-filtres sont activés.
+  /// Si false, tous les sous-filtres sont désactivés.
+  /// Reflète l'état cohérent : true si TOUS les sous-filtres sont activés,
+  /// false si TOUS sont désactivés, null si mixte.
+  final bool? masterSwitch;
+
+  /// Vrai si tous les sous-filtres sont activés (état cohérent).
+  bool get allEnabled =>
+      avoidBarrages &&
+      avoidNasses &&
+      avoidControles &&
+      avoidAccidents &&
+      avoidRassemblements &&
+      avoidAutres;
+
+  /// Vrai si tous les sous-filtres sont désactivés.
+  bool get allDisabled =>
+      !avoidBarrages &&
+      !avoidNasses &&
+      !avoidControles &&
+      !avoidAccidents &&
+      !avoidRassemblements &&
+      !avoidAutres;
+
+  AvoidanceFilters copyWith({
+    bool? avoidBarrages,
+    bool? avoidNasses,
+    bool? avoidControles,
+    bool? avoidAccidents,
+    bool? avoidRassemblements,
+    bool? avoidAutres,
+    bool? masterSwitch,
+  }) {
+    return AvoidanceFilters(
+      avoidBarrages: avoidBarrages ?? this.avoidBarrages,
+      avoidNasses: avoidNasses ?? this.avoidNasses,
+      avoidControles: avoidControles ?? this.avoidControles,
+      avoidAccidents: avoidAccidents ?? this.avoidAccidents,
+      avoidRassemblements: avoidRassemblements ?? this.avoidRassemblements,
+      avoidAutres: avoidAutres ?? this.avoidAutres,
+      masterSwitch: masterSwitch ?? this.masterSwitch,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'avoidBarrages': avoidBarrages,
+        'avoidNasses': avoidNasses,
+        'avoidControles': avoidControles,
+        'avoidAccidents': avoidAccidents,
+        'avoidRassemblements': avoidRassemblements,
+        'avoidAutres': avoidAutres,
+        'masterSwitch': masterSwitch,
+      };
+
+  factory AvoidanceFilters.fromJson(Map<String, dynamic> json) {
+    return AvoidanceFilters(
+      avoidBarrages: (json['avoidBarrages'] as bool?) ?? true,
+      avoidNasses: (json['avoidNasses'] as bool?) ?? true,
+      avoidControles: (json['avoidControles'] as bool?) ?? true,
+      avoidAccidents: (json['avoidAccidents'] as bool?) ?? false,
+      avoidRassemblements: (json['avoidRassemblements'] as bool?) ?? true,
+      avoidAutres: (json['avoidAutres'] as bool?) ?? false,
+      masterSwitch: json['masterSwitch'] as bool?,
+    );
+  }
+
+  /// Indique si un type d'alerte donné doit être évité selon ces filtres.
   bool shouldAvoid(AlertType type) {
     switch (type) {
       case AlertType.barrage:
@@ -58,56 +113,12 @@ class AvoidanceFilters {
         return avoidAccidents;
       case AlertType.rassemblement:
         return avoidRassemblements;
+      case AlertType.zoneSafe:
+        return false; // Zone Safe n'est jamais évitée
+      case AlertType.panicCollectif:
+      case AlertType.density:
       case AlertType.autre:
         return avoidAutres;
-      case AlertType.zoneSafe:
-        // Les zones safes sont des points positifs, on ne les évite jamais.
-        return false;
-      case AlertType.panicCollectif:
-        // Les alertes panic collectives sont traitées comme des dangers autres.
-        return avoidAutres;
-      case AlertType.density:
-        // La densité est une information de pondération, pas un obstacle bloquant.
-        return false;
     }
-  }
-
-  AvoidanceFilters copyWith({
-    bool? avoidBarrages,
-    bool? avoidNasses,
-    bool? avoidControles,
-    bool? avoidAccidents,
-    bool? avoidRassemblements,
-    bool? avoidAutres,
-  }) {
-    return AvoidanceFilters(
-      avoidBarrages: avoidBarrages ?? this.avoidBarrages,
-      avoidNasses: avoidNasses ?? this.avoidNasses,
-      avoidControles: avoidControles ?? this.avoidControles,
-      avoidAccidents: avoidAccidents ?? this.avoidAccidents,
-      avoidRassemblements: avoidRassemblements ?? this.avoidRassemblements,
-      avoidAutres: avoidAutres ?? this.avoidAutres,
-    );
-  }
-
-  /// Sérialise en `Map<String, dynamic>` pour persistance.
-  Map<String, dynamic> toJson() => {
-        'ab': avoidBarrages,
-        'an': avoidNasses,
-        'ac': avoidControles,
-        'aa': avoidAccidents,
-        'am': avoidRassemblements,
-        'ax': avoidAutres,
-      };
-
-  factory AvoidanceFilters.fromJson(Map<String, dynamic> json) {
-    return AvoidanceFilters(
-      avoidBarrages: (json['ab'] as bool?) ?? false,
-      avoidNasses: (json['an'] as bool?) ?? true,
-      avoidControles: (json['ac'] as bool?) ?? false,
-      avoidAccidents: (json['aa'] as bool?) ?? true,
-      avoidRassemblements: (json['am'] as bool?) ?? false,
-      avoidAutres: (json['ax'] as bool?) ?? true,
-    );
   }
 }

@@ -53,16 +53,7 @@ enum AppThemeMode {
     }
   }
 
-  /// Convertit la valeur stockée en enum. Fallback sur `system`.
-  static AppThemeMode fromId(String? id) {
-    if (id == null) return AppThemeMode.system;
-    return AppThemeMode.values.firstWhere(
-      (m) => m.id == id,
-      orElse: () => AppThemeMode.system,
-    );
-  }
-
-  /// Convertit l'enum en `ThemeMode` Flutter.
+  /// Retourne le [ThemeMode] natif Flutter correspondant.
   ThemeMode toThemeMode() {
     switch (this) {
       case AppThemeMode.system:
@@ -72,6 +63,15 @@ enum AppThemeMode {
       case AppThemeMode.dark:
         return ThemeMode.dark;
     }
+  }
+
+  /// Convertit la valeur stockée en enum. Fallback sur `system`.
+  static AppThemeMode fromId(String? id) {
+    if (id == null) return AppThemeMode.system;
+    return AppThemeMode.values.firstWhere(
+      (m) => m.id == id,
+      orElse: () => AppThemeMode.system,
+    );
   }
 }
 

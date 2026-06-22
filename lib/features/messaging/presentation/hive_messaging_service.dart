@@ -85,6 +85,20 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
   // Démarrage / Arrêt
   // --------------------------------------------------------------------------
 
+  /// Déclenché par le NetworkCoordinator lors du retour au premier plan.
+  /// Flush l'outbox et force une synchronisation des messages admin.
+  void syncOnForeground() {
+    if (!_started) return;
+    if (_outbox.isNotEmpty) {
+      unawaited(_flushOutbox());
+    }
+    // Force une purge des messages expirés.
+    _purgeExpired();
+    if (kDebugMode) {
+      debugPrint('[HiveMessaging] syncOnForeground: outbox flush + purge');
+    }
+  }
+
   /// Démarre le service (idempotent).
   void start() async {
     if (_started) return;

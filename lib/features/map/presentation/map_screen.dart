@@ -118,6 +118,9 @@ class _MapScreenState extends State<MapScreen> {
   /// Indique si l'utilisateur a effectivement bougé de plus de 5 m.
   bool _hasMovedBeyondThreshold = false;
 
+  /// Indique si un calcul d'itinéraire est en cours (loader verrouillé).
+  bool _calculatingRoute = false;
+
   /// Points de la Route Safe active.
   List<LatLng>? _safeRoutePoints;
 
@@ -645,6 +648,23 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
+    // Vérification du mode de transport : popup bloquant si non configuré.
+    final prefs = AppPreferencesStore.instance.value;
+    if (prefs.defaultTransportMode == null) {
+      if (!mounted) return;
+      final chosenMode = await _showTransportModePopup();
+      if (chosenMode == null) {
+        setState(() => _calculatingRoute = false);
+        return; // Annulé par l'utilisateur
+      }
+      await AppPreferencesStore.instance.setDefaultTransportMode(chosenMode);
+    }
+
+    // Détermine le profil de routage selon le mode de transport.
+    final transportMode = AppPreferencesStore.instance.value.defaultTransportMode!;
+    final routingProfile = _transportModeToRoutingProfile(transportMode);
+
+    setState(() => _calculatingRoute = true);
     _showRouteSafeProgress(
       isFailover
           ? s.mapRouteSafeFailover.replaceFirst('{label}', destinationLabel)
@@ -658,20 +678,28 @@ class _MapScreenState extends State<MapScreen> {
     final result = await RoutingEngine.instance.computeRoute(
       start: start,
       end: destination,
-      profile: RoutingProfile.pedestrian,
+      profile: routingProfile,
       avoidFilters: filters,
     );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
     if (result.isNotEmpty) {
       final routes = result.routes;
       final selected = await RouteResultSheet.show(context, routes: routes);
 
-      if (!mounted || selected == null) return;
+      if (!mounted || selected == null) {
+        setState(() => _calculatingRoute = false);
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        return;
+      }
 
-      setState(() => _safeRoutePoints = selected.points);
+      // Le trace est maintenant visible sur la carte → on coupe le loader.
+      setState(() {
+        _safeRoutePoints = selected.points;
+        _calculatingRoute = false;
+      });
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _fitRouteBounds(selected.points);
       return;
     }
@@ -684,16 +712,99 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     if (localRoutes.isEmpty) {
+      setState(() => _calculatingRoute = false);
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _showNoDestinationError();
       return;
     }
 
     final selected = await RouteResultSheet.show(context, routes: localRoutes);
 
-    if (!mounted || selected == null) return;
+    if (!mounted || selected == null) {
+      setState(() => _calculatingRoute = false);
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      return;
+    }
 
-    setState(() => _safeRoutePoints = selected.points);
+    setState(() {
+      _safeRoutePoints = selected.points;
+      _calculatingRoute = false;
+    });
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     _fitRouteBounds(selected.points);
+  }
+
+  /// Convertit le mode de transport (String) en profil de routage.
+  RoutingProfile _transportModeToRoutingProfile(String mode) {
+    switch (mode) {
+      case 'pedestrian':
+        return RoutingProfile.pedestrian;
+      case 'car':
+        return RoutingProfile.vehicle;
+      case 'transit':
+        return RoutingProfile.pedestrian; // Fallback piéton pour TC
+      default:
+        return RoutingProfile.pedestrian;
+    }
+  }
+
+  /// Affiche un popup bloquant demandant le mode de transport.
+  /// Retourne le mode choisi sous forme de String ('pedestrian', 'car', 'transit').
+  Future<String?> _showTransportModePopup() async {
+    final s = AppLocale.instance.strings;
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: StreetPhareTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.alt_route, color: StreetPhareTheme.primary, size: 24),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                s.routeTitle,
+                style: const TextStyle(
+                  color: StreetPhareTheme.textPrimary,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              s.mapDestinationLongPressHint,
+              style: const TextStyle(
+                color: StreetPhareTheme.textSecondary,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _TransportOption(
+              icon: Icons.directions_walk,
+              label: s.transportModePedestrian,
+              onTap: () => Navigator.of(ctx).pop('pedestrian'),
+            ),
+            const SizedBox(height: 8),
+            _TransportOption(
+              icon: Icons.directions_car,
+              label: s.transportModeCar,
+              onTap: () => Navigator.of(ctx).pop('car'),
+            ),
+            const SizedBox(height: 8),
+            _TransportOption(
+              icon: Icons.directions_bus,
+              label: s.transportModeTransit,
+              onTap: () => Navigator.of(ctx).pop('transit'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Centre et zoome la carte pour afficher l'INTÉGRALITÉ du trajet.
@@ -2556,6 +2667,39 @@ class _ConnectivityBanner extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+// ============================================================================
+// Widget option de transport (popup)
+// ============================================================================
+
+class _TransportOption extends StatelessWidget {
+  const _TransportOption({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: StreetPhareTheme.primary.withValues(alpha: 0.15),
+          foregroundColor: StreetPhareTheme.textPrimary,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+        ),
+        icon: Icon(icon, size: 20),
+        label: Text(label),
+        onPressed: onTap,
+      ),
     );
   }
 }

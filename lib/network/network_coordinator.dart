@@ -30,6 +30,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../database/alert_model.dart';
 import '../database/alert_ttl_policy.dart';
@@ -45,7 +46,12 @@ import '../services/connectivity_service.dart';
 import '../services/notification_service.dart';
 
 /// Coordinateur réseau singleton.
-class NetworkCoordinator {
+///
+/// Implémente [WidgetsBindingObserver] pour réagir aux changements de
+/// cycle de vie de l'application (arrière-plan / premier plan).
+/// Sauvegarde proprement l'état réseau lors de la mise en pause et
+/// restaure les connexions au retour au premier plan.
+class NetworkCoordinator with WidgetsBindingObserver {
   NetworkCoordinator._();
   static final NetworkCoordinator instance = NetworkCoordinator._();
 
@@ -57,10 +63,15 @@ class NetworkCoordinator {
   Timer? _uploadTimer;
   Timer? _serverCheckTimer;
   Timer? _densityReportTimer;
+  Timer? _peerHealthCheckTimer;
   final List<StreamSubscription> _subs = [];
 
   final String _ephemeralUserId = generateEphemeralUserId();
   bool _initialized = false;
+
+  /// État gelé des timers lors du passage en arrière-plan.
+  bool _lifecyclePaused = false;
+  DateTime? _lastBackgroundTimestamp;
 
   // [3] Mode dégradé : basculement Hive pur si TOUS les serveurs sont hors ligne.
   /// true = aucun serveur (3000 ni 3001) n'est joignable →
@@ -210,11 +221,146 @@ class NetworkCoordinator {
       (_) => _reportLocalDensity(),
     );
 
+    // ── Santé des pairs : purge périodique des pairs inactifs ──
+    _peerHealthCheckTimer = Timer.periodic(
+      const Duration(minutes: 2),
+      (_) => _checkPeerHealth(),
+    );
+
+    // ── Observer le cycle de vie de l'application ──
+    WidgetsBinding.instance.addObserver(this);
+
     _initialized = true;
     if (kDebugMode) {
       debugPrint('[NetworkCoordinator] initialisé. euid=$_ephemeralUserId');
       debugPrint('[NetworkCoordinator] Messagerie Hive P2P branchée '
           'sur ${transports.length} transport(s)');
+    }
+  }
+
+  // ==========================================================================
+  // Cycle de vie de l'application
+  // ==========================================================================
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        _onAppBackgrounded();
+      case AppLifecycleState.resumed:
+        _onAppForegrounded();
+      case AppLifecycleState.detached:
+        _onAppDetached();
+      case AppLifecycleState.hidden:
+        // Pas d'action spécifique pour 'hidden' sur mobile.
+        break;
+    }
+  }
+
+  /// L'application passe en arrière-plan ou est masquée.
+  /// Sauvegarde l'état et gèle les timers sans fermer les sockets.
+  void _onAppBackgrounded() {
+    if (_lifecyclePaused) return;
+    _lifecyclePaused = true;
+    _lastBackgroundTimestamp = DateTime.now().toUtc();
+
+    // Gèle les timers pour économiser la batterie.
+    _uploadTimer?.cancel();
+    _purgeTimer?.cancel();
+    _serverCheckTimer?.cancel();
+    _densityReportTimer?.cancel();
+    _peerHealthCheckTimer?.cancel();
+
+    // Les transports P2P restent ouverts mais en écoute passive.
+    if (kDebugMode) {
+      debugPrint('[NetworkCoordinator] App en arrière-plan — timers gelés, '
+          'transports en écoute passive');
+    }
+  }
+
+  /// L'application revient au premier plan.
+  /// Restaure les timers et déclenche une synchronisation immédiate.
+  void _onAppForegrounded() {
+    if (!_lifecyclePaused) return;
+    _lifecyclePaused = false;
+
+    final downtime = _lastBackgroundTimestamp != null
+        ? DateTime.now().toUtc().difference(_lastBackgroundTimestamp!)
+        : Duration.zero;
+
+    // Restaure les timers.
+    _purgeTimer?.cancel();
+    _purgeTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => _purgeAndMaybeSync(),
+    );
+    _uploadTimer?.cancel();
+    _uploadTimer = Timer.periodic(
+      _hiveOnlyMode ? _kDegradedUploadInterval : _kNormalUploadInterval,
+      (_) => unawaited(_uploadValidatedAlerts()),
+    );
+    _serverCheckTimer?.cancel();
+    _serverCheckTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _checkServerReachabilityAndAdapt(),
+    );
+    _peerHealthCheckTimer?.cancel();
+    _peerHealthCheckTimer = Timer.periodic(
+      const Duration(minutes: 2),
+      (_) => _checkPeerHealth(),
+    );
+
+    // Déclenche une synchronisation immédiate après un retour au
+    // premier plan (récupération des messages admin et alertes critiques).
+    unawaited(_syncOnForeground());
+
+    if (kDebugMode) {
+      debugPrint('[NetworkCoordinator] App au premier plan '
+          '(après ${downtime.inSeconds}s d\'arrêt) — timers restaurés, '
+          'sync déclenchée');
+    }
+  }
+
+  /// L'application est détachée (fermeture imminente).
+  /// Sauvegarde l'état et ferme proprement les connexions.
+  void _onAppDetached() {
+    if (kDebugMode) {
+      debugPrint('[NetworkCoordinator] App détachée — nettoyage…');
+    }
+    unawaited(dispose());
+  }
+
+  /// Synchronisation au retour au premier plan : récupère les messages
+  /// admin et les alertes critiques encore valides.
+  Future<void> _syncOnForeground() async {
+    try {
+      // Tente un upload immédiat des alertes en attente.
+      await _uploadValidatedAlerts();
+
+      // Notifie le HiveMessagingService pour qu'il flush son outbox.
+      if (!ConnectivityService.instance.isIsolated) {
+        HiveMessagingService.instance.syncOnForeground();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[NetworkCoordinator] erreur sync foreground: $e');
+      }
+    }
+  }
+
+  /// Vérifie la santé des pairs P2P : force une purge des entrées
+  /// expirées dans le [PeerCounterService] (fenêtre glissante).
+  void _checkPeerHealth() {
+    try {
+      // Le PeerCounterService purge automatiquement via son ticker
+      // interne toutes les secondes. On force simplement un notify
+      // pour que l'UI reflète l'état réel.
+      PeerCounterService.instance.forceRefresh();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[NetworkCoordinator] erreur checkPeerHealth: $e');
+      }
     }
   }
 
@@ -636,10 +782,12 @@ class NetworkCoordinator {
   }
 
   Future<void> dispose() async {
+    WidgetsBinding.instance.removeObserver(this);
     _purgeTimer?.cancel();
     _uploadTimer?.cancel();
     _serverCheckTimer?.cancel();
     _densityReportTimer?.cancel();
+    _peerHealthCheckTimer?.cancel();
     for (final s in _subs) {
       await s.cancel();
     }
@@ -648,5 +796,6 @@ class NetworkCoordinator {
     await _failover.stop();
     _hiveOnlyMode = false;
     _initialized = false;
+    _lifecyclePaused = false;
   }
 }

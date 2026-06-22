@@ -269,8 +269,13 @@ class _LowVisionSection extends StatelessWidget {
                   ),
                 ),
                 value: prefs.lowVisionMode,
-                onChanged: (v) =>
-                    AppPreferencesStore.instance.setLowVisionMode(v),
+                onChanged: (v) {
+                  AppPreferencesStore.instance.setLowVisionMode(v);
+                  // Forcer immédiatement le TextScaler à 1.5x si activé.
+                  if (v) {
+                    AppPreferencesStore.instance.setTextScaleFactor(1.5);
+                  }
+                },
                 activeThumbColor: const Color(0xFF7B1FA2),
                 contentPadding: EdgeInsets.zero,
                 dense: true,
@@ -284,22 +289,25 @@ class _LowVisionSection extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Slider(
-                        value: prefs.textScaleFactor,
+                        value: prefs.lowVisionMode ? 1.5 : prefs.textScaleFactor,
                         min: 1.0,
                         max: 2.0,
                         divisions: 10,
                         activeColor: const Color(0xFF7B1FA2),
-                        label: '${prefs.textScaleFactor.toStringAsFixed(1)}×',
-                        onChanged: (v) =>
-                            AppPreferencesStore.instance.setTextScaleFactor(v),
+                        label: '${(prefs.lowVisionMode ? 1.5 : prefs.textScaleFactor).toStringAsFixed(1)}×',
+                        onChanged: prefs.lowVisionMode
+                            ? null // Verrouillé à 1.5x quand le mode malvoyant est actif.
+                            : (v) => AppPreferencesStore.instance.setTextScaleFactor(v),
                       ),
                     ),
                     SizedBox(
-                      width: 40,
+                      width: 44,
                       child: Text(
-                        '${prefs.textScaleFactor.toStringAsFixed(1)}×',
+                        '${(prefs.lowVisionMode ? 1.5 : prefs.textScaleFactor).toStringAsFixed(1)}×',
                         style: TextStyle(
-                          color: onSurface,
+                          color: prefs.lowVisionMode
+                              ? const Color(0xFF7B1FA2)
+                              : onSurface,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -574,6 +582,12 @@ class _AvoidanceFiltersSection extends StatelessWidget {
       child: ValueListenableBuilder<AvoidanceFilters>(
         valueListenable: AvoidanceFilterStore.instance,
         builder: (context, filters, _) {
+          final masterValue = filters.allEnabled
+              ? true
+              : filters.allDisabled
+                  ? false
+                  : null; // État mixte → null.
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -593,47 +607,96 @@ class _AvoidanceFiltersSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
+              // ── Switch Maître ────────────────────────────────────
+              SwitchListTile(
+                title: Text(
+                  'Tout activer / désactiver',
+                  style: TextStyle(
+                    color: onSurface,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  'Active ou désactive tous les filtres d\'évitement d\'un seul geste.',
+                  style: TextStyle(
+                    color: onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
+                value: masterValue ?? false,
+                activeThumbColor: StreetPhareTheme.primary,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                onChanged: (v) {
+                  // Active/désactive TOUS les sous-filtres.
+                  AvoidanceFilterStore.instance.update(
+                    filters.copyWith(
+                      avoidBarrages: v,
+                      avoidNasses: v,
+                      avoidControles: v,
+                      avoidAccidents: v,
+                      avoidRassemblements: v,
+                      avoidAutres: v,
+                      masterSwitch: v,
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1, color: StreetPhareTheme.textSecondary),
               _AvoidanceTile(
                 title: strings.avoidBarragesTitle,
                 subtitle: strings.avoidBarragesSubtitle,
                 value: filters.avoidBarrages,
-                onChanged: (v) => AvoidanceFilterStore.instance
-                    .update(filters.copyWith(avoidBarrages: v)),
+                onChanged: (v) {
+                  final updated = filters.copyWith(avoidBarrages: v);
+                  AvoidanceFilterStore.instance.update(updated);
+                },
               ),
               _AvoidanceTile(
                 title: strings.avoidNassesTitle,
                 subtitle: strings.avoidNassesSubtitle,
                 value: filters.avoidNasses,
-                onChanged: (v) => AvoidanceFilterStore.instance
-                    .update(filters.copyWith(avoidNasses: v)),
+                onChanged: (v) {
+                  final updated = filters.copyWith(avoidNasses: v);
+                  AvoidanceFilterStore.instance.update(updated);
+                },
               ),
               _AvoidanceTile(
                 title: strings.avoidControlesTitle,
                 subtitle: strings.avoidControlesSubtitle,
                 value: filters.avoidControles,
-                onChanged: (v) => AvoidanceFilterStore.instance
-                    .update(filters.copyWith(avoidControles: v)),
+                onChanged: (v) {
+                  final updated = filters.copyWith(avoidControles: v);
+                  AvoidanceFilterStore.instance.update(updated);
+                },
               ),
               _AvoidanceTile(
                 title: strings.avoidAccidentsTitle,
                 subtitle: strings.avoidAccidentsSubtitle,
                 value: filters.avoidAccidents,
-                onChanged: (v) => AvoidanceFilterStore.instance
-                    .update(filters.copyWith(avoidAccidents: v)),
+                onChanged: (v) {
+                  final updated = filters.copyWith(avoidAccidents: v);
+                  AvoidanceFilterStore.instance.update(updated);
+                },
               ),
               _AvoidanceTile(
                 title: strings.avoidRassemblementsTitle,
                 subtitle: strings.avoidRassemblementsSubtitle,
                 value: filters.avoidRassemblements,
-                onChanged: (v) => AvoidanceFilterStore.instance
-                    .update(filters.copyWith(avoidRassemblements: v)),
+                onChanged: (v) {
+                  final updated = filters.copyWith(avoidRassemblements: v);
+                  AvoidanceFilterStore.instance.update(updated);
+                },
               ),
               _AvoidanceTile(
                 title: strings.avoidAutresTitle,
                 subtitle: strings.avoidAutresSubtitle,
                 value: filters.avoidAutres,
-                onChanged: (v) => AvoidanceFilterStore.instance
-                    .update(filters.copyWith(avoidAutres: v)),
+                onChanged: (v) {
+                  final updated = filters.copyWith(avoidAutres: v);
+                  AvoidanceFilterStore.instance.update(updated);
+                },
               ),
             ],
           );

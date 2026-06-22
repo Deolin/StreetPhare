@@ -166,6 +166,7 @@ class AppPreferences {
     this.messageFilter = MessageFilter.all,
     this.mapCacheMaxAgeDays = 7,
     this.androidChannelSettings = const {},
+    this.defaultTransportMode,
   });
 
   final bool batterySaverEnabled;
@@ -193,6 +194,11 @@ class AppPreferences {
   /// Clés : 'alerts', 'events', 'panic', 'messages'
   final Map<String, bool> androidChannelSettings;
 
+  /// Mode de transport par défaut pour le routage.
+  /// Valeurs : 'pedestrian', 'car', 'transit' (stocké en String).
+  /// Si null, l'utilisateur n'a pas encore configuré sa préférence.
+  final String? defaultTransportMode;
+
   /// Retourne si un canal Android est activé (actif par défaut).
   bool isAndroidChannelEnabled(String channelId) =>
       androidChannelSettings[channelId] ?? true;
@@ -208,7 +214,7 @@ class AppPreferences {
     double? textScaleFactor,
     MessageFilter? messageFilter,
     int? mapCacheMaxAgeDays,
-    Map<String, bool>? androidChannelSettings,
+    String? defaultTransportMode,
   }) {
     return AppPreferences(
       batterySaverEnabled: batterySaverEnabled ?? this.batterySaverEnabled,
@@ -223,6 +229,7 @@ class AppPreferences {
       mapCacheMaxAgeDays: mapCacheMaxAgeDays ?? this.mapCacheMaxAgeDays,
       androidChannelSettings:
           androidChannelSettings ?? this.androidChannelSettings,
+      defaultTransportMode: defaultTransportMode ?? this.defaultTransportMode,
     );
   }
 
@@ -238,6 +245,7 @@ class AppPreferences {
         'messageFilter': messageFilter.name,
         'mapCacheMaxAgeDays': mapCacheMaxAgeDays,
         'androidChannels': androidChannelSettings,
+        'defaultTransportMode': defaultTransportMode,
       };
 
   factory AppPreferences.fromJson(Map<String, dynamic> json) {
@@ -267,6 +275,7 @@ class AppPreferences {
         orElse: () => MessageFilter.all,
       ),
       mapCacheMaxAgeDays: (json['mapCacheMaxAgeDays'] as int?) ?? 7,
+      defaultTransportMode: json['defaultTransportMode'] as String?,
     );
   }
 }
@@ -342,9 +351,10 @@ class AppPreferencesStore extends ValueNotifier<AppPreferences> {
   Future<void> setMessageFilter(MessageFilter filter) =>
       update(value.copyWith(messageFilter: filter));
 
-  /// Modifie la durée de cache des tuiles (en jours).
+    /// Modifie la durée de cache des tuiles (en jours).
+  /// Minimum verrouillé à 7 jours pour garantir la disponibilité hors-ligne.
   Future<void> setMapCacheMaxAgeDays(int days) =>
-      update(value.copyWith(mapCacheMaxAgeDays: days.clamp(1, 30)));
+      update(value.copyWith(mapCacheMaxAgeDays: days.clamp(7, 30)));
 
   /// [4] Active/désactive un canal de notifications Android système.
   Future<void> setAndroidChannelEnabled(String channelId, bool enabled) {
@@ -352,4 +362,9 @@ class AppPreferencesStore extends ValueNotifier<AppPreferences> {
       ..[channelId] = enabled;
     return update(value.copyWith(androidChannelSettings: updated));
   }
+
+  /// Définit le mode de transport par défaut.
+  /// [mode] : 'pedestrian', 'car', ou 'transit'.
+  Future<void> setDefaultTransportMode(String mode) =>
+      update(value.copyWith(defaultTransportMode: mode));
 }

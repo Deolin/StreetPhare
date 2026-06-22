@@ -219,6 +219,14 @@ class PeerCounterService extends ValueNotifier<int> {
     }
   }
 
+  /// Force une rafraîchissement immédiat du compteur (purge + notify).
+  /// Appelé par le NetworkCoordinator lors du health check des pairs.
+  void forceRefresh() {
+    final now = DateTime.now().toUtc();
+    final kept = _prune(now);
+    value = kept.length;
+  }
+
   /// Arrêt propre du service.
   void stop() {
     _ticker?.cancel();

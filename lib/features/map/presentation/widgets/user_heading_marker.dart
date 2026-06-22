@@ -72,17 +72,7 @@ class UserHeadingMarker extends StatelessWidget {
           ),
         ),
 
-        // ── Ombre portée de la flèche ─────────────────────────────
-        Transform.rotate(
-          angle: angleRad,
-          child: Icon(
-            Icons.navigation,
-            color: Colors.black.withValues(alpha: 0.25),
-            size: 30,
-          ),
-        ),
-
-        // ── Flèche directionnelle orientée ────────────────────────
+        // ── Flèche directionnelle orientée (sans ombre parasite) ──
         Transform.rotate(
           angle: angleRad,
           child: const Icon(
