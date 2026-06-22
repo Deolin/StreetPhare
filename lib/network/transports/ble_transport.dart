@@ -62,8 +62,9 @@ class BleMeshTransport implements MeshTransport {
   BleMeshTransport({
     FlutterReactiveBle? ble,
     String? peerId,
-    this._pingInterval = const Duration(seconds: 8),
-  })  : _ble = ble ?? FlutterReactiveBle(),
+    Duration pingInterval = const Duration(seconds: 8),
+  })  : _pingInterval = pingInterval,
+        _ble = ble ?? FlutterReactiveBle(),
         _peerId = peerId ?? _generateRandomPeerId();
 
   final FlutterReactiveBle _ble;

@@ -78,23 +78,25 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
     switch (type) {
       case AlertType.barrage:
         return Colors.red;
-      case AlertType.barrage:
-        return Colors.orange;
-      case AlertType.policiers:
-        return Colors.blue;
-      case AlertType.danger:
-        return Colors.purple;
       case AlertType.casseurs:
         return Colors.amber;
-      case AlertType.autre:
-        return Colors.green;
+      case AlertType.danger:
+        return Colors.purple;
+      case AlertType.policiers:
+        return Colors.blue;
+      case AlertType.autopompes:
+        return Colors.orange;
+      case AlertType.filtre:
+        return Colors.teal;
+      case AlertType.panic:
+        return Colors.deepOrange;
       case AlertType.dangerCollectif:
         return Colors.redAccent;
       case AlertType.density:
         return Colors.cyanAccent;
       case AlertType.autre:
         return Colors.grey;
-    }
+      }
   }
 
   /// Icône pour le type d'alerte.
@@ -102,23 +104,25 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
     switch (type) {
       case AlertType.barrage:
         return Icons.block;
-      case AlertType.barrage:
-        return Icons.safety_check;
-      case AlertType.policiers:
-        return Icons.local_police;
-      case AlertType.danger:
-        return Icons.warning_amber;
       case AlertType.casseurs:
         return Icons.groups;
-      case AlertType.autre:
-        return Icons.shield;
+      case AlertType.danger:
+        return Icons.warning_amber;
+      case AlertType.policiers:
+        return Icons.local_police;
+      case AlertType.autopompes:
+        return Icons.fire_truck;
+      case AlertType.filtre:
+        return Icons.filter_alt;
+      case AlertType.panic:
+        return Icons.emergency;
       case AlertType.dangerCollectif:
         return Icons.campaign;
       case AlertType.density:
         return Icons.people;
       case AlertType.autre:
         return Icons.error;
-    }
+      }
   }
 
   /// Construit la liste des marqueurs à partir du flux d'alertes.
@@ -163,23 +167,25 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
     switch (type) {
       case AlertType.barrage:
         return 'Barrage';
-      case AlertType.barrage:
-        return 'Nasse';
-      case AlertType.policiers:
-        return 'Contrôle';
-      case AlertType.danger:
-        return 'Accident';
       case AlertType.casseurs:
-        return 'Rassemblement';
-      case AlertType.autre:
-        return 'Zone sûre';
-      case AlertType.dangerCollectif:
+        return 'Casseurs';
+      case AlertType.danger:
+        return 'Danger';
+      case AlertType.policiers:
+        return 'Police';
+      case AlertType.autopompes:
+        return 'Autopompes';
+      case AlertType.filtre:
+        return 'Filtre';
+      case AlertType.panic:
         return 'Panic';
+      case AlertType.dangerCollectif:
+        return 'Panic collectif';
       case AlertType.density:
         return 'Densité';
       case AlertType.autre:
         return 'Autre';
-    }
+      }
   }
 
   @override

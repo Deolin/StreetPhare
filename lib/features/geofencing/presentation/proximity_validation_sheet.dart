@@ -42,16 +42,18 @@ class ProximityValidationSheet extends StatelessWidget {
     switch (type) {
       case AlertType.barrage:
         return 'un barrage';
-      case AlertType.barrage:
-        return 'une nasse';
-      case AlertType.policiers:
-        return 'un contrôle de police';
-      case AlertType.danger:
-        return 'un danger / accident';
       case AlertType.casseurs:
         return 'un rassemblement à risque';
-      case AlertType.autre:
-        return 'une zone safe';
+      case AlertType.danger:
+        return 'un danger / accident';
+      case AlertType.policiers:
+        return 'un contrôle de police';
+      case AlertType.autopompes:
+        return 'des autopompes';
+      case AlertType.filtre:
+        return 'un filtre';
+      case AlertType.panic:
+        return 'une alerte panic';
       case AlertType.dangerCollectif:
         return 'une alerte panic collective';
       case AlertType.density:
@@ -65,18 +67,20 @@ class ProximityValidationSheet extends StatelessWidget {
     switch (type) {
       case AlertType.barrage:
         return Icons.block;
-      case AlertType.barrage:
-        return Icons.crop_square;
-      case AlertType.policiers:
-        return Icons.local_police;
-      case AlertType.danger:
-        return Icons.warning_amber;
       case AlertType.casseurs:
         return Icons.groups;
-      case AlertType.autre:
-        return Icons.shield_outlined;
-      case AlertType.dangerCollectif:
+      case AlertType.danger:
+        return Icons.warning_amber;
+      case AlertType.policiers:
+        return Icons.local_police;
+      case AlertType.autopompes:
+        return Icons.fire_truck;
+      case AlertType.filtre:
+        return Icons.filter_alt;
+      case AlertType.panic:
         return Icons.emergency;
+      case AlertType.dangerCollectif:
+        return Icons.campaign;
       case AlertType.density:
         return Icons.bolt;
       case AlertType.autre:
@@ -88,16 +92,18 @@ class ProximityValidationSheet extends StatelessWidget {
     switch (type) {
       case AlertType.barrage:
         return const Color(0xFFE53935);
-      case AlertType.barrage:
-        return const Color(0xFFFFB300);
-      case AlertType.policiers:
-        return const Color(0xFF3F51B5);
-      case AlertType.danger:
-        return const Color(0xFFFF6F00);
       case AlertType.casseurs:
         return const Color(0xFF7B1FA2);
-      case AlertType.autre:
-        return const Color(0xFF2E7D32);
+      case AlertType.danger:
+        return const Color(0xFFFF6F00);
+      case AlertType.policiers:
+        return const Color(0xFF3F51B5);
+      case AlertType.autopompes:
+        return const Color(0xFFE65100);
+      case AlertType.filtre:
+        return const Color(0xFF00695C);
+      case AlertType.panic:
+        return const Color(0xFFBF360C);
       case AlertType.dangerCollectif:
         return const Color(0xFFE53935);
       case AlertType.density:

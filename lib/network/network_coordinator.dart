@@ -685,20 +685,22 @@ class NetworkCoordinator with WidgetsBindingObserver {
     switch (type) {
       case AlertType.barrage:
         return 'Barrage';
-      case AlertType.barrage:
-        return 'Nasse';
-      case AlertType.policiers:
-        return 'Contrôle policier';
-      case AlertType.danger:
-        return 'Accident / canon à eau';
       case AlertType.casseurs:
-        return 'Rassemblement à risque';
-      case AlertType.autre:
-        return 'Zone sûre';
+        return 'Casseurs';
+      case AlertType.danger:
+        return 'Danger';
+      case AlertType.policiers:
+        return 'Police';
+      case AlertType.autopompes:
+        return 'Autopompes';
+      case AlertType.filtre:
+        return 'Filtre';
+      case AlertType.panic:
+        return 'Panic';
       case AlertType.dangerCollectif:
         return 'Alerte Panic Collective';
       case AlertType.density:
-        return 'Densité élevée';
+        return 'Densité';
       case AlertType.autre:
         return 'Autre danger';
     }
