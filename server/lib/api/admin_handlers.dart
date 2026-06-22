@@ -2,9 +2,10 @@
 //
 // Endpoints d'administration des comptes et des permissions.
 //
-// Routes :
+// Routes (montées sous /api/ dans server.dart) :
+//   GET  /api/health       — Health check public.
 //   POST /api/setup        — Création du Master Admin (setup run).
-//   POST /api/login        — Connexion, retourne un token JWT.
+//   POST /api/login        — Connexion, retourne un token.
 //   POST /api/logout       — Déconnexion.
 //   GET  /api/accounts     — Liste des comptes (admin only).
 //   POST /api/accounts     — Créer un modérateur (admin only).
@@ -13,7 +14,7 @@
 //   GET  /api/permissions  — Liste des permissions.
 //   PUT  /api/permissions  — Modifier une permission (admin only).
 //   POST /api/permissions/reset — Réinitialiser les permissions (admin only).
-//   GET  /api/health       — Health check public.
+//   *    /api/*            — Fallback 404 JSON pour toute route non trouvée.
 
 import 'dart:convert';
 
@@ -28,7 +29,7 @@ Router buildAdminRouter() {
   final router = Router();
 
   // ── Health check (public) ──────────────────────────────────────────
-  router.get('/api/health', (request) {
+  router.get('/health', (request) {
     return Response.ok(
       jsonEncode({'status': 'ok', 'setup': AuthManager.instance.isSetupComplete}),
       headers: {'Content-Type': 'application/json; charset=utf-8'},
@@ -36,7 +37,7 @@ Router buildAdminRouter() {
   });
 
   // ── Setup Master Admin (public, une seule fois) ────────────────────
-  router.post('/api/setup', (request) async {
+  router.post('/setup', (request) async {
     if (AuthManager.instance.isSetupComplete) {
       return Response.forbidden(
         jsonEncode({'error': 'Le setup est déjà terminé.'}),
@@ -72,7 +73,7 @@ Router buildAdminRouter() {
   });
 
   // ── Login (public) ────────────────────────────────────────────────
-  router.post('/api/login', (request) async {
+  router.post('/login', (request) async {
     try {
       final body = await request.readAsString();
       final data = jsonDecode(body) as Map<String, dynamic>;
@@ -97,7 +98,7 @@ Router buildAdminRouter() {
   });
 
   // ── Logout ────────────────────────────────────────────────────────
-  router.post('/api/logout', (request) async {
+  router.post('/logout', (request) async {
     final token = _extractBearer(request);
     if (token != null) {
       await AuthManager.instance.logout(token);
@@ -109,7 +110,7 @@ Router buildAdminRouter() {
   });
 
   // ── Liste des comptes (admin only) ────────────────────────────────
-  router.get('/api/accounts', (request) {
+  router.get('/accounts', (request) {
     final role = request.context['auth_role'] as String?;
     if (role != 'admin') {
       return Response.forbidden(
@@ -130,7 +131,7 @@ Router buildAdminRouter() {
   });
 
   // ── Créer un modérateur (admin only) ──────────────────────────────
-  router.post('/api/accounts', (request) async {
+  router.post('/accounts', (request) async {
     final role = request.context['auth_role'] as String?;
     if (role != 'admin') {
       return Response.forbidden(
@@ -157,7 +158,7 @@ Router buildAdminRouter() {
   });
 
   // ── Supprimer un compte (admin only) ──────────────────────────────
-  router.delete('/api/accounts/<id>', (request, String id) async {
+  router.delete('/accounts/<id>', (request, String id) async {
     final role = request.context['auth_role'] as String?;
     if (role != 'admin') {
       return Response.forbidden(
@@ -185,7 +186,7 @@ Router buildAdminRouter() {
   });
 
   // ── Changer mot de passe (admin only) ─────────────────────────────
-  router.put('/api/accounts/<id>/password', (request, String id) async {
+  router.put('/accounts/<id>/password', (request, String id) async {
     final role = request.context['auth_role'] as String?;
     if (role != 'admin') {
       return Response.forbidden(
@@ -211,7 +212,7 @@ Router buildAdminRouter() {
   });
 
   // ── Liste des permissions ─────────────────────────────────────────
-  router.get('/api/permissions', (request) {
+  router.get('/permissions', (request) {
     final perms = CommandRouter.instance.permissions.toJson();
     return Response.ok(
       jsonEncode(perms),
@@ -220,7 +221,7 @@ Router buildAdminRouter() {
   });
 
   // ── Modifier une permission (admin only) ──────────────────────────
-  router.put('/api/permissions', (request) async {
+  router.put('/permissions', (request) async {
     final role = request.context['auth_role'] as String?;
     if (role != 'admin') {
       return Response.forbidden(
@@ -252,7 +253,7 @@ Router buildAdminRouter() {
   });
 
   // ── Réinitialiser les permissions (admin only) ────────────────────
-  router.post('/api/permissions/reset', (request) async {
+  router.post('/permissions/reset', (request) async {
     final role = request.context['auth_role'] as String?;
     if (role != 'admin') {
       return Response.forbidden(
@@ -263,6 +264,14 @@ Router buildAdminRouter() {
     await CommandRouter.instance.resetToDefaults();
     return Response.ok(
       jsonEncode({'success': true}),
+      headers: {'Content-Type': 'application/json; charset=utf-8'},
+    );
+  });
+
+  // ── Fallback 404 JSON pour toute route /api/* non trouvée ─────────
+  router.all('/<ignored|.*>', (request) {
+    return Response.notFound(
+      jsonEncode({'error': 'Route not found', 'code': 404}),
       headers: {'Content-Type': 'application/json; charset=utf-8'},
     );
   });

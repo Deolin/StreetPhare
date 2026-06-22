@@ -92,10 +92,30 @@ const api = async (url, opts = {}) => {
     headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(opts.body);
   }
-  const r = await fetch(url, { ...opts, headers });
+  let r;
+  try {
+    r = await fetch(url, { ...opts, headers });
+  } catch (e) {
+    console.error('[api] fetch error:', e);
+    toast('❌ Erreur réseau — serveur injoignable');
+    return null;
+  }
+  // Protection anti-corruption JSON : ne parse que si le statut est OK ou 4xx.
+  let body;
+  try {
+    const text = await r.text();
+    try {
+      body = JSON.parse(text);
+    } catch (_) {
+      body = { raw: text };
+    }
+  } catch (_) {
+    body = {};
+  }
+  // Surcharge .json() pour compatibilité avec le code existant.
+  r.json = () => Promise.resolve(body);
   if (r.status === 403) {
-    const d = await r.json().catch(() => ({}));
-    if (d.error === 'SESSION_EXPIRED' || d.error === 'SETUP_REQUIRED') {
+    if (body.error === 'SESSION_EXPIRED' || body.error === 'SETUP_REQUIRED') {
       token = '';
       localStorage.removeItem('sp_admin_token');
       boot();
@@ -153,12 +173,18 @@ document.getElementById('navBar').addEventListener('click', (e) => {
 // ── Chargement données ────────────────────────────────────────────────────────
 const loadAll = async () => {
   try {
-    const [ar, pr, er] = await Promise.all([
-      api('/api/accounts'), api('/api/permissions'), api('/api/events')
+    const results = await Promise.allSettled([
+      api('/accounts'), api('/permissions'), api('/events')
     ]);
-    if (ar && ar.ok) accounts = await ar.json();
-    if (pr && pr.ok) permissions = (await pr.json()).permissions || {};
-    if (er && er.ok) events = await er.json();
+    if (results[0].status === 'fulfilled' && results[0].value && results[0].value.ok) {
+      accounts = await results[0].value.json();
+    }
+    if (results[1].status === 'fulfilled' && results[1].value && results[1].value.ok) {
+      permissions = (await results[1].value.json()).permissions || {};
+    }
+    if (results[2].status === 'fulfilled' && results[2].value && results[2].value.ok) {
+      events = await results[2].value.json();
+    }
   } catch (e) { console.error(e); }
 };
 
@@ -307,7 +333,7 @@ const renderAccounts = () => {
       <td>${new Date(a.created_at).toLocaleDateString()}</td>
       <td>
         ${a.role !== 'admin' ? `
-          <button class="btn btn-danger btn-sm" onclick="deleteAccount('${a.id}')">🗑 Supprimer</button>
+          <button class="btn btn-danger btn-sm" onclick="window.doDeleteAccount('${a.id}')">🗑 Supprimer</button>
         ` : '<span style="color:#aaa;font-size:11px">Admin</span>'}
       </td>
     </tr>
@@ -317,7 +343,7 @@ const renderAccounts = () => {
     <div class="card">
       <h2>👥 Comptes <span class="badge">${accounts.length} compte(s)</span></h2>
       <div class="row" style="margin-bottom:16px">
-        <button class="btn btn-primary" onclick="showCreateModerator()">＋ Nouveau modérateur</button>
+        <button class="btn btn-primary" onclick="window.doShowCreateModerator()">＋ Nouveau modérateur</button>
       </div>
       ${accounts.length === 0 ? '<div class="empty-state">Aucun compte modérateur</div>' : `
         <table><thead><tr><th>Nom</th><th>Rôle</th><th>ID</th><th>Créé le</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>
@@ -327,14 +353,14 @@ const renderAccounts = () => {
   `;
 };
 
-window.deleteAccount = async (id) => {
+window.doDeleteAccount = async (id) => {
   if (!confirm('Supprimer ce compte ? Toutes ses sessions seront invalidées.')) return;
-  const r = await api('/api/accounts/' + id, { method: 'DELETE' });
+  const r = await api('/accounts/' + id, { method: 'DELETE' });
   if (r && r.ok) { toast('✅ Compte supprimé.', '#4caf50'); await loadAll(); renderPage(); }
   else { toast('❌ Échec suppression.', '#d32f2f'); }
 };
 
-window.showCreateModerator = () => {
+window.doShowCreateModerator = () => {
   document.getElementById('modalSlot').innerHTML = `
     <div style="position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;z-index:10" onclick="this.remove()">
       <div class="card" style="width:380px" onclick="event.stopPropagation()">
@@ -342,7 +368,7 @@ window.showCreateModerator = () => {
         <div class="form-group"><label>Nom d'utilisateur</label><input id="newModUser" placeholder="moderator1"></div>
         <div class="form-group"><label>Mot de passe (min. 6 caractères)</label><input type="password" id="newModPass" placeholder="••••••"></div>
         <div class="row">
-          <button class="btn btn-primary" onclick="createModerator()">Créer</button>
+          <button class="btn btn-primary" onclick="window.doCreateModerator()">Créer</button>
           <button class="btn btn-outline" onclick="document.getElementById('modalSlot').innerHTML=''">Annuler</button>
         </div>
       </div>
@@ -350,12 +376,12 @@ window.showCreateModerator = () => {
   `;
 };
 
-window.createModerator = async () => {
+window.doCreateModerator = async () => {
   const u = document.getElementById('newModUser').value.trim();
   const p = document.getElementById('newModPass').value;
   if (!u || !p) { toast('Champs requis.'); return; }
   if (p.length < 6) { toast('Mot de passe trop court (min 6).'); return; }
-  const r = await api('/api/accounts', { method:'POST', body:{username:u,password:p} });
+  const r = await api('/accounts', { method:'POST', body:{username:u,password:p} });
   if (r && r.ok) { toast('✅ Modérateur créé !', '#4caf50'); await loadAll(); renderPage(); }
   else { const d = r ? await r.json() : {}; toast('❌ '+(d.error||'Erreur')); }
 };
@@ -375,7 +401,7 @@ const renderPermissions = () => {
       <div class="cell cmd">${cmd}</div>
       <div class="cell"><input type="checkbox" checked disabled></div>
       <div class="cell"><input type="checkbox" ${mod?'checked':''}
-        onchange="togglePerm('${cmd}', this.checked)"></div>
+        onchange="window.doTogglePerm('${cmd}', this.checked)"></div>
     `;
   }).join('');
 
@@ -393,28 +419,28 @@ const renderPermissions = () => {
       </div>
       <div class="row" style="margin-top:16px">
         <span class="spacer"></span>
-        <button class="btn btn-outline btn-sm" onclick="resetPermissions()">↺ Réinitialiser</button>
+        <button class="btn btn-outline btn-sm" onclick="window.doResetPermissions()">↺ Réinitialiser</button>
       </div>
     </div>
   `;
 };
 
-window.togglePerm = async (cmd, allowed) => {
-  const r = await api('/api/permissions', {
+window.doTogglePerm = async (cmd, allowed) => {
+  const r = await api('/permissions', {
     method:'PUT', body:{command:cmd, role:'moderator', allowed}
   });
   if (r && r.ok) { toast(`✅ ${cmd} → ${allowed?'autorisé':'bloqué'}`, allowed?'#4caf50':'#ff9800'); }
   else { toast('❌ Erreur mise à jour'); await loadAll(); renderPage(); }
 };
 
-window.resetPermissions = async () => {
+window.doResetPermissions = async () => {
   if (!confirm('Réinitialiser toutes les permissions aux valeurs par défaut ?')) return;
-  const r = await api('/api/permissions/reset', { method:'POST' });
+  const r = await api('/permissions/reset', { method:'POST' });
   if (r && r.ok) { toast('✅ Permissions réinitialisées.', '#4caf50'); await loadAll(); renderPage(); }
 };
 
 // ==========================================================================
-// PAGE : Événements (dashboard admin existant)
+// PAGE : Événements
 // ==========================================================================
 const renderEvents = () => {
   const rows = events.map(e => `
@@ -423,9 +449,9 @@ const renderEvents = () => {
       <td>${escapeHtml(e.name)}</td>
       <td class="mono">${(e.created_at||'').substring(0,10)}</td>
       <td class="row">
-        <button class="btn btn-outline btn-sm" onclick="editEvent('${e.id}')">✏️</button>
-        <button class="btn btn-outline btn-sm" onclick="showQr('${e.code}')">📱 QR</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteEvent('${e.id}')">🗑</button>
+        <button class="btn btn-outline btn-sm" onclick="window.doEditEvent('${e.id}')">✏️</button>
+        <button class="btn btn-outline btn-sm" onclick="window.doShowQr('${e.code}')">📱 QR</button>
+        <button class="btn btn-danger btn-sm" onclick="window.doDeleteEvent('${e.id}')">🗑</button>
       </td>
     </tr>
   `).join('');
@@ -433,21 +459,21 @@ const renderEvents = () => {
     <div class="card">
       <h2>📋 Événements <span class="badge">${events.length}</span></h2>
       <div class="row" style="margin-bottom:12px">
-        <button class="btn btn-primary" onclick="createEvent()">＋ Nouvel événement</button>
+        <button class="btn btn-primary" onclick="window.doCreateEvent()">＋ Nouvel événement</button>
       </div>
       ${events.length===0?'<div class="empty-state">Aucun événement</div>':`<table><thead><tr><th>Code</th><th>Nom</th><th>Créé le</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table>`}
     </div>
   `;
 };
 
-window.createEvent = () => { const n = prompt("Nom de l'événement :"); if (!n) return;
-  api('/api/events', { method:'POST', body:{name:n} }).then(r => r && r.ok ? loadAll().then(renderPage) : null); };
-window.editEvent = (id) => { const e = events.find(x => x.id === id); if (!e) return;
+window.doCreateEvent = () => { const n = prompt("Nom de l'événement :"); if (!n) return;
+  api('/events', { method:'POST', body:{name:n} }).then(r => r && r.ok ? loadAll().then(renderPage) : null); };
+window.doEditEvent = (id) => { const e = events.find(x => x.id === id); if (!e) return;
   const n = prompt('Nom :', e.name); if (!n) return;
-  api('/api/events', { method:'POST', body:{...e,name:n,_action:'update'} }).then(r => r && r.ok ? loadAll().then(renderPage) : null); };
-window.deleteEvent = (id) => { if (!confirm('Supprimer ?')) return;
-  api('/api/events', { method:'POST', body:{id,_action:'delete'} }).then(r => r && r.ok ? loadAll().then(renderPage) : null); };
-window.showQr = async (code) => { const r = await api('/api/events/' + code + '/qr');
+  api('/events', { method:'POST', body:{...e,name:n,_action:'update'} }).then(r => r && r.ok ? loadAll().then(renderPage) : null); };
+window.doDeleteEvent = (id) => { if (!confirm('Supprimer ?')) return;
+  api('/events', { method:'POST', body:{id,_action:'delete'} }).then(r => r && r.ok ? loadAll().then(renderPage) : null); };
+window.doShowQr = async (code) => { const r = await api('/events/' + code + '/qr');
   if (!r || !r.ok) return; const d = await r.json();
   const w = window.open('','_blank','width=400,height=400'); w.document.write('<img src="'+d.qr+'" style="width:100%"><p style="text-align:center;font-family:monospace">'+code+'</p>'); };
 

@@ -294,27 +294,28 @@ class AuthManager {
   // --------------------------------------------------------------------------
 
   /// Middleware qui bloque les requêtes non authentifiées.
-  /// Si [setupOnly] est true, autorise uniquement l'endpoint de setup.
+  /// En phase de setup (non initialisé), toutes les routes /api/* sont
+  /// autorisées temporairement — le dashboard affiche l'écran de setup
+  /// et les autres appels sont inoffensifs (base vide).
   Handler authMiddleware(Handler innerHandler, {bool setupOnly = false}) {
     return (Request request) async {
-      // Si le setup n'est pas fait, rediriger TOUT vers le setup (sauf /api/setup).
-      if (!_setupComplete && !request.url.path.endsWith('/api/setup')) {
-        return Response.forbidden(
-          jsonEncode({'error': 'SETUP_REQUIRED', 'message': 'Le serveur n\'est pas configuré. '
-              'Accédez à /setup pour créer le compte administrateur.'}),
-          headers: {'Content-Type': 'application/json; charset=utf-8'},
-        );
-      }
-
-      // Routes publiques (setup, login, health).
       final path = request.url.path;
-      if (path.endsWith('/api/setup') ||
-          path.endsWith('/api/login') ||
-          path.endsWith('/api/health') ||
-          path.endsWith('/setup')) {
+
+      // En phase de setup (non initialisé), autoriser TOUTES les routes /api/*.
+      // Le dashboard gère l'affichage conditionnel (setup wizard).
+      if (!_setupComplete && path.contains('/api/')) {
         return innerHandler(request);
       }
 
+      // Routes publiques (setup, login, health, page setup HTML).
+      if (path.endsWith('/setup') ||
+          path.contains('/api/setup') ||
+          path.contains('/api/login') ||
+          path.contains('/api/health')) {
+        return innerHandler(request);
+      }
+
+      // Authentification requise pour toutes les autres routes.
       final token = _extractToken(request);
       if (token == null) {
         return Response.forbidden(
@@ -418,7 +419,6 @@ class AuthManager {
   // --------------------------------------------------------------------------
 
   void _cleanExpiredSessions() {
-    final now = DateTime.now().toUtc();
     _sessions.removeWhere((_, s) => s.isExpired);
   }
 
