@@ -23,11 +23,11 @@
 // ---------------------------------------------------------------------------
 
 // Adresse No-IP du serveur principal StreetPhare
-define('PRIMARY_HOST', 'streetphare-principal.ddns.net');
+define('PRIMARY_HOST', 'streetphare.ddns.be');
 define('PRIMARY_PORT', 3000);
 
 // Adresse du serveur secondaire / backup
-define('SECONDARY_HOST', 'streetphare-backup.ddns.net');
+define('SECONDARY_HOST', 'streetphare.ddns.be');
 define('SECONDARY_PORT', 3001);
 
 // Timeout de connexion en secondes

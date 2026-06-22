@@ -273,7 +273,7 @@ class AuthManager {
     return session;
   }
 
-  /// Extrait le token d'une requête HTTP (Authorization: Bearer <token> ou cookie).
+  /// Extrait le token d'une requête HTTP (Authorization: Bearer token ou cookie).
   String? _extractToken(Request request) {
     // Authorization header
     final authHeader = request.headers['authorization'];

@@ -308,7 +308,7 @@ void main(List<String> args) async {
   Logger.root.onRecord.listen((rec) {
     final ts =
         '${rec.time.hour.toString().padLeft(2, '0')}:${rec.time.minute.toString().padLeft(2, '0')}:${rec.time.second.toString().padLeft(2, '0')}';
-    print('[$ts] ${rec.level.name.toUpperCase()}: ${rec.message}');
+    stdout.writeln('[$ts] ${rec.level.name.toUpperCase()}: ${rec.message}');
   });
 
   final parser = ArgParser()
@@ -319,9 +319,9 @@ void main(List<String> args) async {
   final results = parser.parse(args);
 
   if (results['help'] as bool) {
-    print('StreetPhare Server v1.0.0');
-    print('Usage: dart run bin/server.dart [options]');
-    print(parser.usage);
+    _log.info('StreetPhare Server v1.0.0');
+    _log.info('Usage: dart run bin/server.dart [options]');
+    _log.info(parser.usage);
     return;
   }
 
@@ -373,7 +373,7 @@ void main(List<String> args) async {
     ..mount('/api/', adminRouter.call) // Routes admin (authentification intégrée via authMiddleware)
     ..mount('/', pipeline);
 
-  await io.serve(appRouter, '0.0.0.0', port);
+  await io.serve(appRouter.call, '0.0.0.0', port);
   _log.info('Serveur démarré sur http://0.0.0.0:$port');
   _log.info('WebSocket : ws://0.0.0.0:$port/ws');
   _log.info('Dashboard : http://0.0.0.0:$port/');

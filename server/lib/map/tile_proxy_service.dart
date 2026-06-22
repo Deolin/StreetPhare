@@ -25,6 +25,7 @@
 /// await tileProxy.init();
 /// router.get('/tiles/<zoom>/<x>/<y>', tileProxy.handler);
 /// ```
+library;
 
 import 'dart:async';
 import 'dart:io';
@@ -120,7 +121,7 @@ class TileProxyService {
         y: y,
         ifModifiedSince: request.headers['if-modified-since'],
       );
-    } catch (e, st) {
+    } catch (e) {
       _log.warning('Erreur tuile $zoom/$x/$y : $e');
       return Response.internalServerError(
         body: jsonEncode({'error': 'Échec récupération tuile'}),
@@ -188,7 +189,7 @@ class TileProxyService {
       // Modifié → mettre à jour le cache
       if (osmResponse.statusCode == 200) {
         _misses++;
-        final body = await osmResponse.bodyBytes;
+        final body = osmResponse.bodyBytes;
         await cacheFile.parent.create(recursive: true);
         await cacheFile.writeAsBytes(body);
         _log.fine('UPD  $zoom/$x/$y (${body.length} octets)');
@@ -219,7 +220,7 @@ class TileProxyService {
     );
 
     if (osmResponse.statusCode == 200) {
-      final body = await osmResponse.bodyBytes;
+      final body = osmResponse.bodyBytes;
       await cacheFile.parent.create(recursive: true);
       await cacheFile.writeAsBytes(body);
       return Response.ok(

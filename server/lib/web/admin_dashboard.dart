@@ -174,7 +174,7 @@ document.getElementById('navBar').addEventListener('click', (e) => {
 const loadAll = async () => {
   try {
     const results = await Promise.allSettled([
-      api('/accounts'), api('/permissions'), api('/events')
+      api('/api/accounts'), api('/api/permissions'), api('/api/events')
     ]);
     if (results[0].status === 'fulfilled' && results[0].value && results[0].value.ok) {
       accounts = await results[0].value.json();
@@ -355,7 +355,7 @@ const renderAccounts = () => {
 
 window.doDeleteAccount = async (id) => {
   if (!confirm('Supprimer ce compte ? Toutes ses sessions seront invalidées.')) return;
-  const r = await api('/accounts/' + id, { method: 'DELETE' });
+  const r = await api('/api/accounts/' + id, { method: 'DELETE' });
   if (r && r.ok) { toast('✅ Compte supprimé.', '#4caf50'); await loadAll(); renderPage(); }
   else { toast('❌ Échec suppression.', '#d32f2f'); }
 };
@@ -381,7 +381,7 @@ window.doCreateModerator = async () => {
   const p = document.getElementById('newModPass').value;
   if (!u || !p) { toast('Champs requis.'); return; }
   if (p.length < 6) { toast('Mot de passe trop court (min 6).'); return; }
-  const r = await api('/accounts', { method:'POST', body:{username:u,password:p} });
+  const r = await api('/api/accounts', { method:'POST', body:{username:u,password:p} });
   if (r && r.ok) { toast('✅ Modérateur créé !', '#4caf50'); await loadAll(); renderPage(); }
   else { const d = r ? await r.json() : {}; toast('❌ '+(d.error||'Erreur')); }
 };
@@ -426,7 +426,7 @@ const renderPermissions = () => {
 };
 
 window.doTogglePerm = async (cmd, allowed) => {
-  const r = await api('/permissions', {
+  const r = await api('/api/permissions', {
     method:'PUT', body:{command:cmd, role:'moderator', allowed}
   });
   if (r && r.ok) { toast(`✅ ${cmd} → ${allowed?'autorisé':'bloqué'}`, allowed?'#4caf50':'#ff9800'); }
@@ -435,7 +435,7 @@ window.doTogglePerm = async (cmd, allowed) => {
 
 window.doResetPermissions = async () => {
   if (!confirm('Réinitialiser toutes les permissions aux valeurs par défaut ?')) return;
-  const r = await api('/permissions/reset', { method:'POST' });
+  const r = await api('/api/permissions/reset', { method:'POST' });
   if (r && r.ok) { toast('✅ Permissions réinitialisées.', '#4caf50'); await loadAll(); renderPage(); }
 };
 
@@ -467,13 +467,13 @@ const renderEvents = () => {
 };
 
 window.doCreateEvent = () => { const n = prompt("Nom de l'événement :"); if (!n) return;
-  api('/events', { method:'POST', body:{name:n} }).then(r => r && r.ok ? loadAll().then(renderPage) : null); };
+  api('/api/events', { method:'POST', body:{name:n} }).then(r => r && r.ok ? loadAll().then(renderPage) : null); };
 window.doEditEvent = (id) => { const e = events.find(x => x.id === id); if (!e) return;
   const n = prompt('Nom :', e.name); if (!n) return;
-  api('/events', { method:'POST', body:{...e,name:n,_action:'update'} }).then(r => r && r.ok ? loadAll().then(renderPage) : null); };
+  api('/api/events', { method:'POST', body:{...e,name:n,_action:'update'} }).then(r => r && r.ok ? loadAll().then(renderPage) : null); };
 window.doDeleteEvent = (id) => { if (!confirm('Supprimer ?')) return;
-  api('/events', { method:'POST', body:{id,_action:'delete'} }).then(r => r && r.ok ? loadAll().then(renderPage) : null); };
-window.doShowQr = async (code) => { const r = await api('/events/' + code + '/qr');
+  api('/api/events', { method:'POST', body:{id,_action:'delete'} }).then(r => r && r.ok ? loadAll().then(renderPage) : null); };
+window.doShowQr = async (code) => { const r = await api('/api/events/' + code + '/qr');
   if (!r || !r.ok) return; const d = await r.json();
   const w = window.open('','_blank','width=400,height=400'); w.document.write('<img src="'+d.qr+'" style="width:100%"><p style="text-align:center;font-family:monospace">'+code+'</p>'); };
 

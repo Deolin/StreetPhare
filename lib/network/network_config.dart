@@ -1,18 +1,17 @@
 // lib/network/network_config.dart
 //
-// Configuration réseau de StreetPhare — Version TEST locale.
+// Configuration réseau de StreetPhare — Version PRODUCTION No-IP.
 //
 // Centralise TOUTES les URL de serveurs (principal + secours +
-// relay) pour pointer exclusivement vers l'infrastructure de test
-// locale : 192.168.31.18.
+// relay) pour pointer exclusivement vers l'infrastructure de
+// production : streetphare.ddns.be.
 //
-//   Serveur Principal : http://192.168.31.18:3000
-//   Serveur Backup   : http://192.168.31.18:3001
-//   Relay WebSocket   : ws://192.168.31.18:3000/mesh
+//   Serveur Principal : http://streetphare.ddns.be:3000
+//   Serveur Backup   : http://streetphare.ddns.be:3001
+//   Relay WebSocket   : ws://streetphare.ddns.be:3000/mesh
 //
-// Le FailoverManager est configuré avec un heartbeat accéléré
-// (5s au lieu de 30s) et un timeout de ping réduit (2s au lieu
-// de 5s) pour un basculement quasi-instantané.
+// Le FailoverManager est configuré avec un heartbeat normal
+// (30s) et un timeout de ping standard (5s).
 //
 // Ce fichier est consommé par :
 //   * lib/main.dart            -> valeurs passées à buildNetworkBootstrap
@@ -27,46 +26,46 @@ class NetworkConfig {
   NetworkConfig._();
 
   // ---------------------------------------------------------------------------
-  // Adresse IP fixe de la machine de test locale
+  // Adresse No-IP de production
   // ---------------------------------------------------------------------------
-  static const String _testHost = '192.168.31.18';
+  static const String _productionHost = 'streetphare.ddns.be';
 
   // ---------------------------------------------------------------------------
-  // Constantes de ports (miroir de test_servers/server_*.js)
+  // Constantes de ports
   // ---------------------------------------------------------------------------
-  static const int _primaryPortDev = 3000;
-  static const int _secondaryPortDev = 3001;
+  static const int _primaryPort = 3000;
+  static const int _secondaryPort = 3001;
 
   // ---------------------------------------------------------------------------
-  // Adresses RÉSEAU (mode DEBUG forcé pour le test)
+  // Adresses RÉSEAU (mode PRODUCTION)
   // ---------------------------------------------------------------------------
 
   /// URL du serveur PRINCIPAL courant.
   ///
-  /// Debug : http://192.168.31.18:3000  (test_servers/server_primary.js)
+  /// Production : http://streetphare.ddns.be:3000
   static String get primaryServer {
-    return 'http://$_testHost:$_primaryPortDev';
+    return 'http://$_productionHost:$_primaryPort';
   }
 
   /// URL du serveur SECONDAIRE (secours).
   ///
-  /// http://192.168.31.18:3001 (test_servers/server_secondary.js)
+  /// http://streetphare.ddns.be:3001
   static String get initialSecondaryServer {
-    return 'http://$_testHost:$_secondaryPortDev';
+    return 'http://$_productionHost:$_secondaryPort';
   }
 
   /// URL du relay WebSocket (utilisé par `RelayMeshTransport`).
   ///
-  /// ws://192.168.31.18:3000/mesh
+  /// ws://streetphare.ddns.be:3000/mesh
   static String get relayUrl {
-    return 'ws://$_testHost:$_primaryPortDev/mesh';
+    return 'ws://$_productionHost:$_primaryPort/mesh';
   }
 
   /// URL WebSocket du relais d'administration serveur.
   ///
-  /// ws://192.168.31.18:3000/admin
+  /// ws://streetphare.ddns.be:3000/admin
   static String get primaryUrl {
-    return 'ws://$_testHost:$_primaryPortDev/admin';
+    return 'ws://$_productionHost:$_primaryPort/admin';
   }
 
   /// Master passphrase utilisée pour dériver la clé AES
@@ -94,7 +93,7 @@ class NetworkConfig {
   /// QUE dans des `debugPrint`). Ne jamais logger les secrets.
   static String describe() {
     return 'NetworkConfig{'
-        'host=$_testHost '
+        'host=$_productionHost '
         'primary=$primaryServer '
         'secondary=$initialSecondaryServer '
         'relay=$relayUrl'
