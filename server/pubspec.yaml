@@ -1,0 +1,27 @@
+name: streetphare_server
+description: Serveur standalone StreetPhare — CLI + GUI admin + QR events.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.12.0 <4.0.0'
+
+dependencies:
+  shelf: ^1.4.2
+  shelf_router: ^1.1.4
+  shelf_web_socket: ^2.0.0
+  shelf_static: ^1.1.3
+  web_socket_channel: ^3.0.3
+  qr: ^3.0.2
+  qr_flutter: ^4.1.0
+  archive: ^4.0.7
+  path: ^1.9.1
+  uuid: ^4.5.1
+  crypto: ^3.0.6
+  collection: ^1.19.1
+  logging: ^1.3.0
+  args: ^2.6.0
+
+dev_dependencies:
+  test: ^1.31.0
+  lints: ^5.1.1

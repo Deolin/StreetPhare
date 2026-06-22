@@ -41,8 +41,8 @@ MAGENTA="\033[0;35m"
 NC="\033[0m"
 
 # ── Configuration par défaut ─────────────────────────────────────────────
-SKIP_IOS=false
-SKIP_WINDOWS=false
+SKIP_IOS=true
+SKIP_WINDOWS=true
 DEBUG_MODE=false
 
 # Token et clé Appetize (variables d'environnement)

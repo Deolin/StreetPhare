@@ -13,12 +13,15 @@
 //     - Ajout de participants à un fil existant.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../network/network_coordinator.dart';
+import '../../../services/connectivity_service.dart';
 import '../../settings/data/app_preferences_store.dart';
 import '../data/hive_block_service.dart';
 import '../domain/models/hive_message.dart';
@@ -35,6 +38,12 @@ const Duration _kMessageTtl = Duration(hours: 6);
 
 /// Nombre maximum de messages en mémoire.
 const int _kMaxMessages = 200;
+
+/// Nombre maximum de messages dans la file d'attente outbox.
+const int _kMaxOutboxSize = 50;
+
+/// Clé SharedPreferences pour la file d'attente outbox.
+const String _kOutboxKey = 'hive_msg_outbox_v1';
 
 // ============================================================================
 // HiveMessagingService
@@ -59,22 +68,54 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
   /// Timer de purge automatique des messages expirés.
   Timer? _purgeTimer;
 
+  /// File d'attente des messages dont l'envoi a échoué (outbox).
+  /// Chaque entrée est une `Map<String, dynamic>` (sérialisation du message).
+  final List<Map<String, dynamic>> _outbox = [];
+
+  /// Timer de flush automatique de l'outbox.
+  Timer? _outboxFlushTimer;
+
+  /// Callback d'écoute de la connectivité (ChangeNotifier).
+  VoidCallback? _onConnectivityChanged;
+
   bool _started = false;
+  SharedPreferences? _prefs;
 
   // --------------------------------------------------------------------------
   // Démarrage / Arrêt
   // --------------------------------------------------------------------------
 
   /// Démarre le service (idempotent).
-  void start() {
+  void start() async {
     if (_started) return;
     _started = true;
+    _prefs ??= await SharedPreferences.getInstance();
     _purgeTimer = Timer.periodic(
       const Duration(minutes: 5),
       (_) => _purgeExpired(),
     );
     // Charge les préférences de blocage.
     HiveBlockService.instance.load();
+    // Restaure l'outbox persistée.
+    await _loadOutbox();
+    // Flush immédiat de l'outbox (au cas où on aurait redémarré avec
+    // des messages en attente).
+    if (_outbox.isNotEmpty) {
+      unawaited(_flushOutbox());
+    }
+    // Timer de flush périodique (toutes les 30 secondes).
+    _outboxFlushTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => unawaited(_flushOutbox()),
+    );
+    // Écoute les changements de connectivité pour flusher l'outbox
+    // dès qu'une connexion est rétablie.
+    _onConnectivityChanged = () {
+      if (!ConnectivityService.instance.isIsolated && _outbox.isNotEmpty) {
+        unawaited(_flushOutbox());
+      }
+    };
+    ConnectivityService.instance.addListener(_onConnectivityChanged!);
     debugPrint('[HiveMessaging] service démarré — id=$_localEphemeralId');
   }
 
@@ -82,7 +123,105 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
   void stop() {
     _purgeTimer?.cancel();
     _purgeTimer = null;
+    _outboxFlushTimer?.cancel();
+    _outboxFlushTimer = null;
+    if (_onConnectivityChanged != null) {
+      ConnectivityService.instance.removeListener(_onConnectivityChanged!);
+      _onConnectivityChanged = null;
+    }
     _started = false;
+  }
+
+  // --------------------------------------------------------------------------
+  // Outbox — file d'attente offline
+  // --------------------------------------------------------------------------
+
+  /// Restaure l'outbox depuis SharedPreferences.
+  Future<void> _loadOutbox() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    final raw = _prefs!.getStringList(_kOutboxKey) ?? [];
+    _outbox.clear();
+    for (final entry in raw) {
+      try {
+        final map = jsonDecode(entry) as Map<String, dynamic>;
+        _outbox.add(map);
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[HiveMessaging] erreur restauration outbox: $e');
+        }
+      }
+    }
+    if (kDebugMode && _outbox.isNotEmpty) {
+      debugPrint('[HiveMessaging] outbox chargée: ${_outbox.length} messages');
+    }
+  }
+
+  /// Persiste l'outbox dans SharedPreferences.
+  Future<void> _persistOutbox() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    final raw = _outbox.map((m) => jsonEncode(m)).toList();
+    await _prefs!.setStringList(_kOutboxKey, raw);
+  }
+
+  /// Ajoute un message à l'outbox et le persiste.
+  void _enqueueOutbox(Map<String, dynamic> messageJson) {
+    if (_outbox.length >= _kMaxOutboxSize) {
+      _outbox.removeAt(0); // FIFO : supprime le plus ancien.
+    }
+    _outbox.add(messageJson);
+    unawaited(_persistOutbox());
+    if (kDebugMode) {
+      debugPrint('[HiveMessaging] message mis en outbox (${_outbox.length} en attente)');
+    }
+  }
+
+  /// Retire un message de l'outbox.
+  void _dequeueOutbox(Map<String, dynamic> messageJson) {
+    _outbox.remove(messageJson);
+    unawaited(_persistOutbox());
+  }
+
+  /// Vide la file d'attente outbox : retente l'envoi de chaque message
+  /// en attente. Appelé périodiquement et lors du retour de connexion.
+  Future<void> _flushOutbox() async {
+    if (_outbox.isEmpty) return;
+    if (kDebugMode) {
+      debugPrint('[HiveMessaging] flush outbox: ${_outbox.length} messages');
+    }
+    // Copie pour éviter la modification concurrente.
+    final pending = List<Map<String, dynamic>>.from(_outbox);
+    for (final msg in pending) {
+      try {
+        await NetworkCoordinator.instance.broadcastHiveMessage(
+          msg,
+          localPriorityOnly: false,
+        );
+        // Succès → retire de l'outbox.
+        _dequeueOutbox(msg);
+      } catch (e) {
+        // Échec → le message reste dans l'outbox, sera retenté plus tard.
+        if (kDebugMode) {
+          debugPrint('[HiveMessaging] échec flush outbox: $e');
+        }
+      }
+    }
+  }
+
+  /// Nettoie l'outbox des messages expirés (TTL dépassé).
+  void _purgeOutboxExpired() {
+    final now = DateTime.now().toUtc();
+    final before = _outbox.length;
+    _outbox.removeWhere((msg) {
+      try {
+        final ts = DateTime.parse(msg['sent_at'] as String? ?? '');
+        return now.difference(ts) > _kMessageTtl;
+      } catch (_) {
+        return true; // Donnée corrompue → supprimer.
+      }
+    });
+    if (_outbox.length != before) {
+      unawaited(_persistOutbox());
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -128,34 +267,56 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
     debugPrint('[HiveMessaging] message diffusé localement: ${msg.id}');
   }
 
+  /// Version de broadcast qui accepte un message déjà construit
+  /// (utilisé pour retenter l'envoi depuis l'outbox).
+  void broadcastExisting(HiveMessage msg) {
+    _allMessages[msg.id] = msg;
+    _trimToLimit();
+    _emitFiltered();
+    unawaited(_broadcastWithPriority(msg));
+  }
+
   /// Pipeline de broadcast hiérarchique :
   ///   1. Réseau local P2P (BLE Mesh / Wi-Fi) — prioritaire.
   ///   2. Serveur distant — tâche d'arrière-plan non bloquante.
   Future<void> _broadcastWithPriority(HiveMessage msg) async {
+    bool anySuccess = false;
     // Étape 1 : broadcast P2P local via NetworkCoordinator.
     try {
       await NetworkCoordinator.instance.broadcastHiveMessage(
         msg.toJson(),
         localPriorityOnly: true, // Signale au coordinator : réseau local ONLY.
       );
+      anySuccess = true;
     } catch (e) {
       debugPrint('[HiveMessaging] échec broadcast P2P local: $e');
     }
 
     // Étape 2 (arrière-plan) : propagation vers le serveur distant.
     // Complètement détaché de l'UI.
-    unawaited(_propagateToRemoteServer(msg));
+    unawaited(_propagateToRemoteServer(msg, markSuccess: anySuccess));
   }
 
   /// Propagation asynchrone (background) vers le serveur distant.
-  Future<void> _propagateToRemoteServer(HiveMessage msg) async {
+  ///
+  /// Si [markSuccess] est true, indique que l'étape locale a déjà
+  /// réussi. Seule l'étape distante est tentée.
+  /// Si l'étape distante échoue alors que l'étape locale a aussi
+  /// échoué, le message est placé dans l'outbox pour retry ultérieur.
+  Future<void> _propagateToRemoteServer(HiveMessage msg,
+      {bool markSuccess = false}) async {
     try {
       await NetworkCoordinator.instance.broadcastHiveMessage(
         msg.toJson(),
         localPriorityOnly: false, // Toutes les destinations.
       );
+      // Succès total : on ne fait rien, message déjà diffusé.
     } catch (e) {
       debugPrint('[HiveMessaging] échec propagation serveur distant: $e');
+      // Si NEITHER local NOR distant n'a réussi → outbox.
+      if (!markSuccess) {
+        _enqueueOutbox(msg.toJson());
+      }
     }
   }
 
@@ -249,6 +410,7 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
     _allMessages.removeWhere(
       (_, msg) => now.difference(msg.sentAt) > _kMessageTtl,
     );
+    _purgeOutboxExpired();
     _emitFiltered();
     debugPrint(
         '[HiveMessaging] purge — ${_allMessages.length} messages conservés');

@@ -27,6 +27,7 @@ class HiveBlockService extends ChangeNotifier {
 
   static const _kBlockedKey = 'hive_blocked_ids_v1';
   static const _kThreadDurationKey = 'hive_thread_duration_min_v1';
+  static const _kThreadsKey = 'hive_threads_v2';
 
   final Set<String> _blockedIds = {};
   final List<TempThread> _threads = [];
@@ -48,7 +49,38 @@ class HiveBlockService extends ChangeNotifier {
       ..clear()
       ..addAll(raw);
     _threadDurationMinutes = _prefs!.getInt(_kThreadDurationKey) ?? 30;
+    await _loadThreads();
     notifyListeners();
+  }
+
+  /// Restaure les fils temporaires depuis SharedPreferences.
+  /// Seuls les fils encore actifs sont conservés (TTL strict).
+  Future<void> _loadThreads() async {
+    final raw = _prefs!.getStringList(_kThreadsKey) ?? [];
+    _threads.clear();
+    for (final entry in raw) {
+      try {
+        final thread = TempThread.fromJson(entry);
+        if (thread.isActive) {
+          _threads.add(thread);
+        }
+        // Les fils expirés sont silencieusement ignorés (TTL strict).
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[HiveBlock] erreur restauration thread: $e');
+        }
+      }
+    }
+    if (kDebugMode && _threads.isNotEmpty) {
+      debugPrint('[HiveBlock] ${_threads.length} fils restaurés');
+    }
+  }
+
+  /// Persiste les fils actifs dans SharedPreferences.
+  Future<void> _persistThreads() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    final active = activeThreads.map((t) => t.toJson()).toList();
+    await _prefs!.setStringList(_kThreadsKey, active);
   }
 
   // ---------------------------------------------------------------------------
@@ -70,6 +102,9 @@ class HiveBlockService extends ChangeNotifier {
     await _persistBlocked();
     notifyListeners();
   }
+
+  /// Liste des IDs éphémères actuellement bloqués (lecture seule).
+  List<String> get blockedIds => List.unmodifiable(_blockedIds);
 
   /// `true` si l'utilisateur est bloqué.
   bool isBlocked(String ephemeralId) => _blockedIds.contains(ephemeralId);
@@ -111,6 +146,7 @@ class HiveBlockService extends ChangeNotifier {
       color: _kThreadColors[colorIdx],
     );
     _threads.add(thread);
+    unawaited(_persistThreads());
     notifyListeners();
     if (kDebugMode) {
       debugPrint('[HiveBlock] Fil temporaire créé : $id '
@@ -132,6 +168,7 @@ class HiveBlockService extends ChangeNotifier {
       participantIds: {...thread.participantIds, ephemeralId},
     );
     _threads[idx] = updated;
+    unawaited(_persistThreads());
     notifyListeners();
     return updated;
   }
@@ -150,7 +187,10 @@ class HiveBlockService extends ChangeNotifier {
   void _pruneExpired() {
     final before = _threads.length;
     _threads.removeWhere((t) => !t.isActive);
-    if (_threads.length != before) notifyListeners();
+    if (_threads.length != before) {
+      unawaited(_persistThreads());
+      notifyListeners();
+    }
   }
 
   static String _generateThreadId() {

@@ -41,7 +41,8 @@ class HiveMessagingScreen extends StatefulWidget {
   State<HiveMessagingScreen> createState() => _HiveMessagingScreenState();
 }
 
-class _HiveMessagingScreenState extends State<HiveMessagingScreen> {
+class _HiveMessagingScreenState extends State<HiveMessagingScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
 
@@ -52,6 +53,7 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     HiveMessagingService.instance.start();
     HiveMessagingService.instance.refreshFilter(
       userPosition: widget.userPosition,
@@ -61,10 +63,31 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _scrollCtrl.dispose();
     _threadTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    // Lorsque le clavier s'ouvre (viewInsets.bottom > 0), défile
+    // automatiquement vers le bas pour ne pas masquer le dernier message.
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    if (bottomInset > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollCtrl.hasClients && mounted) {
+          // Avec reverse:true, position 0 = bas de la liste.
+          _scrollCtrl.animateTo(
+            0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
   }
 
   void _startThreadTimer() {
@@ -82,13 +105,11 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen> {
       threadId: widget.threadId ?? _activeThread?.id,
     );
     _controller.clear();
+    // Après l'envoi, défile vers le bas (position 0 en reverse)
+    // pour afficher le nouveau message.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollCtrl.hasClients) {
-        _scrollCtrl.animateTo(
-          0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+        _scrollCtrl.jumpTo(0);
       }
     });
   }
@@ -681,172 +702,175 @@ class _MessageContextMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Poignée
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: onSurface.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(2),
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Poignée
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: onSurface.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          // En-tête : alias de l'émetteur
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor:
-                      StreetPhareTheme.primary.withValues(alpha: 0.2),
-                  radius: 18,
-                  child: Text(
-                    message.senderAlias.substring(0, 2).toUpperCase(),
-                    style: const TextStyle(
-                      color: StreetPhareTheme.primary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
+            // En-tête : alias de l'émetteur
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor:
+                        StreetPhareTheme.primary.withValues(alpha: 0.2),
+                    radius: 18,
+                    child: Text(
+                      message.senderAlias.substring(0, 2).toUpperCase(),
+                      style: const TextStyle(
+                        color: StreetPhareTheme.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Utilisateur ${message.senderAlias}',
-                      style: TextStyle(
-                        color: onSurface,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Utilisateur ${message.senderAlias}',
+                        style: TextStyle(
+                          color: onSurface,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
                       ),
-                    ),
-                    Text(
-                      'UUID éphémère · ${message.senderEphemeralId}',
-                      style: TextStyle(
-                        color: onSurface.withValues(alpha: 0.5),
-                        fontSize: 10,
+                      Text(
+                        'UUID éphémère · ${message.senderEphemeralId}',
+                        style: TextStyle(
+                          color: onSurface.withValues(alpha: 0.5),
+                          fontSize: 10,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 24),
+            const Divider(height: 24),
 
-          // Action 1 : Bloquer
-          ListTile(
-            leading: Icon(
-              isBlocked ? Icons.block_flipped : Icons.block,
-              color: StreetPhareTheme.danger,
-            ),
-            title: Text(
-              isBlocked
-                  ? 'Débloquer cet utilisateur'
-                  : 'Bloquer cet utilisateur',
-              style: const TextStyle(
+            // Action 1 : Bloquer
+            ListTile(
+              leading: Icon(
+                isBlocked ? Icons.block_flipped : Icons.block,
                 color: StreetPhareTheme.danger,
-                fontWeight: FontWeight.w500,
               ),
-            ),
-            subtitle: Text(
-              isBlocked
-                  ? 'Rend ses messages à nouveau visibles'
-                  : 'Rend tous ses messages passés et futurs invisibles '
-                      'sur cet appareil (UUID éphémère local)',
-              style: TextStyle(
-                color: onSurface.withValues(alpha: 0.6),
-                fontSize: 12,
+              title: Text(
+                isBlocked
+                    ? 'Débloquer cet utilisateur'
+                    : 'Bloquer cet utilisateur',
+                style: const TextStyle(
+                  color: StreetPhareTheme.danger,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
+              subtitle: Text(
+                isBlocked
+                    ? 'Rend ses messages à nouveau visibles'
+                    : 'Rend tous ses messages passés et futurs invisibles '
+                        'sur cet appareil (UUID éphémère local)',
+                style: TextStyle(
+                  color: onSurface.withValues(alpha: 0.6),
+                  fontSize: 12,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                if (isBlocked) {
+                  HiveBlockService.instance
+                      .unblockUser(message.senderEphemeralId);
+                } else {
+                  onBlock();
+                }
+              },
             ),
-            onTap: () {
-              Navigator.of(context).pop();
-              if (isBlocked) {
-                HiveBlockService.instance
-                    .unblockUser(message.senderEphemeralId);
-              } else {
-                onBlock();
-              }
-            },
-          ),
 
-          // Action 2 : Créer une discussion temporaire
-          ListTile(
-            leading: const Icon(Icons.add_comment, color: Color(0xFF9C27B0)),
-            title: const Text(
-              'Créer une discussion temporaire',
-              style: TextStyle(
-                color: Color(0xFF9C27B0),
-                fontWeight: FontWeight.w500,
+            // Action 2 : Créer une discussion temporaire
+            ListTile(
+              leading: const Icon(Icons.add_comment, color: Color(0xFF9C27B0)),
+              title: const Text(
+                'Créer une discussion temporaire',
+                style: TextStyle(
+                  color: Color(0xFF9C27B0),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-            subtitle: Text(
-              'Initialise un fil parallèle de '
-              '${HiveBlockService.instance.threadDurationMinutes} min '
-              '(configurable dans les options)',
-              style: TextStyle(
-                color: onSurface.withValues(alpha: 0.6),
-                fontSize: 12,
+              subtitle: Text(
+                'Initialise un fil parallèle de '
+                '${HiveBlockService.instance.threadDurationMinutes} min '
+                '(configurable dans les options)',
+                style: TextStyle(
+                  color: onSurface.withValues(alpha: 0.6),
+                  fontSize: 12,
+                ),
               ),
+              onTap: () {
+                Navigator.of(context).pop();
+                onCreateThread();
+              },
             ),
-            onTap: () {
-              Navigator.of(context).pop();
-              onCreateThread();
-            },
-          ),
 
-          // Action 3 : Ajouter / indicateur de fil actif
-          ListTile(
-            leading: Icon(
-              isInThread ? Icons.group : Icons.group_add,
-              color: isInThread
-                  ? const Color(0xFF388E3C)
-                  : const Color(0xFF1976D2),
-            ),
-            title: Text(
-              isInThread
-                  ? 'Messages copiés dans ce fil (déjà ajouté)'
-                  : hasActiveThread
-                      ? 'Ajouter à la discussion active'
-                      : 'Créer un fil et y ajouter',
-              style: TextStyle(
+            // Action 3 : Ajouter / indicateur de fil actif
+            ListTile(
+              leading: Icon(
+                isInThread ? Icons.group : Icons.group_add,
                 color: isInThread
                     ? const Color(0xFF388E3C)
                     : const Color(0xFF1976D2),
-                fontWeight: FontWeight.w500,
               ),
-            ),
-            subtitle: Text(
-              isInThread
-                  ? 'La bulle de cet utilisateur est colorée '
-                      'pour indiquer que ses messages sont dans le fil actif'
-                  : 'Ajoute l\'utilisateur au fil temporaire en cours',
-              style: TextStyle(
-                color: onSurface.withValues(alpha: 0.6),
-                fontSize: 12,
+              title: Text(
+                isInThread
+                    ? 'Messages copiés dans ce fil (déjà ajouté)'
+                    : hasActiveThread
+                        ? 'Ajouter à la discussion active'
+                        : 'Créer un fil et y ajouter',
+                style: TextStyle(
+                  color: isInThread
+                      ? const Color(0xFF388E3C)
+                      : const Color(0xFF1976D2),
+                  fontWeight: FontWeight.w500,
+                ),
               ),
+              subtitle: Text(
+                isInThread
+                    ? 'La bulle de cet utilisateur est colorée '
+                        'pour indiquer que ses messages sont dans le fil actif'
+                    : 'Ajoute l\'utilisateur au fil temporaire en cours',
+                style: TextStyle(
+                  color: onSurface.withValues(alpha: 0.6),
+                  fontSize: 12,
+                ),
+              ),
+              onTap: isInThread
+                  ? null
+                  : () {
+                      Navigator.of(context).pop();
+                      onAddToThread();
+                    },
             ),
-            onTap: isInThread
-                ? null
-                : () {
-                    Navigator.of(context).pop();
-                    onAddToThread();
-                  },
-          ),
 
-          const SizedBox(height: 8),
-        ],
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

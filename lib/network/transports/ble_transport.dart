@@ -1,19 +1,23 @@
 // lib/network/transports/ble_transport.dart
 //
-// Implémentation BLE (Bluetooth Low Energy) du contrat MeshTransport.
+// Transport BLE (Bluetooth Low Energy) — v2.0 SCAN-ONLY
 //
-// Dépend du package `flutter_reactive_ble` (qui doit être ajouté au
-// pubspec.yaml) :
-//   flutter_reactive_ble: ^5.0.0
+// === COMPTAGE PASSIF EXCLUSIF ===
 //
-// Le service se comporte à la fois comme :
-//   - GATT Server (advertise un service StreetPhare contenant
-//     une caractéristique "alert" en notify/write)
-//   - Scanner BLE pour découvrir les autres appareils
+// À partir de la v2.0, le transport BLE est BRIDÉ au scanning passif.
+// Il ne tente PLUS de connexion GATT, de read/write de caractéristiques,
+// ni d'échange de données applicatives. Son unique mission est :
 //
-// Les payloads d'alertes sont courts (≤ 244 octets typiques d'une
-// caractéristique BLE), ce impose un format compact (déjà
-// prévu dans `Alert.toCompact()`).
+//   1. Scanner en continu les advertisements BLE à la recherche de
+//      l'UUID de service StreetPhare (`kStreetPhareBleServiceUuid`).
+//   2. Pour chaque appareil détecté portant cette signature, enregistrer
+//      le `peerId` dans `PeerCounterService` (fenêtre glissante 5 min).
+//   3. Émettre périodiquement un ping de présence BLE pour signaler
+//      sa propre existence aux autres scanners StreetPhare.
+//
+// Les échanges de données (messages, alertes) transitent exclusivement
+// par Wi-Fi Direct / WebSocket / Relay. Le BLE est réservé à la
+// DÉTECTION DE PROXIMITÉ (comptage HIVE).
 //
 // === Identifiant de pair (UUID de session anonyme) ===
 //
@@ -27,7 +31,7 @@
 //
 // === Correction ANR (Signal 3) ===
 //
-// Les rafales d'émissions/réceptions BLE peuvent saturer la boucle
+// Les rafales de découvertes BLE peuvent saturer la boucle
 // d'événements Dart (thread UI). Pour éviter les ANR :
 //   - Le callback de scan est désormais « throttlé » : on ignore
 //     les découvertes redondantes d'un même device dans une fenêtre
@@ -46,6 +50,7 @@ import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../p2p_mesh_service.dart';
+import '../../core/network/peer_counter_service.dart';
 
 /// Transport BLE pour la propagation P2P.
 ///
@@ -133,7 +138,9 @@ class BleMeshTransport implements MeshTransport {
       return;
     }
 
-    // Scan : on écoute tous les appareils qui exposent notre service.
+    // ── Scan passif permanent : détection de présence uniquement ──
+    // Le BLE ne fait PLUS de connexion GATT, uniquement du scanning
+    // d'advertisements pour le comptage HIVE (PeerCounterService).
     _scanSub = _ble
         .scanForDevices(
       withServices: [serviceUuid],
@@ -150,15 +157,24 @@ class BleMeshTransport implements MeshTransport {
       }
       _lastDeviceSeen[device.id] = now;
 
-      // Quand on détecte un pair, on s'y connecte pour recevoir ses
-      // notifications. La lecture effective des caractéristiques
-      // dépend d'un connectGatt + discoverServices (omis ici pour
-      // concision — voir flutter_reactive_ble pour l'API complète).
+      // ── Comptage HIVE : enregistre le pair dans la fenêtre glissante ──
+      // Le BLE est exclusivement dédié au comptage de proximité.
+      // Aucune connexion GATT, aucun échange de données.
+      PeerCounterService.instance.recordPeer(
+        device.id,
+        serviceUuid: serviceUuid.toString(),
+        metadata: device.name.isNotEmpty ? 'SP_HIVE_${device.name}' : null,
+      );
+
       if (kDebugMode) {
-        debugPrint('[BLE] pair découvert: ${device.name} (${device.id})');
+        debugPrint('[BLE] pair détecté (scan only): ${device.name} (${device.id})');
       }
     }, onError: (Object e) {
-      if (kDebugMode) debugPrint('[BLE] scan error: $e');
+      if (kDebugMode) {
+        debugPrint('[BLE] scan error: $e');
+      }
+      // L'erreur de scan ne doit pas planter le service.
+      // On log et on continue : le scan est résilient.
     });
 
     // Ping périodique de présence (inclut le peerId stable).
@@ -196,72 +212,48 @@ class BleMeshTransport implements MeshTransport {
 
   @override
   Future<void> broadcast(String payload) async {
-    // En BLE pur, il n'y a pas de broadcast "broadcast" entre
-    // appareils non connectés. On se contente d'émettre sur le
-    // service GATT dès qu'un central est connecté (cas typique :
-    // un téléphone "advertiser" et un autre "scanner/connecté").
-    // On log en debug pour traçabilité.
+    // ── SCAN-ONLY : le BLE ne fait plus de broadcast de données ──
+    // Les messages et alertes transitent exclusivement par Wi-Fi
+    // Direct / WebSocket / Relay.
+    // On log uniquement pour la traçabilité, sans effet de bord.
     if (kDebugMode) {
-      debugPrint('[BLE] broadcast: ${payload.length} octets');
+      debugPrint('[BLE] broadcast ignoré (scan-only): ${payload.length} octets');
     }
-    // NOTE : pour un vrai broadcast, on utiliserait les "BLE
-    // advertisements" en mode non connectable (limité à 31 octets)
-    // via un format厂商specifique. Voir les "Extended Advertising"
-    // sur Android 8+ / iOS 13+.
-
-    // ANR fix : libère la boucle d'événements après le broadcast.
-    await Future<void>.delayed(Duration.zero);
   }
 
   @override
   Future<void> sendTo(MeshPeer peer, String payload) async {
+    // ── SCAN-ONLY : aucune connexion GATT n'est établie ──
+    // La méthode reste disponible pour compatibilité avec le contrat
+    // MeshTransport, mais ne fait rien.
     if (kDebugMode) {
-      debugPrint('[BLE] sendTo ${peer.id} (${payload.length} octets)');
-    }
-    // Connexion GATT + write caractéristique : laissé à un
-    // connecteur concret (dépend de l'ID device BLE distant).
-    try {
-      await _ble
-          .connectToDevice(
-            id: peer.id,
-            servicesWithCharacteristicsToDiscover: {
-              serviceUuid: [characteristicUuid],
-            },
-          )
-          .first
-          .timeout(const Duration(seconds: 5));
-    } catch (e) {
-      if (kDebugMode) debugPrint('[BLE] sendTo error: $e');
+      debugPrint('[BLE] sendTo ignoré (scan-only): ${peer.id}');
     }
   }
 
-  /// Construit et émet un ping de présence BLE contenant le
-  /// peerId stable. C'est ce peerId qui sert de clé de
-  /// déduplication côté réception.
+  /// Émet un ping de présence BLE contenant le peerId stable.
+  ///
+  /// En mode SCAN-ONLY, ce ping n'est PAS transmis via une connexion
+  /// GATT (pas de broadcast). Il est enregistré LOCALEMENT dans le
+  /// `PeerCounterService` pour que le compteur HIVE inclue cet
+  /// appareil lui-même dans le décompte local (utile pour les tests
+  /// et la cohérence du dashboard).
   ///
   /// ANR fix : la méthode est volontairement synchrone pour la
-  /// construction du ping, mais l'émission est confiée à
-  /// [broadcast] qui yield l'event loop. L'appelant doit
-  /// utiliser `scheduleMicrotask` pour ne pas bloquer.
+  /// construction du ping. L'appelant doit utiliser
+  /// `scheduleMicrotask` pour ne pas bloquer.
   void _sendPresencePing() {
-    final ping = jsonEncode({
-      'kind': 'ping',
-      // IMPORTANT : `id` = peerId STABLE de la session anonyme
-      // courante. C'est cette clé qui permet aux pairs distants
-      // de dédupliquer ce signal dans leur fenêtre glissante.
-      'id': _peerId,
-      't': name, // nom du transport ('ble')
-      'ts': DateTime.now().toUtc().toIso8601String(),
-    });
-    // En production : injecter dans un advertisement ou une
-    // caractéristique notifiable. Ici, on log en debug et on
-    // laisse `broadcast` côté GATT faire le relais.
+    // ── Auto-enregistrement dans le compteur HIVE local ──
+    // Permet au dashboard de voir au moins 1 pair (soi-même) même
+    // quand aucun autre appareil StreetPhare n'est à portée.
+    PeerCounterService.instance.recordPeer(
+      _peerId,
+      serviceUuid: kStreetPhareBleServiceUuid,
+    );
+
     if (kDebugMode) {
-      debugPrint('[BLE] presence ping peerId=$_peerId');
+      debugPrint('[BLE] presence ping (auto-comptage) peerId=$_peerId');
     }
-    // Ne pas await volontairement : le broadcast est fire-and-forget
-    // pour ne pas bloquer le microtask.
-    broadcast(ping);
   }
 
   /// Vérifie et demande les permissions nécessaires au scan BLE.

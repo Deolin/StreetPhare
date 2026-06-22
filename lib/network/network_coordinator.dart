@@ -120,34 +120,64 @@ class NetworkCoordinator {
 
     // À chaque mutation locale, on tente l'upload si l'alerte
     // vient d'être validée par consensus.
-    _subs.add(_db.changes.listen(_onDatabaseChanged));
+    // Enveloppé dans un try/catch : un crash dans le listener ne doit
+    // jamais faire planter l'app entière (ex. corruption Hive locale).
+    _subs.add(
+      _db.changes.listen((alerts) {
+        try {
+          _onDatabaseChanged(alerts);
+        } catch (e, st) {
+          if (kDebugMode) {
+            debugPrint('[NetworkCoordinator] erreur _onDatabaseChanged: $e\n$st');
+          }
+        }
+      }),
+    );
 
     // À chaque réception d'alerte P2P, on incrémente le consensus.
-    _subs.add(_mesh!.alertsReceived.listen(_onAlertReceivedViaMesh));
+    _subs.add(
+      _mesh!.alertsReceived.listen((alert) {
+        try {
+          _onAlertReceivedViaMesh(alert);
+        } catch (e, st) {
+          if (kDebugMode) {
+            debugPrint('[NetworkCoordinator] erreur _onAlertReceivedViaMesh: $e\n$st');
+          }
+        }
+      }),
+    );
 
     // Brancher le service de panic collectif.
     CollectivePanicService.instance.setCreateAlertCallback(createAlert);
     _subs.add(_mesh!.panicSignals.listen((signal) {
-      CollectivePanicService.instance.recordPanicSignal(
-        peerId: signal['peerId'] as String,
-        lat: signal['lat'] as double,
-        lng: signal['lng'] as double,
-      );
+      try {
+        CollectivePanicService.instance.recordPanicSignal(
+          peerId: signal['peerId'] as String,
+          lat: signal['lat'] as double,
+          lng: signal['lng'] as double,
+        );
+      } catch (e, st) {
+        if (kDebugMode) {
+          debugPrint('[NetworkCoordinator] erreur panicSignal: $e\n$st');
+        }
+      }
     }));
 
     // === Branchement Hive P2P Messaging ===
-    // On écoute le flux de données brutes du maillage.
-    // Les messages Hive sont préfixés par "hive_msg:" dans le payload.
-    _subs.add(_mesh!.alertsReceived.listen((alert) {
-      // Ignorer les alertes, ce sont des messages structurés
-    }));
-
     // On écoute TOUS les payloads bruts entrants via les transports
     // pour détecter les messages Hive P2P.
     for (final transport in transports) {
-      _subs.add(transport.incoming.listen((raw) {
-        _handleIncomingRaw(raw);
-      }));
+      _subs.add(
+        transport.incoming.listen((raw) {
+          try {
+            _handleIncomingRaw(raw);
+          } catch (e, st) {
+            if (kDebugMode) {
+              debugPrint('[NetworkCoordinator] erreur incoming raw: $e\n$st');
+            }
+          }
+        }),
+      );
     }
 
     await _mesh!.start();
@@ -306,12 +336,34 @@ class NetworkCoordinator {
       'local_only': localPriorityOnly,
     };
 
-    if (localPriorityOnly) {
-      // PRIORITÉ LOCALE : diffusion uniquement sur BLE/Wi-Fi local.
-      await _mesh!.broadcastRawJsonLocal(wrapper);
-    } else {
-      // ARRIÈRE-PLAN : tous les transports (y compris relay distant).
-      await _mesh!.broadcastRawJson(wrapper);
+    try {
+      if (localPriorityOnly) {
+        // PRIORITÉ LOCALE : diffusion uniquement sur BLE/Wi-Fi local.
+        await _mesh!.broadcastRawJsonLocal(wrapper);
+      } else {
+        // ARRIÈRE-PLAN : tous les transports (y compris relay distant).
+        await _mesh!.broadcastRawJson(wrapper);
+      }
+    } catch (e, st) {
+      // Capture les pertes de connexion, timeouts, fermetures de socket.
+      // Le message est conservé localement, le HiveMessagingService
+      // dispose d'une file outbox pour retenter plus tard.
+      if (kDebugMode) {
+        debugPrint('[NetworkCoordinator] échec broadcast Hive (non fatal) : $e\n$st');
+      }
+      // Relance silencieuse : ne pas crasher l'UI ni le service.
+      await Future<void>.delayed(const Duration(seconds: 2));
+      try {
+        if (localPriorityOnly) {
+          await _mesh?.broadcastRawJsonLocal(wrapper);
+        } else {
+          await _mesh?.broadcastRawJson(wrapper);
+        }
+      } catch (_) {
+        if (kDebugMode) {
+          debugPrint('[NetworkCoordinator] échec définitif broadcast Hive');
+        }
+      }
     }
 
     if (kDebugMode) {
@@ -358,7 +410,13 @@ class NetworkCoordinator {
     }
 
     await _db.upsert(alert);
-    await _mesh?.broadcastAlert(alert);
+    try {
+      await _mesh?.broadcastAlert(alert);
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[NetworkCoordinator] échec broadcastAlert (non fatal): $e\n$st');
+      }
+    }
 
     if (kDebugMode) {
       debugPrint('[NetworkCoordinator] alerte créée : $alert');
@@ -378,7 +436,13 @@ class NetworkCoordinator {
       lat: latitude,
       lng: longitude,
     );
-    await _mesh?.broadcastRawJson(payload);
+    try {
+      await _mesh?.broadcastRawJson(payload);
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[NetworkCoordinator] échec broadcast panic (non fatal): $e\n$st');
+      }
+    }
     if (kDebugMode) {
       debugPrint(
           '[NetworkCoordinator] signal panic local broadcasté ($latitude, $longitude)');
@@ -410,7 +474,13 @@ class NetworkCoordinator {
     );
 
     // Diffusion prioritaire HIVE (BLE/Wi-Fi)
-    await _mesh?.broadcastAlert(alert);
+    try {
+      await _mesh?.broadcastAlert(alert);
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[NetworkCoordinator] échec broadcast densité (non fatal): $e\n$st');
+      }
+    }
     
     // Upload asynchrone secondaire vers le serveur (Requirement #4)
     unawaited(_failover.uploadAlerts([alert.toJson()]));

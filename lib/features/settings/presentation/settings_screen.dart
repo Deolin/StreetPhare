@@ -28,6 +28,7 @@ import '../../events/presentation/events_screen.dart';
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/domain/models/avoidance_filters.dart';
 import '../../tutorial/presentation/tutorial_screen.dart';
+import '../../messaging/data/hive_block_service.dart';
 import '../data/app_preferences_store.dart';
 import '../data/panic_contact.dart';
 import '../data/panic_contact_store.dart';
@@ -83,6 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _LanguageSection(strings: s),
                   _LowVisionSection(strings: s),
                   _MessageFilterSection(strings: s),
+                  _BlockedUsersSection(strings: s),
                   _ThemeSection(strings: s),
                   _BatterySaverSection(strings: s),
                   _AndroidNotificationSection(strings: s),
@@ -1464,6 +1466,136 @@ class _AndroidChannelTile extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       dense: true,
     );
+  }
+}
+
+// ============================================================================
+// [3b] Section UTILISATEURS BLOQUÉS (Messagerie P2P)
+// ============================================================================
+
+class _BlockedUsersSection extends StatelessWidget {
+  const _BlockedUsersSection({required this.strings});
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final blockSvc = HiveBlockService.instance;
+    return _Card(
+      child: ListenableBuilder(
+        listenable: blockSvc,
+        builder: (context, _) {
+          final blockedIds = blockSvc.blockedIds;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionHeader(
+                icon: Icons.block_outlined,
+                title: strings.blockedUsersTitle,
+                color: StreetPhareTheme.danger,
+              ),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(left: 30),
+                child: Text(
+                  strings.blockedUsersDescription,
+                  style: TextStyle(
+                    color: onSurface.withValues(alpha: 0.65),
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (blockedIds.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 30, vertical: 8),
+                  child: Text(
+                    strings.blockedUsersEmpty,
+                    style: TextStyle(
+                      color: onSurface.withValues(alpha: 0.5),
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                )
+              else ...[
+                Padding(
+                  padding: const EdgeInsets.only(left: 30, bottom: 4),
+                  child: Text(
+                    strings.blockedUsersCount
+                        .replaceFirst('{count}', '${blockedIds.length}'),
+                    style: TextStyle(
+                      color: onSurface.withValues(alpha: 0.6),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                for (final id in blockedIds)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor:
+                          StreetPhareTheme.danger.withValues(alpha: 0.15),
+                      radius: 16,
+                      child: Text(
+                        id.length >= 2 ? id.substring(0, 2).toUpperCase() : id,
+                        style: const TextStyle(
+                          color: StreetPhareTheme.danger,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      _truncateId(id),
+                      style: TextStyle(
+                        color: onSurface,
+                        fontSize: 13,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    trailing: TextButton.icon(
+                      onPressed: () async {
+                        await HiveBlockService.instance.unblockUser(id);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${_truncateId(id)} débloqué(e). Ses messages sont à nouveau visibles.',
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              backgroundColor: StreetPhareTheme.primary,
+                              duration: const Duration(seconds: 3),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.lock_open,
+                          size: 16, color: StreetPhareTheme.primary),
+                      label: Text(
+                        strings.blockedUsersUnblock,
+                        style: const TextStyle(
+                          color: StreetPhareTheme.primary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Tronque un UUID éphémère pour l'affichage.
+  String _truncateId(String id) {
+    if (id.length <= 16) return id;
+    return '${id.substring(0, 8)}…${id.substring(id.length - 4)}';
   }
 }
 

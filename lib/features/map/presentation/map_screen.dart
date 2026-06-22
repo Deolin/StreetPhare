@@ -2081,7 +2081,7 @@ class _PeerCounterBadge extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                '${s.mapPeersNearby} : $count',
+                '$count\u00A0${s.mapPeersNearby.toLowerCase()}',
                 style: TextStyle(
                   color: isActive
                       ? StreetPhareTheme.textPrimary
