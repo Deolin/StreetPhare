@@ -87,7 +87,7 @@ echo ""
 
 # Tableau pour stocker les PIDs des processus lancés
 declare -a PIDS=()
-LOGDIR="run_logs_$(date +%Y%m%d_%H%M%S)"
+LOGDIR="logs/run_logs_$(date +%Y%m%d_%H%M%S)"
 
 # Fonction de nettoyage en cas d'interruption
 cleanup() {
