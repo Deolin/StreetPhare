@@ -273,14 +273,6 @@ class _SplashScreenState extends State<SplashScreen>
     });
   }
 
-  /// Change le tooltip affiché (appelé périodiquement).
-  void _nextTooltip() {
-    if (!mounted) return;
-    setState(() {
-      _tooltipIndex = (_tooltipIndex + 1) % _tooltips.length;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -8,8 +8,9 @@
 // Lance un serveur HTTP + WebSocket qui :
 //   1. Écoute les clients StreetPhare via /ws
 //   2. Synchronise les alertes admin et événements
-//   3. Sert un dashboard web d'administration sur /
+//   3. Sert un dashboard web d'administration sécurisé sur /
 //   4. Exporte les QR codes des événements
+//   5. Gère l'authentification (Admin/Modérateur) et les permissions
 
 import 'dart:async';
 import 'dart:convert';
@@ -28,6 +29,10 @@ import 'package:streetphare_server/event_manager.dart';
 import 'package:streetphare_server/qr_generator.dart';
 import 'package:streetphare_server/models/event.dart';
 import 'package:streetphare_server/map/tile_proxy_service.dart';
+import 'package:streetphare_server/core/auth_manager.dart';
+import 'package:streetphare_server/core/command_router.dart';
+import 'package:streetphare_server/api/admin_handlers.dart';
+import 'package:streetphare_server/web/admin_dashboard.dart';
 
 final _log = Logger('Server');
 final _uuid = const Uuid();
@@ -39,9 +44,16 @@ final _uuid = const Uuid();
 Router _buildRouter(TileProxyService tileProxy) {
   final router = Router();
 
-  // ── Dashboard admin ──────────────────────────────────────────────────
+  // ── Dashboard admin sécurisé ────────────────────────────────────────
   router.get('/', (request) {
-    return Response.ok(_adminHtml, headers: {
+    return Response.ok(adminDashboardHtml, headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+    });
+  });
+
+  // ── Page de setup (accessible sans authentification) ────────────────
+  router.get('/setup', (request) {
+    return Response.ok(adminDashboardHtml, headers: {
       'Content-Type': 'text/html; charset=utf-8',
     });
   });
@@ -144,6 +156,13 @@ Router _buildRouter(TileProxyService tileProxy) {
 
   // ── Proxy de tuiles OSM ─────────────────────────────────────────────
   router.get('/tiles/<zoom>/<x>/<y>', tileProxy.handler);
+
+  // ── Page de setup (accessible sans authentification) ────────────────
+  router.get('/setup', (request) {
+    return Response.ok(adminDashboardHtml, headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+    });
+  });
 
   return router;
 }
@@ -281,116 +300,6 @@ ServerEvent _parseEventFromMap(Map<String, dynamic> map) {
 }
 
 // ============================================================================
-// Page HTML du dashboard admin
-// ============================================================================
-
-const String _adminHtml = r'''
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StreetPhare — Admin Dashboard</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,-apple-system,sans-serif;background:#1a1a2e;color:#eee;min-height:100vh}
-header{background:#16213e;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #0f3460}
-header h1{font-size:20px;color:#e94560}
-header .stats{font-size:13px;color:#aaa}
-main{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:24px;max-width:1400px;margin:0 auto}
-.panel{background:#16213e;border-radius:12px;padding:20px;border:1px solid #0f3460}
-.panel h2{font-size:16px;margin-bottom:12px;color:#e94560;display:flex;align-items:center;gap:8px}
-.panel h2 span{font-size:13px;color:#aaa;font-weight:normal}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{text-align:left;padding:8px 6px;border-bottom:1px solid #0f3460}
-th{color:#aaa;font-weight:600}
-.mono{font-family:monospace;font-size:12px}
-.btn{padding:6px 14px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:4px;transition:all .2s}
-.btn-primary{background:#e94560;color:#fff}
-.btn-primary:hover{background:#c73050}
-.btn-outline{background:transparent;border:1px solid #e94560;color:#e94560}
-.btn-outline:hover{background:#e9456015}
-.btn-danger{background:#d32f2f;color:#fff}
-.form-group{margin-bottom:12px}
-.form-group label{display:block;font-size:13px;color:#aaa;margin-bottom:4px}
-.form-group input,.form-group textarea{width:100%;padding:8px 10px;border-radius:6px;border:1px solid #0f3460;background:#1a1a2e;color:#eee;font-size:13px;font-family:inherit}
-.form-group textarea{resize:vertical;min-height:60px}
-.qr-preview{text-align:center;padding:12px;background:#fff;border-radius:8px;display:inline-block}
-.qr-preview img{max-width:256px;height:auto}
-.empty-state{text-align:center;padding:32px;color:#666;font-style:italic}
-.peer-count{display:inline-block;padding:4px 10px;background:#0f3460;border-radius:20px;font-size:12px;color:#4fc3f7}
-.flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-@media(max-width:800px){main{grid-template-columns:1fr}}
-</style>
-</head>
-<body>
-<header>
-<h1>🚦 StreetPhare — Admin Server</h1>
-<div class="stats" id="statsBar">Pairs : <span id="peerCount">0</span> | Événements : <span id="eventCount">0</span></div>
-</header>
-<main>
-<section class="panel" style="grid-column:1/-1">
-<h2>📋 Événements <span id="eventCountHeader">(0)</span></h2>
-<div id="eventsList"></div>
-<div class="flex" style="margin-top:12px">
-<button class="btn btn-primary" onclick="createEvent()">＋ Nouvel événement</button>
-</div>
-</section>
-<section class="panel" id="eventDetailPanel" style="display:none;grid-column:1/-1">
-<h2>✏️ Édition — <span id="detailTitle"></span></h2>
-<div class="form-group"><label>Nom</label><input id="editName" type="text"></div>
-<div class="form-group"><label>Description</label><textarea id="editDesc"></textarea></div>
-<div class="flex" style="margin-top:12px">
-<button class="btn btn-primary" onclick="saveEvent()">💾 Sauvegarder</button>
-<button class="btn btn-outline" onclick="closeDetail()">Annuler</button>
-</div>
-<div style="margin-top:16px" id="qrPanel"></div>
-</section>
-<section class="panel">
-<h2>🔌 Pairs connectés</h2>
-<div id="peersPanel"><span class="peer-count" id="peerBadge">0 connecté(s)</span></div>
-</section>
-</main>
-<script>
-let events=[],selectedEventId=null,ws=null;
-const api=async(url,opts={})=>{const r=await fetch(url,opts);return r.json()};
-const load=async()=>{
-events=await api('/api/events');
-renderEvents();
-const s=await api('/api/stats');
-document.getElementById('eventCount').textContent=s.events_total;
-document.getElementById('peerCount').textContent=s.peers;
-document.getElementById('eventCountHeader').textContent=`(${s.events_total})`;
-document.getElementById('peerBadge').textContent=`${s.peers} connecté(s)`;
-};
-const renderEvents=()=>{
-const el=document.getElementById('eventsList');
-if(!events.length){el.innerHTML='<div class="empty-state">Aucun événement créé</div>';return}
-el.innerHTML=events.map(e=>`<tr>
-<td><strong>${e.code}</strong></td>
-<td>${e.name}</td>
-<td class="mono">${e.created_at?.substring(0,10)||''}</td>
-<td class="flex">
-<button class="btn btn-outline" onclick="editEvent('${e.id}')">✏️</button>
-<button class="btn btn-outline" onclick="showQr('${e.code}')">📱 QR</button>
-<button class="btn btn-danger" onclick="deleteEvent('${e.id}')">🗑</button>
-</td></tr>`).join('');
-document.getElementById('eventsList').innerHTML='<table><thead><tr><th>Code</th><th>Nom</th><th>Créé le</th><th>Actions</th></tr></thead><tbody>'+document.getElementById('eventsList').innerHTML+'</tbody></table>';
-};
-const createEvent=()=>{const n=prompt('Nom de l\'événement :');if(!n)return;api('/api/events',{method:'POST',body:JSON.stringify({name:n})}).then(load)};
-const editEvent=(id)=>{const e=events.find(x=>x.id===id);if(!e)return;selectedEventId=id;document.getElementById('eventDetailPanel').style.display='';document.getElementById('detailTitle').textContent=e.code;document.getElementById('editName').value=e.name;document.getElementById('editDesc').value=e.description||'';loadQr(e.code)};
-const closeDetail=()=>{document.getElementById('eventDetailPanel').style.display='none';selectedEventId=null};
-const saveEvent=()=>{if(!selectedEventId)return;const e=events.find(x=>x.id===selectedEventId);if(!e)return;e.name=document.getElementById('editName').value;e.description=document.getElementById('editDesc').value;api('/api/events',{method:'POST',body:JSON.stringify({...e,_action:'update'})}).then(load).then(closeDetail)};
-const deleteEvent=(id)=>{if(!confirm('Supprimer cet événement ?'))return;api('/api/events',{method:'POST',body:JSON.stringify({id,_action:'delete'})}).then(load)};
-const showQr=async(code)=>{const r=await api('/api/events/'+code+'/qr');const el=document.getElementById('qrPanel');el.innerHTML='<div class="qr-preview"><img src="'+r.qr+'" alt="QR Code"><p style="color:#333;font-size:12px;margin-top:8px"><code>SP_EVENT:'+code+'</code></p></div>'};
-const loadQr=async(code)=>{const r=await api('/api/events/'+code+'/qr');const el=document.getElementById('qrPanel');el.innerHTML='<div class="qr-preview"><img src="'+r.qr+'" alt="QR Code"><p style="color:#333;font-size:12px;margin-top:8px"><code>'+code+'</code></p></div>'};
-load();setInterval(load,10000);
-</script>
-</body>
-</html>
-''';
-
-// ============================================================================
 // Main — Lancement du serveur
 // ============================================================================
 
@@ -419,7 +328,13 @@ void main(List<String> args) async {
   final port = int.tryParse(results['port'] as String) ?? 3000;
   final dataFile = results['data'] as String;
 
-  // Initialise le proxy de tuiles OSM (cache 30 jours)
+  // Initialise le gestionnaire d'authentification (setup run, sessions, RBAC).
+  await AuthManager.instance.init();
+
+  // Initialise le routeur de commandes (matrice de permissions).
+  await CommandRouter.instance.init();
+
+  // Initialise le proxy de tuiles OSM (cache 30 jours).
   final tileProxy = TileProxyService(
     cacheDir: 'tiles_cache',
     userAgent: 'StreetPhare/2.2.0',
@@ -444,7 +359,10 @@ void main(List<String> args) async {
 
   // Construction du serveur
   final router = _buildRouter(tileProxy);
-  const Pipeline()
+  final adminRouter = buildAdminRouter();
+
+  // Pipeline principal.
+  final pipeline = const Pipeline()
       .addMiddleware(logRequests())
       .addHandler(router.call);
 
@@ -452,11 +370,14 @@ void main(List<String> args) async {
   final wsHandler = webSocketHandler(_handleWebSocket);
   final appRouter = Router()
     ..mount('/ws', wsHandler)
-    ..mount('/', router);
+    ..mount('/api/', adminRouter.call) // Routes admin (authentification intégrée via authMiddleware)
+    ..mount('/', pipeline);
 
   await io.serve(appRouter, '0.0.0.0', port);
   _log.info('Serveur démarré sur http://0.0.0.0:$port');
   _log.info('WebSocket : ws://0.0.0.0:$port/ws');
   _log.info('Dashboard : http://0.0.0.0:$port/');
+  _log.info('Setup : http://0.0.0.0:$port/setup (premier lancement)');
   _log.info('Sauvegarde automatique : $dataFile (toutes les 60s)');
+  _log.info('Authentification : ${AuthManager.instance.isSetupComplete ? "✅ Active" : "⚠️ Setup requis"}');
 }

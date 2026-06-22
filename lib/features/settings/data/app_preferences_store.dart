@@ -214,6 +214,7 @@ class AppPreferences {
     double? textScaleFactor,
     MessageFilter? messageFilter,
     int? mapCacheMaxAgeDays,
+    Map<String, bool>? androidChannelSettings,
     String? defaultTransportMode,
   }) {
     return AppPreferences(
