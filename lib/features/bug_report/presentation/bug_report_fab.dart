@@ -22,8 +22,9 @@ class BugReportFab extends StatelessWidget {
     return Positioned(
       right: 16,
       top: 32,
-      child: Tooltip(
-        message: 'Signaler un bug ou une suggestion',
+      child: Semantics(
+        label: 'Signaler un bug ou une suggestion',
+        button: true,
         child: Material(
           elevation: 8,
           shape: RoundedRectangleBorder(

@@ -179,6 +179,17 @@ class HiveAlertDatabase {
     _emit();
   }
 
+  /// Retourne le [DateTime] de la dernière modification parmi toutes
+  /// les alertes en base, ou `null` si la base est vide.
+  /// Utilisé par [SyncService] pour la synchronisation différentielle.
+  DateTime? lastModifiedTimestamp() {
+    _ensureOpen();
+    if (_box!.isEmpty) return null;
+    return _box!.values
+        .map((a) => a.lastModifiedAt)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+  }
+
   void _emit() {
     if (!_changesController.isClosed) {
       _changesController.add(getAllValid());
@@ -229,13 +240,14 @@ class AlertAdapter extends TypeAdapter<Alert> {
       status: AlertStatus.values[(fields[9] as int?) ?? 0],
       confirmations: ((fields[10] as List?) ?? const []).cast<String>().toSet(),
       uploadedTo: (fields[11] as String?) ?? '',
+      lastModifiedAt: (fields[12] as DateTime?) ?? DateTime.now().toUtc(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Alert obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -259,7 +271,9 @@ class AlertAdapter extends TypeAdapter<Alert> {
       ..writeByte(10)
       ..write(obj.confirmations.toList())
       ..writeByte(11)
-      ..write(obj.uploadedTo);
+      ..write(obj.uploadedTo)
+      ..writeByte(12)
+      ..write(obj.lastModifiedAt);
   }
 
   @override

@@ -14,6 +14,7 @@ import 'core/i18n/app_locale.dart';
 import 'core/theme/streetphare_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'debug/client_debug_logger.dart';
+import 'features/bug_report/presentation/bug_report_fab.dart';
 import 'features/events/presentation/event_manager.dart';
 import 'features/geofencing/presentation/geofencing_service.dart';
 import 'features/geofencing/presentation/proximity_validation_service.dart';
@@ -206,18 +207,24 @@ class StreetPhareApp extends StatelessWidget {
                         Locale('de', ''),
                       ],
 
-                      // Facteur d'échelle du texte global (accessibilité / malvoyant).
-                      builder: (context, child) {
-                        final factor = isVisualImpaired
-                            ? 1.5
-                            : prefs.textScaleFactor;
-                        return MediaQuery(
-                          data: MediaQuery.of(context).copyWith(
-                            textScaler: TextScaler.linear(factor),
-                          ),
-                          child: child!,
-                        );
-                      },
+                       // Facteur d'échelle du texte global (accessibilité / malvoyant)
+                       // + bouton de débogage global permanent.
+                       builder: (context, child) {
+                         final factor = isVisualImpaired
+                             ? 1.5
+                             : prefs.textScaleFactor;
+                         return MediaQuery(
+                           data: MediaQuery.of(context).copyWith(
+                             textScaler: TextScaler.linear(factor),
+                           ),
+                           child: Stack(
+                             children: [
+                               if (child != null) child,
+                               const BugReportFab(),
+                             ],
+                           ),
+                         );
+                       },
 
                       home: const SplashScreen(),
                     );

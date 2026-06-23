@@ -41,7 +41,9 @@ import '../features/messaging/presentation/hive_messaging_service.dart';
 import '../core/network/peer_counter_service.dart';
 import 'collective_panic_service.dart';
 import 'failover_manager.dart';
+import 'network_manager.dart';
 import 'p2p_mesh_service.dart';
+import 'sync_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/notification_service.dart';
 
@@ -122,6 +124,12 @@ class NetworkCoordinator with WidgetsBindingObserver {
     // pour qu'il soit systématiquement exclu du décompte HIVE.
     PeerCounterService.instance
         .setLocalPeerId(localPeerId ?? _ephemeralUserId);
+
+    // Démarre la machine d'état de basculement réseau.
+    NetworkManager.instance.start();
+
+    // Démarre la synchronisation différentielle Hive ↔ Serveur.
+    SyncService.instance.start();
 
     // ── Priorité de découverte P2P : BLE → Wi-Fi → WebSocket ──────
     await _discoverPeersInPriorityOrder(transports);

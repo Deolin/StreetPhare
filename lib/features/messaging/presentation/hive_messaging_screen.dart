@@ -431,7 +431,7 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
         left: 12,
         right: 8,
         top: 8,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 8,
+        bottom: 8,
       ),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,

@@ -87,6 +87,11 @@ class Alert {
   /// (vide tant que pas synchronisée).
   String uploadedTo;
 
+  /// Horodatage de dernière modification.
+  /// Mis à jour à chaque changement de statut, confirmation ou synchronisation.
+  /// Utilisé pour la synchronisation différentielle Hive ↔ Serveur.
+  DateTime lastModifiedAt;
+
   Alert({
     required this.id,
     required this.ephemeralUserId,
@@ -101,8 +106,10 @@ class Alert {
     this.status = AlertStatus.pending,
     Set<String>? confirmations,
     this.uploadedTo = '',
+    DateTime? lastModifiedAt,
   })  : createdAt = createdAt ?? DateTime.now().toUtc(),
-        confirmations = confirmations ?? <String>{};
+        confirmations = confirmations ?? <String>{},
+        lastModifiedAt = lastModifiedAt ?? DateTime.now().toUtc();
 
   /// Coordonnées LatLng (utile pour flutter_map).
   LatLng get position => LatLng(latitude, longitude);
@@ -119,11 +126,13 @@ class Alert {
 
   /// Ajoute une confirmation. Passe le statut à [AlertStatus.active]
   /// dès que le seuil de consensus est atteint.
+  /// Met à jour [lastModifiedAt] à chaque ajout.
   bool addConfirmation(String ephemeralUserId) {
     if (confirmations.add(ephemeralUserId)) {
       if (isValidatedByConsensus && status == AlertStatus.pending) {
         status = AlertStatus.active;
       }
+      lastModifiedAt = DateTime.now().toUtc();
       return isValidatedByConsensus;
     }
     return false;
@@ -144,6 +153,7 @@ class Alert {
         'status': status.name,
         'confirmations': confirmations.toList(),
         'signature': signature,
+        'last_modified_at': lastModifiedAt.toUtc().toIso8601String(),
       };
 
   /// Désérialisation depuis le format JSON serveur Node.js
@@ -175,6 +185,9 @@ class Alert {
           .map((e) => e.toString())
           .toSet(),
       uploadedTo: (json['uploaded_to'] as String?) ?? '',
+      lastModifiedAt: json['last_modified_at'] != null
+          ? DateTime.parse(json['last_modified_at'] as String).toUtc()
+          : DateTime.now().toUtc(),
     );
   }
 
