@@ -40,11 +40,10 @@ import 'dart:io';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
+import 'package:shelf_static/shelf_static.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:logging/logging.dart';
-
-import 'package:streetphare_server/crypto_utils.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -135,11 +134,16 @@ void main() async {
   // ── PANIC ─────────────────────────────────────────────────────────────
   app.post('/v1/panic', _panic);
 
+  // ── Sandbox Admin (simulation & injection directe) ─────────────────────
+  app.post('/api/admin/sandbox/inject-fault', _injectFault);
+  app.post('/api/admin/sandbox/simulate-cluster', _simulateCluster);
+  app.post('/api/admin/force-alert', _forceAlert);
+
   // ── Pipeline CORS + JSON ──────────────────────────────────────────────
   final pipeline = Pipeline()
       .addMiddleware(_corsMiddleware())
       .addMiddleware(logRequests())
-      .addHandler(app);
+      .addHandler(app.call);
 
   // ── WebSocket Mesh ────────────────────────────────────────────────────
   final wsHandler = webSocketHandler((WebSocketChannel channel, _) {
@@ -151,12 +155,29 @@ void main() async {
     _registerAdminClient(channel);
   });
 
+  // ── Fichiers statiques (dashboard web) ────────────────────────────────
+  final staticHandler = createStaticHandler('web', defaultDocument: 'index.html');
+
   // ── Démarrage ─────────────────────────────────────────────────────────
   // Handler racine : route /mesh et /admin vers les WebSocket,
+  // /dashboard (et ses sous-ressources) vers les fichiers statiques,
   // toutes les autres requêtes vers le pipeline HTTP.
   FutureOr<Response> rootHandler(Request request) {
-    if (request.url.path == 'mesh') return wsHandler(request);
-    if (request.url.path == 'admin') return adminWsHandler(request);
+    final path = request.url.path;
+    if (path == 'mesh') return wsHandler(request);
+    if (path == 'admin') return adminWsHandler(request);
+    if (path == 'dashboard' || path.startsWith('dashboard/')) {
+      // Retire le préfixe "dashboard" pour servir depuis web/
+      final subPath = path == 'dashboard' ? '' : path.substring('dashboard/'.length);
+      final modifiedRequest = Request(
+        request.method,
+        request.requestedUri.replace(path: subPath),
+        body: request.read(),
+        headers: request.headers,
+        protocolVersion: request.protocolVersion,
+      );
+      return staticHandler(modifiedRequest);
+    }
     return pipeline(request);
   }
 
@@ -683,6 +704,171 @@ void _broadcastAdmin(Map<String, dynamic> msg) {
   for (final client in _adminClients) {
     client.sink.add(encoded);
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Sandbox Admin — Simulation & Injection Directe
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Injecte un défaut simulé (déconnexion mesh, latence, perte de paquets).
+Future<Response> _injectFault(Request request) async {
+  Map<String, dynamic> body;
+  try {
+    body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+  } catch (_) {
+    return Response.badRequest(body: _body({'error': 'JSON invalide'}));
+  }
+
+  final faultType = body['fault'] ?? 'none';
+  _log.warning('Sandbox: injection défaut "$faultType"');
+
+  switch (faultType) {
+    case 'disconnect-mesh':
+      // Déconnecte tous les clients mesh sauf les admins.
+      for (final c in _meshClients.toList()) {
+        c.sink.close();
+      }
+      _meshClients.clear();
+      _broadcastAdmin({'type': 'sandbox_event', 'event': 'mesh_disconnected', 'clients_remaining': 0});
+      break;
+    case 'latency':
+      final delayMs = (body['delay_ms'] as int?) ?? 2000;
+      _broadcastAdmin({'type': 'sandbox_event', 'event': 'latency_injected', 'delay_ms': delayMs});
+      break;
+    case 'packet-loss':
+      final pct = (body['pct'] as num?)?.toDouble() ?? 0.3;
+      _broadcastAdmin({'type': 'sandbox_event', 'event': 'packet_loss_injected', 'pct': pct});
+      break;
+    case 'reset':
+      _broadcastAdmin({'type': 'sandbox_event', 'event': 'fault_reset'});
+      break;
+    default:
+      return _json({'status': 'ok', 'fault': faultType, 'applied': true});
+  }
+
+  return _json({'status': 'ok', 'fault': faultType, 'applied': true});
+}
+
+/// Simule un cluster de charge (N faux signalements).
+Future<Response> _simulateCluster(Request request) async {
+  Map<String, dynamic> body;
+  try {
+    body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+  } catch (_) {
+    return Response.badRequest(body: _body({'error': 'JSON invalide'}));
+  }
+
+  final count = (body['count'] as int?) ?? 10;
+  final clusterLat = (body['lat'] as num?)?.toDouble() ?? 50.4833;
+  final clusterLng = (body['lng'] as num?)?.toDouble() ?? 4.5500;
+  final spread = (body['spread'] as num?)?.toDouble() ?? 0.01;
+
+  final generated = <String>[];
+  for (var i = 0; i < count; i++) {
+    final lat = clusterLat + (DateTime.now().microsecondsSinceEpoch % 1000 / 1000 - 0.5) * spread;
+    final lng = clusterLng + (DateTime.now().microsecondsSinceEpoch % 1000 / 1000 - 0.5) * spread;
+    final types = ['danger', 'autopompes', 'fire', 'flood', 'info'];
+    final report = {
+      'id': _randomId(),
+      'type': types[i % types.length],
+      'lat': lat,
+      'lng': lng,
+      'description': 'Simulation cluster #${i + 1}',
+      'status': 'pending',
+      'active': true,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'reports_count': 1,
+      'signature': null,
+      'public_key': null,
+    };
+    _reports.add(report);
+    generated.add(report['id'] as String);
+  }
+
+  _log.info('Sandbox: $count signalements simulés autour de ($clusterLat, $clusterLng)');
+
+  // Notifier les admins du batch.
+  _broadcastAdmin({
+    'type': 'sandbox_event',
+    'event': 'cluster_simulated',
+    'count': count,
+    'report_ids': generated,
+    'cluster_lat': clusterLat,
+    'cluster_lng': clusterLng,
+  });
+  // Envoyer un snapshot complet pour rafraîchir le dashboard.
+  _broadcastAdmin({
+    'type': 'admin_snapshot',
+    'server': {'role': _role, 'port': _port},
+    'mesh_clients': _meshClients.length,
+    'reports': _reports,
+    'events': _events,
+  });
+
+  return _json({'status': 'ok', 'generated': count, 'report_ids': generated});
+}
+
+/// Force l'ajout immédiat d'une alerte validée sans consensus des pairs.
+///
+/// Bypass du mécanisme standard des 3 confirmations :
+///   - statut = 'validated' d'office
+///   - propagation immédiate à tous les clients mesh connectés
+///   - notification à tous les dashboards admin
+Future<Response> _forceAlert(Request request) async {
+  Map<String, dynamic> body;
+  try {
+    body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+  } catch (_) {
+    return Response.badRequest(body: _body({'error': 'JSON invalide'}));
+  }
+
+  final alertType = body['type'] ?? 'danger';
+  final lat = (body['lat'] as num?)?.toDouble() ?? 0;
+  final lng = (body['lng'] as num?)?.toDouble() ?? 0;
+  final description = body['description'] ?? 'Alerte forcée par administrateur';
+
+  final report = {
+    'id': 'FORCE-${_randomId()}',
+    'type': alertType,
+    'lat': lat,
+    'lng': lng,
+    'description': description,
+    'status': 'validated', // BYPASS : validé d'office
+    'active': true,
+    'created_at': DateTime.now().toUtc().toIso8601String(),
+    'reports_count': 1,
+    'signature': null,
+    'public_key': null,
+    'bypass_consensus': true,
+  };
+
+  _reports.add(report);
+  _log.warning('FORCE ALERT (bypass consensus): ${report['id']} ($alertType) @ ($lat, $lng)');
+
+  // Propagation immédiate à tous les clients mesh.
+  _broadcastMesh({
+    'type': 'report_validated',
+    'report': {
+      'id': report['id'],
+      'lat': report['lat'],
+      'lng': report['lng'],
+      'type': report['type'],
+    },
+  });
+
+  // Notification à tous les dashboards admin.
+  _broadcastAdmin({
+    'type': 'force_alert',
+    'report': report,
+  });
+
+  return _json({
+    'status': 'ok',
+    'report_id': report['id'],
+    'mesh_relayed_to': _meshClients.length,
+    'admin_relayed_to': _adminClients.length,
+    'consensus_bypassed': true,
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
