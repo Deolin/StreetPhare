@@ -381,6 +381,208 @@ class AppLocalizationsEn extends AppLocalizations {
   String get eventsNoEvent => 'No active events at the moment';
 
   @override
+  String get eventsMyEvents => 'My events';
+
+  @override
+  String get eventsEmptyTitle => 'No event loaded';
+
+  @override
+  String get eventsEmptySubtitle => 'Enter an invitation code or scan a QR Code to join up to 3 events simultaneously.';
+
+  @override
+  String get eventsJoinTitle => 'Join an event';
+
+  @override
+  String get eventsJoinSubtitle => 'Enter the invitation code (e.g. MANIF-123) or scan a QR Code.';
+
+  @override
+  String get eventsSecurityTitle => 'Just-in-time security';
+
+  @override
+  String get eventsSecurityDescription => 'To prevent an event route from being hijacked in advance, StreetPhare only reveals the route at the time set by the organizers.\n\nIn addition, each step (gathering point) automatically disappears from the map as soon as its time is exceeded by 5 minutes, or if you are within 30 m of that point.';
+
+  @override
+  String get eventsEnterCodeError => 'Please enter an invitation code.';
+
+  @override
+  String get eventsMaxReachedError => 'Maximum 3 simultaneous events. Remove one before adding a new one.';
+
+  @override
+  String get eventsUnknownCodeError => 'Unknown code or event not found.';
+
+  @override
+  String get eventsFleurusCodes => 'Fleurus codes: FLEURUS-TOUR, FLEURUS-ECOLES, FLEURUS-CORTEGE.';
+
+  @override
+  String get eventsQrMaxReached => 'Maximum 3 simultaneous events. Remove one first.';
+
+  @override
+  String get eventsQrAddError => 'Unable to add the event (already present or limit of 3 events reached).';
+
+  @override
+  String get eventsQrAddSuccess => 'Event added from QR Code!';
+
+  @override
+  String get eventsRemoved => 'Event removed.';
+
+  @override
+  String get eventsLoadButton => 'Load';
+
+  @override
+  String get eventsRemoveTooltip => 'Remove event';
+
+  @override
+  String get eventsCodeLabel => 'Code';
+
+  @override
+  String get eventsStartLabel => 'Start';
+
+  @override
+  String get eventsRouteHidden => 'Route hidden — revealed in:';
+
+  @override
+  String eventsStepActive(int index, int total) {
+    return 'Step $index/$total active:';
+  }
+
+  @override
+  String get eventsStepTime => 'Scheduled time:';
+
+  @override
+  String get eventsRouteVisible => 'Route visible — all steps completed or event without steps.';
+
+  @override
+  String get mapRecenterTooltip => 'Re-center the map';
+
+  @override
+  String get mapLoadingTiles => 'Loading map…';
+
+  @override
+  String get mapGpsOff => 'GPS service disabled';
+
+  @override
+  String get mapGpsDenied => 'GPS permission denied';
+
+  @override
+  String get mapGpsDeniedForever => 'GPS permission permanently denied';
+
+  @override
+  String get mapGpsError => 'GPS error:';
+
+  @override
+  String get mapUserPointDefined => 'User point defined — Safe Route launched…';
+
+  @override
+  String get mapDestinationEvent => 'Event point';
+
+  @override
+  String get mapDestinationSafeZone => 'Safe Zone';
+
+  @override
+  String get mapDestinationCareCenter => 'Care center';
+
+  @override
+  String get mapDestinationExit => 'Exit';
+
+  @override
+  String get mapDestinationUserPoint => 'User point';
+
+  @override
+  String mapRouteSafeCalculating(String label) {
+    return 'Calculating Safe Route to $label…';
+  }
+
+  @override
+  String mapRouteSafeFailover(String label) {
+    return 'Fallback to $label…';
+  }
+
+  @override
+  String get mapNoDestinationError => 'No destination available. Join an event or place a point manually (3s long press on the map).';
+
+  @override
+  String get mapAddEventButton => 'Add an event';
+
+  @override
+  String get mapAddEventWarning => 'Please add an event before starting tracking.';
+
+  @override
+  String get mapCollectivePanicTitle => 'Collective Panic Alert';
+
+  @override
+  String mapCollectivePanicMessage(int count) {
+    return '⚠️ $count nearby devices triggered a Panic alert simultaneously.\n\nA \"High Tension\" point has been automatically created at the geographic center of these signals.\n\nStay vigilant and check the map.';
+  }
+
+  @override
+  String get mapViewOnMap => 'View on map';
+
+  @override
+  String get mapIgnore => 'Ignore';
+
+  @override
+  String get mapNoPanicContactTitle => 'No emergency contacts';
+
+  @override
+  String get mapNoPanicContactMessage => 'You must first configure at least one contact in Settings to use the PANIC button.';
+
+  @override
+  String get mapOpenSettings => 'Open Settings';
+
+  @override
+  String get mapPanicModeTitle => 'Panic Mode';
+
+  @override
+  String mapPanicModeMessage(int count, String list) {
+    return 'Activating panic mode will send an alert SMS with your GPS position to $count contact(s):\n\n$list\n\nContinue?';
+  }
+
+  @override
+  String get mapPanicModeActivate => 'ACTIVATE';
+
+  @override
+  String get mapPanicSmsPreparedTitle => 'SMS prepared';
+
+  @override
+  String mapPanicSmsPreparedMessage(String message) {
+    return 'Unable to open SMS app automatically.\nThe message has been copied to the clipboard:\n\n$message';
+  }
+
+  @override
+  String get mapPanicAlertReadyTitle => 'Alert ready';
+
+  @override
+  String mapPanicAlertReadyMessage(int count) {
+    return 'An emergency SMS will be sent to $count contact(s) with your GPS position.';
+  }
+
+  @override
+  String mapPanicMessageBody(String stamp, String coords) {
+    return '[STREETPHARE] Emergency alert sent on $stamp UTC.\nPosition: $coords\nPlease contact me or notify emergency services.';
+  }
+
+  @override
+  String get mapPanicNoGps => 'GPS position unavailable';
+
+  @override
+  String get mapDestinationObjective => 'Safe Route objective';
+
+  @override
+  String get mapDestinationLongPressHint => '3s long press on map → \"User point\"';
+
+  @override
+  String get mapActiveEvent => 'Active event';
+
+  @override
+  String get mapPeersNearby => 'Nearby devices';
+
+  @override
+  String get mapIsolatedTitle => 'StreetPhare network unavailable';
+
+  @override
+  String get mapIsolatedMessage => 'The application cannot operate at the moment due to lack of server connection or nearby peers (Hive).';
+
+  @override
   String get eventsQrScan => 'Scan QR Code';
 
   @override

@@ -12,12 +12,12 @@ import 'app_localizations_nl.dart';
 
 // ignore_for_file: type=lint
 
-/// Permet de récupérer les chaînes localisées via une instance
-/// de AppLocalizations retournée par `AppLocalizations.of(context)`.
+/// Callers can lookup localized strings with an instance of AppLocalizations
+/// returned by `AppLocalizations.of(context)`.
 ///
-/// Les applications doivent inclure `AppLocalizations.delegate()` dans
-/// leur liste `localizationDelegates` et les locales supportées dans
-/// leur liste `supportedLocales`. Par exemple :
+/// Applications need to include `AppLocalizations.delegate()` in their app's
+/// `localizationDelegates` list, and the locales they support in the app's
+/// `supportedLocales` list. For example:
 ///
 /// ```dart
 /// import 'l10n/app_localizations.dart';
@@ -29,35 +29,34 @@ import 'app_localizations_nl.dart';
 /// );
 /// ```
 ///
-/// ## Mise à jour de pubspec.yaml
+/// ## Update pubspec.yaml
 ///
-/// Assurez-vous de mettre à jour votre pubspec.yaml pour inclure
-/// les paquets suivants :
+/// Please make sure to update your pubspec.yaml to include the following
+/// packages:
 ///
 /// ```yaml
 /// dependencies:
-///   # Support de l'internationalisation.
+///   # Internationalization support.
 ///   flutter_localizations:
 ///     sdk: flutter
-///   intl: any # Utiliser la version épinglée de flutter_localizations
+///   intl: any # Use the pinned version from flutter_localizations
 ///
-///   # Reste des dépendances
+///   # Rest of dependencies
 /// ```
 ///
-/// ## Applications iOS
+/// ## iOS Applications
 ///
-/// Les applications iOS définissent des métadonnées clés, y compris les
-/// locales supportées, dans un fichier Info.plist intégré au bundle de
-/// l'application. Pour configurer les locales supportées par votre
-/// application, vous devez modifier ce fichier.
+/// iOS applications define key application metadata, including supported
+/// locales, in an Info.plist file that is built into the application bundle.
+/// To configure the locales supported by your app, you’ll need to edit this
+/// file.
 ///
-/// Ouvrez d'abord l'espace de travail Xcode ios/Runner.xcworkspace de
-/// votre projet. Ensuite, dans le Navigateur de projet, ouvrez le fichier
-/// Info.plist sous le dossier Runner du projet Runner.
+/// First, open your project’s ios/Runner.xcworkspace Xcode workspace file.
+/// Then, in the Project Navigator, open the Info.plist file under the Runner
+/// project’s Runner folder.
 ///
-/// Puis, sélectionnez l'élément Information Property List, choisissez
-/// Add Item dans le menu Editor, puis sélectionnez Localizations dans
-/// le menu contextuel.
+/// Next, select the Information Property List item, select Add Item from the
+/// Editor menu, then select Localizations from the pop-up menu.
 ///
 /// Select and expand the newly-created Localizations item then, for each
 /// locale your application supports, add a new item and select the locale
@@ -844,6 +843,378 @@ abstract class AppLocalizations {
   /// **'No active events at the moment'**
   String get eventsNoEvent;
 
+  /// No description provided for @eventsMyEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'My events'**
+  String get eventsMyEvents;
+
+  /// No description provided for @eventsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No event loaded'**
+  String get eventsEmptyTitle;
+
+  /// No description provided for @eventsEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an invitation code or scan a QR Code to join up to 3 events simultaneously.'**
+  String get eventsEmptySubtitle;
+
+  /// No description provided for @eventsJoinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join an event'**
+  String get eventsJoinTitle;
+
+  /// No description provided for @eventsJoinSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the invitation code (e.g. MANIF-123) or scan a QR Code.'**
+  String get eventsJoinSubtitle;
+
+  /// No description provided for @eventsSecurityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Just-in-time security'**
+  String get eventsSecurityTitle;
+
+  /// No description provided for @eventsSecurityDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'To prevent an event route from being hijacked in advance, StreetPhare only reveals the route at the time set by the organizers.\n\nIn addition, each step (gathering point) automatically disappears from the map as soon as its time is exceeded by 5 minutes, or if you are within 30 m of that point.'**
+  String get eventsSecurityDescription;
+
+  /// No description provided for @eventsEnterCodeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter an invitation code.'**
+  String get eventsEnterCodeError;
+
+  /// No description provided for @eventsMaxReachedError.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum 3 simultaneous events. Remove one before adding a new one.'**
+  String get eventsMaxReachedError;
+
+  /// No description provided for @eventsUnknownCodeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown code or event not found.'**
+  String get eventsUnknownCodeError;
+
+  /// No description provided for @eventsFleurusCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Fleurus codes: FLEURUS-TOUR, FLEURUS-ECOLES, FLEURUS-CORTEGE.'**
+  String get eventsFleurusCodes;
+
+  /// No description provided for @eventsQrMaxReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum 3 simultaneous events. Remove one first.'**
+  String get eventsQrMaxReached;
+
+  /// No description provided for @eventsQrAddError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to add the event (already present or limit of 3 events reached).'**
+  String get eventsQrAddError;
+
+  /// No description provided for @eventsQrAddSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Event added from QR Code!'**
+  String get eventsQrAddSuccess;
+
+  /// No description provided for @eventsRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Event removed.'**
+  String get eventsRemoved;
+
+  /// No description provided for @eventsLoadButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Load'**
+  String get eventsLoadButton;
+
+  /// No description provided for @eventsRemoveTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove event'**
+  String get eventsRemoveTooltip;
+
+  /// No description provided for @eventsCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get eventsCodeLabel;
+
+  /// No description provided for @eventsStartLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get eventsStartLabel;
+
+  /// No description provided for @eventsRouteHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Route hidden — revealed in:'**
+  String get eventsRouteHidden;
+
+  /// Shows the current step out of the total steps of an event
+  ///
+  /// In en, this message translates to:
+  /// **'Step {index}/{total} active:'**
+  String eventsStepActive(int index, int total);
+
+  /// No description provided for @eventsStepTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled time:'**
+  String get eventsStepTime;
+
+  /// No description provided for @eventsRouteVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Route visible — all steps completed or event without steps.'**
+  String get eventsRouteVisible;
+
+  /// No description provided for @mapRecenterTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-center the map'**
+  String get mapRecenterTooltip;
+
+  /// No description provided for @mapLoadingTiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading map…'**
+  String get mapLoadingTiles;
+
+  /// No description provided for @mapGpsOff.
+  ///
+  /// In en, this message translates to:
+  /// **'GPS service disabled'**
+  String get mapGpsOff;
+
+  /// No description provided for @mapGpsDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'GPS permission denied'**
+  String get mapGpsDenied;
+
+  /// No description provided for @mapGpsDeniedForever.
+  ///
+  /// In en, this message translates to:
+  /// **'GPS permission permanently denied'**
+  String get mapGpsDeniedForever;
+
+  /// No description provided for @mapGpsError.
+  ///
+  /// In en, this message translates to:
+  /// **'GPS error:'**
+  String get mapGpsError;
+
+  /// No description provided for @mapUserPointDefined.
+  ///
+  /// In en, this message translates to:
+  /// **'User point defined — Safe Route launched…'**
+  String get mapUserPointDefined;
+
+  /// No description provided for @mapDestinationEvent.
+  ///
+  /// In en, this message translates to:
+  /// **'Event point'**
+  String get mapDestinationEvent;
+
+  /// No description provided for @mapDestinationSafeZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Safe Zone'**
+  String get mapDestinationSafeZone;
+
+  /// No description provided for @mapDestinationCareCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Care center'**
+  String get mapDestinationCareCenter;
+
+  /// No description provided for @mapDestinationExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit'**
+  String get mapDestinationExit;
+
+  /// No description provided for @mapDestinationUserPoint.
+  ///
+  /// In en, this message translates to:
+  /// **'User point'**
+  String get mapDestinationUserPoint;
+
+  /// Message displayed while calculating a safe route to a destination
+  ///
+  /// In en, this message translates to:
+  /// **'Calculating Safe Route to {label}…'**
+  String mapRouteSafeCalculating(String label);
+
+  /// Message displayed during automatic fallback to a backup destination
+  ///
+  /// In en, this message translates to:
+  /// **'Fallback to {label}…'**
+  String mapRouteSafeFailover(String label);
+
+  /// No description provided for @mapNoDestinationError.
+  ///
+  /// In en, this message translates to:
+  /// **'No destination available. Join an event or place a point manually (3s long press on the map).'**
+  String get mapNoDestinationError;
+
+  /// No description provided for @mapAddEventButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an event'**
+  String get mapAddEventButton;
+
+  /// No description provided for @mapAddEventWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Please add an event before starting tracking.'**
+  String get mapAddEventWarning;
+
+  /// No description provided for @mapCollectivePanicTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collective Panic Alert'**
+  String get mapCollectivePanicTitle;
+
+  /// Alert displayed when a multi-device Collective Panic is triggered
+  ///
+  /// In en, this message translates to:
+  /// **'⚠️ {count} nearby devices triggered a Panic alert simultaneously.\n\nA \"High Tension\" point has been automatically created at the geographic center of these signals.\n\nStay vigilant and check the map.'**
+  String mapCollectivePanicMessage(int count);
+
+  /// No description provided for @mapViewOnMap.
+  ///
+  /// In en, this message translates to:
+  /// **'View on map'**
+  String get mapViewOnMap;
+
+  /// No description provided for @mapIgnore.
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore'**
+  String get mapIgnore;
+
+  /// No description provided for @mapNoPanicContactTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No emergency contacts'**
+  String get mapNoPanicContactTitle;
+
+  /// No description provided for @mapNoPanicContactMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'You must first configure at least one contact in Settings to use the PANIC button.'**
+  String get mapNoPanicContactMessage;
+
+  /// No description provided for @mapOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Settings'**
+  String get mapOpenSettings;
+
+  /// No description provided for @mapPanicModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Panic Mode'**
+  String get mapPanicModeTitle;
+
+  /// Confirmation before activating panic mode, lists the contacts that will be notified
+  ///
+  /// In en, this message translates to:
+  /// **'Activating panic mode will send an alert SMS with your GPS position to {count} contact(s):\n\n{list}\n\nContinue?'**
+  String mapPanicModeMessage(int count, String list);
+
+  /// No description provided for @mapPanicModeActivate.
+  ///
+  /// In en, this message translates to:
+  /// **'ACTIVATE'**
+  String get mapPanicModeActivate;
+
+  /// No description provided for @mapPanicSmsPreparedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS prepared'**
+  String get mapPanicSmsPreparedTitle;
+
+  /// Message displayed when the alert SMS has been copied to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to open SMS app automatically.\nThe message has been copied to the clipboard:\n\n{message}'**
+  String mapPanicSmsPreparedMessage(String message);
+
+  /// No description provided for @mapPanicAlertReadyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Alert ready'**
+  String get mapPanicAlertReadyTitle;
+
+  /// Confirmation that the alert SMS will be sent to emergency contacts
+  ///
+  /// In en, this message translates to:
+  /// **'An emergency SMS will be sent to {count} contact(s) with your GPS position.'**
+  String mapPanicAlertReadyMessage(int count);
+
+  /// Body of the alert SMS sent to emergency contacts
+  ///
+  /// In en, this message translates to:
+  /// **'[STREETPHARE] Emergency alert sent on {stamp} UTC.\nPosition: {coords}\nPlease contact me or notify emergency services.'**
+  String mapPanicMessageBody(String stamp, String coords);
+
+  /// No description provided for @mapPanicNoGps.
+  ///
+  /// In en, this message translates to:
+  /// **'GPS position unavailable'**
+  String get mapPanicNoGps;
+
+  /// No description provided for @mapDestinationObjective.
+  ///
+  /// In en, this message translates to:
+  /// **'Safe Route objective'**
+  String get mapDestinationObjective;
+
+  /// No description provided for @mapDestinationLongPressHint.
+  ///
+  /// In en, this message translates to:
+  /// **'3s long press on map → \"User point\"'**
+  String get mapDestinationLongPressHint;
+
+  /// No description provided for @mapActiveEvent.
+  ///
+  /// In en, this message translates to:
+  /// **'Active event'**
+  String get mapActiveEvent;
+
+  /// No description provided for @mapPeersNearby.
+  ///
+  /// In en, this message translates to:
+  /// **'Nearby devices'**
+  String get mapPeersNearby;
+
+  /// No description provided for @mapIsolatedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'StreetPhare network unavailable'**
+  String get mapIsolatedTitle;
+
+  /// No description provided for @mapIsolatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The application cannot operate at the moment due to lack of server connection or nearby peers (Hive).'**
+  String get mapIsolatedMessage;
+
   /// No description provided for @eventsQrScan.
   ///
   /// In en, this message translates to:
@@ -1253,7 +1624,7 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
 AppLocalizations lookupAppLocalizations(Locale locale) {
 
 
-  // Logique de recherche lorsque seul le code langue est spécifié.
+  // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
     case 'de': return AppLocalizationsDe();
     case 'en': return AppLocalizationsEn();
@@ -1262,9 +1633,9 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   }
 
   throw FlutterError(
-    'AppLocalizations.delegate n\'a pas pu charger la locale non supportée "$locale". '
-    'Il s\'agit probablement d\'un problème avec l\'outil de génération de localisations. '
-    'Veuillez signaler le problème sur GitHub avec un exemple reproductible et la '
-    'configuration gen-l10n utilisée.'
+    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.'
   );
 }

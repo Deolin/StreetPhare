@@ -381,6 +381,208 @@ class AppLocalizationsDe extends AppLocalizations {
   String get eventsNoEvent => 'Derzeit keine aktiven Veranstaltungen';
 
   @override
+  String get eventsMyEvents => 'Meine Veranstaltungen';
+
+  @override
+  String get eventsEmptyTitle => 'Keine Veranstaltung geladen';
+
+  @override
+  String get eventsEmptySubtitle => 'Geben Sie einen Einladungscode ein oder scannen Sie einen QR-Code, um an bis zu 3 Veranstaltungen gleichzeitig teilzunehmen.';
+
+  @override
+  String get eventsJoinTitle => 'An einer Veranstaltung teilnehmen';
+
+  @override
+  String get eventsJoinSubtitle => 'Geben Sie den Einladungscode ein (z. B. MANIF-123) oder scannen Sie einen QR-Code.';
+
+  @override
+  String get eventsSecurityTitle => 'Just-in-time-Sicherheit';
+
+  @override
+  String get eventsSecurityDescription => 'Um zu verhindern, dass eine Veranstaltungsroute im Voraus gekapert wird, zeigt StreetPhare die Route erst zu dem von den Organisatoren festgelegten Zeitpunkt an.\n\nDarüber hinaus verschwindet jeder Schritt (Sammelpunkt) automatisch von der Karte, sobald seine Zeit um 5 Minuten überschritten ist oder Sie sich innerhalb von 30 m von diesem Punkt befinden.';
+
+  @override
+  String get eventsEnterCodeError => 'Bitte geben Sie einen Einladungscode ein.';
+
+  @override
+  String get eventsMaxReachedError => 'Maximal 3 gleichzeitige Veranstaltungen. Entfernen Sie eine, bevor Sie eine neue hinzufügen.';
+
+  @override
+  String get eventsUnknownCodeError => 'Unbekannter Code oder Veranstaltung nicht gefunden.';
+
+  @override
+  String get eventsFleurusCodes => 'Fleurus-Codes: FLEURUS-TOUR, FLEURUS-ECOLES, FLEURUS-CORTEGE.';
+
+  @override
+  String get eventsQrMaxReached => 'Maximal 3 gleichzeitige Veranstaltungen. Entfernen Sie zuerst eine.';
+
+  @override
+  String get eventsQrAddError => 'Veranstaltung kann nicht hinzugefügt werden (bereits vorhanden oder Limit von 3 Veranstaltungen erreicht).';
+
+  @override
+  String get eventsQrAddSuccess => 'Veranstaltung aus QR-Code hinzugefügt!';
+
+  @override
+  String get eventsRemoved => 'Veranstaltung entfernt.';
+
+  @override
+  String get eventsLoadButton => 'Laden';
+
+  @override
+  String get eventsRemoveTooltip => 'Veranstaltung entfernen';
+
+  @override
+  String get eventsCodeLabel => 'Code';
+
+  @override
+  String get eventsStartLabel => 'Beginn';
+
+  @override
+  String get eventsRouteHidden => 'Route verborgen — Enthüllung in:';
+
+  @override
+  String eventsStepActive(int index, int total) {
+    return 'Schritt $index/$total aktiv:';
+  }
+
+  @override
+  String get eventsStepTime => 'Geplante Zeit:';
+
+  @override
+  String get eventsRouteVisible => 'Route sichtbar — alle Schritte abgeschlossen oder Veranstaltung ohne Schritte.';
+
+  @override
+  String get mapRecenterTooltip => 'Karte neu zentrieren';
+
+  @override
+  String get mapLoadingTiles => 'Karte wird geladen…';
+
+  @override
+  String get mapGpsOff => 'GPS-Dienst deaktiviert';
+
+  @override
+  String get mapGpsDenied => 'GPS-Berechtigung verweigert';
+
+  @override
+  String get mapGpsDeniedForever => 'GPS-Berechtigung dauerhaft verweigert';
+
+  @override
+  String get mapGpsError => 'GPS-Fehler:';
+
+  @override
+  String get mapUserPointDefined => 'Benutzerpunkt definiert — Sichere Route gestartet…';
+
+  @override
+  String get mapDestinationEvent => 'Veranstaltungspunkt';
+
+  @override
+  String get mapDestinationSafeZone => 'Sicherheitszone';
+
+  @override
+  String get mapDestinationCareCenter => 'Versorgungszentrum';
+
+  @override
+  String get mapDestinationExit => 'Ausgang';
+
+  @override
+  String get mapDestinationUserPoint => 'Benutzerpunkt';
+
+  @override
+  String mapRouteSafeCalculating(String label) {
+    return 'Berechne Sichere Route nach $label…';
+  }
+
+  @override
+  String mapRouteSafeFailover(String label) {
+    return 'Ausweichroute nach $label…';
+  }
+
+  @override
+  String get mapNoDestinationError => 'Kein Ziel verfügbar. Treten Sie einer Veranstaltung bei oder platzieren Sie einen Punkt manuell (3 Sek. langes Drücken auf der Karte).';
+
+  @override
+  String get mapAddEventButton => 'Veranstaltung hinzufügen';
+
+  @override
+  String get mapAddEventWarning => 'Bitte fügen Sie eine Veranstaltung hinzu, bevor Sie die Verfolgung starten.';
+
+  @override
+  String get mapCollectivePanicTitle => 'Kollektive Panik-Warnung';
+
+  @override
+  String mapCollectivePanicMessage(int count) {
+    return '⚠️ $count Geräte in der Nähe haben gleichzeitig einen Panik-Alarm ausgelöst.\n\nEin Punkt \"Hohe Spannung\" wurde automatisch im geografischen Zentrum dieser Signale erstellt.\n\nBleiben Sie wachsam und konsultieren Sie die Karte.';
+  }
+
+  @override
+  String get mapViewOnMap => 'Auf Karte anzeigen';
+
+  @override
+  String get mapIgnore => 'Ignorieren';
+
+  @override
+  String get mapNoPanicContactTitle => 'Keine Notfallkontakte';
+
+  @override
+  String get mapNoPanicContactMessage => 'Sie müssen zuerst mindestens einen Kontakt in den Einstellungen konfigurieren, um die PANIK-Taste zu verwenden.';
+
+  @override
+  String get mapOpenSettings => 'Einstellungen öffnen';
+
+  @override
+  String get mapPanicModeTitle => 'Panikmodus';
+
+  @override
+  String mapPanicModeMessage(int count, String list) {
+    return 'Die Aktivierung des Panikmodus sendet eine Alarm-SMS mit Ihrer GPS-Position an $count Kontakt(e):\n\n$list\n\nFortfahren?';
+  }
+
+  @override
+  String get mapPanicModeActivate => 'AKTIVIEREN';
+
+  @override
+  String get mapPanicSmsPreparedTitle => 'SMS vorbereitet';
+
+  @override
+  String mapPanicSmsPreparedMessage(String message) {
+    return 'SMS-App kann nicht automatisch geöffnet werden.\nDie Nachricht wurde in die Zwischenablage kopiert:\n\n$message';
+  }
+
+  @override
+  String get mapPanicAlertReadyTitle => 'Alarm bereit';
+
+  @override
+  String mapPanicAlertReadyMessage(int count) {
+    return 'Eine Notfall-SMS wird an $count Kontakt(e) mit Ihrer GPS-Position gesendet.';
+  }
+
+  @override
+  String mapPanicMessageBody(String stamp, String coords) {
+    return '[STREETPHARE] Notfallalarm gesendet am $stamp UTC.\nPosition: $coords\nBitte kontaktieren Sie mich oder benachrichtigen Sie den Rettungsdienst.';
+  }
+
+  @override
+  String get mapPanicNoGps => 'GPS-Position nicht verfügbar';
+
+  @override
+  String get mapDestinationObjective => 'Ziel der Sicheren Route';
+
+  @override
+  String get mapDestinationLongPressHint => '3s langes Drücken auf Karte → \"Benutzerpunkt\"';
+
+  @override
+  String get mapActiveEvent => 'Aktive Veranstaltung';
+
+  @override
+  String get mapPeersNearby => 'Geräte in der Nähe';
+
+  @override
+  String get mapIsolatedTitle => 'StreetPhare-Netzwerk nicht verfügbar';
+
+  @override
+  String get mapIsolatedMessage => 'Die Anwendung kann derzeit nicht betrieben werden, da keine Serververbindung oder Peers (Hive) in der Nähe sind.';
+
+  @override
   String get eventsQrScan => 'QR-Code scannen';
 
   @override

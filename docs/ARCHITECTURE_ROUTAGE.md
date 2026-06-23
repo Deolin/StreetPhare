@@ -26,7 +26,7 @@ Le moteur de routage OSMAnd n'est pas une boîte noire monolithique. Son archite
 
 OSMAnd utilise son propre format binaire `.obf` (OsmAnd Binary Format) qui est **fondamentalement différent** d'un dump OSM brut :
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
 │                    Fichier .obf                          │
 ├─────────────────┬───────────────────────────────────────┤
@@ -52,13 +52,13 @@ OSMAnd utilise son propre format binaire `.obf` (OsmAnd Binary Format) qui est *
 
 **Techniques de compression clés :**
 
-| Technique | Détail | Gain |
-|-----------|--------|------|
-| **Delta encoding** | Les coordonnées des nœuds sont stockées en différences (Δlat, Δlon) au lieu de valeurs absolues | ~60% |
-| **Varint (Base 128)** | Les entiers sont encodés sur un nombre variable d'octets (petits nombres = 1 octet) | ~50% |
-| **Bit packing** | Les flags (sens unique, type de route, restrictions) sont packed sur 16-32 bits | ~70% |
-| **Shared strings** | Les noms de rues sont indexés dans une table de hachage ; le terrain stocke un index 2B | ~90% sur les strings |
-| **Spatial quadtree** | Index spatial binaire : chaque nœud split en 4 quadrants, stocké en pré-ordre | Recherche O(log n) |
+| Technique             | Détail                                                                                          | Gain                 |
+|-----------------------|-------------------------------------------------------------------------------------------------|----------------------|
+| **Delta encoding**    | Les coordonnées des nœuds sont stockées en différences (Δlat, Δlon) au lieu de valeurs absolues | ~60%                 |
+| **Varint (Base 128)** | Les entiers sont encodés sur un nombre variable d'octets (petits nombres = 1 octet)             | ~50%                 |
+| **Bit packing**       | Les flags (sens unique, type de route, restrictions) sont packed sur 16-32 bits                 | ~70%                 |
+| **Shared strings**    | Les noms de rues sont indexés dans une table de hachage ; le terrain stocke un index 2B         | ~90% sur les strings |
+| **Spatial quadtree**  | Index spatial binaire : chaque nœud split en 4 quadrants, stocké en pré-ordre                   | Recherche O(log n)   |
 
 **Résultat :** Un fichier .obf pour la Belgique (30 689 km²) pèse **~350-450 Mo** contre ~2.5 Go pour le dump PBF brut. La partie "routing" seule (sans tuiles visuelles) représente environ **120-180 Mo**.
 
@@ -80,12 +80,14 @@ flowchart TD
 ```
 
 **Points forts :**
+
 - Graphe orienté avec restrictions de tourne (turn restrictions)
 - Profils marchable, vélo, voiture, poids lourds
 - Poids combinés : distance, temps, pente (via SRTM), surface
 - CH pré-calculé réduit le temps de query de 500 ms → 5-15 ms sur mobile
 
 **Points faibles pour réimplémentation :**
+
 - Code C++ très optimisé (12+ ans d'optimisations)
 - Dépendance OpenGL pour le rendu (non nécessaire)
 - Architecture monolithique difficile à extraire
@@ -94,17 +96,18 @@ flowchart TD
 
 #### 1.2.1 Options de portage
 
-                    | Approche | Effort | Performance | Maintenabilité | Empreinte |
-|----------|--------|-------------|----------------|-----------|
-| **GraphHopper (Java → Dart FFI)** | Très élevé | Excellente | Faible | ~8 Mo .so |
-| **OSRM C++ via dart:ffi** | Élevé | Excellente | Faible | ~12 Mo .so |
-| **Valhalla C++ via dart:ffi** | Très élevé | Excellente | Faible | ~15 Mo .so |
-| **Rust bridge (custom CH)** | Moyen | Très bonne | Bonne | ~3-5 Mo .so |
-| **Pure Dart (CH custom)** | Faible | Bonne | Excellente | 0 Mo (dart) |
+| Approche                          | Effort     | Performance | Maintenabilité | Empreinte   |
+|-----------------------------------|------------|-------------|----------------|-------------|
+| **GraphHopper (Java → Dart FFI)** | Très élevé | Excellente  | Faible         | ~8 Mo .so   |
+| **OSRM C++ via dart:ffi**         | Élevé      | Excellente  | Faible         | ~12 Mo .so  |
+| **Valhalla C++ via dart:ffi**     | Très élevé | Excellente  | Faible         | ~15 Mo .so  |
+| **Rust bridge (custom CH)**       | Moyen      | Très bonne  | Bonne          | ~3-5 Mo .so |
+| **Pure Dart (CH custom)**         | Faible     | Bonne       | Excellente     | 0 Mo (dart) |
 
-**Recommandation : Pure Dart (CH custom)**
+Recommandation : Pure Dart (CH custom)
 
 Raisons :
+
 1. **Pas de cross-compilation** : Dart FFI nécessite de compiler des .so/.a pour chaque arch (arm64, x86_64) et chaque plateforme (Android, iOS, Windows). La moindre erreur de compilation bloque le déploiement.
 2. **Pas de NDK hell** : La chaîne C++/NDK Android est notoirement instable avec Flutter (ABI mismatch, STL linkage).
 3. **Débogage impossible** : Une fois dans le C++, plus de stack trace Dart, plus de hot reload.
@@ -207,7 +210,7 @@ message ChShortcut {
 
 #### 2.1.3 Pipeline de génération du `.spg`
 
-```
+```text
 ┌──────────────┐     ┌──────────────────┐     ┌──────────────────┐
 │  OSM PBF     │────>│  spg-builder     │────>│  .spg file      │
 │  (régional)  │     │  (CLI Dart/Node) │     │  (à distribuer) │
@@ -270,6 +273,7 @@ class SpgGraph {
 ```
 
 **Empreinte mémoire Belgique :**
+
 - Float64List (×2) : 800k × 8 × 2 = 12.8 MB
 - Uint32List (×2) : 800k × 4 × 2 = 6.4 MB
 - Uint8List (×2) : 800k × 1 × 2 = 1.6 MB
@@ -359,6 +363,7 @@ class MapMatcher {
 ```
 
 **Benchmark de performance :**
+
 - Recherche 5 candidats spatiaux : **< 0.1 ms** (index maillage fixe)
 - HMM transition (1 candidat candidat) : **~0.05 ms**
 - Interpolation sur edge : **~0.02 ms**
@@ -458,7 +463,7 @@ class RouteLayer extends StatelessWidget {
 
 ### 4.1 Architecture du code
 
-```
+```text
 lib/features/routing/
 ├── core/                           ← NOUVEAU : moteur pur, sans UI
 │   ├── graph/
@@ -614,7 +619,7 @@ class RoutingIsolate {
 
 ### 4.4 Cascade de priorité mise à jour
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ computeRoute(start, end)                                                 │
 ├──────────────────────────────────────────────────────────────────────────┤
@@ -655,7 +660,8 @@ class RoutingIsolate {
 ### 4.7 Fichiers à créer/modifier
 
 **Nouveaux fichiers (9) :**
-```
+
+```text
 lib/features/routing/core/graph/spg_graph.dart          (150 lignes)
 lib/features/routing/core/graph/spg_loader.dart         (200 lignes)
 lib/features/routing/core/graph/spg_types.dart          (80 lignes)
@@ -669,7 +675,8 @@ lib/features/routing/presentation/route_notifier.dart   (60 lignes)
 ```
 
 **Fichiers modifiés (3) :**
-```
+
+```text
 lib/features/routing/domain/pedestrian_route_service.dart  ← cascade priorité 0
 lib/features/routing/presentation/safe_path_engine.dart    ← déprécié → alias
 lib/features/map/presentation/map_screen.dart              ← ajout RouteLayer
@@ -729,7 +736,7 @@ class ProfileSettings {
 
 ### 5.4 Stratégie de migration
 
-```
+```text
 Phase 1 (S1) : Layout du core + parseur .spg
 Phase 2 (S2) : A* + CH dans Isolate
 Phase 3 (S3) : Map matching + RouteNotifier

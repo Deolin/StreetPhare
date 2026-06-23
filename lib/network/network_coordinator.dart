@@ -118,6 +118,11 @@ class NetworkCoordinator with WidgetsBindingObserver {
       localPeerId: localPeerId ?? _ephemeralUserId,
     );
 
+    // Enregistre l'identifiant local auprès du compteur de pairs
+    // pour qu'il soit systématiquement exclu du décompte HIVE.
+    PeerCounterService.instance
+        .setLocalPeerId(localPeerId ?? _ephemeralUserId);
+
     // ── Priorité de découverte P2P : BLE → Wi-Fi → WebSocket ──────
     await _discoverPeersInPriorityOrder(transports);
 

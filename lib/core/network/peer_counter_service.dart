@@ -66,8 +66,30 @@ class PeerCounterService extends ValueNotifier<int> {
   /// Identifiant éphémère → dernier timestamp observé.
   final Map<String, DateTime> _lastSeen = <String, DateTime>{};
 
+  /// Identifiant éphémère de l'appareil local. S'il est défini, il sera
+  /// exclu du décompte pour ne jamais se compter soi-même.
+  String? _localPeerId;
+
   Timer? _ticker;
   bool _started = false;
+
+  // --------------------------------------------------------------------------
+  // Identité locale (exclusion du nœud courant)
+  // --------------------------------------------------------------------------
+
+  /// Enregistre l'identifiant de l'appareil local. Appelé une seule fois
+  /// par le [NetworkCoordinator] à l'initialisation.
+  ///
+  /// Une fois défini, le [PeerCounterService] exclut systématiquement
+  /// cet identifiant du décompte des pairs actifs. Si la fenêtre ne
+  /// contient que l'ID local, le compteur est forcé à `0`.
+  void setLocalPeerId(String id) {
+    _localPeerId = id;
+    forceRefresh();
+  }
+
+  /// Identifiant local actuellement enregistré, ou `null` si non défini.
+  String? get localPeerId => _localPeerId;
 
   // --------------------------------------------------------------------------
   // Validation de la signature StreetPhare
@@ -211,7 +233,8 @@ class PeerCounterService extends ValueNotifier<int> {
   void _pruneAndEmit() {
     final now = DateTime.now().toUtc();
     final kept = _prune(now);
-    final count = kept.length;
+    final filtered = _excludeLocal(kept);
+    final count = filtered.length;
     if (count != value) {
       value = count;
     } else {
@@ -224,7 +247,15 @@ class PeerCounterService extends ValueNotifier<int> {
   void forceRefresh() {
     final now = DateTime.now().toUtc();
     final kept = _prune(now);
-    value = kept.length;
+    final filtered = _excludeLocal(kept);
+    value = filtered.length;
+  }
+
+  /// Retire l'identifiant local de la liste s'il est présent.
+  /// Si la liste ne contient QUE l'ID local, retourne une liste vide → 0.
+  List<String> _excludeLocal(List<String> ids) {
+    if (_localPeerId == null) return ids;
+    return ids.where((id) => id != _localPeerId).toList();
   }
 
   /// Arrêt propre du service.

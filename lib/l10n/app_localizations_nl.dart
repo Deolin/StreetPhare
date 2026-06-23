@@ -381,6 +381,208 @@ class AppLocalizationsNl extends AppLocalizations {
   String get eventsNoEvent => 'Momenteel geen actieve evenementen';
 
   @override
+  String get eventsMyEvents => 'Mijn evenementen';
+
+  @override
+  String get eventsEmptyTitle => 'Geen evenement geladen';
+
+  @override
+  String get eventsEmptySubtitle => 'Voer een uitnodigingscode in of scan een QR-code om deel te nemen aan maximaal 3 evenementen tegelijk.';
+
+  @override
+  String get eventsJoinTitle => 'Word lid van een evenement';
+
+  @override
+  String get eventsJoinSubtitle => 'Voer de uitnodigingscode in (bijv. MANIF-123) of scan een QR-code.';
+
+  @override
+  String get eventsSecurityTitle => 'Just-in-time beveiliging';
+
+  @override
+  String get eventsSecurityDescription => 'Om te voorkomen dat een evenementroute van tevoren wordt gekaapt, onthult StreetPhare de route pas op het door de organisatoren ingestelde tijdstip.\n\nBovendien verdwijnt elke stap (verzamelpunt) automatisch van de kaart zodra de tijd met 5 minuten is overschreden, of als u zich binnen 30 m van dat punt bevindt.';
+
+  @override
+  String get eventsEnterCodeError => 'Voer een uitnodigingscode in.';
+
+  @override
+  String get eventsMaxReachedError => 'Maximaal 3 gelijktijdige evenementen. Verwijder er een voordat u een nieuwe toevoegt.';
+
+  @override
+  String get eventsUnknownCodeError => 'Onbekende code of evenement niet gevonden.';
+
+  @override
+  String get eventsFleurusCodes => 'Fleurus-codes: FLEURUS-TOUR, FLEURUS-ECOLES, FLEURUS-CORTEGE.';
+
+  @override
+  String get eventsQrMaxReached => 'Maximaal 3 gelijktijdige evenementen. Verwijder er eerst een.';
+
+  @override
+  String get eventsQrAddError => 'Kan het evenement niet toevoegen (al aanwezig of limiet van 3 evenementen bereikt).';
+
+  @override
+  String get eventsQrAddSuccess => 'Evenement toegevoegd van QR-code!';
+
+  @override
+  String get eventsRemoved => 'Evenement verwijderd.';
+
+  @override
+  String get eventsLoadButton => 'Laden';
+
+  @override
+  String get eventsRemoveTooltip => 'Evenement verwijderen';
+
+  @override
+  String get eventsCodeLabel => 'Code';
+
+  @override
+  String get eventsStartLabel => 'Start';
+
+  @override
+  String get eventsRouteHidden => 'Route verborgen — onthulling in:';
+
+  @override
+  String eventsStepActive(int index, int total) {
+    return 'Stap $index/$total actief:';
+  }
+
+  @override
+  String get eventsStepTime => 'Geplande tijd:';
+
+  @override
+  String get eventsRouteVisible => 'Route zichtbaar — alle stappen voltooid of evenement zonder stappen.';
+
+  @override
+  String get mapRecenterTooltip => 'Kaart opnieuw centreren';
+
+  @override
+  String get mapLoadingTiles => 'Kaart laden…';
+
+  @override
+  String get mapGpsOff => 'GPS-service uitgeschakeld';
+
+  @override
+  String get mapGpsDenied => 'GPS-toestemming geweigerd';
+
+  @override
+  String get mapGpsDeniedForever => 'GPS-toestemming permanent geweigerd';
+
+  @override
+  String get mapGpsError => 'GPS-fout:';
+
+  @override
+  String get mapUserPointDefined => 'Gebruikerspunt gedefinieerd — Veilige Route gestart…';
+
+  @override
+  String get mapDestinationEvent => 'Evenementpunt';
+
+  @override
+  String get mapDestinationSafeZone => 'Veilige Zone';
+
+  @override
+  String get mapDestinationCareCenter => 'Zorgcentrum';
+
+  @override
+  String get mapDestinationExit => 'Uitgang';
+
+  @override
+  String get mapDestinationUserPoint => 'Gebruikerspunt';
+
+  @override
+  String mapRouteSafeCalculating(String label) {
+    return 'Bereken Veilige Route naar $label…';
+  }
+
+  @override
+  String mapRouteSafeFailover(String label) {
+    return 'Uitwijk naar $label…';
+  }
+
+  @override
+  String get mapNoDestinationError => 'Geen bestemming beschikbaar. Word lid van een evenement of plaats een punt handmatig (3s lang indrukken op de kaart).';
+
+  @override
+  String get mapAddEventButton => 'Evenement toevoegen';
+
+  @override
+  String get mapAddEventWarning => 'Voeg een evenement toe voordat u de tracking start.';
+
+  @override
+  String get mapCollectivePanicTitle => 'Collectieve Paniekwaarschuwing';
+
+  @override
+  String mapCollectivePanicMessage(int count) {
+    return '⚠️ $count apparaten in de buurt hebben tegelijkertijd een Paniek-alarm geactiveerd.\n\nEen punt \"Hoge Spanning\" is automatisch aangemaakt op het geografische centrum van deze signalen.\n\nBlijf waakzaam en raadpleeg de kaart.';
+  }
+
+  @override
+  String get mapViewOnMap => 'Bekijk op kaart';
+
+  @override
+  String get mapIgnore => 'Negeren';
+
+  @override
+  String get mapNoPanicContactTitle => 'Geen noodcontacten';
+
+  @override
+  String get mapNoPanicContactMessage => 'U moet eerst ten minste één contact configureren in Instellingen om de PANIEK-knop te gebruiken.';
+
+  @override
+  String get mapOpenSettings => 'Instellingen openen';
+
+  @override
+  String get mapPanicModeTitle => 'Paniekmodus';
+
+  @override
+  String mapPanicModeMessage(int count, String list) {
+    return 'Het activeren van de paniekmodus stuurt een alarm-sms met uw GPS-positie naar $count contact(en):\n\n$list\n\nDoorgaan?';
+  }
+
+  @override
+  String get mapPanicModeActivate => 'ACTIVEREN';
+
+  @override
+  String get mapPanicSmsPreparedTitle => 'SMS voorbereid';
+
+  @override
+  String mapPanicSmsPreparedMessage(String message) {
+    return 'Kan SMS-app niet automatisch openen.\nHet bericht is naar het klembord gekopieerd:\n\n$message';
+  }
+
+  @override
+  String get mapPanicAlertReadyTitle => 'Alarm gereed';
+
+  @override
+  String mapPanicAlertReadyMessage(int count) {
+    return 'Er wordt een nood-sms verzonden naar $count contact(en) met uw GPS-positie.';
+  }
+
+  @override
+  String mapPanicMessageBody(String stamp, String coords) {
+    return '[STREETPHARE] Noodalarm verzonden op $stamp UTC.\nPositie: $coords\nNeem contact met mij op of waarschuw de hulpdiensten.';
+  }
+
+  @override
+  String get mapPanicNoGps => 'GPS-positie niet beschikbaar';
+
+  @override
+  String get mapDestinationObjective => 'Doel van de Veilige Route';
+
+  @override
+  String get mapDestinationLongPressHint => '3s lang indrukken op kaart → \"Gebruikerspunt\"';
+
+  @override
+  String get mapActiveEvent => 'Actief evenement';
+
+  @override
+  String get mapPeersNearby => 'Apparaten in de buurt';
+
+  @override
+  String get mapIsolatedTitle => 'StreetPhare-netwerk niet beschikbaar';
+
+  @override
+  String get mapIsolatedMessage => 'De applicatie kan momenteel niet werken vanwege gebrek aan serververbinding of peers (Hive) in de buurt.';
+
+  @override
   String get eventsQrScan => 'Scan QR-code';
 
   @override
