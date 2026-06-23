@@ -1,0 +1,19 @@
+name: streetphare_server
+description: Serveur StreetPhare 100% Dart — HTTP + WebSocket Mesh + Crypto.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+
+dependencies:
+  shelf: ^1.4.2
+  shelf_router: ^1.1.4
+  shelf_web_socket: ^2.0.1
+  web_socket_channel: ^3.0.3
+  cryptography: ^2.9.0
+  hive_ce: ^2.19.3
+  logging: ^1.3.0
+
+dev_dependencies:
+  lints: ^6.0.0

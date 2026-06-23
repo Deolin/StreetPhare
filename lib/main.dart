@@ -162,6 +162,10 @@ Future<List<String>> _seedSingleBackup(
 }
 
 /// Widget racine de l'application StreetPhare.
+/// Clé globale du navigateur, utilisée par le bouton de bug global
+/// pour ouvrir le dialogue sans dépendre du contexte du builder.
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 class StreetPhareApp extends StatelessWidget {
   const StreetPhareApp({super.key});
 
@@ -182,6 +186,7 @@ class StreetPhareApp extends StatelessWidget {
                     return MaterialApp(
                       title: 'StreetPhare',
                       debugShowCheckedModeBanner: false,
+                      navigatorKey: navigatorKey,
 
                       // Thèmes clair & sombre.
                       theme: StreetPhareTheme.lightTheme(),

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../../core/cache/cache_manager.dart';
+import '../../../core/services/permission_guard_screen.dart';
+import '../../../core/services/permission_guard_service.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../map/map_cache_manager.dart';
 import '../../map/presentation/map_screen.dart';
@@ -90,51 +92,65 @@ class _SplashScreenState extends State<SplashScreen>
   /// Séquence complète de démarrage
   Future<void> _bootstrap() async {
     try {
-      // Étape 0 : Vérification de la version (Kill Switch)
-      _updateProgress(0.05, 'Vérification de la version…');
+      // Étape 0 : Vérification des permissions indispensables (maillage P2P)
+      _updateProgress(0.05, 'Vérification des permissions…');
+      if (mounted) {
+        final guardResult = await PermissionGuardService.instance.checkAll();
+        if (!guardResult.allGranted) {
+          // Bloque le démarrage : affiche l'écran de permission.
+          // L'utilisateur doit accorder toutes les permissions pour continuer.
+          await _showPermissionGuard();
+          // Après le guard, on revérifie ; si toujours pas accordé,
+          // on laisse l'utilisateur bloqué (le guard ne pop que si OK).
+          return;
+        }
+      }
+
+      // Étape 1 : Vérification de la version (Kill Switch)
+      _updateProgress(0.15, 'Vérification de la version…');
       if (mounted) {
         await VersionCheckService.instance.checkVersion(context);
         if (VersionCheckService.instance.isObsolete) return;
       }
 
-      // Étape 1 : Vérification du cache
-      _updateProgress(0.15, 'Vérification du cache local…');
+      // Étape 2 : Vérification du cache
+      _updateProgress(0.25, 'Vérification du cache local…');
       final status = await CacheManager.instance.initialize();
       debugPrint('[Splash] Statut du cache : $status');
 
-      // Étape 2 : Si le cache a expiré, on le purge
+      // Étape 3 : Si le cache a expiré, on le purge
       if (status == CacheStatus.expired) {
-        _updateProgress(0.25, 'Cache expiré, purge en cours…');
+        _updateProgress(0.35, 'Cache expiré, purge en cours…');
         await CacheManager.instance.purge();
         await Future.delayed(const Duration(milliseconds: 400));
       }
 
-      // Étape 3 : Géolocalisation précoce (bloquante pour le loader)
-      _updateProgress(0.35, 'Recherche de votre position…');
+      // Étape 4 : Géolocalisation précoce (bloquante pour le loader)
+      _updateProgress(0.45, 'Recherche de votre position…');
       _tooltipIndex = (_tooltipIndex + 1) % _tooltips.length;
       final position = await _getInitialPosition();
 
-      // Étape 4 : Vérification des tuiles en cache autour de la position
-      _updateProgress(0.55, 'Vérification des tuiles locales…');
+      // Étape 5 : Vérification des tuiles en cache autour de la position
+      _updateProgress(0.65, 'Vérification des tuiles locales…');
       _tooltipIndex = (_tooltipIndex + 1) % _tooltips.length;
       final tilesReady = await _ensureLocalTilesReady(position);
 
       if (!tilesReady) {
-        _updateProgress(0.70, 'Téléchargement des tuiles de votre zone…');
+        _updateProgress(0.80, 'Téléchargement des tuiles de votre zone…');
         _tooltipIndex = (_tooltipIndex + 1) % _tooltips.length;
         // Le téléchargement effectif sera fait par flutter_map au premier
         // affichage. On laisse un délai pour que le cache manager s'initialise.
         await Future.delayed(const Duration(milliseconds: 1200));
       }
 
-      _updateProgress(0.85, 'Finalisation…');
+      _updateProgress(0.90, 'Finalisation…');
       _tooltipIndex = (_tooltipIndex + 1) % _tooltips.length;
       await Future.delayed(const Duration(milliseconds: 500));
 
       _updateProgress(1.0, 'Prêt !');
       await Future.delayed(const Duration(milliseconds: 400));
 
-      // Étape 5 : Redirection vers l'écran principal.
+      // Étape 6 : Redirection vers l'écran principal.
       if (!mounted) return;
 
       if (StartScreenStore.instance.isFirstLaunch) {
@@ -160,6 +176,40 @@ class _SplashScreenState extends State<SplashScreen>
       setState(() {
         _statusMessage = 'Erreur : $e';
       });
+    }
+  }
+
+  /// Affiche l'écran de blocage des permissions et attend que
+  /// l'utilisateur les accorde toutes. Redirige vers la carte
+  /// une fois les permissions obtenues, ou reste bloqué.
+  Future<void> _showPermissionGuard() async {
+    final granted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => const PermissionGuardScreen(),
+      ),
+    );
+
+    // Si l'utilisateur a accordé toutes les permissions, on reprend
+    // le flux de démarrage normal (sans repasser par le splash).
+    if (granted == true && mounted) {
+      // On saute directement à l'écran principal approprié.
+      if (StartScreenStore.instance.isFirstLaunch) {
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const _StartScreenBridge(),
+          ),
+        );
+      } else if (TutorialStore.instance.isFirstLaunch) {
+        await Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const _TutorialThenMapBridge(),
+          ),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MapScreen()),
+        );
+      }
     }
   }
 

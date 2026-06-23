@@ -18,7 +18,6 @@ import 'package:permission_handler/permission_handler.dart' as ph;
 
 /// Énumération des permissions critiques pour StreetPhare.
 enum StreetPharePermission {
-  bluetooth,
   bluetoothScan,
   bluetoothConnect,
   location,
@@ -81,8 +80,6 @@ class PermissionService extends ChangeNotifier {
 
   static String labelForPermission(StreetPharePermission p) {
     switch (p) {
-      case StreetPharePermission.bluetooth:
-        return 'Bluetooth';
       case StreetPharePermission.bluetoothScan:
         return 'Scan Bluetooth';
       case StreetPharePermission.bluetoothConnect:
@@ -98,8 +95,6 @@ class PermissionService extends ChangeNotifier {
 
   static String descriptionForPermission(StreetPharePermission p) {
     switch (p) {
-      case StreetPharePermission.bluetooth:
-        return 'Permet la découverte des appareils StreetPhare à proximité.';
       case StreetPharePermission.bluetoothScan:
         return 'Permet de scanner les pairs BLE pour le maillage décentralisé.';
       case StreetPharePermission.bluetoothConnect:
@@ -116,7 +111,6 @@ class PermissionService extends ChangeNotifier {
   /// Vérifie toutes les permissions critiques.
   Future<void> checkAll() async {
     final checks = <Future<void>>[
-      _check(StreetPharePermission.bluetooth, ph.Permission.bluetooth),
       _check(StreetPharePermission.bluetoothScan, ph.Permission.bluetoothScan),
       _check(StreetPharePermission.bluetoothConnect, ph.Permission.bluetoothConnect),
       _check(StreetPharePermission.location, ph.Permission.location),
@@ -159,8 +153,6 @@ class PermissionService extends ChangeNotifier {
 
   ph.Permission? _toHandler(StreetPharePermission sp) {
     switch (sp) {
-      case StreetPharePermission.bluetooth:
-        return ph.Permission.bluetooth;
       case StreetPharePermission.bluetoothScan:
         return ph.Permission.bluetoothScan;
       case StreetPharePermission.bluetoothConnect:
@@ -224,7 +216,6 @@ class PermissionService extends ChangeNotifier {
 
   String _impact(StreetPharePermission p) {
     switch (p) {
-      case StreetPharePermission.bluetooth:
       case StreetPharePermission.bluetoothScan:
       case StreetPharePermission.bluetoothConnect:
         return 'Sans cette permission, le maillage décentralisé (BLE) est désactivé. '

@@ -2,12 +2,14 @@
 //
 // [5] FAB persistant de signalement de bugs — StreetPhare
 //
-// S'affiche en haut à droite au-dessus de tous les éléments de l'interface.
-// Ouvre un dialogue de saisie du rapport.
+// S'affiche en bas à droite au-dessus de tous les éléments de l'interface.
+// Ouvre un dialogue de saisie du rapport via la clé globale du navigateur.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
+import '../../../../main.dart' show navigatorKey;
 import 'bug_report_service.dart';
 
 // ============================================================================
@@ -20,43 +22,58 @@ class BugReportFab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      right: 16,
-      top: 32,
-      child: Semantics(
-        label: 'Signaler un bug ou une suggestion',
-        button: true,
-        child: Material(
-          elevation: 8,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          color: StreetPhareTheme.surface.withValues(alpha: 0.92),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: () => BugReportDialog.show(context),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.bug_report_outlined,
-                      color: StreetPhareTheme.primary, size: 20),
-                  SizedBox(width: 6),
-                  Text(
-                    'Bug',
-                    style: TextStyle(
-                      color: StreetPhareTheme.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+      left: 16,
+      bottom: 85,
+      child: SafeArea(
+        child: Semantics(
+          label: 'Signaler un bug ou une suggestion',
+          button: true,
+          child: Material(
+            elevation: 8,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            color: StreetPhareTheme.surface.withValues(alpha: 0.92),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => _openBugDialog(),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.bug_report_outlined,
+                        color: StreetPhareTheme.primary, size: 20),
+                    SizedBox(width: 6),
+                    Text(
+                      'Bug',
+                      style: TextStyle(
+                        color: StreetPhareTheme.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  /// Ouvre le dialogue de rapport de bug via la clé globale du navigateur.
+  /// Évite le crash `No Overlay widget found` car le builder de MaterialApp
+  /// s'exécute avant la création du Navigator.
+  void _openBugDialog() {
+    final navContext = navigatorKey.currentContext;
+    if (navContext != null) {
+      BugReportDialog.show(navContext);
+    } else if (kDebugMode) {
+      debugPrint('[BugReportFab] navigatorKey.currentContext est null');
+    }
   }
 }
 
@@ -133,7 +150,8 @@ class _BugReportDialogState extends State<BugReportDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
         children: [
-          const Icon(Icons.bug_report, color: StreetPhareTheme.primary, size: 26),
+          const Icon(Icons.bug_report,
+              color: StreetPhareTheme.primary, size: 26),
           const SizedBox(width: 10),
           Text(
             'Signaler un bug',
@@ -184,11 +202,13 @@ class _BugReportDialogState extends State<BugReportDialog> {
                   spacing: 6,
                   children: BugCategory.values
                       .map((c) => ChoiceChip(
-                            label: Text(c.label, style: const TextStyle(fontSize: 12)),
+                            label: Text(c.label,
+                                style: const TextStyle(fontSize: 12)),
                             selected: _category == c,
-                            selectedColor:
-                                StreetPhareTheme.primary.withValues(alpha: 0.2),
-                            onSelected: (_) => setState(() => _category = c),
+                            selectedColor: StreetPhareTheme.primary
+                                .withValues(alpha: 0.2),
+                            onSelected: (_) =>
+                                setState(() => _category = c),
                           ))
                       .toList(),
                 ),
@@ -202,7 +222,8 @@ class _BugReportDialogState extends State<BugReportDialog> {
                     labelText: 'Titre bref *',
                     hintText: 'Ex: L\'écran de la carte crash au démarrage',
                     hintStyle: TextStyle(
-                        color: onSurface.withValues(alpha: 0.4), fontSize: 12),
+                        color: onSurface.withValues(alpha: 0.4),
+                        fontSize: 12),
                     border: const OutlineInputBorder(),
                   ),
                   validator: (v) =>

@@ -299,8 +299,7 @@ class NetworkManager extends ChangeNotifier {
   Map<String, bool> get hardwareStatus => Map.unmodifiable(_hardwareState);
 
   /// Vérifie l'état des capteurs Bluetooth et Wi-Fi via
-  /// [Permission.bluetooth] / [Permission.location] et
-  /// [ConnectivityService].
+  /// [Permission.bluetoothScan] et [ConnectivityService].
   Future<void> _checkHardware() async {
     final bleOk = await _isBluetoothEnabled();
     final wifiOk = await _isWifiEnabled();
@@ -322,7 +321,7 @@ class NetworkManager extends ChangeNotifier {
 
   Future<bool> _isBluetoothEnabled() async {
     try {
-      final status = await Permission.bluetooth.status;
+      final status = await Permission.bluetoothScan.status;
       return status.isGranted || status.isLimited;
     } catch (_) {
       return true; // Pas de faux positif si indisponible
