@@ -25,6 +25,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -34,7 +35,12 @@ import '../../../database/hive_alert_database.dart';
 import '../domain/models/geofence_event.dart';
 
 /// Service singleton de géofencing.
-class GeofencingService {
+///
+/// Implémente [WidgetsBindingObserver] pour détecter les transitions
+/// app/background et arrêter/redémarrer proprement le flux GPS.
+/// Cela évite le crash `Lost connection to device` quand l'activité
+/// Android est détruite alors que le flux Geolocator est encore actif.
+class GeofencingService extends WidgetsBindingObserver {
   GeofencingService._();
   static final GeofencingService instance = GeofencingService._();
 
@@ -54,6 +60,7 @@ class GeofencingService {
 
   double _radiusMeters = defaultRadiusMeters;
   bool _started = false;
+  bool _observerRegistered = false;
 
   /// Démarre le service. Idempotent.
   void start({double radiusMeters = defaultRadiusMeters}) {
@@ -61,22 +68,15 @@ class GeofencingService {
     _started = true;
     _radiusMeters = radiusMeters;
 
-    // 1) Abonnement au flux de position. Geolocator gère l'autorisation
-    //    en amont (déjà demandée par l'écran principal). On utilise
-    //    un `distanceFilter` raisonnable pour ne pas spammer.
-    _posSub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10, // mètres
-      ),
-    ).listen(
-      (pos) => _onPositionUpdate(pos),
-      onError: (e) {
-        if (kDebugMode) {
-          debugPrint('[Geofencing] erreur GPS : $e');
-        }
-      },
-    );
+    // Enregistre l'écouteur de cycle de vie pour gérer proprement
+    // les transitions app/background (évite le crash `Lost connection`).
+    if (!_observerRegistered) {
+      WidgetsBinding.instance.addObserver(this);
+      _observerRegistered = true;
+    }
+
+    // Réabonne au flux de position (peut être appelé après un resume).
+    _subscribeToPositionStream();
 
     // 2) À chaque mise à jour de la base d'alertes, on doit
     //    pouvoir nettoyer le cache `_alreadyTriggeredAlertIds` si
@@ -100,6 +100,90 @@ class GeofencingService {
 
     if (kDebugMode) {
       debugPrint('[Geofencing] démarré, rayon=$_radiusMeters m');
+    }
+  }
+
+  /// Souscrit au flux de position GPS (extrait pour être réutilisable
+  /// par [didChangeAppLifecycleState] lors du resume).
+  void _subscribeToPositionStream() {
+    // Annule d'abord tout abonnement existant pour éviter les doublons.
+    _posSub?.cancel();
+    _posSub = null;
+
+    _posSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10, // mètres
+      ),
+    ).listen(
+      (pos) => _onPositionUpdate(pos),
+      onError: (e) {
+        if (kDebugMode) {
+          debugPrint('[Geofencing] erreur GPS : $e');
+        }
+      },
+    );
+  }
+
+  // ── Cycle de vie de l'application ──────────────────────────────────
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (kDebugMode) {
+      debugPrint('[Geofencing] lifecycle → $state');
+    }
+
+    switch (state) {
+      case AppLifecycleState.paused:
+        // L'app passe en arrière-plan : on coupe le flux GPS pour
+        // éviter le crash "Lost connection to device" quand l'activité
+        // Android est détruite alors que le canal Geolocator est actif.
+        _posSub?.cancel();
+        _posSub = null;
+        _alertsSub?.cancel();
+        _alertsSub = null;
+        _recheckTimer?.cancel();
+        _recheckTimer = null;
+        break;
+
+      case AppLifecycleState.resumed:
+        // L'app revient au premier plan : on réabonne le flux GPS.
+        // On ne réinitialise pas `_started` pour que le service
+        // reprenne exactement là où il s'était arrêté.
+        if (_started) {
+          _subscribeToPositionStream();
+
+          // Réabonne aux changements de la base d'alertes.
+          _alertsSub = HiveAlertDatabase.instance.changes.listen((alerts) {
+            final liveIds = alerts.map((a) => a.id).toSet();
+            _alreadyTriggeredAlertIds.retainAll(liveIds);
+          });
+
+          // Relance le timer périodique.
+          _recheckTimer = Timer.periodic(
+            const Duration(seconds: 30),
+            (_) {
+              final pos = _lastPosition;
+              if (pos != null) _checkProximity(pos);
+            },
+          );
+
+          if (kDebugMode) {
+            debugPrint('[Geofencing] flux GPS réabonné (resume)');
+          }
+        }
+        break;
+
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+        // L'app est en transition ou se ferme : on coupe tout.
+        _posSub?.cancel();
+        _posSub = null;
+        break;
+
+      case AppLifecycleState.hidden:
+        // Flutter web uniquement — ignoré.
+        break;
     }
   }
 
@@ -184,8 +268,11 @@ class GeofencingService {
 
   void stop() {
     _posSub?.cancel();
+    _posSub = null;
     _alertsSub?.cancel();
+    _alertsSub = null;
     _recheckTimer?.cancel();
+    _recheckTimer = null;
     _alreadyTriggeredAlertIds.clear();
     _started = false;
   }
@@ -193,6 +280,10 @@ class GeofencingService {
   /// Libère proprement les ressources (à appeler au shutdown de l'app).
   Future<void> dispose() async {
     stop();
+    if (_observerRegistered) {
+      WidgetsBinding.instance.removeObserver(this);
+      _observerRegistered = false;
+    }
     await _eventsController.close();
   }
 }

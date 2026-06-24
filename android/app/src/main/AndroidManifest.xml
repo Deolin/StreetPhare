@@ -86,6 +86,14 @@
             android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
             android:exported="false"/>
 
+        <!-- Service de géolocalisation en premier plan (Geolocator) -->
+        <!-- Android 14+ (API 34+) exige foregroundServiceType explicite -->
+        <service
+            android:name="com.baseflow.geolocator.GeolocatorLocationService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
         <!-- Meta Flutter plugin embedding -->
         <meta-data
             android:name="flutterEmbedding"

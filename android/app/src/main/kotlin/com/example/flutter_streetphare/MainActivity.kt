@@ -78,6 +78,14 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         bridge?.dispose()
         bridge = null
-        super.onDestroy()
+        try {
+            super.onDestroy()
+        } catch (e: Exception) {
+            // Le ProfileInstaller peut tenter d'écrire des profils de
+            // performance au moment exact où l'activité est détruite,
+            // provoquant une exception "BLASTBufferQueue" ou similaire.
+            // On capture silencieusement l'exception pour éviter le crash.
+            android.util.Log.w("StreetPhare", "onDestroy exception (non critique)", e)
+        }
     }
 }
