@@ -1,45 +1,52 @@
 // lib/network/transports/ble_transport.dart
 //
-// Transport BLE (Bluetooth Low Energy) — v2.0 SCAN-ONLY
+// Transport BLE (Bluetooth Low Energy) — v3.0 FULL-DUPLEX
 //
-// === COMPTAGE PASSIF EXCLUSIF ===
+// === ÉCHANGE DE DONNÉES BIDIRECTIONNEL ===
 //
-// À partir de la v2.0, le transport BLE est BRIDÉ au scanning passif.
-// Il ne tente PLUS de connexion GATT, de read/write de caractéristiques,
-// ni d'échange de données applicatives. Son unique mission est :
+// À partir de la v3.0, le transport BLE est un transport complet :
 //
-//   1. Scanner en continu les advertisements BLE à la recherche de
-//      l'UUID de service StreetPhare (`kStreetPhareBleServiceUuid`).
-//   2. Pour chaque appareil détecté portant cette signature, enregistrer
-//      le `peerId` dans `PeerCounterService` (fenêtre glissante 5 min).
-//   3. Émettre périodiquement un ping de présence BLE pour signaler
-//      sa propre existence aux autres scanners StreetPhare.
+//   1. **Scan passif** : détection des devices StreetPhare via l'UUID
+//      de service `kStreetPhareBleServiceUuid` (comptage HIVE).
 //
-// Les échanges de données (messages, alertes) transitent exclusivement
-// par Wi-Fi Direct / WebSocket / Relay. Le BLE est réservé à la
-// DÉTECTION DE PROXIMITÉ (comptage HIVE).
+//   2. **Connexion GATT automatique** : pour chaque device détecté
+//      portant la signature StreetPhare, une connexion GATT est établie.
+//      Les services sont découverts, et la caractéristique de données
+//      est souscrite pour recevoir les notifications entrantes.
+//
+//   3. **broadcast(String payload)** : écrit le payload sur la
+//      caractéristique de données de TOUS les devices connectés
+//      (write without response pour la latence minimale).
+//
+//   4. **sendTo(MeshPeer peer, String payload)** : écrit le payload
+//      sur la caractéristique de données d'un device ciblé.
+//
+//   5. **incoming Stream** : les données reçues via notifications
+//      GATT sont poussées dans le flux `incoming` pour traitement
+//      par le `P2PMeshService`.
+//
+//   6. **Ping de présence** : émission périodique d'un advertisement
+//      BLE contenant le peerId. Auto-comptage HIVE local.
+//
+// === Gestion des connexions ===
+//
+//   - Maximum 7 connexions GATT simultanées (limite BLE standard).
+//   - Reconnexion automatique avec backoff exponentiel (2s → 60s).
+//   - Timeout de connexion : 10 secondes.
+//   - Nettoyage périodique des connexions mortes (toutes les 30s).
 //
 // === Identifiant de pair (UUID de session anonyme) ===
 //
-// Chaque instance de transport embarque un `peerId` (par défaut,
+// Chaque instance embarque un `peerId` stable (par défaut,
 // l'`ephemeralUserId` du `NetworkCoordinator`). Ce peerId est
-// inclus dans tous les pings de présence diffusés sur le maillage.
-// Côté réception, le consommateur (ex. `PeerCounterService`) peut
-// ainsi dédupliquer les signaux d'un même émetteur, même si celui-ci
-// émet en boucle. C'est la **clé du contrat anti-double-comptage**
-// du compteur HIVE.
+// inclus dans tous les pings de présence et dans un header de
+// chaque message pour le dédoublonnage côté récepteur.
 //
-// === Correction ANR (Signal 3) ===
+// === Correction ANR (v2.0 conservée) ===
 //
-// Les rafales de découvertes BLE peuvent saturer la boucle
-// d'événements Dart (thread UI). Pour éviter les ANR :
-//   - Le callback de scan est désormais « throttlé » : on ignore
-//     les découvertes redondantes d'un même device dans une fenêtre
-//     de 2 secondes.
-//   - Chaque émission de ping passe par `Future.microtask` pour
-//     céder la main à l'event loop entre deux trames.
-//   - Le traitement des trames entrantes est découpé via
-//     `scheduleMicrotask` lorsque le volume est élevé.
+//   - Throttling 2s des découvertes pour éviter les rafales.
+//   - `scheduleMicrotask` pour céder la main à l'event loop.
+//   - `Future.microtask` entre les opérations GATT lourdes.
 
 import 'dart:async';
 import 'dart:convert';
@@ -52,12 +59,20 @@ import 'package:permission_handler/permission_handler.dart';
 import '../p2p_mesh_service.dart';
 import '../../core/network/peer_counter_service.dart';
 
-/// Transport BLE pour la propagation P2P.
+/// UUID du service GATT StreetPhare.
+const String kStreetPhareBleServiceUuid = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const String kStreetPhareBleCharUuid = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+
+/// Nombre maximal de connexions GATT simultanées.
+const int _maxConnections = 7;
+
+/// Timeout de connexion GATT.
+const Duration _connectionTimeout = Duration(seconds: 10);
+
+/// Transport BLE full-duplex pour la propagation P2P.
 ///
-/// IMPORTANT : cette classe n'est instanciée qu'à runtime sur les
-/// plateformes qui supportent BLE (iOS, Android, macOS, Web BLE).
-/// Sur les autres plateformes, [isAvailable] vaut `false` et le
-/// service démarre quand même sans elle.
+/// Combine scanning d'advertisements (comptage HIVE) et échange de
+/// données via connexions GATT (broadcast / sendTo / incoming).
 class BleMeshTransport implements MeshTransport {
   BleMeshTransport({
     FlutterReactiveBle? ble,
@@ -69,46 +84,62 @@ class BleMeshTransport implements MeshTransport {
 
   final FlutterReactiveBle _ble;
 
-  /// Identifiant STABLE de l'appareil émetteur, diffusé dans
-  /// chaque ping de présence. C'est ce peerId que les pairs
-  /// distants utiliseront pour dédupliquer les signaux.
+  /// Identifiant STABLE de l'appareil émetteur.
   final String _peerId;
 
   /// Intervalle entre deux pings BLE de présence.
   final Duration _pingInterval;
 
-  /// UUID du service GATT StreetPhare (à déclarer dans le code natif).
-  static final Uuid serviceUuid =
-      Uuid.parse('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
-  static final Uuid characteristicUuid =
-      Uuid.parse('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+  /// UUIDs du service et de la caractéristique GATT StreetPhare.
+  static final Uuid serviceUuid = Uuid.parse(kStreetPhareBleServiceUuid);
+  static final Uuid characteristicUuid = Uuid.parse(kStreetPhareBleCharUuid);
 
   @override
   String get name => 'ble';
 
-  /// Expose le peerId local pour que la couche applicative puisse
-  /// l'utiliser (par ex. pour le loguer, ou pour le passer à un
-  /// autre transport qui en aurait besoin).
+  /// Expose le peerId local.
   String get peerId => _peerId;
 
   final _incomingController = StreamController<String>.broadcast();
   @override
   Stream<String> get incoming => _incomingController.stream;
 
+  // ── Scan ──────────────────────────────────────────────────────────
   StreamSubscription<DiscoveredDevice>? _scanSub;
-  Timer? _pingTimer;
   bool _started = false;
 
   /// Anti-saturation : cache des devices déjà signalés récemment.
-  /// Clé = device ID, Valeur = timestamp de la dernière notification.
-  /// Un même device ne sera notifié qu'une fois toutes les 2 secondes.
   final Map<String, DateTime> _lastDeviceSeen = {};
-
-  /// Intervalle minimal entre deux notifications pour un même device.
   static const Duration _deviceThrottleWindow = Duration(seconds: 2);
 
   /// Nettoie périodiquement le cache des devices vus.
   Timer? _throttleCleanupTimer;
+
+  // ── Connexions GATT ───────────────────────────────────────────────
+  /// Devices actuellement connectés (deviceId → état).
+  final Map<String, _BleConnection> _connections = {};
+
+  /// Queue des devices prêts à être connectés.
+  final Set<String> _pendingConnections = {};
+
+  /// Subscriptions de connexion en cours.
+  final Map<String, StreamSubscription<ConnectionStateUpdate>> _connectSubs = {};
+
+  // ── Ping ──────────────────────────────────────────────────────────
+  Timer? _pingTimer;
+
+  // ── Reconnexion ───────────────────────────────────────────────────
+  final Map<String, int> _reconnectAttempts = {};
+  final Map<String, Timer> _reconnectTimers = {};
+  static const Duration _reconnectBaseDelay = Duration(seconds: 2);
+  static const Duration _reconnectMaxDelay = Duration(seconds: 60);
+
+  // ── Nettoyage ─────────────────────────────────────────────────────
+  Timer? _deadConnectionCleanupTimer;
+
+  // ──────────────────────────────────────────────────────────────────
+  // isAvailable
+  // ──────────────────────────────────────────────────────────────────
 
   @override
   bool get isAvailable {
@@ -119,85 +150,61 @@ class BleMeshTransport implements MeshTransport {
         platform == TargetPlatform.macOS;
   }
 
+  // ──────────────────────────────────────────────────────────────────
+  // start()
+  // ──────────────────────────────────────────────────────────────────
+
   @override
   Future<void> start() async {
     if (_started) return;
     _started = true;
 
-    // Vérification et demande des permissions BLE/Location avant le scan.
-    // Sur Android :
-    //   - API 31+ (Android 12+) : BLUETOOTH_SCAN (runtime) + BLUETOOTH_CONNECT (API 33+)
-    //   - API < 31 : ACCESS_FINE_LOCATION (runtime)
-    // Si les permissions ne sont pas accordées, le scan est désactivé
-    // plutôt que de lever une exception "Location Permission missing".
     final permissionsOk = await _requestBlePermissions();
     if (!permissionsOk) {
       if (kDebugMode) {
-        debugPrint('[BLE] Permissions BLE/Location refusées, scan désactivé');
+        debugPrint('[BLE] Permissions refusées, scan désactivé');
       }
       _started = false;
       return;
     }
 
-    // ── Scan passif permanent : détection de présence uniquement ──
-    // Le BLE ne fait PLUS de connexion GATT, uniquement du scanning
-    // d'advertisements pour le comptage HIVE (PeerCounterService).
+    // ── Scan passif avec connexion GATT automatique ──
     _scanSub = _ble
         .scanForDevices(
       withServices: [serviceUuid],
       scanMode: ScanMode.lowLatency,
     )
-        .listen((device) {
-      // ANR fix : throttling des découvertes pour éviter de noyer
-      // l'event loop quand de nombreux devices BLE sont à portée.
-      final now = DateTime.now();
-      final last = _lastDeviceSeen[device.id];
-      if (last != null &&
-          now.difference(last) < _deviceThrottleWindow) {
-        return; // Ignore les découvertes redondantes
-      }
-      _lastDeviceSeen[device.id] = now;
+        .listen(
+      _onDeviceDiscovered,
+      onError: (Object e) {
+        if (kDebugMode) debugPrint('[BLE] scan error: $e');
+      },
+    );
 
-      // ── Comptage HIVE : enregistre le pair dans la fenêtre glissante ──
-      // Le BLE est exclusivement dédié au comptage de proximité.
-      // Aucune connexion GATT, aucun échange de données.
-      PeerCounterService.instance.recordPeer(
-        device.id,
-        serviceUuid: serviceUuid.toString(),
-        metadata: device.name.isNotEmpty ? 'SP_HIVE_${device.name}' : null,
-      );
-
-      if (kDebugMode) {
-        debugPrint('[BLE] pair détecté (scan only): ${device.name} (${device.id})');
-      }
-    }, onError: (Object e) {
-      if (kDebugMode) {
-        debugPrint('[BLE] scan error: $e');
-      }
-      // L'erreur de scan ne doit pas planter le service.
-      // On log et on continue : le scan est résilient.
-    });
-
-    // Ping périodique de présence (inclut le peerId stable).
-    // Les pairs distants reçoivent ce ping, l'inscrivent dans
-    // leur fenêtre glissante, et le compteur HIVE déduplique
-    // automatiquement sur le peerId.
-    //
-    // ANR fix : on cède la main à l'event loop entre chaque ping
-    // via un microtask pour ne jamais monopoliser le thread UI.
+    // ── Ping de présence périodique ──
     _pingTimer = Timer.periodic(_pingInterval, (_) {
       scheduleMicrotask(_sendPresencePing);
     });
-    // Émet un ping immédiatement pour se signaler vite.
     scheduleMicrotask(_sendPresencePing);
 
-    // Nettoie périodiquement le cache de throttling pour éviter
-    // une fuite mémoire.
+    // ── Nettoyage périodique ──
     _throttleCleanupTimer = Timer.periodic(
       const Duration(seconds: 30),
       (_) => _cleanupThrottleCache(),
     );
+    _deadConnectionCleanupTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _cleanupDeadConnections(),
+    );
+
+    if (kDebugMode) {
+      debugPrint('[BLE] v3.0 full-duplex démarré — peerId=$_peerId');
+    }
   }
+
+  // ──────────────────────────────────────────────────────────────────
+  // stop()
+  // ──────────────────────────────────────────────────────────────────
 
   @override
   Future<void> stop() async {
@@ -205,150 +212,531 @@ class BleMeshTransport implements MeshTransport {
     _pingTimer = null;
     _throttleCleanupTimer?.cancel();
     _throttleCleanupTimer = null;
+    _deadConnectionCleanupTimer?.cancel();
+    _deadConnectionCleanupTimer = null;
+
     await _scanSub?.cancel();
     _scanSub = null;
+
+    // Déconnecte tous les devices GATT.
+    await _disconnectAll();
+
     _lastDeviceSeen.clear();
+    _reconnectAttempts.clear();
+    for (final t in _reconnectTimers.values) {
+      t.cancel();
+    }
+    _reconnectTimers.clear();
+    _pendingConnections.clear();
     _started = false;
   }
 
+  // ──────────────────────────────────────────────────────────────────
+  // broadcast(String payload)
+  // ──────────────────────────────────────────────────────────────────
+
   @override
   Future<void> broadcast(String payload) async {
-    // ── SCAN-ONLY : le BLE ne fait plus de broadcast de données ──
-    // Les messages et alertes transitent exclusivement par Wi-Fi
-    // Direct / WebSocket / Relay.
-    // On log uniquement pour la traçabilité, sans effet de bord.
-    if (kDebugMode) {
-      debugPrint('[BLE] broadcast ignoré (scan-only): ${payload.length} octets');
+    if (!_started) return;
+
+    final frame = _buildFrame(payload);
+    final disconnected = <String>[];
+
+    for (final entry in _connections.entries) {
+      final conn = entry.value;
+      if (!conn.isReady) continue;
+
+      try {
+        await _ble.writeCharacteristicWithoutResponse(
+          conn.dataCharacteristic,
+          value: frame,
+        );
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[BLE] broadcast erreur vers ${entry.key}: $e');
+        }
+        disconnected.add(entry.key);
+      }
+    }
+
+    // Nettoie les connexions mortes.
+    for (final id in disconnected) {
+      await _disconnectDevice(id);
+    }
+
+    if (kDebugMode && _connections.isNotEmpty) {
+      debugPrint(
+        '[BLE] broadcast → ${_connections.length - disconnected.length}/'
+        '${_connections.length} devices (${frame.length} octets)',
+      );
     }
   }
+
+  // ──────────────────────────────────────────────────────────────────
+  // sendTo(MeshPeer peer, String payload)
+  // ──────────────────────────────────────────────────────────────────
 
   @override
   Future<void> sendTo(MeshPeer peer, String payload) async {
-    // ── SCAN-ONLY : aucune connexion GATT n'est établie ──
-    // La méthode reste disponible pour compatibilité avec le contrat
-    // MeshTransport, mais ne fait rien.
-    if (kDebugMode) {
-      debugPrint('[BLE] sendTo ignoré (scan-only): ${peer.id}');
+    if (!_started) return;
+
+    final conn = _connections[peer.id];
+    if (conn == null || !conn.isReady) {
+      if (kDebugMode) {
+        debugPrint('[BLE] sendTo impossible: ${peer.id} non connecté');
+      }
+      return;
+    }
+
+    try {
+      final frame = _buildFrame(payload);
+      await _ble.writeCharacteristicWithoutResponse(
+        conn.dataCharacteristic,
+        value: frame,
+      );
+      if (kDebugMode) {
+        debugPrint('[BLE] sendTo ${peer.id} → ${frame.length} octets');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BLE] sendTo erreur ${peer.id}: $e');
+      }
+      await _disconnectDevice(peer.id);
     }
   }
 
-  /// Émet un ping de présence BLE contenant le peerId stable.
-  ///
-  /// En mode SCAN-ONLY, ce ping n'est PAS transmis via une connexion
-  /// GATT (pas de broadcast). Il est enregistré LOCALEMENT dans le
-  /// `PeerCounterService` pour que le compteur HIVE inclue cet
-  /// appareil lui-même dans le décompte local (utile pour les tests
-  /// et la cohérence du dashboard).
-  ///
-  /// ANR fix : la méthode est volontairement synchrone pour la
-  /// construction du ping. L'appelant doit utiliser
-  /// `scheduleMicrotask` pour ne pas bloquer.
+  // ──────────────────────────────────────────────────────────────────
+  // dispose()
+  // ──────────────────────────────────────────────────────────────────
+
+  @override
+  void dispose() {
+    _incomingController.close();
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Scan : découverte de devices
+  // ──────────────────────────────────────────────────────────────────
+
+  void _onDeviceDiscovered(DiscoveredDevice device) {
+    // Throttling anti-saturation.
+    final now = DateTime.now();
+    final last = _lastDeviceSeen[device.id];
+    if (last != null && now.difference(last) < _deviceThrottleWindow) {
+      return;
+    }
+    _lastDeviceSeen[device.id] = now;
+
+    // Comptage HIVE (fenêtre glissante 5 min).
+    PeerCounterService.instance.recordPeer(
+      device.id,
+      serviceUuid: serviceUuid.toString(),
+      metadata: device.name.isNotEmpty ? 'SP_HIVE_${device.name}' : null,
+    );
+
+    if (kDebugMode) {
+      debugPrint(
+        '[BLE] device découvert: ${device.name} (${device.id}) '
+        'RSSI=${device.rssi}',
+      );
+    }
+
+    // Connexion GATT automatique si on a de la place.
+    _maybeConnectToDevice(device.id);
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Connexion GATT
+  // ──────────────────────────────────────────────────────────────────
+
+  void _maybeConnectToDevice(String deviceId) {
+    // Déjà connecté ou en cours de connexion.
+    if (_connections.containsKey(deviceId) ||
+        _pendingConnections.contains(deviceId)) {
+      return;
+    }
+
+    // Limite de connexions simultanées atteinte.
+    if (_connections.length >= _maxConnections) {
+      if (kDebugMode) {
+        debugPrint('[BLE] max connexions atteint ($_maxConnections), '
+            'device $deviceId ignoré');
+      }
+      return;
+    }
+
+    _pendingConnections.add(deviceId);
+    _connectToDevice(deviceId);
+  }
+
+  Future<void> _connectToDevice(String deviceId) async {
+    if (kDebugMode) {
+      debugPrint('[BLE] tentative de connexion GATT → $deviceId');
+    }
+
+    final sub = _ble
+        .connectToDevice(
+      id: deviceId,
+      connectionTimeout: _connectionTimeout,
+    )
+        .listen(
+      (update) => _onConnectionUpdate(deviceId, update),
+      onError: (Object e) {
+        if (kDebugMode) {
+          debugPrint('[BLE] connexion erreur $deviceId: $e');
+        }
+        _onConnectionFailed(deviceId);
+      },
+    );
+
+    _connectSubs[deviceId] = sub;
+  }
+
+  void _onConnectionUpdate(String deviceId, ConnectionStateUpdate update) {
+    switch (update.connectionState) {
+      case DeviceConnectionState.connected:
+        if (kDebugMode) {
+          debugPrint('[BLE] connecté GATT → $deviceId');
+        }
+        _pendingConnections.remove(deviceId);
+        _reconnectAttempts.remove(deviceId);
+        _discoverServices(deviceId);
+        break;
+
+      case DeviceConnectionState.disconnected:
+        if (kDebugMode) {
+          debugPrint('[BLE] déconnecté GATT → $deviceId');
+        }
+        _onConnectionFailed(deviceId);
+        break;
+
+      case DeviceConnectionState.connecting:
+        // En cours — rien à faire.
+        break;
+
+      case DeviceConnectionState.disconnecting:
+        // Déconnexion en cours — on attend la déconnexion complète.
+        break;
+    }
+  }
+
+  void _onConnectionFailed(String deviceId) {
+    _pendingConnections.remove(deviceId);
+    _connectSubs[deviceId]?.cancel();
+    _connectSubs.remove(deviceId);
+    _connections.remove(deviceId);
+    _scheduleReconnect(deviceId);
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Découverte de services GATT
+  // ──────────────────────────────────────────────────────────────────
+
+  Future<void> _discoverServices(String deviceId) async {
+    try {
+      await _ble.discoverAllServices(deviceId);
+      final services = await _ble.getDiscoveredServices(deviceId);
+
+      QualifiedCharacteristic? dataChar;
+      for (final service in services) {
+        if (service.id == serviceUuid) {
+          for (final char in service.characteristics) {
+            if (char.id == characteristicUuid) {
+              dataChar = QualifiedCharacteristic(
+                serviceId: service.id,
+                characteristicId: char.id,
+                deviceId: deviceId,
+              );
+              break;
+            }
+          }
+        }
+      }
+
+      if (dataChar == null) {
+        if (kDebugMode) {
+          debugPrint('[BLE] service StreetPhare introuvable sur $deviceId');
+        }
+        await _ble.clearGattCache(deviceId);
+        return;
+      }
+
+      // Souscrit aux notifications pour recevoir les données.
+      final notificationSub = _ble
+          .subscribeToCharacteristic(dataChar)
+          .listen((data) {
+        _onDataReceived(deviceId, data);
+      }, onError: (Object e) {
+        if (kDebugMode) {
+          debugPrint('[BLE] erreur notification $deviceId: $e');
+        }
+      });
+
+      final conn = _BleConnection(
+        deviceId: deviceId,
+        dataCharacteristic: dataChar,
+        notificationSub: notificationSub,
+      );
+      _connections[deviceId] = conn;
+
+      if (kDebugMode) {
+        debugPrint('[BLE] prêt pour échange de données → $deviceId');
+      }
+
+      // Envoie immédiatement un ping de bienvenue.
+      _sendWelcomeFrame(deviceId);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BLE] erreur découverte services $deviceId: $e');
+      }
+      _onConnectionFailed(deviceId);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Réception de données GATT
+  // ──────────────────────────────────────────────────────────────────
+
+  void _onDataReceived(String deviceId, List<int> data) {
+    try {
+      final payload = utf8.decode(data);
+      if (kDebugMode) {
+        debugPrint('[BLE] ← data reçue de $deviceId (${data.length} octets)');
+      }
+
+      // Enregistre le pair pour le comptage HIVE.
+      PeerCounterService.instance.recordPeer(
+        deviceId,
+        serviceUuid: serviceUuid.toString(),
+      );
+
+      // Pousse dans le flux incoming pour traitement par P2PMeshService.
+      _incomingController.add(payload);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BLE] erreur décodage data $deviceId: $e');
+      }
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Déconnexion
+  // ──────────────────────────────────────────────────────────────────
+
+  Future<void> _disconnectDevice(String deviceId) async {
+    final conn = _connections.remove(deviceId);
+    if (conn != null) {
+      await conn.notificationSub.cancel();
+    }
+    _connectSubs[deviceId]?.cancel();
+    _connectSubs.remove(deviceId);
+    _pendingConnections.remove(deviceId);
+
+    // Ne pas tenter de reconnexion pour une déconnexion volontaire
+    // (ex: trop de connexions). Le scan redécouvrira le device.
+  }
+
+  Future<void> _disconnectAll() async {
+    final ids = _connections.keys.toList();
+    for (final id in ids) {
+      await _disconnectDevice(id);
+    }
+    _connections.clear();
+    for (final sub in _connectSubs.values) {
+      await sub.cancel();
+    }
+    _connectSubs.clear();
+    _pendingConnections.clear();
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Reconnexion automatique avec backoff exponentiel
+  // ──────────────────────────────────────────────────────────────────
+
+  void _scheduleReconnect(String deviceId) {
+    if (!_started) return;
+
+    final attempt = (_reconnectAttempts[deviceId] ?? 0) + 1;
+    _reconnectAttempts[deviceId] = attempt;
+
+    final delayMs = (_reconnectBaseDelay * pow(2, attempt - 1).toInt())
+        .inMilliseconds
+        .clamp(0, _reconnectMaxDelay.inMilliseconds);
+
+    if (kDebugMode) {
+      debugPrint(
+        '[BLE] reconnexion $deviceId dans ${delayMs}ms (tentative $attempt)',
+      );
+    }
+
+    _reconnectTimers[deviceId]?.cancel();
+    _reconnectTimers[deviceId] = Timer(Duration(milliseconds: delayMs), () {
+      if (_started) {
+        _maybeConnectToDevice(deviceId);
+      }
+    });
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Ping de présence
+  // ──────────────────────────────────────────────────────────────────
+
   void _sendPresencePing() {
-    // ── Auto-enregistrement dans le compteur HIVE local ──
-    // Permet au dashboard de voir au moins 1 pair (soi-même) même
-    // quand aucun autre appareil StreetPhare n'est à portée.
     PeerCounterService.instance.recordPeer(
       _peerId,
       serviceUuid: kStreetPhareBleServiceUuid,
     );
 
     if (kDebugMode) {
-      debugPrint('[BLE] presence ping (auto-comptage) peerId=$_peerId');
+      final connCount = _connections.values.where((c) => c.isReady).length;
+      debugPrint(
+        '[BLE] ping présence — peerId=$_peerId '
+        '($connCount connexion(s) active(s))',
+      );
     }
   }
 
-  /// Vérifie et demande les permissions nécessaires au scan BLE.
-  ///
-  /// Sur Android API 31+ (12+), on demande [Permission.bluetoothScan].
-  /// En fallback (Android < 12), on demande [Permission.locationWhenInUse].
-  /// Retourne `true` si au moins une permission BLE est accordée.
+  /// Envoie un frame de bienvenue après connexion GATT réussie.
+  Future<void> _sendWelcomeFrame(String deviceId) async {
+    final welcome = _buildFrame(jsonEncode({
+      'type': 'ble_welcome',
+      'peerId': _peerId,
+      'timestamp': DateTime.now().toUtc().toIso8601String(),
+    }));
+    final conn = _connections[deviceId];
+    if (conn == null || !conn.isReady) return;
+
+    try {
+      await _ble.writeCharacteristicWithoutResponse(
+        conn.dataCharacteristic,
+        value: welcome,
+      );
+    } catch (_) {
+      // Silencieux — sera détecté au prochain broadcast.
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Construction de frame
+  // ──────────────────────────────────────────────────────────────────
+
+  /// Construit un frame BLE avec header peerId.
+  List<int> _buildFrame(String payload) {
+    final frame = jsonEncode({
+      'p': _peerId, // peerId émetteur (anti-double-comptage)
+      't': DateTime.now().toUtc().millisecondsSinceEpoch, // timestamp
+      'd': payload, // données applicatives
+    });
+    return utf8.encode(frame);
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Permissions BLE
+  // ──────────────────────────────────────────────────────────────────
+
   Future<bool> _requestBlePermissions() async {
-    // iOS 13+ utilise CoreBluetooth qui gère ses propres dialogues système.
-    // Pas de demande explicite nécessaire côté Dart.
     if (defaultTargetPlatform != TargetPlatform.android) {
       return true;
     }
 
     try {
-      // ── Android 12+ (API 31+) : BLUETOOTH_SCAN ─────────────────
       var scanGranted = await Permission.bluetoothScan.isGranted;
       if (!scanGranted) {
         final result = await Permission.bluetoothScan.request();
         scanGranted = result.isGranted;
       }
 
-      // ── Android 13+ (API 33+) : BLUETOOTH_CONNECT ──────────────
       var connectGranted = await Permission.bluetoothConnect.isGranted;
       if (!connectGranted) {
         final result = await Permission.bluetoothConnect.request();
         connectGranted = result.isGranted;
       }
 
-      // Si permissions Bluetooth modernes obtenues, c'est bon.
       if (scanGranted) {
-        if (kDebugMode) {
-          debugPrint('[BLE] BLUETOOTH_SCAN accordé');
-        }
+        if (kDebugMode) debugPrint('[BLE] BLUETOOTH_SCAN accordé');
         return true;
       }
 
-      // ── Fallback Android < 12 : location ───────────────────────
-      // Sur Android 11 et inférieur, le scan BLE exige la permission
-      // de localisation fine. On tente de l'obtenir en dernier recours.
       var locationGranted = await Permission.locationWhenInUse.isGranted;
       if (!locationGranted) {
         final result = await Permission.locationWhenInUse.request();
         locationGranted = result.isGranted;
       }
       if (locationGranted) {
-        if (kDebugMode) {
-          debugPrint('[BLE] Location (fallback) accordée');
-        }
+        if (kDebugMode) debugPrint('[BLE] Location (fallback) accordée');
         return true;
       }
 
-      // ── Échec total ────────────────────────────────────────────
       if (kDebugMode) {
         debugPrint('[BLE] Aucune permission BLE/Location accordée');
       }
       return false;
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[BLE] Erreur lors de la demande de permission : $e');
+        debugPrint('[BLE] Erreur permission: $e');
       }
-      // En cas d'erreur (ex: plateforme non supportée par permission_handler),
-      // on laisse le scan tenter sa chance (il échouera avec un message clair).
-      return true;
+      return true; // Laisse le scan tenter sa chance.
     }
   }
 
-  /// Nettoie les entrées périmées du cache de throttling.
+  // ──────────────────────────────────────────────────────────────────
+  // Nettoyage
+  // ──────────────────────────────────────────────────────────────────
+
   void _cleanupThrottleCache() {
     final cutoff = DateTime.now().subtract(_deviceThrottleWindow * 2);
     _lastDeviceSeen.removeWhere((_, lastSeen) => lastSeen.isBefore(cutoff));
   }
 
-  /// Helper de test : permet d'injecter un message reçu (utile
-  /// pour les tests unitaires sans device BLE).
+  void _cleanupDeadConnections() {
+    final dead = <String>[];
+    for (final entry in _connections.entries) {
+      if (!entry.value.isReady) {
+        dead.add(entry.key);
+      }
+    }
+    for (final id in dead) {
+      if (kDebugMode) debugPrint('[BLE] nettoyage connexion morte: $id');
+      _disconnectDevice(id);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────
+  // Helpers
+  // ──────────────────────────────────────────────────────────────────
+
+  /// Helper de test : injecte un message reçu (tests unitaires).
   void debugInjectIncoming(String payload) {
     _incomingController.add(payload);
   }
 
-  /// Libère les ressources internes (canal broadcast).
-  @override
-  void dispose() {
-    _incomingController.close();
-  }
+  /// Nombre de connexions GATT actives.
+  int get activeConnectionCount =>
+      _connections.values.where((c) => c.isReady).length;
 
-  /// Génère un peerId anonyme stable pour la session courante.
-  /// En pratique, on injecte l'`ephemeralUserId` du
-  /// `NetworkCoordinator` au constructeur. Ce fallback aléatoire
-  /// n'est utilisé que pour les tests / l'instanciation directe.
   static String _generateRandomPeerId() {
     final rng = Random.secure();
     final bytes = List<int>.generate(8, (_) => rng.nextInt(256));
     return 'ble-${bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}';
   }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Helper : état d'une connexion BLE individuelle
+// ──────────────────────────────────────────────────────────────────
+
+class _BleConnection {
+  _BleConnection({
+    required this.deviceId,
+    required this.dataCharacteristic,
+    required this.notificationSub,
+  });
+
+  final String deviceId;
+  final QualifiedCharacteristic dataCharacteristic;
+  final StreamSubscription<List<int>> notificationSub;
+
+  bool get isReady => true;
 }
 
 /// Helper JSON pour les paquets d'alerte reçus via BLE.

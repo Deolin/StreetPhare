@@ -128,10 +128,9 @@ class FailoverConfig {
   /// Timeout d'une tentative individuelle de ping.
   final Duration pingTimeout;
 
-  /// Master passphrase pour dériver la clé AES. En production,
-  /// ce devrait être une clé issue du secure-storage iOS/Android
-  /// ou d'un serveur de clés distant.
-  final String masterPassphrase;
+  /// Clé maîtresse AES issue du keystore sécurisé de l'OS
+  /// (Android Keystore / iOS Keychain).
+  final SecretKey masterKey;
 
   const FailoverConfig({
     required this.primaryAddress,
@@ -139,7 +138,7 @@ class FailoverConfig {
     this.maxAttempts = 3,
     this.heartbeatInterval = const Duration(seconds: 5),
     this.pingTimeout = const Duration(seconds: 2),
-    required this.masterPassphrase,
+    required this.masterKey,
   });
 }
 
@@ -181,7 +180,7 @@ class FailoverManager {
     if (_started) return;
     _config = config;
 
-    _aesKey = await CryptoUtils.instance.deriveAesKey(config.masterPassphrase);
+    _aesKey = config.masterKey;
 
     _current = ServerEndpoint(
       address: config.primaryAddress,

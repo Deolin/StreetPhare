@@ -2,7 +2,7 @@
 
 ## Emplacement attendu du fichier
 
-```
+```text
 android/app/src/main/assets/osm/fleurus.osm.pbf
 ```
 
@@ -23,11 +23,7 @@ curl -O https://download.geofabrik.de/europe/belgium-latest.osm.pbf
 
 # 2. Découper la zone de Fleurus (bounding box ~6 km autour)
 #    bbox : minLon=4.50 minLat=50.44 maxLon=4.60 maxLat=50.52
-osmium extract \
-  --bbox 4.50,50.44,4.60,50.52 \
-  belgium-latest.osm.pbf \
-  --output fleurus.osm.pbf \
-  --overwrite
+osmium extract --bbox 4.50,50.44,4.60,50.52 belgium-latest.osm.pbf --output fleurus.osm.pbf --overwrite
 
 # 3. Copier dans les assets
 cp fleurus.osm.pbf android/app/src/main/assets/osm/fleurus.osm.pbf
@@ -35,7 +31,7 @@ cp fleurus.osm.pbf android/app/src/main/assets/osm/fleurus.osm.pbf
 
 ### Option 2 — Overpass Turbo (petits extraits)
 
-1. Ouvrir https://overpass-turbo.eu
+1. Ouvrir <https://overpass-turbo.eu>
 2. Sélectionner la zone de Fleurus (6220)
 3. Exporter → OpenStreetMap XML / PBF
 4. Renommer le fichier `fleurus.osm.pbf`
@@ -45,7 +41,7 @@ cp fleurus.osm.pbf android/app/src/main/assets/osm/fleurus.osm.pbf
 
 ## Attribution obligatoire (ODbL 1.0)
 
-```
+```text
 © OpenStreetMap contributors — openstreetmap.org/copyright
 Ce fichier est sous licence Open Data Commons Open Database License (ODbL) v1.0.
 Voir : https://opendatacommons.org/licenses/odbl/1-0/
@@ -57,11 +53,12 @@ Voir : https://opendatacommons.org/licenses/odbl/1-0/
 
 - GraphHopper ne peut pas s'initialiser → `engineReady = false`
 - `OsmAndRoutingService` bascule automatiquement sur :
-  1. GraphHopper HTTP local (`192.168.31.18:8080`)
+  1. GraphHopper HTTP local (`127.0.0.1:8080`)
   2. OSRM public (`router.project-osrm.org`)
 
 Le log Android affichera :
-```
+
+```text
 W/StreetPhare.OsmAndBridge: Fichier OSM absent — moteur désactivé.
     Placez le fichier dans assets/osm/fleurus.osm.pbf
 ```

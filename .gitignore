@@ -43,8 +43,13 @@ results_kdebug.txt
 # Fichiers temporaires système et OS
 .DS_Store
 Thumbs.db
-*.md
+# *.md  — Retiré : README.md et SECURITY.md doivent être versionnés.
+# Ignorer uniquement les fichiers temporaires markdown
+CLIENT_DEBUG.md.tmp
 android/build/reports/problems/problems-report.html
 android/.kotlin/sessions/kotlin-compiler-12426433643112611207.salive
 CLIENT_DEBUG.md.tmp
 /android/.kotlin
+status/SERVER_STATUS_3000.md
+status/SERVER_STATUS_3001.md
+status/CLIENT_DEBUG.md

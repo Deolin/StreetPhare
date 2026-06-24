@@ -53,7 +53,7 @@ const String _kOutboxKey = 'hive_msg_outbox_v1';
 ///
 /// Architecture réseau hybride :
 ///   PRIORITÉ 1 → Réseau local P2P (BLE Mesh / Wi-Fi Direct) — synchrone.
-///   PRIORITÉ 2 → Serveur distant (192.168.31.18) — tâche d'arrière-plan.
+///   PRIORITÉ 2 → Serveur distant (adminServerUrl:4000) — tâche d'arrière-plan.
 class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
   HiveMessagingService._() : super(const []);
 

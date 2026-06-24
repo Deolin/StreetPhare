@@ -44,20 +44,32 @@ class CryptoUtils {
   // AES-256-CBC authentifié par HMAC-SHA256.
   final _aes = AesCbc.with256bits(macAlgorithm: Hmac.sha256());
 
-  /// Clé AES dérivée depuis une passphrase maître (à fournir
-  /// idéalement depuis un secure storage iOS/Android).
-  /// PBKDF2-HMAC-SHA256 → 100 000 itérations → 32 octets → AES-256.
-  Future<SecretKey> deriveAesKey(String passphrase,
-      {String salt = 'StreetPhareV2'}) async {
+  /// Longueur du sel aléatoire (16 octets) utilisé pour la dérivation
+  /// PBKDF2. Chaque ciphertext embarque son propre sel en préfixe.
+  static const int _saltLength = 16;
+
+  /// Dérive une clé AES-256 depuis une clé maîtresse et un sel
+  /// via PBKDF2-HMAC-SHA256 (100 000 itérations, OWASP 2023).
+  ///
+  /// Le [salt] DOIT être unique par ciphertext (généré aléatoirement).
+  /// Si non fourni, un sel aléatoire est généré automatiquement.
+  Future<SecretKey> deriveAesKey(SecretKey masterKey,
+      {List<int>? salt}) async {
     final pbkdf2 = Pbkdf2(
       macAlgorithm: Hmac.sha256(),
       iterations: 100000,
       bits: 256,
     );
     return pbkdf2.deriveKey(
-      secretKey: SecretKey(utf8.encode(passphrase)),
-      nonce: utf8.encode(salt),
+      secretKey: masterKey,
+      nonce: salt ?? _generateSalt(),
     );
+  }
+
+  /// Génère un sel aléatoire de 16 octets.
+  List<int> _generateSalt() {
+    final rng = Random.secure();
+    return List<int>.generate(_saltLength, (_) => rng.nextInt(256));
   }
 
   /// Signe une alerte (id + type + lat + lng + createdAt) avec
@@ -113,22 +125,42 @@ class CryptoUtils {
   }
 
   /// Chiffre une adresse (URL / IP) avec AES-256-CBC + HMAC.
-  /// Le ciphertext retourné est encodé en base64 et contient
-  /// la concaténation (nonce + mac + cipher).
-  Future<String> encryptAddress(String address, SecretKey aesKey) async {
+  ///
+  /// Format de sortie : `base64(sel_16_octets || nonce_16 || mac_32 || cipher)`
+  /// Le sel est généré aléatoirement et permet une dérivation PBKDF2
+  /// unique par ciphertext.
+  Future<String> encryptAddress(String address, SecretKey masterKey) async {
+    final salt = _generateSalt();
+    final aesKey = await deriveAesKey(masterKey, salt: salt);
     final box = await _aes.encrypt(
       utf8.encode(address),
       secretKey: aesKey,
     );
-    return base64Url.encode(box.concatenation());
+    // Prépare le bloc complet : sel + concatenation(nonce + mac + cipher)
+    final combined = <int>[
+      ...salt,
+      ...box.concatenation(),
+    ];
+    return base64Url.encode(combined);
   }
 
   /// Déchiffre une adresse chiffrée.
-  Future<String> decryptAddress(String cipherB64, SecretKey aesKey) async {
+  ///
+  /// Extrait le sel des 16 premiers octets, dérive la clé AES
+  /// via PBKDF2, puis déchiffre.
+  Future<String> decryptAddress(String cipherB64, SecretKey masterKey) async {
     final combined = base64Url.decode(cipherB64);
+    if (combined.length < _saltLength + 16 + 32) {
+      throw FormatException('Ciphertext trop court : ${combined.length} octets');
+    }
+    // Extrait le sel (16 premiers octets).
+    final salt = combined.sublist(0, _saltLength);
+    final rest = combined.sublist(_saltLength);
+
+    final aesKey = await deriveAesKey(masterKey, salt: salt);
     // AesCbc.with256bits + Hmac.sha256 -> nonce=16, mac=32
     final box = SecretBox.fromConcatenation(
-      combined,
+      rest,
       nonceLength: 16,
       macLength: 32,
     );

@@ -4,11 +4,11 @@
 //
 // Centralise TOUTES les URL de serveurs (principal + secours +
 // relay) pour pointer exclusivement vers l'infrastructure de
-// production : streetphare.ddns.net.
+// production.
 //
-//   Serveur Principal : http://streetphare.ddns.net:3000
-//   Serveur Backup   : http://streetphare.ddns.net:3001
-//   Relay WebSocket   : ws://streetphare.ddns.net:3000/mesh
+//   Serveur Principal : http://adminServerUrl:3000
+//   Serveur Backup   : http://adminServerUrl:3001
+//   Relay WebSocket   : ws://adminServerUrl:3000/mesh
 //
 // Le FailoverManager est configuré avec un heartbeat normal
 // (30s) et un timeout de ping standard (5s).
@@ -21,6 +21,7 @@
 // IMPORTANT : ne JAMAIS hardcoder d'URL ailleurs dans l'app.
 // Toujours importer 'network_config.dart' pour rester cohérent.
 
+import 'package:flutter_streetphare/constants/app_constants.dart';
 /// Configuration réseau résolue pour l'environnement courant.
 class NetworkConfig {
   NetworkConfig._();
@@ -28,7 +29,11 @@ class NetworkConfig {
   // ---------------------------------------------------------------------------
   // Adresse No-IP de production
   // ---------------------------------------------------------------------------
-  static const String _productionHost = 'streetphare.ddns.net';
+  static final String _productionHost = AppStrings.adminServerUrl
+      .replaceAll('http://', '')
+      .replaceAll('https://', '')
+      .split(':')
+      .first;
 
   // ---------------------------------------------------------------------------
   // Constantes de ports
@@ -51,48 +56,40 @@ class NetworkConfig {
 
   /// URL du serveur PRINCIPAL courant.
   ///
-  /// Production : http://streetphare.ddns.net:3000
+  /// Production : http://adminServerUrl:3000
   static String get primaryServer {
     return 'http://$_productionHost:$_primaryPort';
   }
 
   /// URL du serveur SECONDAIRE (secours).
   ///
-  /// http://streetphare.ddns.net:3001
+  /// http://adminServerUrl:3001
   static String get initialSecondaryServer {
     return 'http://$_productionHost:$_secondaryPort';
   }
 
   /// URL du relay WebSocket (utilisé par `RelayMeshTransport`).
   ///
-  /// ws://streetphare.ddns.net:3000/mesh
+  /// ws://adminServerUrl:3000/mesh
   static String get relayUrl {
     return 'ws://$_productionHost:$_primaryPort/mesh';
   }
 
   /// URL WebSocket du relais d'administration serveur.
   ///
-  /// ws://streetphare.ddns.net:3000/admin
+  /// ws://adminServerUrl:3000/admin
   static String get primaryUrl {
     return 'ws://$_productionHost:$_primaryPort/admin';
   }
 
-  /// Master passphrase utilisée pour dériver la clé AES
-  /// de chiffrement / déchiffrement des adresses de backup.
-  /// DOIT être fournie via la variable d'environnement
-  /// `STREETPHARE_MASTER_KEY` au moment de la compilation.
-  /// Aucune valeur par défaut n'est acceptée en production.
-  static String get masterPassphrase {
-    const key = String.fromEnvironment('STREETPHARE_MASTER_KEY');
-    if (key.isEmpty) {
-      throw StateError(
-        'STREETPHARE_MASTER_KEY non définie. '
-        'Passez --dart-define=STREETPHARE_MASTER_KEY=... '
-        'à la compilation.',
-      );
-    }
-    return key;
-  }
+  /// La clé maîtresse est désormais gérée par `KeyStoreService`
+  /// (lib/core/security/keystore_service.dart). Elle est générée
+  /// aléatoirement au premier lancement et stockée dans le keystore
+  /// sécurisé de l'OS (Android Keystore / iOS Keychain).
+  ///
+  /// L'ancien getter `masterPassphrase` basé sur
+  /// `String.fromEnvironment('STREETPHARE_MASTER_KEY')` est
+  /// supprimé car il compilait la clé en dur dans le binaire.
 
   // ---------------------------------------------------------------------------
   // Helpers de debug
@@ -104,7 +101,7 @@ class NetworkConfig {
   //
   // Contexte : De nombreuses box internet bloquent le NAT Hairpinning,
   // empêchant l'application (exécutée sur le même PC que le serveur)
-  // de résoudre `streetphare.ddns.net` → IP publique → rebouclage local.
+  // de résoudre `adminServerUrl` → IP publique → rebouclage local.
   //
   // Solution : Le FailoverManager tente automatiquement ces adresses
   // de fallback local lorsque la résolution No-IP échoue.

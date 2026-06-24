@@ -19,6 +19,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_streetphare/constants/app_constants.dart';
 
 /// Résultat d'un check kick.
 class KickStatus {
@@ -39,7 +40,7 @@ class KickCheckService extends ChangeNotifier {
   KickCheckService._();
   static final KickCheckService instance = KickCheckService._();
 
-  static const String _adminBase = 'http://192.168.31.18:4000';
+  static const String _adminBase = '${AppStrings.adminServerUrl}:4000';
   static const String _uuidKey = 'streetphare_ephemeral_uuid';
   static const Duration _checkInterval = Duration(minutes: 5);
 

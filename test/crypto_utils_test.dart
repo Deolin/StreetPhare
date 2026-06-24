@@ -23,50 +23,52 @@ import 'package:flutter_streetphare/database/crypto_utils.dart'
     as streetphare;
 
 void main() {
-  group('CryptoUtils — AES-256-CBC + HMAC-SHA256', () {
-    // Passphrase de développement (identique à server_crypto.js)
-    const testPassphrase = 'streetphare-dev-key-CHANGE_ME_IN_PROD';
+  group('CryptoUtils — AES-256-CBC + HMAC-SHA256 (sel aléatoire)', () {
     const testAddress = 'http://localhost:3001';
 
-    late SecretKey aesKey;
+    late SecretKey masterKey;
+    late SecretKey wrongKey;
     late streetphare.CryptoUtils crypto;
 
     setUp(() async {
       crypto = streetphare.CryptoUtils.instance;
-      aesKey = await crypto.deriveAesKey(testPassphrase);
+      // Génère des clés aléatoires pour les tests (256 bits).
+      masterKey = SecretKey(List<int>.generate(
+          32, (_) => DateTime.now().microsecondsSinceEpoch % 256));
+      wrongKey = SecretKey(List<int>.generate(
+          32, (_) => DateTime.now().microsecondsSinceEpoch % 256));
     });
 
     test('la clé AES dérivée fait 32 octets (AES-256)', () async {
+      final aesKey = await crypto.deriveAesKey(masterKey);
       final keyBytes = await aesKey.extractBytes();
       expect(keyBytes.length, 32);
     });
 
     test('encrypt + decrypt restore l\'adresse originale', () async {
       // Chiffrement
-      final cipherB64 = await crypto.encryptAddress(testAddress, aesKey);
+      final cipherB64 = await crypto.encryptAddress(testAddress, masterKey);
       expect(cipherB64, isNotEmpty);
 
       // Vérification du format base64Url
       final raw = base64Url.decode(cipherB64);
-      // IV(16) + MAC(32) + au moins 16 octets de cipher (padding AES)
-      expect(raw.length, greaterThanOrEqualTo(16 + 32 + 16));
+      // sel(16) + IV(16) + MAC(32) + au moins 16 octets de cipher (padding AES)
+      expect(raw.length, greaterThanOrEqualTo(16 + 16 + 32 + 16));
 
       // Déchiffrement
-      final decrypted = await crypto.decryptAddress(cipherB64, aesKey);
+      final decrypted = await crypto.decryptAddress(cipherB64, masterKey);
       expect(decrypted, testAddress);
     });
 
-    test('deux chiffrements produisent des IV distincts', () async {
-      final c1 = await crypto.encryptAddress(testAddress, aesKey);
-      final c2 = await crypto.encryptAddress(testAddress, aesKey);
-      // Les IV étant aléatoires, les ciphertexts doivent différer
+    test('deux chiffrements produisent des ciphertexts distincts (sel aléatoire)', () async {
+      final c1 = await crypto.encryptAddress(testAddress, masterKey);
+      final c2 = await crypto.encryptAddress(testAddress, masterKey);
+      // Les sels étant aléatoires, les ciphertexts doivent différer
       expect(c1, isNot(c2));
     });
 
-    test('déchiffrement avec une mauvaise passphrase échoue', () async {
-      final cipherB64 = await crypto.encryptAddress(testAddress, aesKey);
-      final wrongKey =
-          await crypto.deriveAesKey('wrong-passphrase-CHANGE_ME');
+    test('déchiffrement avec une mauvaise clé échoue', () async {
+      final cipherB64 = await crypto.encryptAddress(testAddress, masterKey);
 
       // Le déchiffrement doit lever une exception (MAC invalide ou padding)
       expect(
@@ -76,7 +78,7 @@ void main() {
     });
 
     test('déchiffrement d\'un ciphertext corrompu échoue', () async {
-      final cipherB64 = await crypto.encryptAddress(testAddress, aesKey);
+      final cipherB64 = await crypto.encryptAddress(testAddress, masterKey);
       final raw = base64Url.decode(cipherB64);
 
       // Corrompre un octet au milieu du ciphertext
@@ -85,25 +87,14 @@ void main() {
       final corruptB64 = base64Url.encode(corrupted);
 
       expect(
-        () async => crypto.decryptAddress(corruptB64, aesKey),
+        () async => crypto.decryptAddress(corruptB64, masterKey),
         throwsA(isA<Exception>()),
       );
     });
 
-    test('la passphrase de dev produit la même clé que server_crypto.js',
-        () async {
-      // Vecteur de test calculé avec server_crypto.js :
-      //   node -e "
-      //     const c = require('./server/server_crypto');
-      //     const enc = c.encryptAddress('http://localhost:3001',
-      //       'streetphare-dev-key-CHANGE_ME_IN_PROD');
-      //     console.log(enc);
-      //   "
-      //
-      // On vérifie UNIQUEMENT que le déchiffrement fonctionne,
-      // pas le ciphertext exact (IV aléatoire).
-      final cipherB64 = await crypto.encryptAddress(testAddress, aesKey);
-      final decrypted = await crypto.decryptAddress(cipherB64, aesKey);
+    test('le round-trip fonctionne avec n\'importe quelle clé maîtresse', () async {
+      final cipherB64 = await crypto.encryptAddress(testAddress, masterKey);
+      final decrypted = await crypto.decryptAddress(cipherB64, masterKey);
       expect(decrypted, testAddress);
     });
   });

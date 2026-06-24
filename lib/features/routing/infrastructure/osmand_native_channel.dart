@@ -9,7 +9,7 @@
 //
 // Cascade de priorité :
 //   1. MethodChannel Android (GraphHopper embarqué + OSM data local)
-//   2. HTTP GraphHopper local (192.168.31.18:8080) — si moteur non prêt
+//   2. HTTP GraphHopper local (adminServerUrl:8080) — si moteur non prêt
 //   3. OSRM public (internet) — fallback ultime
 
 import 'dart:io' as io;

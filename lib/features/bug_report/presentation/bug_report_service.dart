@@ -13,6 +13,7 @@ import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_streetphare/constants/app_constants.dart';
 
 // ============================================================================
 // Modèle de rapport
@@ -76,10 +77,6 @@ class BugReportService {
   BugReportService._();
   static final BugReportService instance = BugReportService._();
 
-  // URL du serveur web d'administration (configurable).
-  static const String _adminServerUrl =
-      'http://192.168.31.18:4000/api/bug-report';
-
   /// Envoie un rapport de bug au serveur d'administration.
   Future<BugReportResult> submit(BugReport report) async {
     try {
@@ -88,7 +85,7 @@ class BugReportService {
 
       final response = await http
           .post(
-            Uri.parse(_adminServerUrl),
+            Uri.parse(AppStrings.adminServerUrl),
             headers: {
               'Content-Type': 'application/json',
               'X-StreetPhare-Client': '1.0',

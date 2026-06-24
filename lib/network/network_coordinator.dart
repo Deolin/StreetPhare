@@ -208,7 +208,7 @@ class NetworkCoordinator with WidgetsBindingObserver {
 
     // Tâches périodiques : purge TTL et tentative d'upload.
     _purgeTimer = Timer.periodic(
-      const Duration(minutes: 5),
+      const Duration(minutes: 1),
       (_) => _purgeAndMaybeSync(),
     );
     _uploadTimer = Timer.periodic(

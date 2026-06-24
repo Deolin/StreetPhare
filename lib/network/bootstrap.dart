@@ -15,6 +15,7 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -57,7 +58,7 @@ class NetworkBootstrap {
 Future<NetworkBootstrap> buildNetworkBootstrap({
   required String primaryServer,
   required String relayUrl,
-  required String masterPassphrase,
+  required SecretKey masterKey,
   List<String> initialBackupChain = const [],
   Duration heartbeatInterval = const Duration(seconds: 5),
   Duration pingTimeout = const Duration(seconds: 2),
@@ -70,7 +71,7 @@ Future<NetworkBootstrap> buildNetworkBootstrap({
   final chain = List<String>.from(initialBackupChain);
   if (chain.isEmpty) {
     chain.addAll(await _seedInitialChain(
-      masterPassphrase,
+      masterKey,
       debugExtraAddress: NetworkConfig.initialSecondaryServer,
     ));
   }
@@ -81,7 +82,7 @@ Future<NetworkBootstrap> buildNetworkBootstrap({
     maxAttempts: 3,
     heartbeatInterval: heartbeatInterval,
     pingTimeout: pingTimeout,
-    masterPassphrase: masterPassphrase,
+    masterKey: masterKey,
   );
 
   // Identifiant de session anonyme STABLE.
@@ -164,18 +165,17 @@ int _secureNextInt(int max) {
 }
 
 Future<List<String>> _seedInitialChain(
-  String passphrase, {
+  SecretKey masterKey, {
   String debugExtraAddress = '',
 }) async {
   try {
-    final key = await CryptoUtils.instance.deriveAesKey(passphrase);
     final out = <String>[];
     if (debugExtraAddress.isNotEmpty) {
       out.add(await CryptoUtils.instance
-          .encryptAddress(debugExtraAddress, key));
+          .encryptAddress(debugExtraAddress, masterKey));
     }
     out.add(await CryptoUtils.instance
-        .encryptAddress('https://backup1.streetphare.local', key));
+        .encryptAddress('https://backup1.streetphare.local', masterKey));
     return out;
   } catch (_) {
     return [];

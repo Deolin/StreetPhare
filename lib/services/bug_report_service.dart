@@ -13,6 +13,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_streetphare/constants/app_constants.dart';
 
 // ============================================================================
 // Modèle de rapport de bug
@@ -68,7 +69,7 @@ class BugReportService {
   static final BugReportService instance = BugReportService._();
 
   /// URL du serveur d'administration.
-  static const String _adminBaseUrl = 'http://192.168.31.18:4000';
+  static const String _adminBaseUrl = '${AppStrings.adminServerUrl}:4000';
 
   /// Détecte si l'app tourne dans un environnement de test Google
   /// (Firebase Test Lab, Play Console pre-launch testing).

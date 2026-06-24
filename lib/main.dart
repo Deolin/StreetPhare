@@ -5,12 +5,14 @@
 // à produire `CLIENT_DEBUG.md` dès la phase de bootstrap.
 import 'dart:async';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/i18n/app_locale.dart';
+import 'core/security/keystore_service.dart';
 import 'core/theme/streetphare_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'debug/client_debug_logger.dart';
@@ -126,80 +128,71 @@ void main() async {
   }
 
   // === Étape 3 : Initialisation de la "ruche" réseau décentralisée ===
-    if (kDebugMode) {
-      try {
-        debugPrint('[main] ${NetworkConfig.describe()}');
-      } catch (_) {
-        debugPrint('[main] NetworkConfig indisponible (master key manquante)');
-      }
-    }
-
+  if (kDebugMode) {
     try {
-      // Essaie de récupérer la master passphrase. Sur le Web en
-      // développement, la variable dart-define peut être absente.
-      // On bascule en mode dégradé (réseau désactivé) plutôt que
-      // de planter l'application entière.
-      String masterKey;
-      try {
-        masterKey = NetworkConfig.masterPassphrase;
-      } catch (_) {
-        masterKey = 'streetphare-web-dev-fallback';
-        if (kDebugMode) {
-          debugPrint('[main] ⚠ Master key manquante → fallback web-dev');
-        }
-      }
-
-      ClientDebugLogger.instance.log(
-        'Démarrage app',
-        details: 'Web mode',
-        emoji: '🚀',
-      );
-
-      final bootstrap = await buildNetworkBootstrap(
-        primaryServer: NetworkConfig.primaryServer,
-        relayUrl: NetworkConfig.relayUrl,
-        masterPassphrase: masterKey,
-        initialBackupChain: NetworkConfig.initialSecondaryServer.isEmpty
-            ? const []
-            : await _seedSingleBackup(
-                NetworkConfig.initialSecondaryServer, masterKey),
-      );
-
-      await NetworkCoordinator.instance.init(
-        failoverConfig: bootstrap.failoverConfig,
-        transports: bootstrap.transports,
-        localPeerId: bootstrap.peerId,
-      );
-
-      if (kDebugMode) {
-        debugPrint('[main] réseau StreetPhare initialisé sur '
-            '${describePlatform()}');
-      }
-
-      // === Étape 5 : Intelligence StreetPhare ===
-      ConnectivityService.instance.start();
-      GeofencingService.instance.start();
-      ProximityValidationService.instance.start();
-      EventManager.instance.start();
-      HiveMessagingService.instance.start();
-      unawaited(NotificationService.instance.showPersistentNotification());
-    } catch (e, st) {
-      if (kDebugMode) {
-        debugPrint('[main] ERREUR initialisation réseau : $e\n$st');
-      }
-      ClientDebugLogger.instance.log(
-        'ERREUR init réseau',
-        details: e.toString(),
-        emoji: '❌',
-      );
+      debugPrint('[main] ${NetworkConfig.describe()}');
+    } catch (_) {
+      debugPrint('[main] NetworkConfig indisponible');
     }
+  }
+
+  try {
+    // Charge la clé maîtresse depuis le keystore sécurisé
+    // (Android Keystore / iOS Keychain). Génère une clé
+    // aléatoire au premier lancement si nécessaire.
+    final masterKey = await KeyStoreService.instance.loadOrCreateMasterKey();
+
+    ClientDebugLogger.instance.log(
+      'Démarrage app',
+      details: 'Web mode',
+      emoji: '🚀',
+    );
+
+    final bootstrap = await buildNetworkBootstrap(
+      primaryServer: NetworkConfig.primaryServer,
+      relayUrl: NetworkConfig.relayUrl,
+      masterKey: masterKey,
+      initialBackupChain: NetworkConfig.initialSecondaryServer.isEmpty
+          ? const []
+          : await _seedSingleBackup(
+              NetworkConfig.initialSecondaryServer, masterKey),
+    );
+
+    await NetworkCoordinator.instance.init(
+      failoverConfig: bootstrap.failoverConfig,
+      transports: bootstrap.transports,
+      localPeerId: bootstrap.peerId,
+    );
+
+    if (kDebugMode) {
+      debugPrint('[main] réseau StreetPhare initialisé sur '
+          '${describePlatform()}');
+    }
+
+    // === Étape 5 : Intelligence StreetPhare ===
+    ConnectivityService.instance.start();
+    GeofencingService.instance.start();
+    ProximityValidationService.instance.start();
+    EventManager.instance.start();
+    HiveMessagingService.instance.start();
+    unawaited(NotificationService.instance.showPersistentNotification());
+  } catch (e, st) {
+    if (kDebugMode) {
+      debugPrint('[main] ERREUR initialisation réseau : $e\n$st');
+    }
+    ClientDebugLogger.instance.log(
+      'ERREUR init réseau',
+      details: e.toString(),
+      emoji: '❌',
+    );
+  }
 
   runApp(StreetPhareApp());
 }
 
 Future<List<String>> _seedSingleBackup(
   String address,
-  String passphrase,
+  SecretKey masterKey,
 ) async {
   return const [];
 }

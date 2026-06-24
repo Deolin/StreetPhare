@@ -3,7 +3,8 @@
 **Application citoyenne de cartographie collaborative en temps réel**
 *Compatible Android, iOS et Windows — Open Source*
 
-Soutenez-moi via [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/L8X321888R) 
+Soutenez-moi via [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/L8X321888R)
+
 ---
 
 ## 📁 Architecture du projet
@@ -11,7 +12,7 @@ Soutenez-moi via [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://k
 L'application suit une **architecture orientée fonctionnalités** (feature-first),
 organisée en couches :
 
-```
+```text
 lib/
 ├── core/                                # Cœur de l'application
 │   ├── cache/

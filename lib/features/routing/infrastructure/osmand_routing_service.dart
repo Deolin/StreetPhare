@@ -19,7 +19,7 @@
 //   MODE B — InternalPolyline (rendu dans flutter_map SafeRouteLayer)
 //   ──────────────────────────────────────────────────────────────────
 //   Appel HTTP au moteur de routage :
-//     1. GraphHopper local     → http://192.168.31.18:8080 (profil foot)
+//     1. GraphHopper local     → http://adminServerUrl:8080 (profil foot)
 //     2. OSRM public (fallback) → https://router.project-osrm.org   (foot)
 //   Retourne une List<LatLng> strictement conforme au réseau routier
 //   OpenStreetMap (trottoirs, chemins piétons, passages). Ces points
@@ -260,7 +260,7 @@ class OsmAndRoutingService {
   ///
   /// Ordre de priorité :
   ///   0. MethodChannel Android (GraphHopper embarqué + OSM offline) — PRIORITAIRE
-  ///   1. GraphHopper HTTP local (`192.168.31.18:8080`) — profil foot
+  ///   1. GraphHopper HTTP local (`adminServerUrl:8080`) — profil foot
   ///   2. OSRM public demo  (`router.project-osrm.org`)  — foot
   ///   3. Retourne [OsmAndResult] vide (erreur remontée à l'appelant)
   ///
