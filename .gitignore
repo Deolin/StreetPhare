@@ -53,3 +53,6 @@ CLIENT_DEBUG.md.tmp
 status/SERVER_STATUS_3000.md
 status/SERVER_STATUS_3001.md
 status/CLIENT_DEBUG.md
+belgium-latest.osm.pbf
+server_dart/assets/osm/belgium-260623.osm.pbf
+android/app/src/main/assets/osm/fleurus.osm.pbf
