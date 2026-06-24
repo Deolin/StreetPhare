@@ -18,8 +18,8 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27'
-          channel: 'stable'
+          flutter-version: "3.27"
+          channel: "stable"
           cache: true
 
       - name: Verify Dart SDK constraint

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StreetPhare — Connexion Admin</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: #0d1117;
+        color: #c9d1d9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+      .login-box {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 40px;
+        width: 100%;
+        max-width: 400px;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+      }
+      .login-box h1 {
+        font-size: 24px;
+        margin-bottom: 8px;
+        color: #58a6ff;
+      }
+      .login-box h2 {
+        font-size: 13px;
+        color: #8b949e;
+        font-weight: 400;
+        margin-bottom: 28px;
+      }
+      .form-group {
+        margin-bottom: 16px;
+      }
+      .form-group label {
+        display: block;
+        font-size: 12px;
+        color: #8b949e;
+        margin-bottom: 4px;
+      }
+      .form-group input {
+        width: 100%;
+        padding: 10px 12px;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .form-group input:focus {
+        border-color: #58a6ff;
+      }
+      .btn {
+        width: 100%;
+        padding: 12px;
+        background: #238636;
+        border: none;
+        border-radius: 6px;
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+        margin-top: 8px;
+      }
+      .btn:hover {
+        background: #2ea043;
+      }
+      .btn:disabled {
+        background: #21262d;
+        color: #484f58;
+        cursor: not-allowed;
+      }
+      .error-msg {
+        color: #f85149;
+        font-size: 12px;
+        margin-top: 12px;
+        display: none;
+        text-align: center;
+      }
+      .error-msg.show {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-box">
+      <h1>🛡️ StreetPhare</h1>
+      <h2>Dashboard d'Administration — Authentification requise</h2>
+      <form id="loginForm">
+        <div class="form-group">
+          <label>Nom d'utilisateur</label>
+          <input
+            type="text"
+            id="username"
+            placeholder="admin"
+            autocomplete="username"
+            required
+          />
+        </div>
+        <div class="form-group">
+          <label>Mot de passe</label>
+          <input
+            type="password"
+            id="password"
+            placeholder="••••••••"
+            autocomplete="current-password"
+            required
+          />
+        </div>
+        <button type="submit" class="btn" id="loginBtn">Se connecter</button>
+      </form>
+      <div class="error-msg" id="errorMsg">
+        Identifiants invalides. Veuillez réessayer.
+      </div>
+    </div>
+
+    <script>
+      const form = document.getElementById("loginForm");
+      const btn = document.getElementById("loginBtn");
+      const error = document.getElementById("errorMsg");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        btn.disabled = true;
+        btn.textContent = "Connexion...";
+        error.classList.remove("show");
+
+        try {
+          const resp = await fetch("/api/admin/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: document.getElementById("username").value,
+              password: document.getElementById("password").value,
+            }),
+          });
+          const data = await resp.json();
+          if (data.ok) {
+            localStorage.setItem("streetphare_token", data.token);
+            localStorage.setItem("streetphare_user", JSON.stringify(data.user));
+            window.location.href = "/dashboard";
+          } else {
+            error.classList.add("show");
+          }
+        } catch (_) {
+          error.classList.add("show");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Se connecter";
+        }
+      });
+
+      // Si déjà connecté, rediriger vers le dashboard.
+      if (localStorage.getItem("streetphare_token")) {
+        window.location.href = "/dashboard";
+      }
+    </script>
+  </body>
+</html>

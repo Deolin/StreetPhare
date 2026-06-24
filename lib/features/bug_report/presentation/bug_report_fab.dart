@@ -23,7 +23,7 @@ class BugReportFab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Positioned(
       left: 16,
-      bottom: 85,
+      bottom: 78,
       child: SafeArea(
         child: Semantics(
           label: 'Signaler un bug ou une suggestion',

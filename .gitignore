@@ -21,11 +21,9 @@ build/
 *.stackdump
 crash_report.*
 
-# Répertoire de logs des serveurs
-server/logs/
-server/.server-pids.json
-server/admin_data.json
-server/events_admin.json
+# Dépendances Node.js
+node_modules/
+package-lock.json
 
 # Fichiers générés Flutter/IDE
 .metadata

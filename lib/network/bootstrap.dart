@@ -7,7 +7,7 @@
 //
 // Version TEST avec heartbeat accéléré (5s au lieu de 30s)
 // et ping timeout réduit (2s au lieu de 5s) pour un failover
-// quasi-instantané sur l'infrastructure 192.168.31.18.
+// quasi-instantané sur l'infrastructure locale.
 //
 // Ce fichier isole toute la logique de "boot" pour que main.dart
 // reste simple.

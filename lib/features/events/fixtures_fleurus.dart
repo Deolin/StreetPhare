@@ -1,4 +1,4 @@
-// lib/core/config/fixtures_fleurus.dart
+// lib/features/events/fixtures_fleurus.dart
 //
 // Constantes géographiques de démonstration pour les événements
 // StreetPhare. Extraites de `event_manager.dart` pour assainir
@@ -7,7 +7,7 @@
 // Toutes les coordonnées GPS sont réelles — commune de Fleurus
 // (6220), Belgique.
 
-import '../../features/events/domain/models/event_model.dart';
+import 'domain/models/event_model.dart';
 
 /// Coordonnées des lieux-clés de Fleurus.
 abstract final class FleurusLocations {

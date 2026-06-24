@@ -10,24 +10,24 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/streetphare_icon.png"
-  
+
   # Android adaptive icon (foreground + background)
   adaptive_icon_foreground: "assets/icon/streetphare_icon.png"
   adaptive_icon_background: "#0d1117"
-  
+
   # Windows ICO generation (requires manual .ico conversion or imagetool)
   windows:
     generate: true
     image_path: "assets/icon/streetphare_icon.ico"
     icon_size: 48
-  
+
   # Web favicon
   web:
     generate: true
     image_path: "assets/icon/streetphare_icon.png"
-  
+
   # Custom sizes for Android mipmap
   min_sdk_android: 21
-  
+
   remove_alpha_ios: true
   background_color_ios: "#0d1117"

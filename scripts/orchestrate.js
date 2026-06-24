@@ -13,33 +13,22 @@
 //   test      : flutter test
 //   lint      : dart analyze + dart format
 //   ci        : lint + flutter test (équivalent CI complet)
-//   start     : lance les serveurs Node.js (primary + secondary + dashboard)
-//   all       : ci + start
 //   (vide)    : ci (par défaut)
 
-'use strict';
+"use strict";
 
-const { spawnSync } = require('child_process');
-const os = require('os');
+const { spawnSync } = require("child_process");
+const os = require("os");
 
 // ── Détection OS ──────────────────────────────────────────────────────────
-const isWindows = os.platform() === 'win32';
+const isWindows = os.platform() === "win32";
 
 function shell(cmd, args, opts) {
   const fullCmd = isWindows ? `${cmd}.bat` : cmd;
   const result = spawnSync(fullCmd, args, {
-    stdio: 'inherit',
+    stdio: "inherit",
     shell: isWindows,
     ...opts,
-  });
-  return result.status;
-}
-
-function node(script, args) {
-  const scriptPath = `server/${script}`;
-  const result = spawnSync('node', [scriptPath, ...(args || [])], {
-    stdio: 'inherit',
-    shell: isWindows,
   });
   return result.status;
 }
@@ -47,66 +36,57 @@ function node(script, args) {
 // ── Commandes ─────────────────────────────────────────────────────────────
 
 function runAnalyze() {
-  console.log('┌──────────────────────────────────────────┐');
-  console.log('│  dart analyze                             │');
-  console.log('└──────────────────────────────────────────┘');
-  return shell('dart', ['analyze']);
+  console.log("┌──────────────────────────────────────────┐");
+  console.log("│  dart analyze                             │");
+  console.log("└──────────────────────────────────────────┘");
+  return shell("dart", ["analyze"]);
 }
 
 function runFormat() {
-  console.log('┌──────────────────────────────────────────┐');
-  console.log('│  dart format                              │');
-  console.log('└──────────────────────────────────────────┘');
-  return shell('dart', ['format', '--output=none', '--set-exit-if-changed', '.']);
+  console.log("┌──────────────────────────────────────────┐");
+  console.log("│  dart format                              │");
+  console.log("└──────────────────────────────────────────┘");
+  return shell("dart", [
+    "format",
+    "--output=none",
+    "--set-exit-if-changed",
+    ".",
+  ]);
 }
 
 function runTest() {
-  console.log('┌──────────────────────────────────────────┐');
-  console.log('│  flutter test                             │');
-  console.log('└──────────────────────────────────────────┘');
-  return shell('flutter', ['test']);
-}
-
-function runStart() {
-  console.log('┌──────────────────────────────────────────┐');
-  console.log('│  Démarrage des serveurs Node.js           │');
-  console.log('│    Primary  → http://localhost:3000       │');
-  console.log('│    Secondary → http://localhost:3001      │');
-  console.log('│    Dashboard → http://localhost:3500      │');
-  console.log('└──────────────────────────────────────────┘');
-  return node('launch_all.js');
+  console.log("┌──────────────────────────────────────────┐");
+  console.log("│  flutter test                             │");
+  console.log("└──────────────────────────────────────────┘");
+  return shell("flutter", ["test"]);
 }
 
 // ── Dispatch ──────────────────────────────────────────────────────────────
 
-const command = (process.argv[2] || 'ci').toLowerCase();
+const command = (process.argv[2] || "ci").toLowerCase();
 let exitCode = 0;
 
 switch (command) {
-  case 'analyze':
+  case "analyze":
     exitCode = runAnalyze();
     break;
-  case 'format':
+  case "format":
     exitCode = runFormat();
     break;
-  case 'test':
+  case "test":
     exitCode = runTest();
     break;
-  case 'lint':
+  case "lint":
     exitCode = runFormat() || runAnalyze();
     break;
-  case 'ci':
+  case "ci":
     exitCode = runFormat() || runAnalyze() || runTest();
-    break;
-  case 'start':
-    exitCode = runStart();
-    break;
-  case 'all':
-    exitCode = runFormat() || runAnalyze() || runTest() || runStart();
     break;
   default:
     console.error(`Commande inconnue : ${command}`);
-    console.error('Commandes disponibles : analyze, format, test, lint, ci, start, all');
+    console.error(
+      "Commandes disponibles : analyze, format, test, lint, ci",
+    );
     exitCode = 1;
 }
 

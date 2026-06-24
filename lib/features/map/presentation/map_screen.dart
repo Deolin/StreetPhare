@@ -62,7 +62,11 @@ const _kEventColors = [
   Color(0xFF4CAF50), // Vert
 ];
 
-const _kTileUrlLight = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+// CartoDB Positron (light) — gratuit, pas d'avertissement OSM
+// CartoDB Dark Matter (dark) — gratuit, thème sombre cohérent
+// Voir conditions : https://carto.com/help/working-with-data/attribution
+const _kTileUrlLight =
+    'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
 const _kTileUrlDark =
     'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
 

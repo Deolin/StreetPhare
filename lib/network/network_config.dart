@@ -4,11 +4,11 @@
 //
 // Centralise TOUTES les URL de serveurs (principal + secours +
 // relay) pour pointer exclusivement vers l'infrastructure de
-// production : streetphare.ddns.be.
+// production : streetphare.ddns.net.
 //
-//   Serveur Principal : http://streetphare.ddns.be:3000
-//   Serveur Backup   : http://streetphare.ddns.be:3001
-//   Relay WebSocket   : ws://streetphare.ddns.be:3000/mesh
+//   Serveur Principal : http://streetphare.ddns.net:3000
+//   Serveur Backup   : http://streetphare.ddns.net:3001
+//   Relay WebSocket   : ws://streetphare.ddns.net:3000/mesh
 //
 // Le FailoverManager est configuré avec un heartbeat normal
 // (30s) et un timeout de ping standard (5s).
@@ -28,7 +28,7 @@ class NetworkConfig {
   // ---------------------------------------------------------------------------
   // Adresse No-IP de production
   // ---------------------------------------------------------------------------
-  static const String _productionHost = 'streetphare.ddns.be';
+  static const String _productionHost = 'streetphare.ddns.net';
 
   // ---------------------------------------------------------------------------
   // Constantes de ports
@@ -51,28 +51,28 @@ class NetworkConfig {
 
   /// URL du serveur PRINCIPAL courant.
   ///
-  /// Production : http://streetphare.ddns.be:3000
+  /// Production : http://streetphare.ddns.net:3000
   static String get primaryServer {
     return 'http://$_productionHost:$_primaryPort';
   }
 
   /// URL du serveur SECONDAIRE (secours).
   ///
-  /// http://streetphare.ddns.be:3001
+  /// http://streetphare.ddns.net:3001
   static String get initialSecondaryServer {
     return 'http://$_productionHost:$_secondaryPort';
   }
 
   /// URL du relay WebSocket (utilisé par `RelayMeshTransport`).
   ///
-  /// ws://streetphare.ddns.be:3000/mesh
+  /// ws://streetphare.ddns.net:3000/mesh
   static String get relayUrl {
     return 'ws://$_productionHost:$_primaryPort/mesh';
   }
 
   /// URL WebSocket du relais d'administration serveur.
   ///
-  /// ws://streetphare.ddns.be:3000/admin
+  /// ws://streetphare.ddns.net:3000/admin
   static String get primaryUrl {
     return 'ws://$_productionHost:$_primaryPort/admin';
   }
@@ -104,7 +104,7 @@ class NetworkConfig {
   //
   // Contexte : De nombreuses box internet bloquent le NAT Hairpinning,
   // empêchant l'application (exécutée sur le même PC que le serveur)
-  // de résoudre `streetphare.ddns.be` → IP publique → rebouclage local.
+  // de résoudre `streetphare.ddns.net` → IP publique → rebouclage local.
   //
   // Solution : Le FailoverManager tente automatiquement ces adresses
   // de fallback local lorsque la résolution No-IP échoue.

@@ -190,17 +190,61 @@
     "lead": "StreetPhare vertrouwt op opmerkelijke open-source bibliotheken. Hier zijn de dankbetuigingen en expliciete credits aan hun auteurs.",
     "box_title": "📦 Gebruikte bibliotheken en frameworks",
     "libraries": [
-      { "name": "Flutter & Dart SDK", "desc": "Multi-platform UI-framework (Google). Basis van de mobiele en desktop applicatie.", "license": "BSD-3-Clause" },
-      { "name": "flutter_map", "desc": "Interactieve kaarten gebaseerd op Leaflet.js voor Flutter. Weergave van OSM-tegels en datalagen.", "license": "MIT" },
-      { "name": "OsmAnd Core / osmand_flutter", "desc": "Routeringsengine en offline OpenStreetMap-kaartgegevens. Berekening van de veilige route.", "license": "GPLv3" },
-      { "name": "flutter_reactive_ble", "desc": "Reactieve BLE-bibliotheek voor Flutter. Bluetooth Low Energy-communicatie voor P2P-mesh.", "license": "MIT" },
-      { "name": "Hive (hive_flutter)", "desc": "Lichtgewicht en snelle lokale database voor Flutter. Opslag van waarschuwingen, voorkeuren en berichten.", "license": "Apache-2.0" },
-      { "name": "geolocator", "desc": "Cross-platform GPS en geolocatietoegang. Realtime positie en afstandsberekening.", "license": "MIT" },
-      { "name": "latlong2", "desc": "Geodetische berekeningen (afstanden, peilingen, conversies). Gebruikt voor navigatie en geofences.", "license": "MIT" },
-      { "name": "flutter_compass", "desc": "Toegang tot hardwarekompas. Richtingsoriëntatie en navigatiepijl.", "license": "MIT" },
-      { "name": "pointycastle / cryptography", "desc": "AES-256 encryptie, ECDSA-handtekeningen en sleutelafleiding. Beveiliging van Hive-berichten en waarschuwingen.", "license": "MIT / MPL-2.0" },
-      { "name": "Node.js + Express", "desc": "Versleutelde relayservers (poort 3000/3001) en webbeheer-dashboard.", "license": "MIT" },
-      { "name": "OpenStreetMap contributors", "desc": "Vrije en collaboratieve wereldwijde kaartgegevens. Tegels geleverd door CartoDB / OSM.", "license": "ODbL 1.0" }
+      {
+        "name": "Flutter & Dart SDK",
+        "desc": "Multi-platform UI-framework (Google). Basis van de mobiele en desktop applicatie.",
+        "license": "BSD-3-Clause"
+      },
+      {
+        "name": "flutter_map",
+        "desc": "Interactieve kaarten gebaseerd op Leaflet.js voor Flutter. Weergave van OSM-tegels en datalagen.",
+        "license": "MIT"
+      },
+      {
+        "name": "OsmAnd Core / osmand_flutter",
+        "desc": "Routeringsengine en offline OpenStreetMap-kaartgegevens. Berekening van de veilige route.",
+        "license": "GPLv3"
+      },
+      {
+        "name": "flutter_reactive_ble",
+        "desc": "Reactieve BLE-bibliotheek voor Flutter. Bluetooth Low Energy-communicatie voor P2P-mesh.",
+        "license": "MIT"
+      },
+      {
+        "name": "Hive (hive_flutter)",
+        "desc": "Lichtgewicht en snelle lokale database voor Flutter. Opslag van waarschuwingen, voorkeuren en berichten.",
+        "license": "Apache-2.0"
+      },
+      {
+        "name": "geolocator",
+        "desc": "Cross-platform GPS en geolocatietoegang. Realtime positie en afstandsberekening.",
+        "license": "MIT"
+      },
+      {
+        "name": "latlong2",
+        "desc": "Geodetische berekeningen (afstanden, peilingen, conversies). Gebruikt voor navigatie en geofences.",
+        "license": "MIT"
+      },
+      {
+        "name": "flutter_compass",
+        "desc": "Toegang tot hardwarekompas. Richtingsoriëntatie en navigatiepijl.",
+        "license": "MIT"
+      },
+      {
+        "name": "pointycastle / cryptography",
+        "desc": "AES-256 encryptie, ECDSA-handtekeningen en sleutelafleiding. Beveiliging van Hive-berichten en waarschuwingen.",
+        "license": "MIT / MPL-2.0"
+      },
+      {
+        "name": "Node.js + Express",
+        "desc": "Versleutelde relayservers (poort 3000/3001) en webbeheer-dashboard.",
+        "license": "MIT"
+      },
+      {
+        "name": "OpenStreetMap contributors",
+        "desc": "Vrije en collaboratieve wereldwijde kaartgegevens. Tegels geleverd door CartoDB / OSM.",
+        "license": "ODbL 1.0"
+      }
     ],
     "authors": "<strong style=\"color:var(--text)\">Auteurs van het StreetPhare-project</strong><br>Ontwikkeld met ❤️ door de bijdragersgemeenschap. Project geïnitieerd in 2026 als activistische open-source tool.<br>Bijdragen welkom via <a href=\"https://github.com/Deolin/StreetPhare\" target=\"_blank\" rel=\"noopener\">GitHub</a>."
   },

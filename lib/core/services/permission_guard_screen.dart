@@ -110,10 +110,8 @@ class _PermissionGuardScreenState extends State<PermissionGuardScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),         
             children: [
               // ── Icône ─────────────────────────────────────────────
               Icon(
@@ -231,8 +229,7 @@ class _PermissionGuardScreenState extends State<PermissionGuardScreen> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 }
 

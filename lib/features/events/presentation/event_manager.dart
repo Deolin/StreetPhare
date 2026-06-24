@@ -17,7 +17,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../core/config/fixtures_fleurus.dart';
+import '../fixtures_fleurus.dart';
 import '../../../debug/client_debug_logger.dart';
 import '../domain/models/event_model.dart';
 
@@ -170,7 +170,7 @@ class EventManager extends ValueNotifier<List<EventModel>> {
   // Fixtures réelles — Fleurus (6220), Belgique
   // --------------------------------------------------------------------------
 
-  // Coordonnées GPS extraites dans lib/core/config/fixtures_fleurus.dart.
+  // Coordonnées GPS extraites dans lib/features/events/fixtures_fleurus.dart.
   // Réutilise les constantes FleurusLocations, stMedicCareCenter et
   // FleurusPolylines pour le mapping des événements de démonstration.
 

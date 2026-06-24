@@ -190,17 +190,61 @@
     "lead": "StreetPhare stützt sich auf bemerkenswerte Open-Source-Bibliotheken. Hier sind die Danksagungen und ausdrücklichen Credits an ihre Autoren.",
     "box_title": "📦 Verwendete Bibliotheken und Frameworks",
     "libraries": [
-      { "name": "Flutter & Dart SDK", "desc": "Multiplattform-UI-Framework (Google). Basis der Mobil- und Desktop-Anwendung.", "license": "BSD-3-Clause" },
-      { "name": "flutter_map", "desc": "Interaktive Kartendarstellung basierend auf Leaflet.js für Flutter. Anzeige von OSM-Kacheln und Datenebenen.", "license": "MIT" },
-      { "name": "OsmAnd Core / osmand_flutter", "desc": "Routing-Engine und Offline-OpenStreetMap-Kartendaten. Berechnung der sicheren Route.", "license": "GPLv3" },
-      { "name": "flutter_reactive_ble", "desc": "Reaktive BLE-Bibliothek für Flutter. Bluetooth Low Energy-Kommunikation für P2P-Mesh.", "license": "MIT" },
-      { "name": "Hive (hive_flutter)", "desc": "Leichte und schnelle lokale Datenbank für Flutter. Speicherung von Warnungen, Einstellungen und Nachrichten.", "license": "Apache-2.0" },
-      { "name": "geolocator", "desc": "Plattformübergreifender GPS- und Geolokalisierungszugriff. Echtzeitposition und Entfernungsberechnung.", "license": "MIT" },
-      { "name": "latlong2", "desc": "Geodätische Berechnungen (Entfernungen, Peilungen, Konvertierungen). Verwendet für Navigation und Geofences.", "license": "MIT" },
-      { "name": "flutter_compass", "desc": "Hardware-Kompasszugriff. Richtungsorientierung und Navigationspfeil.", "license": "MIT" },
-      { "name": "pointycastle / cryptography", "desc": "AES-256-Verschlüsselung, ECDSA-Signaturen und Schlüsselableitung. Sicherheit von Hive-Nachrichten und Warnungen.", "license": "MIT / MPL-2.0" },
-      { "name": "Node.js + Express", "desc": "Verschlüsselte Relay-Server (Port 3000/3001) und Web-Administrations-Dashboard.", "license": "MIT" },
-      { "name": "OpenStreetMap contributors", "desc": "Freie und kollaborative weltweite Kartendaten. Kacheln bereitgestellt von CartoDB / OSM.", "license": "ODbL 1.0" }
+      {
+        "name": "Flutter & Dart SDK",
+        "desc": "Multiplattform-UI-Framework (Google). Basis der Mobil- und Desktop-Anwendung.",
+        "license": "BSD-3-Clause"
+      },
+      {
+        "name": "flutter_map",
+        "desc": "Interaktive Kartendarstellung basierend auf Leaflet.js für Flutter. Anzeige von OSM-Kacheln und Datenebenen.",
+        "license": "MIT"
+      },
+      {
+        "name": "OsmAnd Core / osmand_flutter",
+        "desc": "Routing-Engine und Offline-OpenStreetMap-Kartendaten. Berechnung der sicheren Route.",
+        "license": "GPLv3"
+      },
+      {
+        "name": "flutter_reactive_ble",
+        "desc": "Reaktive BLE-Bibliothek für Flutter. Bluetooth Low Energy-Kommunikation für P2P-Mesh.",
+        "license": "MIT"
+      },
+      {
+        "name": "Hive (hive_flutter)",
+        "desc": "Leichte und schnelle lokale Datenbank für Flutter. Speicherung von Warnungen, Einstellungen und Nachrichten.",
+        "license": "Apache-2.0"
+      },
+      {
+        "name": "geolocator",
+        "desc": "Plattformübergreifender GPS- und Geolokalisierungszugriff. Echtzeitposition und Entfernungsberechnung.",
+        "license": "MIT"
+      },
+      {
+        "name": "latlong2",
+        "desc": "Geodätische Berechnungen (Entfernungen, Peilungen, Konvertierungen). Verwendet für Navigation und Geofences.",
+        "license": "MIT"
+      },
+      {
+        "name": "flutter_compass",
+        "desc": "Hardware-Kompasszugriff. Richtungsorientierung und Navigationspfeil.",
+        "license": "MIT"
+      },
+      {
+        "name": "pointycastle / cryptography",
+        "desc": "AES-256-Verschlüsselung, ECDSA-Signaturen und Schlüsselableitung. Sicherheit von Hive-Nachrichten und Warnungen.",
+        "license": "MIT / MPL-2.0"
+      },
+      {
+        "name": "Node.js + Express",
+        "desc": "Verschlüsselte Relay-Server (Port 3000/3001) und Web-Administrations-Dashboard.",
+        "license": "MIT"
+      },
+      {
+        "name": "OpenStreetMap contributors",
+        "desc": "Freie und kollaborative weltweite Kartendaten. Kacheln bereitgestellt von CartoDB / OSM.",
+        "license": "ODbL 1.0"
+      }
     ],
     "authors": "<strong style=\"color:var(--text)\">Autoren des StreetPhare-Projekts</strong><br>Entwickelt mit ❤️ von der Beitragsgemeinschaft. Projekt 2026 als aktivistisches Open-Source-Werkzeug initiiert.<br>Beiträge willkommen über <a href=\"https://github.com/Deolin/StreetPhare\" target=\"_blank\" rel=\"noopener\">GitHub</a>."
   },

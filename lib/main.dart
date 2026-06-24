@@ -41,6 +41,25 @@ void main() async {
   configureUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ═══ Correctif Windows : geolocator_updates thread non-platform ═══
+  // Le plugin geolocator_windows envoie les mises à jour GPS depuis un
+  // thread natif non-UI, ce qui déclenche une erreur Flutter :
+  //   "The 'flutter.baseflow.com/geolocator_updates' channel sent a
+  //    message from native to Flutter on a non-platform thread."
+  // Cette erreur est purement cosmétique (les données GPS arrivent
+  // correctement via addPostFrameCallback). On la filtre ici en
+  // attendant un correctif upstream du plugin.
+  // Voir : https://github.com/Baseflow/flutter-geolocator/issues
+  FlutterError.onError = (details) {
+    final msg = details.exceptionAsString();
+    if (msg.contains('geolocator_updates') &&
+        msg.contains('non-platform thread')) {
+      // Ignorée : bug connu geolocator_windows, données GPS OK.
+      return;
+    }
+    FlutterError.presentError(details);
+  };
+
   // Orientation verrouillée en portrait
   final orientationFuture = SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -58,25 +77,49 @@ void main() async {
   // === Étape 1 : Chargement des préférences locales (thème + contacts PANIC
   //     + filtres d'évitement Safe Path + flag premier démarrage tutoriel)
   // On parallélise le chargement des stores et l'initialisation des services de base.
-  await Future.wait([
-    ClientDebugLogger.instance.init(),
-    NotificationService.instance.init(),
-    VersionCheckService.instance.init(),
-    AppLocale.instance.load(),
-    ThemeController.instance.load(),
-    PanicContactStore.instance.load(),
-    AvoidanceFilterStore.instance.load(),
-    AppPreferencesStore.instance.load(),
-    TutorialStore.instance.load(),
-    StartScreenStore.instance.load(),
-    orientationFuture,
-  ]);
+  // Timeout de sécurité à 15 secondes : si un store bloque (ex: SharedPreferences
+  // corrompu), on ne bloque pas l'application indéfiniment.
+  try {
+    await Future.wait([
+      ClientDebugLogger.instance.init(),
+      NotificationService.instance.init(),
+      VersionCheckService.instance.init(),
+      AppLocale.instance.load(),
+      ThemeController.instance.load(),
+      PanicContactStore.instance.load(),
+      AvoidanceFilterStore.instance.load(),
+      AppPreferencesStore.instance.load(),
+      TutorialStore.instance.load(),
+      StartScreenStore.instance.load(),
+      orientationFuture,
+    ]).timeout(const Duration(seconds: 15));
+  } catch (e, st) {
+    if (kDebugMode) {
+      debugPrint('[main] ⚠ Timeout ou erreur init parallèle : $e\n$st');
+    }
+    ClientDebugLogger.instance.log(
+      'Timeout init parallèle',
+      details: e.toString(),
+      emoji: '⏱️',
+    );
+  }
 
   // === Étape 2 : Sauvegarde de l'APK source (premier lancement uniquement) ===
   // Non-bloquant : s'exécute en arrière-plan sans retarder le démarrage.
   // Copie l'APK installé vers le stockage Documents persistant pour
   // la fonctionnalité de distribution P2P (partage sans Play Store).
-  unawaited(ApkBackupService.instance.init());
+  unawaited(
+    ApkBackupService.instance.init().catchError((e, st) {
+      if (kDebugMode) {
+        debugPrint('[main] ⚠ Erreur init APK backup : $e\n$st');
+      }
+      ClientDebugLogger.instance.log(
+        'Erreur APK backup',
+        details: e.toString(),
+        emoji: '📦',
+      );
+    }),
+  );
 
   if (kDebugMode) {
     debugPrint('[main] orientation verrouillée + logger client initialisé');

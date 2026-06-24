@@ -1,19 +1,6 @@
 {
-  "dependencies": {
-    "express": "^4.19.2",
-    "ws": "^8.18.0"
-  },
-  "scripts": {
-    "start": "node server/launch_all.js",
-    "server": "node server/server_primary_v2.js",
-    "server:dev": "node server/server_primary_v2.js",
-    "server:backup": "node server/server_secondary_v2.js",
-    "dashboard": "node server/admin_dashboard_v2.js",
-    "server:all": "node server/launch_all.js",
-    "sim": "node server/sim.js",
-    "sim:reset": "node server/sim.js --reset",
-    "test:ping": "curl http://localhost:3000/ping && curl http://localhost:3001/ping",
-    "test:status": "curl http://localhost:3001/status",
-    "test:failover": "curl -s -X POST http://localhost:3000/_debug/demote -H \"Content-Type: application/json\" -d \"{\\\"reason\\\":\\\"test failover\\\"}\""
+  "private": true,
+  "devDependencies": {
+    "prettier": "3.8.4"
   }
 }

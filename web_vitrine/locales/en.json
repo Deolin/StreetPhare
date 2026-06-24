@@ -190,17 +190,61 @@
     "lead": "StreetPhare relies on remarkable open-source libraries. Here are the acknowledgements and explicit credits to their authors.",
     "box_title": "📦 Used Libraries and Frameworks",
     "libraries": [
-      { "name": "Flutter & Dart SDK", "desc": "Multi-platform UI framework (Google). Base of the mobile and desktop application.", "license": "BSD-3-Clause" },
-      { "name": "flutter_map", "desc": "Interactive mapping based on Leaflet.js for Flutter. Display of OSM tiles and data layers.", "license": "MIT" },
-      { "name": "OsmAnd Core / osmand_flutter", "desc": "Routing engine and offline OpenStreetMap map data. Safe Route calculation.", "license": "GPLv3" },
-      { "name": "flutter_reactive_ble", "desc": "Reactive BLE library for Flutter. Bluetooth Low Energy communication for P2P mesh.", "license": "MIT" },
-      { "name": "Hive (hive_flutter)", "desc": "Lightweight and fast local database for Flutter. Storage of alerts, preferences, and messages.", "license": "Apache-2.0" },
-      { "name": "geolocator", "desc": "Cross-platform GPS and geolocation access. Real-time position and distance calculation.", "license": "MIT" },
-      { "name": "latlong2", "desc": "Geodesic calculations (distances, bearings, conversions). Used for navigation and geofences.", "license": "MIT" },
-      { "name": "flutter_compass", "desc": "Hardware compass access. Directional orientation and navigation arrow.", "license": "MIT" },
-      { "name": "pointycastle / cryptography", "desc": "AES-256 encryption, ECDSA signatures, and key derivation. Hive messages and alerts security.", "license": "MIT / MPL-2.0" },
-      { "name": "Node.js + Express", "desc": "Encrypted relay servers (Port 3000/3001) and web administration dashboard.", "license": "MIT" },
-      { "name": "OpenStreetMap contributors", "desc": "Free and collaborative worldwide map data. Tiles provided by CartoDB / OSM.", "license": "ODbL 1.0" }
+      {
+        "name": "Flutter & Dart SDK",
+        "desc": "Multi-platform UI framework (Google). Base of the mobile and desktop application.",
+        "license": "BSD-3-Clause"
+      },
+      {
+        "name": "flutter_map",
+        "desc": "Interactive mapping based on Leaflet.js for Flutter. Display of OSM tiles and data layers.",
+        "license": "MIT"
+      },
+      {
+        "name": "OsmAnd Core / osmand_flutter",
+        "desc": "Routing engine and offline OpenStreetMap map data. Safe Route calculation.",
+        "license": "GPLv3"
+      },
+      {
+        "name": "flutter_reactive_ble",
+        "desc": "Reactive BLE library for Flutter. Bluetooth Low Energy communication for P2P mesh.",
+        "license": "MIT"
+      },
+      {
+        "name": "Hive (hive_flutter)",
+        "desc": "Lightweight and fast local database for Flutter. Storage of alerts, preferences, and messages.",
+        "license": "Apache-2.0"
+      },
+      {
+        "name": "geolocator",
+        "desc": "Cross-platform GPS and geolocation access. Real-time position and distance calculation.",
+        "license": "MIT"
+      },
+      {
+        "name": "latlong2",
+        "desc": "Geodesic calculations (distances, bearings, conversions). Used for navigation and geofences.",
+        "license": "MIT"
+      },
+      {
+        "name": "flutter_compass",
+        "desc": "Hardware compass access. Directional orientation and navigation arrow.",
+        "license": "MIT"
+      },
+      {
+        "name": "pointycastle / cryptography",
+        "desc": "AES-256 encryption, ECDSA signatures, and key derivation. Hive messages and alerts security.",
+        "license": "MIT / MPL-2.0"
+      },
+      {
+        "name": "Node.js + Express",
+        "desc": "Encrypted relay servers (Port 3000/3001) and web administration dashboard.",
+        "license": "MIT"
+      },
+      {
+        "name": "OpenStreetMap contributors",
+        "desc": "Free and collaborative worldwide map data. Tiles provided by CartoDB / OSM.",
+        "license": "ODbL 1.0"
+      }
     ],
     "authors": "<strong style=\"color:var(--text)\">StreetPhare Project Authors</strong><br>Developed with ❤️ by the contributor community. Project initiated in 2026 as an activist open-source tool.<br>Contributions welcome via <a href=\"https://github.com/Deolin/StreetPhare\" target=\"_blank\" rel=\"noopener\">GitHub</a>."
   },

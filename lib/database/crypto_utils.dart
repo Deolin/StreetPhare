@@ -46,11 +46,18 @@ class CryptoUtils {
 
   /// Clé AES dérivée depuis une passphrase maître (à fournir
   /// idéalement depuis un secure storage iOS/Android).
-  /// SHA-256 → 32 octets → AES-256.
-  Future<SecretKey> deriveAesKey(String passphrase) async {
-    final bytes = utf8.encode(passphrase);
-    final hash = await Sha256().hash(bytes);
-    return SecretKey(hash.bytes);
+  /// PBKDF2-HMAC-SHA256 → 100 000 itérations → 32 octets → AES-256.
+  Future<SecretKey> deriveAesKey(String passphrase,
+      {String salt = 'StreetPhareV2'}) async {
+    final pbkdf2 = Pbkdf2(
+      macAlgorithm: Hmac.sha256(),
+      iterations: 100000,
+      bits: 256,
+    );
+    return pbkdf2.deriveKey(
+      secretKey: SecretKey(utf8.encode(passphrase)),
+      nonce: utf8.encode(salt),
+    );
   }
 
   /// Signe une alerte (id + type + lat + lng + createdAt) avec

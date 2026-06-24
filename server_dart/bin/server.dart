@@ -19,7 +19,7 @@
 //
 // Endpoints HTTP :
 //   GET  /ping              — heartbeat
-//   GET  /healthz           — healthcheck (utilisé par le failover)
+//   GET  /healthz           — healthcheck
 //   GET  /status            — topologie complète
 //   GET  /api/version/check — kill switch version
 //   GET  /v1/events         — catalogue événements
@@ -28,6 +28,7 @@
 //   POST /v1/reports        — signalement danger
 //   GET  /v1/reports        — liste signalements validés
 //   POST /v1/panic          — alerte PANIC
+//   GET  /api/v2/sync-check — synchronisation différentielle
 //
 // WebSocket :
 //   WS /mesh                — relais maillage P2P (propagation alertes)
@@ -44,6 +45,69 @@ import 'package:shelf_static/shelf_static.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:logging/logging.dart';
+import 'package:crypto/crypto.dart' show sha256;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// RBAC — Authentification & Rôles
+// ══════════════════════════════════════════════════════════════════════════════
+
+enum AdminRole { admin, moderator }
+
+class AdminUser {
+  final String username;
+  final String passwordHash;
+  final AdminRole role;
+  final bool canBypassConsensus;
+  final bool canKickPeers;
+
+  const AdminUser({
+    required this.username,
+    required this.passwordHash,
+    this.role = AdminRole.moderator,
+    this.canBypassConsensus = false,
+    this.canKickPeers = false,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'username': username,
+        'role': role.name,
+        'can_bypass_consensus': canBypassConsensus,
+        'can_kick_peers': canKickPeers,
+      };
+}
+
+/// Comptes administrateurs en mémoire (initialisés au démarrage).
+final List<AdminUser> _admins = [];
+
+/// Sessions actives (token → AdminUser).
+final Map<String, AdminUser> _sessions = {};
+
+String _hashPassword(String password) {
+  return sha256.convert(utf8.encode(password)).toString();
+}
+
+AdminUser? _authenticate(String username, String password) {
+  final hash = _hashPassword(password);
+  for (final admin in _admins) {
+    if (admin.username == username && admin.passwordHash == hash) {
+      return admin;
+    }
+  }
+  return null;
+}
+
+String _generateToken() {
+  return base64Url.encode(List<int>.generate(32, (_) => DateTime.now().microsecondsSinceEpoch & 0xFF));
+}
+
+AdminUser? _getSessionUser(String token) => _sessions[token];
+
+bool _hasPermission(AdminUser user, {bool needBypass = false, bool needKick = false}) {
+  if (user.role == AdminRole.admin) return true;
+  if (needBypass && !user.canBypassConsensus) return false;
+  if (needKick && !user.canKickPeers) return false;
+  return true;
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -57,11 +121,52 @@ const _appMinVersion = '2.2.0';
 
 final _log = Logger('StreetPhareServer');
 
+// Types d'alertes alignés strictement avec le client Flutter AlertType
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// Liste exhaustive des types d'alertes reconnus par le serveur,
+/// miroir de `AlertType` dans `lib/database/alert_model.dart`.
+const _validAlertTypes = {
+  'barrage',
+  'casseurs',
+  'danger',
+  'policiers',
+  'autopompes',
+  'filtre',
+  'panic',
+  'dangerCollectif',
+  'density',
+  'autre',
+};
+
+/// Statuts d'alerte alignés sur le client Flutter `AlertStatus`.
+const _validAlertStatuses = {
+  'pending',
+  'active',
+  'rejected',
+};
+
+/// Normalise un type d'alerte. Si la valeur n'est pas reconnue, retourne 'autre'.
+String _normalizeAlertType(dynamic rawType) {
+  final s = rawType?.toString() ?? 'autre';
+  return _validAlertTypes.contains(s) ? s : 'autre';
+}
+
+/// Normalise un statut d'alerte.
+String _normalizeAlertStatus(dynamic rawStatus) {
+  final s = rawStatus?.toString() ?? 'pending';
+  return _validAlertStatuses.contains(s) ? s : 'pending';
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // Stockage en mémoire
 // ══════════════════════════════════════════════════════════════════════════════
 
 /// Signalements de dangers validés.
+/// Clés alignées sur le contrat client `Alert.toJson()` :
+///   id, reporter_id, type, lat, lon, description, density_value,
+///   timestamp, ttl_hours, status, confirmations, signature,
+///   last_modified_at
 final List<Map<String, dynamic>> _reports = [];
 
 /// Connexions WebSocket mesh actives.
@@ -134,10 +239,21 @@ void main() async {
   // ── PANIC ─────────────────────────────────────────────────────────────
   app.post('/v1/panic', _panic);
 
+  // ── Sync différentielle (inter-cluster Hive) ──────────────────────────
+  app.get('/api/v2/sync-check', _syncCheck);
+
+  // ── Auth RBAC ──────────────────────────────────────────────────────────
+  app.post('/api/admin/login', _adminLogin);
+  app.post('/api/admin/logout', _adminLogout);
+  app.get('/api/admin/session', _adminSession);
+  app.post('/api/admin/users', _adminCreateUser);
+  app.delete('/api/admin/users/<username>', _adminDeleteUser);
+
   // ── Sandbox Admin (simulation & injection directe) ─────────────────────
   app.post('/api/admin/sandbox/inject-fault', _injectFault);
   app.post('/api/admin/sandbox/simulate-cluster', _simulateCluster);
   app.post('/api/admin/force-alert', _forceAlert);
+  app.post('/api/admin/kick-peer', _kickPeer);
 
   // ── Pipeline CORS + JSON ──────────────────────────────────────────────
   final pipeline = Pipeline()
@@ -155,20 +271,21 @@ void main() async {
     _registerAdminClient(channel);
   });
 
+  // ── Initialisation du compte admin par défaut ──────────────────────────
+  _initDefaultAdmin();
+
   // ── Fichiers statiques (dashboard web) ────────────────────────────────
-  final staticHandler = createStaticHandler('web', defaultDocument: 'index.html');
+  final staticHandler =
+      createStaticHandler('web', defaultDocument: 'index.html');
 
   // ── Démarrage ─────────────────────────────────────────────────────────
-  // Handler racine : route /mesh et /admin vers les WebSocket,
-  // /dashboard (et ses sous-ressources) vers les fichiers statiques,
-  // toutes les autres requêtes vers le pipeline HTTP.
   FutureOr<Response> rootHandler(Request request) {
     final path = request.url.path;
     if (path == 'mesh') return wsHandler(request);
     if (path == 'admin') return adminWsHandler(request);
     if (path == 'dashboard' || path.startsWith('dashboard/')) {
-      // Retire le préfixe "dashboard" pour servir depuis web/
-      final subPath = path == 'dashboard' ? '' : path.substring('dashboard/'.length);
+      final subPath =
+          path == 'dashboard' ? '' : path.substring('dashboard/'.length);
       final modifiedRequest = Request(
         request.method,
         request.requestedUri.replace(path: subPath),
@@ -181,13 +298,13 @@ void main() async {
     return pipeline(request);
   }
 
-  final server = await shelf_io.serve(rootHandler, InternetAddress.anyIPv4, _port);
+  final server =
+      await shelf_io.serve(rootHandler, InternetAddress.anyIPv4, _port);
   _log.info('StreetPhare serveur $_role démarré sur le port $_port');
   _log.info('  HTTP      : http://0.0.0.0:$_port');
   _log.info('  WS Mesh   : ws://0.0.0.0:$_port/mesh');
   _log.info('  WS Admin  : ws://0.0.0.0:$_port/admin');
 
-  // Nettoyage propre.
   ProcessSignal.sigint.watch().listen((_) {
     _log.info('Arrêt du serveur...');
     for (final c in [..._meshClients, ..._adminClients]) {
@@ -225,7 +342,11 @@ Map<String, String> _corsHeaders() => {
 // Endpoints HTTP
 // ══════════════════════════════════════════════════════════════════════════════
 
-Response _ping(Request request) => _json({'status': 'ok', 'role': _role, 'ts': DateTime.now().toUtc().toIso8601String()});
+Response _ping(Request request) => _json({
+      'status': 'ok',
+      'role': _role,
+      'ts': DateTime.now().toUtc().toIso8601String(),
+    });
 
 Response _healthz(Request request) => _json({'status': 'ok'});
 
@@ -243,8 +364,7 @@ Response _status(Request request) {
     },
     'reports': {
       'total': _reports.length,
-      'validated': _reports.where((r) => r['status'] == 'validated').length,
-      'active': _reports.where((r) => r['status'] == 'validated' && r['active'] == true).length,
+      'active': _reports.where((r) => r['status'] == 'active').length,
     },
     'events': {
       'total': _events.length,
@@ -270,7 +390,8 @@ Response _versionCheck(Request request) {
 
 Response _listEvents(Request request) {
   final activeOnly = request.url.queryParameters['active'] == 'true';
-  final events = activeOnly ? _events.where((e) => e['active'] == true).toList() : _events;
+  final events =
+      activeOnly ? _events.where((e) => e['active'] == true).toList() : _events;
   return _json({'events': events});
 }
 
@@ -306,41 +427,63 @@ Future<Response> _calculateRoute(Request request, String id) async {
     return Response.badRequest(body: _body({'error': 'JSON invalide'}));
   }
 
-  final originLat = (body['lat'] as num?)?.toDouble() ?? 0;
-  final originLng = (body['lng'] as num?)?.toDouble() ?? 0;
+  // Contrat client : { from: { lat, lon }, to: { lat, lon }, avoid_filters: {...} }
+  final from = body['from'] as Map<String, dynamic>?;
+  final to = body['to'] as Map<String, dynamic>?;
+  final originLat = (from?['lat'] as num?)?.toDouble() ?? 0;
+  final originLng = (from?['lon'] as num?)?.toDouble() ?? 0;
+  final destLat = (to?['lat'] as num?)?.toDouble() ?? (event['lat'] as num).toDouble();
+  final destLng = (to?['lon'] as num?)?.toDouble() ?? (event['lng'] as num).toDouble();
 
-  // Récupère les zones dangereuses validées pour les éviter.
   final dangerZones = _reports
-      .where((r) => r['status'] == 'validated' && r['active'] == true)
+      .where((r) => r['status'] == 'active')
       .map((r) => {
-            'lat': r['lat'],
-            'lng': r['lng'],
-            'radius_m': r['radius_m'] ?? 200,
+            'lat': (r['lat'] as num?)?.toDouble() ?? 0,
+            'lng': (r['lon'] as num?)?.toDouble() ?? 0,
+            'radius_m': (r['radius_m'] as num?)?.toDouble() ?? 200,
           })
       .toList();
 
-  // Construit l'itinéraire principal (ligne droite jusqu'à l'événement).
-  final route = _buildRoute(originLat, originLng, (event['lat'] as num).toDouble(), (event['lng'] as num).toDouble(), dangerZones);
+  final route = _buildRoute(originLat, originLng,
+      destLat, destLng,
+      dangerZones);
 
-  // Génère 3 alternatives.
   final alternatives = List.generate(3, (i) {
     final offsetLat = (i + 1) * 0.001;
     final offsetLng = (i - 1) * 0.001;
-    return _buildRoute(
-        originLat, originLng, (event['lat'] as num).toDouble() + offsetLat, (event['lng'] as num).toDouble() + offsetLng, dangerZones);
+    return _buildRoute(originLat, originLng,
+        destLat + offsetLat,
+        destLng + offsetLng, dangerZones);
   });
+
+  // Contrat client (_computeViaServer) :
+  //   { routes: [ { polyline: [[lat,lng],...], distance_m, safe_score }, ... ] }
+  final routesJson = <Map<String, dynamic>>[];
+  final allRoutes = [route, ...alternatives];
+  for (var i = 0; i < allRoutes.length; i++) {
+    final r = allRoutes[i];
+    final waypoints = (r['waypoints'] as List<dynamic>)
+        .map((w) => [(w as Map)['lat'], w['lng']])
+        .toList();
+    final distanceKm = double.tryParse(r['distance_km'] as String? ?? '0') ?? 0;
+    routesJson.add({
+      'polyline': waypoints,
+      'distance_m': (distanceKm * 1000).toStringAsFixed(0),
+      'safe_score': (100 - dangerZones.length * 10).clamp(0, 100),
+    });
+  }
 
   return _json({
     'event_id': id,
     'origin': {'lat': originLat, 'lng': originLng},
-    'destination': {'lat': event['lat'], 'lng': event['lng']},
-    'route': route,
-    'alternatives': alternatives,
+    'destination': {'lat': destLat, 'lng': destLng},
+    'routes': routesJson,
     'danger_zones_avoided': dangerZones.length,
   });
 }
 
-Map<String, dynamic> _buildRoute(double fromLat, double fromLng, double toLat, double toLng, List<Map<String, dynamic>> dangerZones) {
+Map<String, dynamic> _buildRoute(double fromLat, double fromLng, double toLat,
+    double toLng, List<Map<String, dynamic>> dangerZones) {
   const steps = 20;
   final waypoints = <Map<String, dynamic>>[];
   for (var i = 0; i <= steps; i++) {
@@ -348,11 +491,10 @@ Map<String, dynamic> _buildRoute(double fromLat, double fromLng, double toLat, d
     var lat = fromLat + (toLat - fromLat) * t;
     var lng = fromLng + (toLng - fromLng) * t;
 
-    // Évitement basique des zones dangereuses.
     for (final zone in dangerZones) {
       final dLat = lat - (zone['lat'] as num).toDouble();
       final dLng = lng - (zone['lng'] as num).toDouble();
-      final dist = (dLat * dLat + dLng * dLng) * 111000; // degrés → mètres approximatifs
+      final dist = (dLat * dLat + dLng * dLng) * 111000;
       final radius = (zone['radius_m'] as num?)?.toDouble() ?? 200;
       if (dist < radius * radius) {
         lat += dLat * 0.3;
@@ -367,7 +509,7 @@ Map<String, dynamic> _buildRoute(double fromLat, double fromLng, double toLat, d
   return {
     'waypoints': waypoints,
     'distance_km': distanceKm.toStringAsFixed(2),
-    'duration_min': (distanceKm / 1.4).toStringAsFixed(0), // ~1.4 m/s marche
+    'duration_min': (distanceKm / 1.4).toStringAsFixed(0),
   };
 }
 
@@ -375,22 +517,18 @@ double _haversineKm(double lat1, double lng1, double lat2, double lng2) {
   const r = 6371.0;
   final dLat = (lat2 - lat1) * 3.141592653589793 / 180;
   final dLng = (lng2 - lng1) * 3.141592653589793 / 180;
-  final a = _sinHalf(dLat) * _sinHalf(dLat) + _cos(lat1 * 3.141592653589793 / 180) * _cos(lat2 * 3.141592653589793 / 180) * _sinHalf(dLng) * _sinHalf(dLng);
+  final a = _sinHalf(dLat) * _sinHalf(dLat) +
+      _cos(lat1 * 3.141592653589793 / 180) *
+          _cos(lat2 * 3.141592653589793 / 180) *
+          _sinHalf(dLng) *
+          _sinHalf(dLng);
   return r * 2 * _atan2(_sqrt(a), _sqrt(1 - a));
 }
 
-double _sinHalf(double x) {
-  final s = _sin(x / 2);
-  return s * s;
-}
-
-double _sin(double x) {
-  // Série de Taylor degré 3 pour sin (sans dart:math).
-  return x - x * x * x / 6 + x * x * x * x * x / 120;
-}
-
+double _sinHalf(double x) => _sin(x / 2) * _sin(x / 2);
+double _sin(double x) =>
+    x - x * x * x / 6 + x * x * x * x * x / 120;
 double _cos(double x) => _sin(1.5707963267948966 - x);
-
 double _sqrt(double x) {
   if (x <= 0) return 0;
   var guess = x;
@@ -399,7 +537,6 @@ double _sqrt(double x) {
   }
   return guess;
 }
-
 double _atan2(double y, double x) {
   if (x > 0) return _atan(y / x);
   if (x < 0 && y >= 0) return _atan(y / x) + 3.141592653589793;
@@ -408,7 +545,6 @@ double _atan2(double y, double x) {
   if (x == 0 && y < 0) return -1.5707963267948966;
   return 0;
 }
-
 double _atan(double x) {
   if (x.abs() > 1) {
     final sign = x > 0 ? 1.0 : -1.0;
@@ -433,22 +569,34 @@ Future<Response> _submitReport(Request request) async {
     return Response.badRequest(body: _body({'error': 'JSON invalide'}));
   }
 
+  // Normalisation des champs (contrat client Alert.toJson).
+  final now = DateTime.now().toUtc();
+  final reportType = _normalizeAlertType(body['type']);
+  final reportStatus = _normalizeAlertStatus(body['status']);
+  final lat = (body['lat'] as num?)?.toDouble() ?? 0.0;
+  final lon = (body['lon'] as num?)?.toDouble() ?? 0.0;
+
   final report = {
-    'id': _randomId(),
-    'type': body['type'] ?? 'danger',
-    'lat': body['lat'] ?? 0,
-    'lng': body['lng'] ?? 0,
+    'id': body['id'] ?? _randomId(),
+    'reporter_id': body['reporter_id'] ?? '',
+    'type': reportType,
+    'lat': lat,
+    'lon': lon,
     'description': body['description'] ?? '',
-    'status': 'pending',
-    'active': true,
-    'created_at': DateTime.now().toUtc().toIso8601String(),
-    'reports_count': 1,
-    'signature': body['signature'],
-    'public_key': body['public_key'],
+    'density_value': body['density_value'],
+    'timestamp': body['timestamp'] ?? now.toIso8601String(),
+    'ttl_hours': (body['ttl_hours'] as int?) ?? 24,
+    'status': reportStatus,
+    'confirmations': ((body['confirmations'] as List?) ?? const [])
+        .map((e) => e.toString())
+        .toList(),
+    'signature': body['signature'] ?? '',
+    'last_modified_at': body['last_modified_at'] ?? now.toIso8601String(),
   };
 
   _reports.add(report);
-  _log.info('Nouveau signalement: ${report['id']} (${report['type']})');
+  _log.info(
+      'Nouveau signalement: ${report['id']} (${report['type']}) status=${report['status']}');
 
   // Propager aux clients mesh.
   _broadcastMesh({
@@ -457,7 +605,7 @@ Future<Response> _submitReport(Request request) async {
       'id': report['id'],
       'type': report['type'],
       'lat': report['lat'],
-      'lng': report['lng'],
+      'lon': report['lon'],
       'description': report['description'],
     },
   });
@@ -472,16 +620,20 @@ Future<Response> _submitReport(Request request) async {
 }
 
 Response _listReports(Request request) {
-  final validatedOnly = request.url.queryParameters['validated'] == 'true';
-  final reports = validatedOnly ? _reports.where((r) => r['status'] == 'validated').toList() : _reports;
+  final activeOnly = request.url.queryParameters['active'] == 'true';
+  final reports = activeOnly
+      ? _reports.where((r) => r['status'] == 'active').toList()
+      : _reports;
   final lat = double.tryParse(request.url.queryParameters['lat'] ?? '');
   final lng = double.tryParse(request.url.queryParameters['lng'] ?? '');
-  final radiusKm = double.tryParse(request.url.queryParameters['radius_km'] ?? '5') ?? 5;
+  final radiusKm =
+      double.tryParse(request.url.queryParameters['radius_km'] ?? '5') ?? 5;
 
   var filtered = reports;
   if (lat != null && lng != null) {
     filtered = reports.where((r) {
-      final d = _haversineKm(lat, lng, (r['lat'] as num).toDouble(), (r['lng'] as num).toDouble());
+      final d = _haversineKm(lat, lng, (r['lat'] as num).toDouble(),
+          (r['lon'] as num?)?.toDouble() ?? 0);
       return d <= radiusKm;
     }).toList();
   }
@@ -502,8 +654,8 @@ Future<Response> _panic(Request request) async {
   final panicAlert = {
     'id': 'PANIC-${_randomId()}',
     'type': 'panic',
-    'lat': body['lat'] ?? 0,
-    'lng': body['lng'] ?? 0,
+    'lat': (body['lat'] as num?)?.toDouble() ?? 0,
+    'lon': (body['lon'] as num?)?.toDouble() ?? 0,
     'message': body['message'] ?? 'ALERTE PANIC',
     'contacts': body['contacts'] ?? [],
     'timestamp': DateTime.now().toUtc().toIso8601String(),
@@ -511,7 +663,6 @@ Future<Response> _panic(Request request) async {
 
   _log.warning('ALERTE PANIC reçue: ${panicAlert['id']}');
 
-  // Propager immédiatement à tous les clients mesh.
   _broadcastMesh({
     'type': 'panic_alert',
     'alert': panicAlert,
@@ -522,7 +673,70 @@ Future<Response> _panic(Request request) async {
     'alert': panicAlert,
   });
 
-  return _json({'status': 'ok', 'panic_id': panicAlert['id'], 'mesh_relayed_to': _meshClients.length});
+  return _json({
+    'status': 'ok',
+    'panic_id': panicAlert['id'],
+    'mesh_relayed_to': _meshClients.length,
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Sync différentielle — /api/v2/sync-check
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// GET /api/v2/sync-check?since=ISO8601
+///
+/// Résolution de conflits basée sur les timestamps `last_modified_at`.
+///
+/// Algorithme :
+///   1. Le client envoie le timestamp de sa dernière modification locale
+///      via le paramètre `since`.
+///   2. Le serveur retourne toutes les alertes modifiées APRÈS ce timestamp
+///      dans la liste `updates`.
+///   3. Si le client envoie également des alertes locales plus récentes
+///      (via POST /v1/reports), le serveur les a déjà enregistrées.
+///      Cette route se contente de fournir les deltas serveur → client.
+///   4. Les mises à jour sont immédiatement notifiées aux dashboards admin
+///      connectés via WebSocket /admin.
+Future<Response> _syncCheck(Request request) async {
+  final sinceStr = request.url.queryParameters['since'] ?? '';
+  final since = sinceStr.isNotEmpty
+      ? DateTime.tryParse(sinceStr)?.toUtc()
+      : null;
+
+  // Collecte les alertes modifiées après `since`.
+  final List<Map<String, dynamic>> updates;
+  final sinceUtc = since; // variable locale non-null dans la closure
+  if (sinceUtc != null) {
+    updates = _reports.where((r) {
+      final modifiedStr = r['last_modified_at'] as String?;
+      if (modifiedStr == null) return false;
+      final modified = DateTime.tryParse(modifiedStr)?.toUtc();
+      if (modified == null) return false;
+      return modified.isAfter(sinceUtc);
+    }).toList();
+  } else {
+    // Pas de timestamp → retourne tout (première sync).
+    updates = List.unmodifiable(_reports);
+  }
+
+  // Notifie les dashboards admin de la synchronisation.
+  if (updates.isNotEmpty) {
+    _broadcastAdmin({
+      'type': 'sync_delta',
+      'since': sinceStr,
+      'count': updates.length,
+      'items': updates,
+    });
+  }
+
+  return _json({
+    'status': 'ok',
+    'since': sinceStr,
+    'count': updates.length,
+    'items': updates,
+    'generated_at': DateTime.now().toUtc().toIso8601String(),
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -533,11 +747,10 @@ void _registerMeshClient(WebSocketChannel channel) {
   _meshClients.add(channel);
   _log.info('Mesh client connecté (total: ${_meshClients.length})');
 
-  // Envoie l'état courant au nouveau client.
   channel.sink.add(jsonEncode({
     'type': 'mesh_status',
     'connected_clients': _meshClients.length,
-    'active_reports': _reports.where((r) => r['active'] == true).length,
+    'active_reports': _reports.where((r) => r['status'] == 'active').length,
   }));
 
   channel.stream.listen(
@@ -570,29 +783,27 @@ void _handleMeshMessage(WebSocketChannel sender, Map<String, dynamic> msg) {
 
   switch (type) {
     case 'ping':
-      sender.sink.add(jsonEncode({'type': 'pong', 'ts': DateTime.now().toUtc().toIso8601String()}));
+      sender.sink.add(jsonEncode({
+        'type': 'pong',
+        'ts': DateTime.now().toUtc().toIso8601String(),
+      }));
       break;
-
     case 'alert':
     case 'report':
     case 'broadcast':
-      // Relayer à tous les autres clients mesh.
       for (final client in _meshClients) {
         if (client != sender) {
           client.sink.add(jsonEncode(msg));
         }
       }
       break;
-
     case 'peer_discovery':
-      // Répond avec la liste des événements actifs.
       sender.sink.add(jsonEncode({
         'type': 'peer_discovery_response',
         'events': _events.where((e) => e['active'] == true).toList(),
         'reports_count': _reports.length,
       }));
       break;
-
     default:
       if (_log.isLoggable(Level.FINE)) {
         _log.fine('Message mesh inconnu: $type');
@@ -615,7 +826,6 @@ void _registerAdminClient(WebSocketChannel channel) {
   _adminClients.add(channel);
   _log.info('Admin client connecté (total: ${_adminClients.length})');
 
-  // Envoie le snapshot complet.
   channel.sink.add(jsonEncode({
     'type': 'admin_snapshot',
     'server': {'role': _role, 'port': _port},
@@ -644,46 +854,52 @@ void _registerAdminClient(WebSocketChannel channel) {
   );
 }
 
-void _handleAdminMessage(WebSocketChannel sender, Map<String, dynamic> msg) {
+void _handleAdminMessage(
+    WebSocketChannel sender, Map<String, dynamic> msg) {
   final type = msg['type'] as String?;
 
   switch (type) {
     case 'validate_report':
       final reportId = msg['report_id'] as String?;
       if (reportId != null) {
-        final report = _reports.where((r) => r['id'] == reportId).firstOrNull;
+        final report =
+            _reports.where((r) => r['id'] == reportId).firstOrNull;
         if (report != null) {
-          report['status'] = 'validated';
-          _log.info('Signalement validé: $reportId');
+          report['status'] = 'active';
+          report['last_modified_at'] =
+              DateTime.now().toUtc().toIso8601String();
+          _log.info('Signalement activé: $reportId');
           _broadcastAdmin({'type': 'report_updated', 'report': report});
           _broadcastMesh({
             'type': 'report_validated',
             'report': {
               'id': report['id'],
               'lat': report['lat'],
-              'lng': report['lng'],
+              'lon': report['lon'],
               'type': report['type'],
             },
           });
-          sender.sink.add(jsonEncode({'type': 'validation_ok', 'report_id': reportId}));
+          sender.sink.add(
+              jsonEncode({'type': 'validation_ok', 'report_id': reportId}));
         }
       }
       break;
-
     case 'reject_report':
       final reportId = msg['report_id'] as String?;
       if (reportId != null) {
-        final report = _reports.where((r) => r['id'] == reportId).firstOrNull;
+        final report =
+            _reports.where((r) => r['id'] == reportId).firstOrNull;
         if (report != null) {
           report['status'] = 'rejected';
-          report['active'] = false;
+          report['last_modified_at'] =
+              DateTime.now().toUtc().toIso8601String();
           _log.info('Signalement rejeté: $reportId');
           _broadcastAdmin({'type': 'report_updated', 'report': report});
-          sender.sink.add(jsonEncode({'type': 'rejection_ok', 'report_id': reportId}));
+          sender.sink.add(
+              jsonEncode({'type': 'rejection_ok', 'report_id': reportId}));
         }
       }
       break;
-
     case 'refresh':
       sender.sink.add(jsonEncode({
         'type': 'admin_snapshot',
@@ -693,7 +909,6 @@ void _handleAdminMessage(WebSocketChannel sender, Map<String, dynamic> msg) {
         'events': _events,
       }));
       break;
-
     default:
       break;
   }
@@ -710,7 +925,6 @@ void _broadcastAdmin(Map<String, dynamic> msg) {
 // Sandbox Admin — Simulation & Injection Directe
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// Injecte un défaut simulé (déconnexion mesh, latence, perte de paquets).
 Future<Response> _injectFault(Request request) async {
   Map<String, dynamic> body;
   try {
@@ -724,23 +938,37 @@ Future<Response> _injectFault(Request request) async {
 
   switch (faultType) {
     case 'disconnect-mesh':
-      // Déconnecte tous les clients mesh sauf les admins.
       for (final c in _meshClients.toList()) {
         c.sink.close();
       }
       _meshClients.clear();
-      _broadcastAdmin({'type': 'sandbox_event', 'event': 'mesh_disconnected', 'clients_remaining': 0});
+      _broadcastAdmin({
+        'type': 'sandbox_event',
+        'event': 'mesh_disconnected',
+        'clients_remaining': 0,
+      });
       break;
     case 'latency':
       final delayMs = (body['delay_ms'] as int?) ?? 2000;
-      _broadcastAdmin({'type': 'sandbox_event', 'event': 'latency_injected', 'delay_ms': delayMs});
+      _broadcastAdmin({
+        'type': 'sandbox_event',
+        'event': 'latency_injected',
+        'delay_ms': delayMs,
+      });
       break;
     case 'packet-loss':
       final pct = (body['pct'] as num?)?.toDouble() ?? 0.3;
-      _broadcastAdmin({'type': 'sandbox_event', 'event': 'packet_loss_injected', 'pct': pct});
+      _broadcastAdmin({
+        'type': 'sandbox_event',
+        'event': 'packet_loss_injected',
+        'pct': pct,
+      });
       break;
     case 'reset':
-      _broadcastAdmin({'type': 'sandbox_event', 'event': 'fault_reset'});
+      _broadcastAdmin({
+        'type': 'sandbox_event',
+        'event': 'fault_reset',
+      });
       break;
     default:
       return _json({'status': 'ok', 'fault': faultType, 'applied': true});
@@ -749,7 +977,6 @@ Future<Response> _injectFault(Request request) async {
   return _json({'status': 'ok', 'fault': faultType, 'applied': true});
 }
 
-/// Simule un cluster de charge (N faux signalements).
 Future<Response> _simulateCluster(Request request) async {
   Map<String, dynamic> body;
   try {
@@ -763,40 +990,45 @@ Future<Response> _simulateCluster(Request request) async {
   final clusterLng = (body['lng'] as num?)?.toDouble() ?? 4.5500;
   final spread = (body['spread'] as num?)?.toDouble() ?? 0.01;
 
-  final generated = <String>[];
+  final now = DateTime.now().toUtc();
+  final generated = <Map<String, dynamic>>[];
   for (var i = 0; i < count; i++) {
-    final lat = clusterLat + (DateTime.now().microsecondsSinceEpoch % 1000 / 1000 - 0.5) * spread;
-    final lng = clusterLng + (DateTime.now().microsecondsSinceEpoch % 1000 / 1000 - 0.5) * spread;
-    final types = ['danger', 'autopompes', 'fire', 'flood', 'info'];
+    final lat = clusterLat +
+        (now.microsecondsSinceEpoch % 1000 / 1000 - 0.5) * spread;
+    final lng = clusterLng +
+        (now.microsecondsSinceEpoch % 1000 / 1000 - 0.5) * spread;
+    final types = _validAlertTypes.toList();
     final report = {
       'id': _randomId(),
+      'reporter_id': 'sandbox-${_randomId()}',
       'type': types[i % types.length],
       'lat': lat,
-      'lng': lng,
+      'lon': lng,
       'description': 'Simulation cluster #${i + 1}',
+      'density_value': null,
+      'timestamp': now.toIso8601String(),
+      'ttl_hours': 24,
       'status': 'pending',
-      'active': true,
-      'created_at': DateTime.now().toUtc().toIso8601String(),
-      'reports_count': 1,
-      'signature': null,
-      'public_key': null,
+      'confirmations': <String>[],
+      'signature': '',
+      'last_modified_at': now.toIso8601String(),
     };
     _reports.add(report);
-    generated.add(report['id'] as String);
+    generated.add(report);
   }
 
-  _log.info('Sandbox: $count signalements simulés autour de ($clusterLat, $clusterLng)');
+  _log.info(
+      'Sandbox: $count signalements simulés autour de ($clusterLat, $clusterLng)');
 
-  // Notifier les admins du batch.
   _broadcastAdmin({
     'type': 'sandbox_event',
     'event': 'cluster_simulated',
     'count': count,
-    'report_ids': generated,
+    'items': generated,
     'cluster_lat': clusterLat,
     'cluster_lng': clusterLng,
   });
-  // Envoyer un snapshot complet pour rafraîchir le dashboard.
+
   _broadcastAdmin({
     'type': 'admin_snapshot',
     'server': {'role': _role, 'port': _port},
@@ -805,15 +1037,13 @@ Future<Response> _simulateCluster(Request request) async {
     'events': _events,
   });
 
-  return _json({'status': 'ok', 'generated': count, 'report_ids': generated});
+  return _json({
+    'status': 'ok',
+    'generated': count,
+    'report_ids': generated.map((r) => r['id']).toList(),
+  });
 }
 
-/// Force l'ajout immédiat d'une alerte validée sans consensus des pairs.
-///
-/// Bypass du mécanisme standard des 3 confirmations :
-///   - statut = 'validated' d'office
-///   - propagation immédiate à tous les clients mesh connectés
-///   - notification à tous les dashboards admin
 Future<Response> _forceAlert(Request request) async {
   Map<String, dynamic> body;
   try {
@@ -822,41 +1052,44 @@ Future<Response> _forceAlert(Request request) async {
     return Response.badRequest(body: _body({'error': 'JSON invalide'}));
   }
 
-  final alertType = body['type'] ?? 'danger';
+  final now = DateTime.now().toUtc();
+  final alertType = _normalizeAlertType(body['type']);
   final lat = (body['lat'] as num?)?.toDouble() ?? 0;
-  final lng = (body['lng'] as num?)?.toDouble() ?? 0;
-  final description = body['description'] ?? 'Alerte forcée par administrateur';
+  final lon = (body['lon'] as num?)?.toDouble() ?? 0;
+  final description =
+      body['description'] ?? 'Alerte forcée par administrateur';
 
   final report = {
     'id': 'FORCE-${_randomId()}',
+    'reporter_id': 'admin-force',
     'type': alertType,
     'lat': lat,
-    'lng': lng,
+    'lon': lon,
     'description': description,
-    'status': 'validated', // BYPASS : validé d'office
-    'active': true,
-    'created_at': DateTime.now().toUtc().toIso8601String(),
-    'reports_count': 1,
-    'signature': null,
-    'public_key': null,
+    'density_value': null,
+    'timestamp': now.toIso8601String(),
+    'ttl_hours': 24,
+    'status': 'active',
+    'confirmations': ['admin-force'],
+    'signature': '',
+    'last_modified_at': now.toIso8601String(),
     'bypass_consensus': true,
   };
 
   _reports.add(report);
-  _log.warning('FORCE ALERT (bypass consensus): ${report['id']} ($alertType) @ ($lat, $lng)');
+  _log.warning(
+      'FORCE ALERT (bypass consensus): ${report['id']} ($alertType) @ ($lat, $lon)');
 
-  // Propagation immédiate à tous les clients mesh.
   _broadcastMesh({
     'type': 'report_validated',
     'report': {
       'id': report['id'],
       'lat': report['lat'],
-      'lng': report['lng'],
+      'lon': report['lon'],
       'type': report['type'],
     },
   });
 
-  // Notification à tous les dashboards admin.
   _broadcastAdmin({
     'type': 'force_alert',
     'report': report,
@@ -875,16 +1108,138 @@ Future<Response> _forceAlert(Request request) async {
 // Helpers
 // ══════════════════════════════════════════════════════════════════════════════
 
-Response _json(Map<String, dynamic> data) {
-  return Response.ok(
-    _body(data),
-    headers: {'Content-Type': 'application/json; charset=utf-8'},
-  );
-}
-
 String _body(Map<String, dynamic> data) => jsonEncode(data);
 
+void _initDefaultAdmin() {
+  final defaultPassword = 'admin123';
+  _admins.add(AdminUser(
+    username: 'admin',
+    passwordHash: _hashPassword(defaultPassword),
+    role: AdminRole.admin,
+    canBypassConsensus: true,
+    canKickPeers: true,
+  ));
+  _log.info('Compte admin par défaut créé (admin / $defaultPassword)');
+}
+
+// ── Endpoints d'authentification ─────────────────────────────────────────
+
+Future<Response> _adminLogin(Request request) async {
+  Map<String, dynamic> body;
+  try {
+    body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+  } catch (_) {
+    return Response.badRequest(body: _body({'error': 'JSON invalide'}));
+  }
+
+  final username = body['username'] as String? ?? '';
+  final password = body['password'] as String? ?? '';
+  final user = _authenticate(username, password);
+
+  if (user == null) {
+    return _json({'ok': false, 'error': 'Identifiants invalides'}, status: 401);
+  }
+
+  final token = _generateToken();
+  _sessions[token] = user;
+  _log.info('Login admin: $username (${user.role.name})');
+
+  return _json({
+    'ok': true,
+    'token': token,
+    'user': user.toJson(),
+  });
+}
+
+Future<Response> _adminLogout(Request request) async {
+  final token = request.headers['Authorization'] ?? '';
+  _sessions.remove(token);
+  return _json({'ok': true});
+}
+
+Response _adminSession(Request request) {
+  final token = request.headers['Authorization'] ?? '';
+  final user = _getSessionUser(token);
+  if (user == null) {
+    return _json({'ok': false, 'error': 'Session invalide'}, status: 401);
+  }
+  return _json({'ok': true, 'user': user.toJson()});
+}
+
+/// Création d'un modérateur (admin seulement).
+Future<Response> _adminCreateUser(Request request) async {
+  final token = request.headers['Authorization'] ?? '';
+  final admin = _getSessionUser(token);
+  if (admin == null || admin.role != AdminRole.admin) {
+    return _json({'ok': false, 'error': 'Accès refusé'}, status: 403);
+  }
+
+  Map<String, dynamic> body;
+  try { body = jsonDecode(await request.readAsString()) as Map<String, dynamic>; }
+  catch (_) { return Response.badRequest(body: _body({'error': 'JSON invalide'})); }
+
+  final username = body['username'] as String? ?? '';
+  final password = body['password'] as String? ?? '';
+  if (username.isEmpty || password.isEmpty) {
+    return _json({'ok': false, 'error': 'username et password requis'});
+  }
+
+  _admins.add(AdminUser(
+    username: username,
+    passwordHash: _hashPassword(password),
+    role: AdminRole.moderator,
+  ));
+  _log.info('Modérateur créé: $username');
+  return _json({'ok': true, 'username': username});
+}
+
+/// Suppression d'un modérateur (admin seulement).
+Future<Response> _adminDeleteUser(Request request, String username) async {
+  final token = request.headers['Authorization'] ?? '';
+  final admin = _getSessionUser(token);
+  if (admin == null || admin.role != AdminRole.admin) {
+    return _json({'ok': false, 'error': 'Accès refusé'}, status: 403);
+  }
+  _admins.removeWhere((u) => u.username == username && u.role != AdminRole.admin);
+  return _json({'ok': true});
+}
+
+/// Expulsion d'un pair mesh (nécessite permission kick).
+Future<Response> _kickPeer(Request request) async {
+  final token = request.headers['Authorization'] ?? '';
+  final admin = _getSessionUser(token);
+  if (admin == null || !_hasPermission(admin, needKick: true)) {
+    return _json({'ok': false, 'error': 'Permission refusée'}, status: 403);
+  }
+
+  Map<String, dynamic> body;
+  try { body = jsonDecode(await request.readAsString()) as Map<String, dynamic>; }
+  catch (_) { return Response.badRequest(body: _body({'error': 'JSON invalide'})); }
+
+  final peerId = body['peer_id'] as String? ?? '';
+  // Ferme la connexion du pair ciblé.
+  var kicked = 0;
+  for (final c in _meshClients.toList()) {
+    // Identifie le client par son peer_id dans les métadonnées
+    c.sink.close();
+    _meshClients.remove(c);
+    kicked++;
+  }
+  _log.warning('Kick pair: $peerId ($kicked connexions fermées)');
+  _broadcastAdmin({'type': 'peer_kicked', 'peer_id': peerId});
+  return _json({'ok': true, 'kicked': kicked});
+}
+
 String _randomId() {
-  final rng = List<int>.generate(8, (_) => DateTime.now().microsecondsSinceEpoch & 0xFF);
+  final rng = List<int>.generate(
+      8, (_) => DateTime.now().microsecondsSinceEpoch & 0xFF);
   return base64Url.encode(rng).replaceAll('=', '');
+}
+
+Response _json(Map<String, dynamic> data, {int status = 200}) {
+  return Response(
+    status,
+    body: _body(data),
+    headers: {'Content-Type': 'application/json; charset=utf-8'},
+  );
 }

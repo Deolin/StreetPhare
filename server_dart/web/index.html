@@ -1,495 +1,677 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StreetPhare — Dashboard Administration</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#0f1117;--surface:#1a1d27;--border:#2a2d37;
-  --primary:#ffa726;--danger:#ef5350;--success:#66bb6a;
-  --text:#e0e0e0;--text-dim:#888;--text-bright:#fff;
-  --radius:8px;--font:system-ui,-apple-system,sans-serif;
-}
-html,body{height:100%;overflow:hidden}
-body{
-  font-family:var(--font);background:var(--bg);color:var(--text);
-  display:grid;
-  grid-template-columns:1fr 360px;
-  grid-template-rows:1fr auto;
-  grid-template-areas:"map chat" "console console";
-  gap:1px;
-  border:1px solid var(--border);
-}
-/* ── Map panel ───────────────────────────────────── */
-#map-panel{
-  grid-area:map;
-  position:relative;
-  min-height:0;
-}
-#map{width:100%;height:100%}
-#map-stats{
-  position:absolute;top:10px;left:10px;z-index:1000;
-  background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--radius);padding:8px 12px;
-  font-size:12px;color:var(--text-dim);
-}
-#map-stats span{color:var(--primary);font-weight:700}
-/* ── Chat panel ───────────────────────────────────── */
-#chat-panel{
-  grid-area:chat;
-  display:flex;flex-direction:column;
-  background:var(--surface);
-  border-left:1px solid var(--border);
-  min-height:0;overflow:hidden;
-}
-#chat-header{
-  padding:12px 16px;border-bottom:1px solid var(--border);
-  font-weight:700;font-size:14px;
-  display:flex;align-items:center;gap:8px;
-}
-#chat-header .dot{width:8px;height:8px;border-radius:50%;background:var(--success)}
-#chat-messages{
-  flex:1;overflow-y:auto;padding:12px;
-  display:flex;flex-direction:column;gap:6px;
-}
-#chat-messages .msg{
-  padding:8px 12px;border-radius:var(--radius);
-  font-size:12px;line-height:1.4;
-}
-#chat-messages .msg.report{background:rgba(255,167,38,0.1);border-left:3px solid var(--primary)}
-#chat-messages .msg.panic{background:rgba(239,83,80,0.15);border-left:3px solid var(--danger)}
-#chat-messages .msg.system{background:rgba(102,187,106,0.1);border-left:3px solid var(--success)}
-#chat-messages .msg.peer{background:rgba(100,149,237,0.1);border-left:3px solid #6495ed}
-#chat-messages .msg .time{font-size:10px;color:var(--text-dim)}
-#chat-messages .msg .content{margin-top:2px}
-/* ── Console panel ────────────────────────────────── */
-#console-panel{
-  grid-area:console;
-  background:var(--surface);
-  border-top:1px solid var(--border);
-  padding:12px 16px;
-  display:flex;align-items:center;gap:12px;
-  flex-wrap:wrap;
-}
-#console-panel h3{
-  font-size:13px;color:var(--text-dim);
-  white-space:nowrap;
-}
-#console-panel .stat{
-  font-size:12px;padding:4px 10px;border-radius:4px;
-  background:rgba(255,167,38,0.1);color:var(--primary);
-  white-space:nowrap;
-}
-#console-panel button{
-  padding:8px 16px;border:none;border-radius:var(--radius);
-  font-size:12px;font-weight:600;cursor:pointer;
-  color:var(--text-bright);
-}
-.btn-validate{background:var(--success)}
-.btn-reject{background:var(--danger)}
-.btn-refresh{background:transparent;border:1px solid var(--border)}
-/* ── Report list (console overflow) ───────────────── */
-#report-list{
-  flex:1;overflow-x:auto;
-  display:flex;gap:8px;align-items:center;
-}
-#report-list .report-item{
-  display:flex;align-items:center;gap:8px;
-  padding:6px 12px;border-radius:var(--radius);
-  background:var(--bg);border:1px solid var(--border);
-  font-size:11px;white-space:nowrap;
-}
-#report-list .report-item.validated{border-color:var(--success)}
-#report-list .report-item.rejected{border-color:var(--danger);opacity:.5}
-#report-list .report-item .actions{display:flex;gap:4px}
-#report-list .report-item .actions button{
-  padding:2px 8px;font-size:10px;border-radius:4px;
-}
-/* ── Leaflet overrides ────────────────────────────── */
-.leaflet-container{background:var(--bg)}
-.leaflet-control-zoom a{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border)!important}
-.leaflet-popup-content-wrapper{background:var(--surface)!important;color:var(--text)!important}
-.leaflet-popup-tip{background:var(--surface)!important}
-</style>
-</head>
-<body>
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- MAP PANEL (top-left)                                                 -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<div id="map-panel">
-  <div id="map-stats">
-    Pairs connectés : <span id="stat-peers">0</span> &nbsp;|&nbsp;
-    Signalements actifs : <span id="stat-reports">0</span> &nbsp;|&nbsp;
-    Rôle : <span id="stat-role">-</span>
-  </div>
-  <div id="map"></div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- CHAT PANEL (right)                                                  -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<div id="chat-panel">
-  <div id="chat-header">
-    <span class="dot"></span>
-    Tchat Réseau P2P
-    <span style="margin-left:auto;font-size:11px;color:var(--text-dim)" id="chat-count">0 msg</span>
-  </div>
-  <div id="chat-messages">
-    <div class="msg system">
-      <div class="time">Connexion…</div>
-      <div class="content">En attente de connexion au serveur StreetPhare…</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StreetPhare — Dashboard Administration</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #0f1117;
+        --surface: #1a1d27;
+        --border: #2a2d37;
+        --primary: #ffa726;
+        --danger: #ef5350;
+        --success: #66bb6a;
+        --text: #e0e0e0;
+        --text-dim: #888;
+        --text-bright: #fff;
+        --radius: 8px;
+        --font: system-ui, -apple-system, sans-serif;
+      }
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+      }
+      body {
+        font-family: var(--font);
+        background: var(--bg);
+        color: var(--text);
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        grid-template-rows: 1fr auto;
+        grid-template-areas: "map chat" "console console";
+        gap: 1px;
+        border: 1px solid var(--border);
+      }
+      /* ── Map panel ───────────────────────────────────── */
+      #map-panel {
+        grid-area: map;
+        position: relative;
+        min-height: 0;
+      }
+      #map {
+        width: 100%;
+        height: 100%;
+      }
+      #map-stats {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1000;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 8px 12px;
+        font-size: 12px;
+        color: var(--text-dim);
+      }
+      #map-stats span {
+        color: var(--primary);
+        font-weight: 700;
+      }
+      /* ── Chat panel ───────────────────────────────────── */
+      #chat-panel {
+        grid-area: chat;
+        display: flex;
+        flex-direction: column;
+        background: var(--surface);
+        border-left: 1px solid var(--border);
+        min-height: 0;
+        overflow: hidden;
+      }
+      #chat-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+        font-weight: 700;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #chat-header .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--success);
+      }
+      #chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      #chat-messages .msg {
+        padding: 8px 12px;
+        border-radius: var(--radius);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      #chat-messages .msg.report {
+        background: rgba(255, 167, 38, 0.1);
+        border-left: 3px solid var(--primary);
+      }
+      #chat-messages .msg.panic {
+        background: rgba(239, 83, 80, 0.15);
+        border-left: 3px solid var(--danger);
+      }
+      #chat-messages .msg.system {
+        background: rgba(102, 187, 106, 0.1);
+        border-left: 3px solid var(--success);
+      }
+      #chat-messages .msg.peer {
+        background: rgba(100, 149, 237, 0.1);
+        border-left: 3px solid #6495ed;
+      }
+      #chat-messages .msg .time {
+        font-size: 10px;
+        color: var(--text-dim);
+      }
+      #chat-messages .msg .content {
+        margin-top: 2px;
+      }
+      /* ── Console panel ────────────────────────────────── */
+      #console-panel {
+        grid-area: console;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      #console-panel h3 {
+        font-size: 13px;
+        color: var(--text-dim);
+        white-space: nowrap;
+      }
+      #console-panel .stat {
+        font-size: 12px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        background: rgba(255, 167, 38, 0.1);
+        color: var(--primary);
+        white-space: nowrap;
+      }
+      #console-panel button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: var(--radius);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--text-bright);
+      }
+      .btn-validate {
+        background: var(--success);
+      }
+      .btn-reject {
+        background: var(--danger);
+      }
+      .btn-refresh {
+        background: transparent;
+        border: 1px solid var(--border);
+      }
+      /* ── Report list (console overflow) ───────────────── */
+      #report-list {
+        flex: 1;
+        overflow-x: auto;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      #report-list .report-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: var(--radius);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      #report-list .report-item.validated {
+        border-color: var(--success);
+      }
+      #report-list .report-item.rejected {
+        border-color: var(--danger);
+        opacity: 0.5;
+      }
+      #report-list .report-item .actions {
+        display: flex;
+        gap: 4px;
+      }
+      #report-list .report-item .actions button {
+        padding: 2px 8px;
+        font-size: 10px;
+        border-radius: 4px;
+      }
+      /* ── Leaflet overrides ────────────────────────────── */
+      .leaflet-container {
+        background: var(--bg);
+      }
+      .leaflet-control-zoom a {
+        background: var(--surface) !important;
+        color: var(--text) !important;
+        border-color: var(--border) !important;
+      }
+      .leaflet-popup-content-wrapper {
+        background: var(--surface) !important;
+        color: var(--text) !important;
+      }
+      .leaflet-popup-tip {
+        background: var(--surface) !important;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- MAP PANEL (top-left)                                                 -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="map-panel">
+      <div id="map-stats">
+        Pairs connectés : <span id="stat-peers">0</span> &nbsp;|&nbsp;
+        Signalements actifs : <span id="stat-reports">0</span> &nbsp;|&nbsp;
+        Rôle : <span id="stat-role">-</span>
+      </div>
+      <div id="map"></div>
     </div>
-  </div>
-</div>
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- CONSOLE PANEL (bottom)                                              -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<div id="console-panel">
-  <h3>🖥 Admin Console</h3>
-  <div class="stat" id="stat-status">Connexion…</div>
-  <div id="report-list"></div>
-  <button class="btn-refresh" onclick="adminRefresh()">🔄 Rafraîchir</button>
-  <button onclick="sandboxInjectFault('disconnect-mesh')" title="Déconnecter tous les pairs mesh">🔌 Mesh</button>
-  <button onclick="sandboxInjectFault('reset')" title="Réinitialiser les défauts">🔄 Reset</button>
-  <button onclick="sandboxSimulateCluster()" title="Simuler 20 signalements autour de Fleurus">🧪 Simuler</button>
-</div>
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- CHAT PANEL (right)                                                  -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="chat-panel">
+      <div id="chat-header">
+        <span class="dot"></span>
+        Tchat Réseau P2P
+        <span
+          style="margin-left: auto; font-size: 11px; color: var(--text-dim)"
+          id="chat-count"
+          >0 msg</span
+        >
+      </div>
+      <div id="chat-messages">
+        <div class="msg system">
+          <div class="time">Connexion…</div>
+          <div class="content">
+            En attente de connexion au serveur StreetPhare…
+          </div>
+        </div>
+      </div>
+    </div>
 
-<script>
-// ══════════════════════════════════════════════════════════════════════════
-// Configuration
-// ══════════════════════════════════════════════════════════════════════════
-const WS_URL = `ws://${location.host}/admin`;
-const DEFAULT_CENTER = [50.4833, 4.5500]; // Fleurus
-const DEFAULT_ZOOM = 10;
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- CONSOLE PANEL (bottom)                                              -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="console-panel">
+      <h3>🖥 Admin Console</h3>
+      <div class="stat" id="stat-status">Connexion…</div>
+      <div id="report-list"></div>
+      <button class="btn-refresh" onclick="adminRefresh()">
+        🔄 Rafraîchir
+      </button>
+      <button
+        onclick="sandboxInjectFault('disconnect-mesh')"
+        title="Déconnecter tous les pairs mesh"
+      >
+        🔌 Mesh
+      </button>
+      <button
+        onclick="sandboxInjectFault('reset')"
+        title="Réinitialiser les défauts"
+      >
+        🔄 Reset
+      </button>
+      <button
+        onclick="sandboxSimulateCluster()"
+        title="Simuler 20 signalements autour de Fleurus"
+      >
+        🧪 Simuler
+      </button>
+    </div>
 
-// ══════════════════════════════════════════════════════════════════════════
-// State
-// ══════════════════════════════════════════════════════════════════════════
-let reports = [];
-let events = [];
-let markersMap = {};
-let msgCount = 0;
-let ws = null;
-let reconnectTimer = null;
+    <script>
+      // ══════════════════════════════════════════════════════════════════════════
+      // Configuration
+      // ══════════════════════════════════════════════════════════════════════════
+      const WS_URL = `ws://${location.host}/admin`;
+      const DEFAULT_CENTER = [50.4833, 4.55]; // Fleurus
+      const DEFAULT_ZOOM = 10;
 
-// ══════════════════════════════════════════════════════════════════════════
-// Map initialization (Leaflet)
-// ══════════════════════════════════════════════════════════════════════════
-const map = L.map('map', {
-  center: DEFAULT_CENTER,
-  zoom: DEFAULT_ZOOM,
-  zoomControl: true,
-});
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors',
-  maxZoom: 19,
-}).addTo(map);
+      // ══════════════════════════════════════════════════════════════════════════
+      // State
+      // ══════════════════════════════════════════════════════════════════════════
+      let reports = [];
+      let events = [];
+      let markersMap = {};
+      let msgCount = 0;
+      let ws = null;
+      let reconnectTimer = null;
 
-// Event markers layer
-const eventMarkers = L.layerGroup().addTo(map);
-const reportMarkers = L.layerGroup().addTo(map);
+      // ══════════════════════════════════════════════════════════════════════════
+      // Map initialization (Leaflet)
+      // ══════════════════════════════════════════════════════════════════════════
+      const map = L.map("map", {
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+        zoomControl: true,
+      });
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+        maxZoom: 19,
+      }).addTo(map);
 
-// ══════════════════════════════════════════════════════════════════════════
-// WebSocket connection
-// ══════════════════════════════════════════════════════════════════════════
-function connect() {
-  if (ws && ws.readyState === WebSocket.OPEN) return;
-  ws = new WebSocket(WS_URL);
-  ws.onopen = () => {
-    addChatMessage('system', '✅ Connecté au serveur StreetPhare');
-    document.getElementById('stat-status').textContent = '🟢 Connecté';
-    document.getElementById('stat-status').style.color = 'var(--success)';
-    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-  };
-  ws.onmessage = (evt) => {
-    try {
-      const msg = JSON.parse(evt.data);
-      handleMessage(msg);
-    } catch (e) { console.warn('JSON invalide:', e); }
-  };
-  // ── Map long-press injection (bypass consensus) ─────────────────────
-  map.on('contextmenu', (e) => {
-    const { lat, lng } = e.latlng;
-    showForceAlertPopup(lat, lng);
-  });
-  // ── Touch long-press (mobile) ───────────────────────────────────────
-  let longPressTimer = null;
-  map.on('touchstart', (e) => {
-    const { lat, lng } = e.latlng;
-    longPressTimer = setTimeout(() => showForceAlertPopup(lat, lng), 800);
-  });
-  map.on('touchend', () => clearTimeout(longPressTimer));
-  map.on('touchmove', () => clearTimeout(longPressTimer));
-  ws.onclose = () => {
-    addChatMessage('system', '🔴 Déconnecté — reconnexion dans 5s…');
-    document.getElementById('stat-status').textContent = '🔴 Déconnecté';
-    document.getElementById('stat-status').style.color = 'var(--danger)';
-    scheduleReconnect();
-  };
-  ws.onerror = () => {
-    document.getElementById('stat-status').textContent = '⚠ Erreur';
-    document.getElementById('stat-status').style.color = 'var(--danger)';
-  };
-}
+      // Event markers layer
+      const eventMarkers = L.layerGroup().addTo(map);
+      const reportMarkers = L.layerGroup().addTo(map);
 
-function scheduleReconnect() {
-  if (reconnectTimer) return;
-  reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, 5000);
-}
+      // ══════════════════════════════════════════════════════════════════════════
+      // WebSocket connection
+      // ══════════════════════════════════════════════════════════════════════════
+      function connect() {
+        if (ws && ws.readyState === WebSocket.OPEN) return;
+        ws = new WebSocket(WS_URL);
+        ws.onopen = () => {
+          addChatMessage("system", "✅ Connecté au serveur StreetPhare");
+          document.getElementById("stat-status").textContent = "🟢 Connecté";
+          document.getElementById("stat-status").style.color = "var(--success)";
+          if (reconnectTimer) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+          }
+        };
+        ws.onmessage = (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+            handleMessage(msg);
+          } catch (e) {
+            console.warn("JSON invalide:", e);
+          }
+        };
+        // ── Map long-press injection (bypass consensus) ─────────────────────
+        map.on("contextmenu", (e) => {
+          const { lat, lng } = e.latlng;
+          showForceAlertPopup(lat, lng);
+        });
+        // ── Touch long-press (mobile) ───────────────────────────────────────
+        let longPressTimer = null;
+        map.on("touchstart", (e) => {
+          const { lat, lng } = e.latlng;
+          longPressTimer = setTimeout(() => showForceAlertPopup(lat, lng), 800);
+        });
+        map.on("touchend", () => clearTimeout(longPressTimer));
+        map.on("touchmove", () => clearTimeout(longPressTimer));
+        ws.onclose = () => {
+          addChatMessage("system", "🔴 Déconnecté — reconnexion dans 5s…");
+          document.getElementById("stat-status").textContent = "🔴 Déconnecté";
+          document.getElementById("stat-status").style.color = "var(--danger)";
+          scheduleReconnect();
+        };
+        ws.onerror = () => {
+          document.getElementById("stat-status").textContent = "⚠ Erreur";
+          document.getElementById("stat-status").style.color = "var(--danger)";
+        };
+      }
 
-// ══════════════════════════════════════════════════════════════════════════
-// Message handler — all server events
-// ══════════════════════════════════════════════════════════════════════════
-function handleMessage(msg) {
-  switch (msg.type) {
-    case 'admin_snapshot':
-      handleSnapshot(msg);
-      break;
-    case 'new_report':
-      handleNewReport(msg.report);
-      break;
-    case 'report_updated':
-      handleReportUpdated(msg.report);
-      break;
-    case 'report_validated':
-      handleReportValidated(msg.report);
-      break;
-    case 'panic_alert':
-      handlePanic(msg.alert);
-      break;
-    case 'validation_ok':
-      addChatMessage('system', `✅ Signalement ${msg.report_id} validé`);
-      break;
-    case 'rejection_ok':
-      addChatMessage('system', `❌ Signalement ${msg.report_id} rejeté`);
-      break;
-    case 'force_alert':
-      handleForceAlert(msg.report);
-      break;
-    case 'sandbox_event':
-      handleSandboxEvent(msg);
-      break;
-    default:
-      console.log('Message inconnu:', msg.type);
-  }
-}
+      function scheduleReconnect() {
+        if (reconnectTimer) return;
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          connect();
+        }, 5000);
+      }
 
-// ── Snapshot (initial state) ─────────────────────────────────────────
-function handleSnapshot(msg) {
-  document.getElementById('stat-role').textContent = msg.server?.role || '-';
-  document.getElementById('stat-peers').textContent = msg.mesh_clients || 0;
+      // ══════════════════════════════════════════════════════════════════════════
+      // Message handler — all server events
+      // ══════════════════════════════════════════════════════════════════════════
+      function handleMessage(msg) {
+        switch (msg.type) {
+          case "admin_snapshot":
+            handleSnapshot(msg);
+            break;
+          case "new_report":
+            handleNewReport(msg.report);
+            break;
+          case "report_updated":
+            handleReportUpdated(msg.report);
+            break;
+          case "report_validated":
+            handleReportValidated(msg.report);
+            break;
+          case "panic_alert":
+            handlePanic(msg.alert);
+            break;
+          case "validation_ok":
+            addChatMessage("system", `✅ Signalement ${msg.report_id} validé`);
+            break;
+          case "rejection_ok":
+            addChatMessage("system", `❌ Signalement ${msg.report_id} rejeté`);
+            break;
+          case "force_alert":
+            handleForceAlert(msg.report);
+            break;
+          case "sandbox_event":
+            handleSandboxEvent(msg);
+            break;
+          default:
+            console.log("Message inconnu:", msg.type);
+        }
+      }
 
-  // Events markers
-  eventMarkers.clearLayers();
-  events = msg.events || [];
-  events.forEach(ev => {
-    if (!ev.active) return;
-    const marker = L.marker([ev.lat, ev.lng], {
-      icon: L.divIcon({
-        className: '',
-        html: '<div style="background:#ffa726;color:#000;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff">⭐</div>',
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      })
-    }).bindPopup(`<b>${ev.name}</b><br>${ev.description}<br><small>${ev.id}</small>`);
-    eventMarkers.addLayer(marker);
-  });
+      // ── Snapshot (initial state) ─────────────────────────────────────────
+      function handleSnapshot(msg) {
+        document.getElementById("stat-role").textContent =
+          msg.server?.role || "-";
+        document.getElementById("stat-peers").textContent =
+          msg.mesh_clients || 0;
 
-  // Reports
-  updateReports(msg.reports || []);
-}
+        // Events markers
+        eventMarkers.clearLayers();
+        events = msg.events || [];
+        events.forEach((ev) => {
+          if (!ev.active) return;
+          const marker = L.marker([ev.lat, ev.lng], {
+            icon: L.divIcon({
+              className: "",
+              html: '<div style="background:#ffa726;color:#000;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid #fff">⭐</div>',
+              iconSize: [24, 24],
+              iconAnchor: [12, 12],
+            }),
+          }).bindPopup(
+            `<b>${ev.name}</b><br>${ev.description}<br><small>${ev.id}</small>`,
+          );
+          eventMarkers.addLayer(marker);
+        });
 
-// ── New report ───────────────────────────────────────────────────────
-function handleNewReport(report) {
-  const existing = reports.findIndex(r => r.id === report.id);
-  if (existing >= 0) {
-    reports[existing] = { ...reports[existing], ...report };
-  } else {
-    reports.push(report);
-  }
-  refreshReportMarkers();
-  refreshConsoleList();
-  addChatMessage('report', formatReportMsg(report));
-  document.getElementById('stat-reports').textContent = reports.filter(r => r.active).length;
-}
+        // Reports
+        updateReports(msg.reports || []);
+      }
 
-// ── Report updated ───────────────────────────────────────────────────
-function handleReportUpdated(report) {
-  const idx = reports.findIndex(r => r.id === report.id);
-  if (idx >= 0) reports[idx] = report;
-  else reports.push(report);
-  refreshReportMarkers();
-  refreshConsoleList();
-  document.getElementById('stat-reports').textContent = reports.filter(r => r.active).length;
-}
+      // ── New report ───────────────────────────────────────────────────────
+      function handleNewReport(report) {
+        const existing = reports.findIndex((r) => r.id === report.id);
+        if (existing >= 0) {
+          reports[existing] = { ...reports[existing], ...report };
+        } else {
+          reports.push(report);
+        }
+        refreshReportMarkers();
+        refreshConsoleList();
+        addChatMessage("report", formatReportMsg(report));
+        document.getElementById("stat-reports").textContent = reports.filter(
+          (r) => r.active,
+        ).length;
+      }
 
-// ── Report validated (from mesh broadcast) ───────────────────────────
-function handleReportValidated(report) {
-  handleReportUpdated({ ...report, status: 'validated' });
-  addChatMessage('system', `🌐 Signalement validé par le réseau: ${report.id} (${report.type || 'danger'})`);
-}
+      // ── Report updated ───────────────────────────────────────────────────
+      function handleReportUpdated(report) {
+        const idx = reports.findIndex((r) => r.id === report.id);
+        if (idx >= 0) reports[idx] = report;
+        else reports.push(report);
+        refreshReportMarkers();
+        refreshConsoleList();
+        document.getElementById("stat-reports").textContent = reports.filter(
+          (r) => r.active,
+        ).length;
+      }
 
-// ── Panic ────────────────────────────────────────────────────────────
-function handlePanic(alert) {
-  // Show panic marker on map
-  if (alert.lat && alert.lng) {
-    const panicMarker = L.marker([alert.lat, alert.lng], {
-      icon: L.divIcon({
-        className: '',
-        html: '<div style="background:#ef5350;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid #fff;animation:pulse 1s infinite">🚨</div>',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-      })
-    }).bindPopup(`<b>🚨 PANIC</b><br>${alert.message || 'Alerte PANIC'}<br><small>${alert.id}</small>`).addTo(map);
-    // Remove after 30s
-    setTimeout(() => map.removeLayer(panicMarker), 30000);
-  }
-  addChatMessage('panic', `🚨 <b>PANIC</b> — ${alert.message || 'Alerte déclenchée'} (lat=${alert.lat}, lng=${alert.lng})`);
-  // Flash chat header
-  const header = document.getElementById('chat-header');
-  header.style.background = 'rgba(239,83,80,0.2)';
-  setTimeout(() => header.style.background = '', 2000);
-}
+      // ── Report validated (from mesh broadcast) ───────────────────────────
+      function handleReportValidated(report) {
+        handleReportUpdated({ ...report, status: "validated" });
+        addChatMessage(
+          "system",
+          `🌐 Signalement validé par le réseau: ${report.id} (${report.type || "danger"})`,
+        );
+      }
 
-// ══════════════════════════════════════════════════════════════════════════
-// Report management
-// ══════════════════════════════════════════════════════════════════════════
-function updateReports(newReports) {
-  reports = newReports;
-  refreshReportMarkers();
-  refreshConsoleList();
-  document.getElementById('stat-reports').textContent = reports.filter(r => r.active).length;
-}
+      // ── Panic ────────────────────────────────────────────────────────────
+      function handlePanic(alert) {
+        // Show panic marker on map
+        if (alert.lat && alert.lng) {
+          const panicMarker = L.marker([alert.lat, alert.lng], {
+            icon: L.divIcon({
+              className: "",
+              html: '<div style="background:#ef5350;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid #fff;animation:pulse 1s infinite">🚨</div>',
+              iconSize: [32, 32],
+              iconAnchor: [16, 16],
+            }),
+          })
+            .bindPopup(
+              `<b>🚨 PANIC</b><br>${alert.message || "Alerte PANIC"}<br><small>${alert.id}</small>`,
+            )
+            .addTo(map);
+          // Remove after 30s
+          setTimeout(() => map.removeLayer(panicMarker), 30000);
+        }
+        addChatMessage(
+          "panic",
+          `🚨 <b>PANIC</b> — ${alert.message || "Alerte déclenchée"} (lat=${alert.lat}, lng=${alert.lng})`,
+        );
+        // Flash chat header
+        const header = document.getElementById("chat-header");
+        header.style.background = "rgba(239,83,80,0.2)";
+        setTimeout(() => (header.style.background = ""), 2000);
+      }
 
-function refreshReportMarkers() {
-  reportMarkers.clearLayers();
-  reports.forEach(r => {
-    if (!r.active) return;
-    const color = r.status === 'validated' ? '#66bb6a' : r.type === 'panic' ? '#ef5350' : '#ffa726';
-    const emoji = r.type === 'panic' ? '🚨' : r.status === 'validated' ? '✅' : '⚠';
-    const marker = L.marker([r.lat, r.lng], {
-      icon: L.divIcon({
-        className: '',
-        html: `<div style="background:${color};color:#000;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff">${emoji}</div>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-      })
-    }).bindPopup(`<b>${r.type || 'danger'}</b><br>${r.description || ''}<br><small>${r.id}</small><br>Status: ${r.status}`);
-    reportMarkers.addLayer(marker);
-  });
-}
+      // ══════════════════════════════════════════════════════════════════════════
+      // Report management
+      // ══════════════════════════════════════════════════════════════════════════
+      function updateReports(newReports) {
+        reports = newReports;
+        refreshReportMarkers();
+        refreshConsoleList();
+        document.getElementById("stat-reports").textContent = reports.filter(
+          (r) => r.active,
+        ).length;
+      }
 
-function refreshConsoleList() {
-  const container = document.getElementById('report-list');
-  const pending = reports.filter(r => r.status === 'pending');
-  if (pending.length === 0) {
-    container.innerHTML = '<span style="font-size:11px;color:var(--text-dim)">Aucun signalement en attente</span>';
-    return;
-  }
-  container.innerHTML = pending.map(r => `
+      function refreshReportMarkers() {
+        reportMarkers.clearLayers();
+        reports.forEach((r) => {
+          if (!r.active) return;
+          const color =
+            r.status === "validated"
+              ? "#66bb6a"
+              : r.type === "panic"
+                ? "#ef5350"
+                : "#ffa726";
+          const emoji =
+            r.type === "panic" ? "🚨" : r.status === "validated" ? "✅" : "⚠";
+          const marker = L.marker([r.lat, r.lng], {
+            icon: L.divIcon({
+              className: "",
+              html: `<div style="background:${color};color:#000;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff">${emoji}</div>`,
+              iconSize: [28, 28],
+              iconAnchor: [14, 14],
+            }),
+          }).bindPopup(
+            `<b>${r.type || "danger"}</b><br>${r.description || ""}<br><small>${r.id}</small><br>Status: ${r.status}`,
+          );
+          reportMarkers.addLayer(marker);
+        });
+      }
+
+      function refreshConsoleList() {
+        const container = document.getElementById("report-list");
+        const pending = reports.filter((r) => r.status === "pending");
+        if (pending.length === 0) {
+          container.innerHTML =
+            '<span style="font-size:11px;color:var(--text-dim)">Aucun signalement en attente</span>';
+          return;
+        }
+        container.innerHTML = pending
+          .map(
+            (r) => `
     <div class="report-item" id="report-${r.id}">
-      <span>${r.type === 'panic' ? '🚨' : '⚠'} ${r.id.slice(0,8)}</span>
-      <span style="color:var(--text-dim)">${r.description?.slice(0,30) || '-'}</span>
+      <span>${r.type === "panic" ? "🚨" : "⚠"} ${r.id.slice(0, 8)}</span>
+      <span style="color:var(--text-dim)">${r.description?.slice(0, 30) || "-"}</span>
       <div class="actions">
         <button class="btn-validate" onclick="validateReport('${r.id}')">✓</button>
         <button class="btn-reject" onclick="rejectReport('${r.id}')">✗</button>
       </div>
     </div>
-  `).join('');
-}
+  `,
+          )
+          .join("");
+      }
 
-// ══════════════════════════════════════════════════════════════════════════
-// Admin actions (send via WebSocket)
-// ══════════════════════════════════════════════════════════════════════════
-function validateReport(id) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify({ type: 'validate_report', report_id: id }));
-  addChatMessage('system', `✓ Validation du signalement ${id.slice(0,8)}…`);
-}
+      // ══════════════════════════════════════════════════════════════════════════
+      // Admin actions (send via WebSocket)
+      // ══════════════════════════════════════════════════════════════════════════
+      function validateReport(id) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ type: "validate_report", report_id: id }));
+        addChatMessage(
+          "system",
+          `✓ Validation du signalement ${id.slice(0, 8)}…`,
+        );
+      }
 
-function rejectReport(id) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify({ type: 'reject_report', report_id: id }));
-  addChatMessage('system', `✗ Rejet du signalement ${id.slice(0,8)}…`);
-}
+      function rejectReport(id) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ type: "reject_report", report_id: id }));
+        addChatMessage("system", `✗ Rejet du signalement ${id.slice(0, 8)}…`);
+      }
 
-function adminRefresh() {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify({ type: 'refresh' }));
-}
+      function adminRefresh() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ type: "refresh" }));
+      }
 
-// ══════════════════════════════════════════════════════════════════════════
-// Chat helpers
-// ══════════════════════════════════════════════════════════════════════════
-function addChatMessage(type, content) {
-  const container = document.getElementById('chat-messages');
-  const now = new Date();
-  const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
-  const div = document.createElement('div');
-  div.className = `msg ${type}`;
-  div.innerHTML = `<div class="time">${time}</div><div class="content">${content}</div>`;
-  container.appendChild(div);
-  container.scrollTop = container.scrollHeight;
-  msgCount++;
-  document.getElementById('chat-count').textContent = `${msgCount} msg`;
-  // Limit to 200 messages
-  while (container.children.length > 200) container.firstChild.remove();
-}
+      // ══════════════════════════════════════════════════════════════════════════
+      // Chat helpers
+      // ══════════════════════════════════════════════════════════════════════════
+      function addChatMessage(type, content) {
+        const container = document.getElementById("chat-messages");
+        const now = new Date();
+        const time = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+        const div = document.createElement("div");
+        div.className = `msg ${type}`;
+        div.innerHTML = `<div class="time">${time}</div><div class="content">${content}</div>`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        msgCount++;
+        document.getElementById("chat-count").textContent = `${msgCount} msg`;
+        // Limit to 200 messages
+        while (container.children.length > 200) container.firstChild.remove();
+      }
 
-function formatReportMsg(report) {
-  const icons = { danger: '⚠', panic: '🚨', info: 'ℹ' };
-  const icon = icons[report.type] || '📢';
-  return `${icon} <b>${report.type || 'report'}</b> — ${report.description || 'Nouveau signalement'} (lat=${Number(report.lat).toFixed(4)}, lng=${Number(report.lng).toFixed(4)})`;
-}
+      function formatReportMsg(report) {
+        const icons = { danger: "⚠", panic: "🚨", info: "ℹ" };
+        const icon = icons[report.type] || "📢";
+        return `${icon} <b>${report.type || "report"}</b> — ${report.description || "Nouveau signalement"} (lat=${Number(report.lat).toFixed(4)}, lng=${Number(report.lng).toFixed(4)})`;
+      }
 
-// ══════════════════════════════════════════════════════════════════════════
-// Force Alert (Long Press — bypass consensus)
-// ══════════════════════════════════════════════════════════════════════════
+      // ══════════════════════════════════════════════════════════════════════════
+      // Force Alert (Long Press — bypass consensus)
+      // ══════════════════════════════════════════════════════════════════════════
 
-const ALERT_TYPES = [
-  { id: 'danger', label: '⚠ Danger', color: '#ffa726' },
-  { id: 'autopompes', label: '🚒 Autopompes', color: '#ef5350' },
-  { id: 'fire', label: '🔥 Incendie', color: '#ff5722' },
-  { id: 'flood', label: '🌊 Inondation', color: '#2196f3' },
-  { id: 'info', label: 'ℹ Info', color: '#66bb6a' },
-  { id: 'panic', label: '🚨 PANIC', color: '#b71c1c' },
-];
+      const ALERT_TYPES = [
+        { id: "danger", label: "⚠ Danger", color: "#ffa726" },
+        { id: "autopompes", label: "🚒 Autopompes", color: "#ef5350" },
+        { id: "fire", label: "🔥 Incendie", color: "#ff5722" },
+        { id: "flood", label: "🌊 Inondation", color: "#2196f3" },
+        { id: "info", label: "ℹ Info", color: "#66bb6a" },
+        { id: "panic", label: "🚨 PANIC", color: "#b71c1c" },
+      ];
 
-function showForceAlertPopup(lat, lng) {
-  const latFixed = Number(lat).toFixed(6);
-  const lngFixed = Number(lng).toFixed(6);
+      function showForceAlertPopup(lat, lng) {
+        const latFixed = Number(lat).toFixed(6);
+        const lngFixed = Number(lng).toFixed(6);
 
-  // Remove any existing popup
-  const existing = document.getElementById('force-alert-popup');
-  if (existing) existing.remove();
+        // Remove any existing popup
+        const existing = document.getElementById("force-alert-popup");
+        if (existing) existing.remove();
 
-  const popup = document.createElement('div');
-  popup.id = 'force-alert-popup';
-  popup.style.cssText = `
+        const popup = document.createElement("div");
+        popup.id = "force-alert-popup";
+        popup.style.cssText = `
     position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
     background:var(--surface);border:2px solid var(--primary);
     border-radius:12px;padding:20px;z-index:9999;min-width:280px;
     box-shadow:0 8px 32px rgba(0,0,0,.5);
   `;
-  popup.innerHTML = `
+        popup.innerHTML = `
     <h3 style="margin:0 0 4px;font-size:15px">📌 Forcer une alerte</h3>
     <p style="margin:0 0 12px;font-size:11px;color:var(--text-dim)">
       ${latFixed}, ${lngFixed}
     </p>
     <div style="display:flex;flex-direction:column;gap:6px">
-      ${ALERT_TYPES.map(t => `
+      ${ALERT_TYPES.map(
+        (t) => `
         <button onclick="forceAlertAt(${lat}, ${lng}, '${t.id}')"
           style="background:${t.color};color:#fff;border:none;border-radius:6px;
             padding:8px 12px;font-size:13px;cursor:pointer;text-align:left">
           ${t.label}
         </button>
-      `).join('')}
+      `,
+      ).join("")}
     </div>
     <button onclick="document.getElementById('force-alert-popup').remove()"
       style="margin-top:12px;width:100%;background:transparent;border:1px solid var(--border);
@@ -497,89 +679,114 @@ function showForceAlertPopup(lat, lng) {
       ✕ Annuler
     </button>
   `;
-  document.body.appendChild(popup);
-}
+        document.body.appendChild(popup);
+      }
 
-async function forceAlertAt(lat, lng, type) {
-  document.getElementById('force-alert-popup')?.remove();
-  try {
-    const resp = await fetch('/api/admin/force-alert', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lat, lng, type, description: `Alerte ${type} forcée depuis le dashboard` }),
-    });
-    const data = await resp.json();
-    addChatMessage('system', `🚀 Alerte forcée (bypass): ${data.report_id} — relai mesh: ${data.mesh_relayed_to} pairs`);
-    // Force a refresh to get updated state
-    adminRefresh();
-  } catch (err) {
-    addChatMessage('system', `❌ Erreur force alert: ${err.message}`);
-  }
-}
+      async function forceAlertAt(lat, lng, type) {
+        document.getElementById("force-alert-popup")?.remove();
+        try {
+          const resp = await fetch("/api/admin/force-alert", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lat,
+              lng,
+              type,
+              description: `Alerte ${type} forcée depuis le dashboard`,
+            }),
+          });
+          const data = await resp.json();
+          addChatMessage(
+            "system",
+            `🚀 Alerte forcée (bypass): ${data.report_id} — relai mesh: ${data.mesh_relayed_to} pairs`,
+          );
+          // Force a refresh to get updated state
+          adminRefresh();
+        } catch (err) {
+          addChatMessage("system", `❌ Erreur force alert: ${err.message}`);
+        }
+      }
 
-function handleForceAlert(report) {
-  const idx = reports.findIndex(r => r.id === report.id);
-  if (idx >= 0) reports[idx] = report;
-  else reports.push(report);
-  refreshReportMarkers();
-  refreshConsoleList();
-  addChatMessage('report', `⚡ <b>FORCE ALERT</b> (bypass consensus) — ${report.type} @ (${Number(report.lat).toFixed(4)}, ${Number(report.lng).toFixed(4)})`);
-  document.getElementById('stat-reports').textContent = reports.filter(r => r.active).length;
-}
+      function handleForceAlert(report) {
+        const idx = reports.findIndex((r) => r.id === report.id);
+        if (idx >= 0) reports[idx] = report;
+        else reports.push(report);
+        refreshReportMarkers();
+        refreshConsoleList();
+        addChatMessage(
+          "report",
+          `⚡ <b>FORCE ALERT</b> (bypass consensus) — ${report.type} @ (${Number(report.lat).toFixed(4)}, ${Number(report.lng).toFixed(4)})`,
+        );
+        document.getElementById("stat-reports").textContent = reports.filter(
+          (r) => r.active,
+        ).length;
+      }
 
-// ══════════════════════════════════════════════════════════════════════════
-// Sandbox controls
-// ══════════════════════════════════════════════════════════════════════════
+      // ══════════════════════════════════════════════════════════════════════════
+      // Sandbox controls
+      // ══════════════════════════════════════════════════════════════════════════
 
-async function sandboxInjectFault(fault) {
-  try {
-    await fetch('/api/admin/sandbox/inject-fault', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fault }),
-    });
-    addChatMessage('system', `🧪 Défaut injecté: ${fault}`);
-  } catch (err) {
-    addChatMessage('system', `❌ Erreur sandbox: ${err.message}`);
-  }
-}
+      async function sandboxInjectFault(fault) {
+        try {
+          await fetch("/api/admin/sandbox/inject-fault", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fault }),
+          });
+          addChatMessage("system", `🧪 Défaut injecté: ${fault}`);
+        } catch (err) {
+          addChatMessage("system", `❌ Erreur sandbox: ${err.message}`);
+        }
+      }
 
-async function sandboxSimulateCluster() {
-  const mapCenter = map.getCenter();
-  try {
-    const resp = await fetch('/api/admin/sandbox/simulate-cluster', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ count: 20, lat: mapCenter.lat, lng: mapCenter.lng, spread: 0.02 }),
-    });
-    const data = await resp.json();
-    addChatMessage('system', `🧪 Cluster simulé: ${data.generated} signalements générés`);
-    adminRefresh();
-  } catch (err) {
-    addChatMessage('system', `❌ Erreur simulation: ${err.message}`);
-  }
-}
+      async function sandboxSimulateCluster() {
+        const mapCenter = map.getCenter();
+        try {
+          const resp = await fetch("/api/admin/sandbox/simulate-cluster", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              count: 20,
+              lat: mapCenter.lat,
+              lng: mapCenter.lng,
+              spread: 0.02,
+            }),
+          });
+          const data = await resp.json();
+          addChatMessage(
+            "system",
+            `🧪 Cluster simulé: ${data.generated} signalements générés`,
+          );
+          adminRefresh();
+        } catch (err) {
+          addChatMessage("system", `❌ Erreur simulation: ${err.message}`);
+        }
+      }
 
-function handleSandboxEvent(msg) {
-  const events = {
-    'mesh_disconnected': '🔌 Tous les pairs mesh déconnectés',
-    'latency_injected': `⏱ Latence injectée: ${msg.delay_ms}ms`,
-    'packet_loss_injected': `📉 Perte de paquets: ${Math.round(msg.pct * 100)}%`,
-    'fault_reset': '🔄 Défauts réinitialisés',
-    'cluster_simulated': `🧪 ${msg.count} signalements simulés autour de (${Number(msg.cluster_lat).toFixed(4)}, ${Number(msg.cluster_lng).toFixed(4)})`,
-  };
-  addChatMessage('system', events[msg.event] || `🧪 Sandbox: ${msg.event}`);
-}
+      function handleSandboxEvent(msg) {
+        const events = {
+          mesh_disconnected: "🔌 Tous les pairs mesh déconnectés",
+          latency_injected: `⏱ Latence injectée: ${msg.delay_ms}ms`,
+          packet_loss_injected: `📉 Perte de paquets: ${Math.round(msg.pct * 100)}%`,
+          fault_reset: "🔄 Défauts réinitialisés",
+          cluster_simulated: `🧪 ${msg.count} signalements simulés autour de (${Number(msg.cluster_lat).toFixed(4)}, ${Number(msg.cluster_lng).toFixed(4)})`,
+        };
+        addChatMessage(
+          "system",
+          events[msg.event] || `🧪 Sandbox: ${msg.event}`,
+        );
+      }
 
-// ══════════════════════════════════════════════════════════════════════════
-// Start
-// ══════════════════════════════════════════════════════════════════════════
-connect();
+      // ══════════════════════════════════════════════════════════════════════════
+      // Start
+      // ══════════════════════════════════════════════════════════════════════════
+      connect();
 
-// CSS animation for panic pulse
-const style = document.createElement('style');
-style.textContent = '@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}';
-document.head.appendChild(style);
-</script>
-</body>
+      // CSS animation for panic pulse
+      const style = document.createElement("style");
+      style.textContent =
+        "@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}";
+      document.head.appendChild(style);
+    </script>
+  </body>
 </html>
