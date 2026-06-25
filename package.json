@@ -1,6 +1,38 @@
 {
-  "private": true,
+  "name": "streetphare-server",
+  "version": "3.0.0",
+  "description": "StreetPhare — Infrastructure serveur Node.js (Primary + Backup)",
+  "main": "src/primary.js",
+  "scripts": {
+    "start:primary": "cross-env SERVER_TYPE=PRIMARY node src/primary.js",
+    "start:backup": "cross-env SERVER_TYPE=BACKUP node src/backup.js",
+    "dev:primary": "cross-env SERVER_TYPE=PRIMARY nodemon src/primary.js",
+    "dev:backup": "cross-env SERVER_TYPE=BACKUP nodemon src/backup.js",
+    "build:primary": "node scripts/build-sea.js primary",
+    "build:backup": "node scripts/build-sea.js backup",
+    "build:all": "npm run build:primary && npm run build:backup"
+  },
+  "bin": {
+    "streetphare-primary": "src/primary.js",
+    "streetphare-backup": "src/backup.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "node-cron": "^4.5.0",
+    "node-fetch": "^2.7.0",
+    "qrcode": "^1.5.3",
+    "uuid": "^14.0.1",
+    "ws": "^8.18.0"
+  },
   "devDependencies": {
-    "prettier": "3.8.4"
+    "cross-env": "^7.0.3",
+    "esbuild": "^0.25.12",
+    "nodemon": "^3.1.0"
   }
 }
