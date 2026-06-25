@@ -219,6 +219,14 @@ class GeofencingService extends WidgetsBindingObserver {
   }
 
   void _checkProximity(Position pos) {
+    // ═══ Garde-fou : Hive non initialisée ─══════════════════════════
+    // Si l'init du NetworkCoordinator a échoué en amont, la base
+    // Hive n'a jamais été ouverte. On évite d'appeler getAllValid()
+    // qui lèverait un StateError en boucle (saturation des logs).
+    if (!HiveAlertDatabase.instance.isInitialized) {
+      return;
+    }
+
     final alerts = HiveAlertDatabase.instance.getAllValid();
     final visible = AlertVisibilityPolicy.filterVisible(alerts);
     final user = LatLng(pos.latitude, pos.longitude);

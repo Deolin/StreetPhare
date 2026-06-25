@@ -9,9 +9,7 @@
                     <style type="text/css">
                 /*! normalize.css v7.0.0 | MIT License | github.com/necolas/normalize.css */
 html {
-    line-height: 1.15;
-    -ms-text-size-adjust: 100%;
-    -webkit-text-size-adjust: 100%
+    line-height: 1.15
 }
 
 body {
@@ -47,8 +45,7 @@ pre {
 }
 
 a {
-    background-color: transparent;
-    -webkit-text-decoration-skip: objects
+    background-color: transparent
 }
 
 abbr[title] {
@@ -131,7 +128,8 @@ button, select {
 }
 
 [type=reset], [type=submit], button, html [type=button] {
-    -webkit-appearance: button
+    -webkit-appearance: button;
+    appearance: button;
 }
 
 [type=button]::-moz-focus-inner, [type=reset]::-moz-focus-inner, [type=submit]::-moz-focus-inner, button::-moz-focus-inner {
@@ -176,6 +174,7 @@ textarea {
 
 [type=search] {
     -webkit-appearance: textfield;
+    appearance: textfield;
     outline-offset: -2px
 }
 
@@ -294,7 +293,6 @@ ul .tree-btn {
 }
 
 .invisible-text {
-    user-select: all; /* Allow the text to be selectable */
     color: transparent; /* Hide the text */
     text-indent: -9999px; /* Move the text out of view */
     position: relative;
@@ -492,8 +490,6 @@ html {
 body {
     color: #02303A;
     background-color: #ffffff;
-    -webkit-text-size-adjust: 100%;
-    -ms-text-size-adjust: 100%;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -625,7 +621,6 @@ code + .copy-button {
 }
 
 .java-exception-part-toggle {
-    user-select: none;
     cursor: pointer;
     border-radius: 2px;
     padding: 0.1em 0.2em;

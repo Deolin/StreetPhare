@@ -36,6 +36,8 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -98,14 +100,22 @@ class OsmAndBridgePlugin(
     // que @Volatile seul ne peut pas prévenir (TOCTOU).
     private val engineInitializing = AtomicBoolean(false)
 
-    private val scope = CoroutineScope(Dispatchers.IO)
+    // SupervisorJob : une coroutine enfant qui échoue ne tue pas le scope entier.
+    // Le scope est annulé dans dispose() pour libérer les threads IO et éviter
+    // les fuites mémoire (SIG:9 / Out-Of-Memory) lors de la destruction de l'activité.
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    // ── Initialisation au démarrage ───────────────────────────────────────
+    // ── Initialisation au démarrage (LAZY) ────────────────────────────────
 
     init {
-        // Pré-charge le moteur dès l'instanciation pour éviter la latence
-        // au premier calcul de route.
-        initEngineAsync()
+        // NE PAS pré-charger le moteur ici. Le constructeur est appelé
+        // pendant configureFlutterEngine(), AVANT le démarrage de la VM
+        // Dart/DDS. L'init de GraphHopper (lecture OSM PBF, construction
+        // du graphe) est trop lourde (30+ sec, 100+ MB) et sature le
+        // CoroutineScheduler → SIG:9 → « Lost connection to device ».
+        //
+        // Le moteur sera initialisé à la première demande (lazy init),
+        // bien après la stabilisation du DDS et du cycle de vie Flutter.
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -436,8 +446,15 @@ class OsmAndBridgePlugin(
     // ════════════════════════════════════════════════════════════════════════
 
     fun dispose() {
+        // Annule TOUTES les coroutines en cours avant de fermer le moteur.
+        // Sans cet appel, les tâches GraphHopper continuent de tourner sur
+        // Dispatchers.IO même après la destruction de l'activité → fuite
+        // mémoire → SIG:9 (Kill forcé par l'OS).
+        scope.cancel("MainActivity destroyed")
         hopper?.close()
         hopper = null
         engineReady = false
+        engineInitializing.set(false)
+        Log.i(TAG, "🧹 OsmAndBridgePlugin disposed — scope cancelled")
     }
 }

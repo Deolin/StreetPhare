@@ -58,12 +58,14 @@ class ProfileSettings {
 
   // ── Profils prédéfinis ─────────────────────────────────────────────────
 
-  /// Piéton — 5 km/h, évite escaliers, pénalité diagonale forte.
+  /// Piéton — 5 km/h, autorise escaliers et chemins non revêtus.
+  /// Pénalité diagonale forte pour favoriser le réseau viaire.
+  /// Note : le piéton ignore les sens uniques (non filtrés par l'algo).
   static const pedestrian = ProfileSettings(
     maxSpeedKmh: 6,
     walkSpeedMs: 1.4, // 5.0 km/h
-    avoidStairs: true,
-    avoidUnpaved: true,
+    avoidStairs: false, // Un piéton peut emprunter les escaliers.
+    avoidUnpaved: false, // Un piéton peut marcher sur sentiers/chemins.
     useContractionHierarchies: true,
     heuristicWeight: 1.2,
     penaltyFactorDiagonal: 3.5,

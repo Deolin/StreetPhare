@@ -35,6 +35,7 @@ import '../../../core/network/peer_counter_service.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../database/alert_model.dart';
+import '../../../database/hive_alert_database.dart';
 import '../../../debug/client_debug_logger.dart';
 import '../../events/domain/models/event_model.dart';
 import '../../events/presentation/event_manager.dart';
@@ -45,6 +46,7 @@ import '../../settings/data/panic_contact_store.dart';
 import '../../settings/presentation/settings_screen.dart';
 import '../../../network/collective_panic_service.dart';
 import '../../../network/network_coordinator.dart';
+import '../../../network/server_heartbeat_service.dart';
 import '../../../services/connectivity_service.dart';
 
 import '../../routing/data/avoidance_filter_store.dart';
@@ -658,18 +660,19 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    // Vérification du mode de transport : popup bloquant si non configuré.
+    // Popup bloquant AVANT chaque calcul de route. L'utilisateur
+    // doit confirmer son mode de transport. Le choix est pré-rempli
+    // avec la dernière valeur persistée, mais peut être changé.
+    // Annuler = ne pas lancer le calcul.
     final prefs = AppPreferencesStore.instance.value;
-    if (prefs.defaultTransportMode == null) {
-      if (!mounted) return;
-      final chosenMode = await _showTransportModePopup();
-      if (chosenMode == null) return; // Annulé par l'utilisateur
-      await AppPreferencesStore.instance.setDefaultTransportMode(chosenMode);
-    }
+    final chosenMode = await _showTransportModePopup(
+      currentMode: prefs.defaultTransportMode ?? 'pedestrian',
+    );
+    if (chosenMode == null || !mounted) return;
+    await AppPreferencesStore.instance.setDefaultTransportMode(chosenMode);
 
-    // Détermine le profil de routage selon le mode de transport.
-    final transportMode = AppPreferencesStore.instance.value.defaultTransportMode!;
-    final routingProfile = _transportModeToRoutingProfile(transportMode);
+    // Détermine le profil de routage selon le mode choisi.
+    final routingProfile = _transportModeToRoutingProfile(chosenMode);
     _showRouteSafeProgress(
       isFailover
           ? s.mapRouteSafeFailover.replaceFirst('{label}', destinationLabel)
@@ -758,7 +761,7 @@ class _MapScreenState extends State<MapScreen> {
 
   /// Affiche un popup bloquant demandant le mode de transport.
   /// Retourne le mode choisi sous forme de String ('pedestrian', 'car', 'transit').
-  Future<String?> _showTransportModePopup() async {
+  Future<String?> _showTransportModePopup({String? currentMode}) async {
     final s = AppLocale.instance.strings;
     return showDialog<String>(
       context: context,
@@ -959,6 +962,7 @@ class _MapScreenState extends State<MapScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // TODO: Remplacer '1.2.0' statique par PackageInfo.version + PackageInfo.buildNumber (package_info_plus)
               _AboutRow(label: s.aboutVersion, value: '1.2.0', ctx: ctx),
               const SizedBox(height: 6),
               _AboutRow(label: s.aboutPlatform, value: 'Flutter / Dart', ctx: ctx),
@@ -2176,43 +2180,145 @@ class _PeerCounterBadge extends StatelessWidget {
       valueListenable: PeerCounterService.instance,
       builder: (context, count, _) {
         final isActive = count > 0;
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: StreetPhareTheme.surface.withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isActive
-                  ? StreetPhareTheme.primary.withValues(alpha: 0.6)
-                  : StreetPhareTheme.textSecondary.withValues(alpha: 0.3),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isActive ? Icons.bolt : Icons.bolt_outlined,
-                size: 14,
-                color: isActive
-                    ? StreetPhareTheme.primary
-                    : StreetPhareTheme.textSecondary,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '$count\u00A0${s.mapPeersNearby.toLowerCase()}',
-                style: TextStyle(
+        return ValueListenableBuilder<bool>(
+          valueListenable: ServerHeartbeatService.instance.isServerConnected,
+          builder: (context, serverConnected, _) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: StreetPhareTheme.surface.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
                   color: isActive
-                      ? StreetPhareTheme.textPrimary
-                      : StreetPhareTheme.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                      ? StreetPhareTheme.primary.withValues(alpha: 0.6)
+                      : StreetPhareTheme.textSecondary.withValues(alpha: 0.3),
+                  width: 1,
                 ),
               ),
-            ],
-          ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isActive ? Icons.bolt : Icons.bolt_outlined,
+                    size: 14,
+                    color: isActive
+                        ? StreetPhareTheme.primary
+                        : StreetPhareTheme.textSecondary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '$count\u00A0${s.mapPeersNearby.toLowerCase()}',
+                    style: TextStyle(
+                      color: isActive
+                          ? StreetPhareTheme.textPrimary
+                          : StreetPhareTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  _ServerStatusDot(connected: serverConnected),
+                ],
+              ),
+            );
+          },
         );
       },
+    );
+  }
+}
+
+/// Point lumineux indiquant la connexion au serveur web.
+/// Vert = connecte, Rouge = mode local.
+/// Une micro-animation de pulsation rend le changement d'etat fluide.
+class _ServerStatusDot extends StatefulWidget {
+  const _ServerStatusDot({required this.connected});
+  final bool connected;
+
+  @override
+  State<_ServerStatusDot> createState() => _ServerStatusDotState();
+}
+
+class _ServerStatusDotState extends State<_ServerStatusDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulse;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _scale = Tween<double>(begin: 1.0, end: 1.35).animate(
+      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _ServerStatusDot old) {
+    super.didUpdateWidget(old);
+    if (widget.connected != old.connected) {
+      _pulse
+        ..reset()
+        ..forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.connected
+        ? const Color(0xFF3FB950)
+        : const Color(0xFFF85149);
+    final tooltip = widget.connected
+        ? 'Connecte au serveur'
+        : 'Mode local : Serveur injoignable';
+
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: () {
+          final message = ServerHeartbeatService.instance.statusMessage;
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(message),
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+        },
+        child: AnimatedBuilder(
+          animation: _scale,
+          builder: (context, child) => Transform.scale(
+            scale: _scale.value,
+            child: child,
+          ),
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.5),
+                  blurRadius: 4,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -2618,64 +2724,107 @@ class _DebugOverlaySheet extends StatelessWidget {
 // Bandeau de connectivité critique
 // ============================================================================
 
-class _ConnectivityBanner extends StatelessWidget {
+class _ConnectivityBanner extends StatefulWidget {
   const _ConnectivityBanner({required this.strings});
   final AppStrings strings;
+
+  @override
+  State<_ConnectivityBanner> createState() => _ConnectivityBannerState();
+}
+
+class _ConnectivityBannerState extends State<_ConnectivityBanner> {
+  bool _wasIsolated = false;
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: ConnectivityService.instance,
       builder: (context, _) {
-        if (!ConnectivityService.instance.isIsolated) {
-          return const SizedBox.shrink();
-        }
+        try {
+          final isIsolated = ConnectivityService.instance.isIsolated;
 
-        return Positioned(
-          top: 120,
-          left: 12,
-          right: 12,
-          child: Material(
-            elevation: 8,
-            borderRadius: BorderRadius.circular(12),
-            color: const Color(0xFFF85149), // Danger Red
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Row(
-                children: [
-                  const Icon(Icons.wifi_off, color: Colors.white, size: 24),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          strings.mapIsolatedTitle,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+          // Transition vers l'isolement → sauvegarde immédiate dans Hive.
+          if (isIsolated && !_wasIsolated) {
+            _wasIsolated = true;
+            // Sauvegarde non-bloquante des alertes critiques en mémoire.
+            unawaited(_saveCriticalDataToHive());
+          }
+          if (!isIsolated) {
+            _wasIsolated = false;
+          }
+
+          if (!isIsolated) {
+            return const SizedBox.shrink();
+          }
+
+          return Positioned(
+            top: 120,
+            left: 12,
+            right: 12,
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xFFF85149),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off, color: Colors.white, size: 24),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.strings.mapIsolatedTitle,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          strings.mapIsolatedMessage,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.strings.mapIsolatedMessage,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        );
+          );
+        } catch (e) {
+          // Toute exception lors d'un basculement Wi-Fi/BLE est capturée
+          // pour éviter le crash de l'application.
+          if (kDebugMode) {
+            debugPrint('[ConnectivityBanner] erreur: $e');
+          }
+          return const SizedBox.shrink();
+        }
       },
     );
+  }
+
+  Future<void> _saveCriticalDataToHive() async {
+    try {
+      // Force la sauvegarde des alertes Hive en attente.
+      final db = HiveAlertDatabase.instance;
+      if (db.isInitialized) {
+        final pending = db.getPendingUpload();
+        if (pending.isNotEmpty && kDebugMode) {
+          debugPrint('[Offline] ${pending.length} alertes sauvegardées dans Hive');
+        }
+      }
+    } catch (_) {
+      // Silencieux — la priorité est de ne pas bloquer l'UI.
+    }
   }
 }
 

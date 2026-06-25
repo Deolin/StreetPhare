@@ -100,7 +100,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
   bool _loadingAlternatives = false;
   RouteResult? _selected;
   List<RouteResult> _alternatives = const [];
-  TransportMode _transportMode = TransportMode.pedestrian;
+  final TransportMode _transportMode = TransportMode.pedestrian;
 
   @override
   void initState() {
@@ -202,81 +202,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-
-            // ── Sélecteur de mode de transport ──────────────────────────
-            ValueListenableBuilder<bool>(
-              valueListenable: VisualImpairedStore.instance,
-              builder: (context, isVisualImpaired, _) {
-                return Wrap(
-                  spacing: 8.0,
-                  runSpacing: 8.0,
-                  children: TransportMode.values.map((mode) {
-                    final isSelected = _transportMode == mode;
-                    return ChoiceChip(
-                      label: Text(
-                        mode.label(s),
-                        style: TextStyle(
-                          color: isSelected
-                              ? Colors.black
-                              : StreetPhareTheme.textPrimary,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal,
-                          fontSize: 13,
-                        ),
-                      ),
-                      selected: isSelected,
-                      selectedColor: StreetPhareTheme.primary,
-                      backgroundColor: StreetPhareTheme.darkSurfaceVariant
-                          .withValues(alpha: 0.5),
-                      side: BorderSide(
-                        color: isSelected
-                            ? StreetPhareTheme.primary
-                            : StreetPhareTheme.textSecondary
-                                .withValues(alpha: 0.3),
-                      ),
-                      onSelected: (sel) {
-                        if (sel) {
-                          setState(() => _transportMode = mode);
-                        }
-                      },
-                    );
-                  }).toList(),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
-
-            // ── Mini-carte ───────────────────────────────────────────────
-            _MiniRouteMap(route: _selected ?? recommended),
-            const SizedBox(height: 12),
-
-            // ── Itinéraire recommandé ────────────────────────────────────
-            _RouteTile(
-              route: recommended,
-              strings: s,
-              isSelected: _selected?.id == recommended.id,
-              onTap: () => setState(() => _selected = recommended),
-              badge: s.routeRecommended,
-            ),
-            const SizedBox(height: 8),
-
-            // ── Bouton "Routes alternatives" (JIT) ───────────────────────
-            if (!_showAlternatives && !_loadingAlternatives) ...[
-              // Affiche le bouton si des alternatives peuvent être chargées.
-              if (widget.onRequestAlternatives != null ||
-                  widget.routes.length > 1)
-                TextButton.icon(
-                  onPressed: _loadAlternatives,
-                  icon: const Icon(Icons.alt_route,
-                      color: StreetPhareTheme.primary),
-                  label: Text(
-                    s.routeShowAlternatives,
-                    style: const TextStyle(color: StreetPhareTheme.primary),
-                  ),
-                ),
-            ],
-
+            const SizedBox(height: 8),           
             // ── Indicateur de chargement des alternatives ────────────────
             if (_loadingAlternatives)
               Padding(

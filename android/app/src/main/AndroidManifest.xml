@@ -49,7 +49,8 @@
     <application
         android:label="StreetPhare"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:largeHeap="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -94,7 +95,13 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
-        <!-- Meta Flutter plugin embedding -->
+        <!-- Flutter Engine — Flutter 3.27+ gère automatiquement AOT,
+             assets dir, et Impeller en interne. Aucune métadonnée
+             explicite nécessaire. Les anciennes clés FlutterLoader
+             (io.flutter.embedding.engine.loader.*) ne doivent pas
+             être présentes. -->
+
+        <!-- Meta Flutter embedding (requis) -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

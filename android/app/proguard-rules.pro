@@ -51,7 +51,12 @@
 -dontwarn com.google.android.play.core.tasks.Task
 
 # javax.lang.model (JDK API not available on Android runtime)
--dontwarn javax.lang.model.SourceVersion
+# Certaines dépendances (ex: processeurs d'annotations ObjectBox via
+# flutter_reactive_ble, ou graphhopper-core) référencent cette classe
+# au runtime. On ignore l'avertissement ET on empêche R8 de la supprimer
+# pour éviter le crash java.lang.ClassNotFoundException au démarrage.
+-dontwarn javax.lang.model.**
+-keep class javax.lang.model.** { *; }
 
 # JTS Topology Suite (excluded from GraphHopper but still referenced at compile-time)
 -dontwarn org.locationtech.jts.geom.Coordinate

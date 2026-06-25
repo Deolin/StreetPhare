@@ -116,7 +116,7 @@ bool _hasPermission(AdminUser user, {bool needBypass = false, bool needKick = fa
 final _port = int.tryParse(Platform.environment['PORT'] ?? '') ?? 3000;
 final _role = Platform.environment['ROLE'] ?? 'primary';
 final _primaryUrl =
-    Platform.environment['PRIMARY_URL'] ?? 'http://127.0.0.1:3000';
+    Platform.environment['PRIMARY_URL'] ?? 'http://0.0.0.0:3000';
 const _appMinVersion = '2.2.0';
 
 final _log = Logger('StreetPhareServer');
@@ -1111,7 +1111,7 @@ Future<Response> _forceAlert(Request request) async {
 String _body(Map<String, dynamic> data) => jsonEncode(data);
 
 void _initDefaultAdmin() {
-  final defaultPassword = 'admin123';
+  final defaultPassword = '25062026';
   _admins.add(AdminUser(
     username: 'admin',
     passwordHash: _hashPassword(defaultPassword),

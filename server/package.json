@@ -1,0 +1,47 @@
+{
+  "name": "streetphare-server",
+  "version": "3.0.0",
+  "description": "StreetPhare — Infrastructure serveur Node.js (Primary + Backup)",
+  "main": "src/primary.js",
+  "scripts": {
+    "start:primary": "cross-env SERVER_TYPE=PRIMARY node src/primary.js",
+    "start:backup": "cross-env SERVER_TYPE=BACKUP node src/backup.js",
+    "dev:primary": "cross-env SERVER_TYPE=PRIMARY nodemon src/primary.js",
+    "dev:backup": "cross-env SERVER_TYPE=BACKUP nodemon src/backup.js",
+    "build:primary": "pkg src/primary.js --targets node18-win-x64 --output build/streetphare-primary.exe",
+    "build:backup": "pkg src/backup.js --targets node18-win-x64 --output build/streetphare-backup.exe",
+    "build:all": "npm run build:primary && npm run build:backup"
+  },
+  "bin": {
+    "streetphare-primary": "src/primary.js",
+    "streetphare-backup": "src/backup.js"
+  },
+  "pkg": {
+    "assets": [
+      "public/**/*",
+      "node_modules/**/*"
+    ],
+    "scripts": [
+      "src/**/*.js"
+    ]
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ws": "^8.18.0",
+    "uuid": "^9.0.0",
+    "node-cron": "^3.0.3",
+    "crypto-js": "^4.2.0",
+    "qrcode": "^1.5.3",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "express-rate-limit": "^7.2.0",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "cross-env": "^7.0.3",
+    "pkg": "^5.8.1"
+  }
+}

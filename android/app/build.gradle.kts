@@ -50,6 +50,17 @@ android {
                 "proguard-rules.pro"
             )
         }
+        debug {
+            // R8 applique les règles keep/dontwarn même sans minification.
+            // Requis pour éviter le crash ClassNotFoundException au démarrage
+            // quand une dépendance (ex: flutter_reactive_ble via ObjectBox,
+            // ou graphhopper-core) référence javax.lang.model.SourceVersion.
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
     }
 
 }

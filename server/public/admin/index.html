@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StreetPhare — Admin Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; display: flex; height: 100vh; }
+    #map { flex: 1; height: 100vh; }
+    #panel { width: 420px; background: #161b22; border-left: 1px solid #30363d; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+    h2 { color: #ff7b72; font-size: 18px; margin-bottom: 8px; }
+    h3 { color: #79c0ff; font-size: 14px; margin-bottom: 6px; }
+    .card { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; }
+    .card label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+    .card input, .card textarea, .card select { width: 100%; background: #21262d; border: 1px solid #30363d; border-radius: 4px; padding: 8px; color: #c9d1d9; font-size: 13px; margin-bottom: 8px; }
+    .card button { background: #238636; color: white; border: none; border-radius: 4px; padding: 10px 16px; cursor: pointer; font-size: 13px; width: 100%; }
+    .card button:hover { background: #2ea043; }
+    .card button.danger { background: #da3633; }
+    .card button.danger:hover { background: #f85149; }
+    #qr-container { text-align: center; margin-top: 12px; }
+    #qr-container img { max-width: 200px; border: 2px solid #30363d; border-radius: 6px; }
+    #status { font-size: 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 8px; }
+    #status .ok { color: #3fb950; }
+    #status .ko { color: #f85149; }
+    #alerts-list { max-height: 200px; overflow-y: auto; font-size: 12px; }
+    #alerts-list .alert-item { padding: 6px 0; border-bottom: 1px solid #21262d; }
+    .alert-item button { background: #da3633; color: white; border: none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 11px; }
+    .waypoint-row { display: flex; gap: 8px; margin-bottom: 4px; align-items: center; }
+    .waypoint-row input { flex: 1; margin-bottom: 0; }
+    .waypoint-row button { width: auto; padding: 4px 8px; background: #da3633; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="panel">
+    <h2>🛡 StreetPhare Admin</h2>
+    <div id="status">
+      <span id="sync-status">⏳ Connexion...</span> |
+      Alertes actives: <span id="active-count">0</span> |
+      Utilisateurs mesh: <span id="mesh-count">0</span>
+    </div>
+
+    <div class="card">
+      <h3>📋 Signalements actifs</h3>
+      <div id="alerts-list">Aucun signalement</div>
+    </div>
+
+    <div class="card">
+      <h3>🎪 Créer une manifestation</h3>
+      <label>Code (ex: FLEURUS-TOUR)</label>
+      <input id="event-code" placeholder="MANIF-123">
+      <label>Titre</label>
+      <input id="event-title" placeholder="Le Tour de Fleurus">
+      <label>Début (ISO)</label>
+      <input id="event-start" type="datetime-local" title="Start time" placeholder="0.0000">
+      <label>Fin (ISO)</label>
+      <input id="event-end" type="datetime-local" title="End time" placeholder="60.00000">
+      <label>Destination Lat</label>
+      <input id="event-dest-lat" type="number" step="0.0001" placeholder="50.4762">
+      <label>Destination Lng</label>
+      <input id="event-dest-lng" type="number" step="0.0001" placeholder="4.5422">
+      <label>Route GeoJSON</label>
+      <textarea id="event-route" rows="2" placeholder='[[4.5422,50.4762],[4.5440,50.4780]]'></textarea>
+      <label>Waypoints (lat, lng, label, h+min)</label>
+      <div id="waypoints-container">
+        <div class="waypoint-row">
+          <input class="wp-label" placeholder="Label">
+          <input class="wp-lat" type="number" step="0.0001" placeholder="Lat">
+          <input class="wp-lng" type="number" step="0.0001" placeholder="Lng">
+          <input class="wp-min" type="number" placeholder="Min">
+        </div>
+      </div>
+      <button onclick="addWaypoint()">+ Ajouter waypoint</button>
+      <button onclick="createEvent()" style="margin-top:8px;">Créer + Générer QR Code</button>
+      <div id="qr-container"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([50.4762, 4.5422], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    const markers = {};
+
+    let ws;
+    let currentHash = '';
+
+    function connect() {
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${location.host}/admin-ws`);
+      ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.type === 'admin_snapshot') {
+          updateAlerts(data.alerts || []);
+          updateStatus(data.syncState);
+        }
+        if (data.type === 'new_alert') updateAlerts([data.alert]);
+      };
+      ws.onopen = () => document.getElementById('sync-status').innerHTML = '<span class="ok">● Connecté</span>';
+      ws.onclose = () => {
+        document.getElementById('sync-status').innerHTML = '<span class="ko">● Déconnecté — reconnexion dans 3s</span>';
+        setTimeout(connect, 3000);
+      };
+    }
+
+    function updateAlerts(alerts) {
+      const list = document.getElementById('alerts-list');
+      document.getElementById('active-count').textContent = alerts.length;
+      if (!alerts.length) { list.innerHTML = 'Aucun signalement'; return; }
+      list.innerHTML = alerts.map(a => `<div class="alert-item">
+        <strong>${a.type}</strong> (${(a.votes||[]).length} votes) — ${a.description || 'Sans description'}<br>
+        <small>${a.lat.toFixed(4)}, ${a.lng.toFixed(4)}</small>
+        <button onclick="rejectAlert('${a.id}')">❌ Révoquer</button>
+      </div>`).join('');
+
+      alerts.forEach(a => {
+        const key = a.id;
+        if (markers[key]) { markers[key].setLatLng([a.lat, a.lng]); return; }
+        const color = a.type === 'collective_danger' ? 'red' : a.type === 'panic' ? 'orange' : 'blue';
+        markers[key] = L.circleMarker([a.lat, a.lng], { radius: 8, fillColor: color, color, weight: 2, fillOpacity: 0.6 })
+          .addTo(map).bindPopup(`<b>${a.type}</b><br>${a.description || ''}<br>${(a.votes||[]).length} votes`);
+      });
+    }
+
+    function updateStatus(sync) {
+      if (sync) {
+        document.getElementById('sync-status').innerHTML =
+          `<span class="${sync.lastSyncSuccess ? 'ok' : 'ko'}">● ${sync.lastSyncSuccess ? 'Synchronisé' : 'Erreur synchro'}</span>`;
+      }
+    }
+
+    async function rejectAlert(id) {
+      await fetch(`/api/alerts/${id}/reject`, { method: 'POST' });
+      location.reload();
+    }
+
+    function addWaypoint() {
+      const div = document.createElement('div');
+      div.className = 'waypoint-row';
+      div.innerHTML = `<input class="wp-label" placeholder="Label"><input class="wp-lat" type="number" step="0.0001" placeholder="Lat"><input class="wp-lng" type="number" step="0.0001" placeholder="Lng"><input class="wp-min" type="number" placeholder="Min"><button onclick="this.parentElement.remove()">✕</button>`;
+      document.getElementById('waypoints-container').appendChild(div);
+    }
+
+    async function createEvent() {
+      const code = document.getElementById('event-code').value;
+      const title = document.getElementById('event-title').value;
+      const startAt = document.getElementById('event-start').value;
+      const endAt = document.getElementById('event-end').value;
+      const destLat = parseFloat(document.getElementById('event-dest-lat').value);
+      const destLng = parseFloat(document.getElementById('event-dest-lng').value);
+      const route = document.getElementById('event-route').value;
+
+      const wpRows = document.querySelectorAll('#waypoints-container .waypoint-row');
+      const waypoints = Array.from(wpRows).map(r => ({
+        label: r.querySelector('.wp-label').value,
+        latitude: parseFloat(r.querySelector('.wp-lat').value),
+        longitude: parseFloat(r.querySelector('.wp-lng').value),
+        scheduledAt: new Date(new Date(startAt).getTime() + parseInt(r.querySelector('.wp-min').value || '0') * 60000).toISOString(),
+      }));
+
+      const body = {
+        code, title, startAt, endAt: endAt || null, visibleAt: startAt,
+        routeGeoJson: route, waypoints, pois: [], careCenters: [], exitPoints: [], safeZones: [],
+        destinationLatitude: destLat, destinationLongitude: destLng
+      };
+
+      const res = await fetch('/api/events/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json();
+      document.getElementById('qr-container').innerHTML = `<p><b>Code:</b> ${data.code}</p><p>QR Code (scannez avec StreetPhare) :</p><img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(JSON.stringify(data))}" alt="QR Code">`;
+    }
+
+    connect();
+  </script>
+</body>
+</html>

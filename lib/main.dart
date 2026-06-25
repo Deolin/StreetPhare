@@ -31,6 +31,7 @@ import 'features/tutorial/data/tutorial_store.dart';
 import 'network/bootstrap.dart';
 import 'network/network_config.dart';
 import 'network/network_coordinator.dart';
+import 'network/server_heartbeat_service.dart';
 import 'services/apk_backup_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/notification_service.dart';
@@ -136,6 +137,12 @@ void main() async {
     }
   }
 
+  // Flag indiquant si l'initialisation réseau a réussi. Si false,
+  // les services dépendants de Hive (Geofencing, Proximity) ne
+  // démarrent pas, évitant la cascade "Bad state: HiveAlertDatabase
+  // non initialisée".
+  var networkInitOk = false;
+
   try {
     // Charge la clé maîtresse depuis le keystore sécurisé
     // (Android Keystore / iOS Keychain). Génère une clé
@@ -169,13 +176,17 @@ void main() async {
           '${describePlatform()}');
     }
 
-    // === Étape 5 : Intelligence StreetPhare ===
+    // === Étape 5 : Intelligence StreetPhare (services légers uniquement) ===
+    // Les services sans accès natif lourd démarrent ici.
     ConnectivityService.instance.start();
-    GeofencingService.instance.start();
-    ProximityValidationService.instance.start();
     EventManager.instance.start();
     HiveMessagingService.instance.start();
     unawaited(NotificationService.instance.showPersistentNotification());
+
+    networkInitOk = true;
+
+    // Démarre le heartbeat serveur après l'init réseau (FailoverManager prêt).
+    ServerHeartbeatService.instance.start();
   } catch (e, st) {
     if (kDebugMode) {
       debugPrint('[main] ERREUR initialisation réseau : $e\n$st');
@@ -188,6 +199,24 @@ void main() async {
   }
 
   runApp(StreetPhareApp());
+
+  // === Étape 6 : Services géolocalisés (démarrage différé après 1er rendu) ===
+  // Le GeofencingService et ProximityValidationService ouvrent des flux
+  // natifs (Geolocator.getPositionStream) qui peuvent saturer le thread UI
+  // et provoquer des drops de frames. On les démarre APRÈS le premier
+  // rendu pour que l'UI soit responsive immédiatement.
+  //
+  // ⚠️ Si l'init réseau a échoué, Hive n'a jamais été ouverte. On bloque
+  //    le démarrage pour éviter la cascade "Bad state: HiveAlertDatabase
+  //    non initialisée" en boucle.
+  if (networkInitOk) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      scheduleMicrotask(() {
+        GeofencingService.instance.start();
+        ProximityValidationService.instance.start();
+      });
+    });
+  }
 }
 
 Future<List<String>> _seedSingleBackup(

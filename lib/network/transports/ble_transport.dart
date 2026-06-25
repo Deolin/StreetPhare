@@ -168,6 +168,9 @@ class BleMeshTransport implements MeshTransport {
       return;
     }
 
+    // Enregistre l'identifiant local pour exclusion du compteur HIVE.
+    PeerCounterService.instance.setLocalPeerId(_peerId);
+
     // ── Scan passif avec connexion GATT automatique ──
     _scanSub = _ble
         .scanForDevices(
@@ -328,10 +331,13 @@ class BleMeshTransport implements MeshTransport {
     _lastDeviceSeen[device.id] = now;
 
     // Comptage HIVE (fenêtre glissante 5 min).
+    // Utilise device.id comme peerId stable et metadata SP_HIVE_ pour
+    // passer le filtre isStreetPharePeer(). device.name est souvent vide
+    // → on utilise toujours device.id comme fallback dans le metadata.
     PeerCounterService.instance.recordPeer(
       device.id,
       serviceUuid: serviceUuid.toString(),
-      metadata: device.name.isNotEmpty ? 'SP_HIVE_${device.name}' : null,
+      metadata: 'SP_HIVE_${device.id}',
     );
 
     if (kDebugMode) {
@@ -434,6 +440,7 @@ class BleMeshTransport implements MeshTransport {
 
   Future<void> _discoverServices(String deviceId) async {
     try {
+      // TODO: BLE — vérifier compatibilité API flutter_reactive_ble pour discoverServices (actuellement en deux appels)
       await _ble.discoverAllServices(deviceId);
       final services = await _ble.getDiscoveredServices(deviceId);
 

@@ -432,75 +432,111 @@ class OsmAndRoutingService {
 
   // ── OSRM public ──────────────────────────────────────────────────────────
 
-  /// Appel HTTP vers OSRM public demo en mode foot.
+  /// Appel HTTP vers OSRM public en mode foot.
   ///
-  /// Endpoint : GET /route/v1/foot/{lon1},{lat1};{lon2},{lat2}
+  /// IMPORTANT : router.project-osrm.org ne supporte QUE le profil
+  /// 'driving'. L'instance routing.openstreetmap.de (OSRD) supporte
+  /// le profil 'foot' (piéton).
+  ///
+  /// Endpoint : GET /routed-foot/route/v1/foot/{lon1},{lat1};{lon2},{lat2}
   ///            ?overview=full&geometries=geojson
   Future<List<RouteResult>> _computeViaOsrmPublic({
     required LatLng start,
     required LatLng end,
   }) async {
     final uri = Uri.parse(
-      'https://router.project-osrm.org/route/v1/foot/'
+      'https://routing.openstreetmap.de/routed-foot/route/v1/driving/'
       '${start.longitude.toStringAsFixed(6)},${start.latitude.toStringAsFixed(6)};'
       '${end.longitude.toStringAsFixed(6)},${end.latitude.toStringAsFixed(6)}'
       '?overview=full&geometries=geojson&alternatives=true',
     );
+
+    // Log l'URL exacte dans CLIENT_DEBUG.md pour le débogage.
+    if (kDebugMode) {
+      debugPrint('[OsmAnd] 🔗 OSRM foot URL: $uri');
+    }
 
     try {
       final resp = await http.get(uri, headers: {
         'User-Agent': 'StreetPhare/1.3 OsmAndBridge',
       }).timeout(_kHttpTimeout);
 
-      if (resp.statusCode != 200) return [];
+      if (resp.statusCode != 200) {
+        if (kDebugMode) {
+          debugPrint('[OsmAnd] ❌ OSRM HTTP ${resp.statusCode}: ${resp.body}');
+        }
+        return [];
+      }
 
-      return _parseOsrmResponse(resp.body);
-    } catch (_) {
+      final routes = _parseOsrmResponse(resp.body);
+      if (kDebugMode) {
+        debugPrint('[OsmAnd] ✅ OSRM foot → ${routes.length} route(s)');
+      }
+      return routes;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[OsmAnd] ❌ OSRM exception: $e');
+      }
       return [];
     }
   }
 
-  /// Parse la réponse JSON OSRM.
+  /// Parse la réponse JSON OSRM de manière robuste.
   ///
-  /// Format attendu :
-  /// ```json
-  /// {"routes":[{
-  ///   "geometry":{"coordinates":[[lon,lat],...],"type":"LineString"},
-  ///   "distance":1234.5,"duration":890
-  /// }]}
-  /// ```
+  /// En cas de format JSON inattendu, retourne une liste vide
+  /// plutôt que de crasher l'application.
   List<RouteResult> _parseOsrmResponse(String body) {
-    final json = jsonDecode(body) as Map<String, dynamic>;
-    final status = json['code'] as String? ?? '';
-    if (status != 'Ok') return [];
+    try {
+      final json = jsonDecode(body) as Map<String, dynamic>;
+      final status = json['code'] as String? ?? '';
+      if (status != 'Ok') {
+        if (kDebugMode) {
+          debugPrint('[OsmAnd] OSRM status non-Ok: $status');
+        }
+        return [];
+      }
 
-    final routes = json['routes'] as List<dynamic>? ?? [];
-    final results = <RouteResult>[];
+      final routes = json['routes'] as List<dynamic>? ?? [];
+      final results = <RouteResult>[];
 
-    for (int i = 0; i < routes.length; i++) {
-      final route = routes[i] as Map<String, dynamic>;
-      final geometry = route['geometry'] as Map<String, dynamic>?;
-      if (geometry == null) continue;
+      for (int i = 0; i < routes.length; i++) {
+        try {
+          final route = routes[i] as Map<String, dynamic>;
+          final geometry = route['geometry'] as Map<String, dynamic>?;
+          if (geometry == null) continue;
 
-      final coords = geometry['coordinates'] as List<dynamic>? ?? [];
-      final points = _coordsToLatLng(coords);
-      if (points.length < 2) continue;
+          final coords = geometry['coordinates'] as List<dynamic>? ?? [];
+          final points = _coordsToLatLng(coords);
+          if (points.length < 2) continue;
 
-      final distM = (route['distance'] as num?)?.toDouble() ?? 0;
+          final distM = (route['distance'] as num?)?.toDouble() ?? 0;
 
-      results.add(RouteResult(
-        id: i == 0 ? 'osmand_osrm_primary' : 'osmand_osrm_alt$i',
-        points: points,
-        totalDistanceMeters: distM,
-        totalRiskScore: 0,
-        pois: const [],
-        label: i == 0
-            ? '🌍 Itinéraire piéton OSM (OSRM public)'
-            : '🛤 Alternative OSRM $i',
-      ));
+          results.add(RouteResult(
+            id: i == 0 ? 'osmand_osrm_primary' : 'osmand_osrm_alt$i',
+            points: points,
+            totalDistanceMeters: distM,
+            totalRiskScore: 0,
+            pois: const [],
+            label: i == 0
+                ? '🌍 Itinéraire piéton OSM (OSRM)'
+                : '🛤 Alternative OSRM $i',
+          ));
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('[OsmAnd] Erreur parsing route $i: $e');
+          }
+          // Continue avec les autres routes.
+        }
+      }
+      return results;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[OsmAnd] ❌ Erreur parsing JSON OSRM: $e');
+      }
+      return [];
     }
-    return results;
   }
+
 
   // ── Utilitaires ───────────────────────────────────────────────────────────
 

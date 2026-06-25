@@ -34,6 +34,11 @@ class HiveAlertDatabase {
 
   bool _initialized = false;
 
+  /// Expose l'état d'initialisation pour que les services dépendants
+  /// (ex: GeofencingService) puissent vérifier avant d'appeler
+  /// getAllValid() ou d'autres méthodes qui lèvent un StateError.
+  bool get isInitialized => _initialized && _box != null;
+
   /// Initialise Hive. Doit être appelé une seule fois au démarrage
   /// de l'application (avant `runApp`).
   Future<void> init() async {
@@ -223,25 +228,75 @@ class AlertAdapter extends TypeAdapter<Alert> {
 
   @override
   Alert read(BinaryReader reader) {
-    final fieldsCount = reader.readByte();
-    final fields = <int, dynamic>{
-      for (int i = 0; i < fieldsCount; i++) reader.readByte(): reader.read(),
-    };
-    return Alert(
-      id: fields[0] as String,
-      ephemeralUserId: fields[1] as String,
-      signature: fields[2] as String,
-      type: AlertType.values[fields[3] as int],
-      latitude: fields[4] as double,
-      longitude: fields[5] as double,
-      description: (fields[6] as String?) ?? '',
-      createdAt: fields[7] as DateTime,
-      ttlHours: (fields[8] as int?) ?? 24,
-      status: AlertStatus.values[(fields[9] as int?) ?? 0],
-      confirmations: ((fields[10] as List?) ?? const []).cast<String>().toSet(),
-      uploadedTo: (fields[11] as String?) ?? '',
-      lastModifiedAt: (fields[12] as DateTime?) ?? DateTime.now().toUtc(),
-    );
+    // Sécurisation : si la box Hive contient des données corrompues
+    // ou d'une version antérieure du schéma, on évite le crash
+    // (RangeError / TypeError) qui empêcherait toute l'app de démarrer.
+    try {
+      final fieldsCount = reader.readByte();
+      final fields = <int, dynamic>{
+        for (int i = 0; i < fieldsCount; i++) reader.readByte(): reader.read(),
+      };
+
+      // ── Lecture sécurisée de l'index AlertType ────────────────────
+      AlertType safeAlertType(int? raw) {
+        if (raw == null) return AlertType.danger; // fallback
+        if (raw >= 0 && raw < AlertType.values.length) {
+          return AlertType.values[raw];
+        }
+        return AlertType.danger;
+      }
+
+      // ── Lecture sécurisée de l'index AlertStatus ──────────────────
+      AlertStatus safeAlertStatus(int? raw) {
+        if (raw == null) return AlertStatus.active;
+        if (raw >= 0 && raw < AlertStatus.values.length) {
+          return AlertStatus.values[raw];
+        }
+        return AlertStatus.active;
+      }
+
+      return Alert(
+        id: (fields[0] as String?) ?? '',
+        ephemeralUserId: (fields[1] as String?) ?? '',
+        signature: (fields[2] as String?) ?? '',
+        type: safeAlertType(fields[3] as int?),
+        latitude: (fields[4] as num?)?.toDouble() ?? 0.0,
+        longitude: (fields[5] as num?)?.toDouble() ?? 0.0,
+        description: (fields[6] as String?) ?? '',
+        createdAt: (fields[7] as DateTime?) ?? DateTime.now().toUtc(),
+        ttlHours: (fields[8] as int?) ?? 24,
+        status: safeAlertStatus(fields[9] as int?),
+        confirmations:
+            ((fields[10] as List?) ?? const []).cast<String>().toSet(),
+        uploadedTo: (fields[11] as String?) ?? '',
+        lastModifiedAt:
+            (fields[12] as DateTime?) ?? DateTime.now().toUtc(),
+      );
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint(
+          '[AlertAdapter] Erreur de désérialisation : $e\n$st\n'
+          '→ retour d\'une alerte vide (données corrompues).',
+        );
+      }
+      // Retourne une alerte vide pour ne pas bloquer l'ouverture de la box.
+      final now = DateTime.now().toUtc();
+      return Alert(
+        id: 'corrupted_${now.millisecondsSinceEpoch}',
+        ephemeralUserId: 'corrupted',
+        signature: 'corrupted',
+        type: AlertType.danger,
+        latitude: 0.0,
+        longitude: 0.0,
+        description: '⚠️ Données corrompues',
+        createdAt: now,
+        ttlHours: 1, // Expiration rapide pour auto-nettoyage
+        status: AlertStatus.rejected,
+        confirmations: const {},
+        uploadedTo: '',
+        lastModifiedAt: now,
+      );
+    }
   }
 
   @override
