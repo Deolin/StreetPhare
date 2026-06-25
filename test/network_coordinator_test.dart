@@ -165,9 +165,8 @@ void main() {
 
   group('createAlert()', () {
     test('crée une alerte avec les propriétés attendues', () async {
-      final coordinator = NetworkCoordinator.instance;
-
-      // Injecte le fakeDb dans le coordinateur via son champ privé.
+      // NetworkCoordinator est un singleton ; on vérifie uniquement
+      // ses propriétés publiques via le modèle Alert.
       // On utilise l'accès par le singleton déjà initialisé.
       // Comme le coordinateur est un singleton complexe, on teste
       // la logique de création via le modèle Alert directement.

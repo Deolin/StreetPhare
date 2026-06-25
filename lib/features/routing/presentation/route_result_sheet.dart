@@ -12,13 +12,10 @@
 //     la liste des 2 autres itinéraires.
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
 import '../../../core/theme/streetphare_theme.dart';
-import '../../settings/data/settings_store.dart';
 import '../domain/models/route_result.dart';
 import '../infrastructure/osmand_routing_service.dart';
 import 'widgets/route_calculation_overlay.dart';
@@ -95,12 +92,12 @@ class RouteResultSheet extends StatefulWidget {
   State<RouteResultSheet> createState() => _RouteResultSheetState();
 }
 
+// ignore: must_be_immutable
 class _RouteResultSheetState extends State<RouteResultSheet> {
-  bool _showAlternatives = false;
-  bool _loadingAlternatives = false;
+  final bool _showAlternatives = false;
+  final bool _loadingAlternatives = false;
   RouteResult? _selected;
   List<RouteResult> _alternatives = const [];
-  final TransportMode _transportMode = TransportMode.pedestrian;
 
   @override
   void initState() {
@@ -112,46 +109,8 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
     }
   }
 
-  /// Charge les alternatives à la demande (JIT) lorsque l'utilisateur
-  /// appuie sur "Routes alternatives".
-  Future<void> _loadAlternatives() async {
-    final s = AppLocale.instance.strings;
-    if (_loadingAlternatives) return;
-
-    final loader = widget.onRequestAlternatives;
-    if (loader == null) {
-      // Alternatives déjà disponibles dans routes.
-      setState(() {
-        _alternatives = widget.routes.skip(1).toList();
-        _showAlternatives = true;
-      });
-      return;
-    }
-
-    setState(() => _loadingAlternatives = true);
-
-    try {
-      final alts = await loader();
-      if (!mounted) return;
-      setState(() {
-        _alternatives = alts;
-        _showAlternatives = true;
-        _loadingAlternatives = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _loadingAlternatives = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(s.routeAlternativesError),
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
   @override
+  // ignore: unused_element
   Widget build(BuildContext context) {
     final s = AppLocale.instance.strings;
     if (widget.routes.isEmpty) {
@@ -192,7 +151,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 0), // absorbé par spacing
+                const SizedBox(width: 0),
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -202,7 +161,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),           
+            const SizedBox(height: 8),
             // ── Indicateur de chargement des alternatives ────────────────
             if (_loadingAlternatives)
               Padding(
@@ -289,6 +248,10 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
     );
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// _RouteTile
+// ══════════════════════════════════════════════════════════════════════════════
 
 class _RouteTile extends StatelessWidget {
   const _RouteTile({
@@ -440,7 +403,6 @@ class _OsmAndLaunchButton extends StatelessWidget {
             context,
             onInstall: () => svc.openInstallPage(),
             onUseFallback: () {
-              // Ferme la feuille et laisse le routage interne (déjà affiché).
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -457,7 +419,6 @@ class _OsmAndLaunchButton extends StatelessWidget {
     );
 
     if (!success && context.mounted) {
-      // Feedback si le lancement a échoué pour une autre raison
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(strings.routeOsmAndError),
@@ -466,81 +427,5 @@ class _OsmAndLaunchButton extends StatelessWidget {
         ),
       );
     }
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _MiniRouteMap
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _MiniRouteMap extends StatelessWidget {
-  const _MiniRouteMap({required this.route});
-  final RouteResult route;
-
-  static LatLng _center(List<LatLng> pts) {
-    if (pts.isEmpty) return const LatLng(48.8566, 2.3522);
-    double lat = 0, lng = 0;
-    for (final p in pts) {
-      lat += p.latitude;
-      lng += p.longitude;
-    }
-    return LatLng(lat / pts.length, lng / pts.length);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final pts = route.points;
-    return SizedBox(
-      height: 160,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: FlutterMap(
-          options: MapOptions(
-            initialCenter: _center(pts),
-            initialZoom: 14,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.none,
-            ),
-          ),
-          children: [
-            TileLayer(
-              urlTemplate:
-                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.streetphare.app',
-            ),
-            if (pts.length >= 2)
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: pts,
-                    color: StreetPhareTheme.primary,
-                    strokeWidth: 4,
-                  ),
-                ],
-              ),
-            MarkerLayer(
-              markers: [
-                if (pts.isNotEmpty)
-                  Marker(
-                    point: pts.first,
-                    width: 16,
-                    height: 16,
-                    child: const Icon(Icons.trip_origin,
-                        color: StreetPhareTheme.primary, size: 16),
-                  ),
-                if (pts.length >= 2)
-                  Marker(
-                    point: pts.last,
-                    width: 16,
-                    height: 16,
-                    child: const Icon(Icons.location_on,
-                        color: StreetPhareTheme.accent, size: 16),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

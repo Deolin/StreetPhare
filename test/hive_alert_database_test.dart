@@ -13,7 +13,6 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
-import 'package:path_provider/path_provider.dart';
 
 import 'package:flutter_streetphare/core/models/alert_model.dart';
 import 'package:flutter_streetphare/database/hive_alert_database.dart';
