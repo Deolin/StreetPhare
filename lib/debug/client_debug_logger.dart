@@ -149,12 +149,12 @@ class ClientDebugLogger {
       '🧭',
       'Bootstrap réseau',
       'Principal=$primaryAddress, '
-      'chaîne de secours=${decryptedBackupChain.length} entrée(s)',
+          'chaîne de secours=${decryptedBackupChain.length} entrée(s)',
     );
     _addStep(
       'Bootstrap terminé',
       'Principal verrouillé sur `$primaryAddress`. '
-      '${decryptedBackupChain.length} serveur(s) de secours déchiffré(s).',
+          '${decryptedBackupChain.length} serveur(s) de secours déchiffré(s).',
     );
     _scheduleWrite();
   }
@@ -208,7 +208,7 @@ class ClientDebugLogger {
     _addStep(
       'Basculement réussi',
       'Nouveau principal = `$toAddress`. '
-      'L\'ancien `$fromAddress` est marqué DÉFAILLANT pour la session.',
+          'L\'ancien `$fromAddress` est marqué DÉFAILLANT pour la session.',
     );
     _scheduleWrite();
   }
@@ -225,8 +225,8 @@ class ClientDebugLogger {
     _addStep(
       'Basculement impossible',
       'Tous les secours sont injoignables. L\'app reste '
-      'connectée à `$fromAddress` (marqué défaillant) jusqu\'à '
-      'relance de la session.',
+          'connectée à `$fromAddress` (marqué défaillant) jusqu\'à '
+          'relance de la session.',
     );
     _scheduleWrite();
   }
@@ -239,7 +239,7 @@ class ClientDebugLogger {
       '➕',
       'Nouveau backup en queue',
       '`${_short(cipher)}` (déchiffré: `$clear`). '
-      'Chaîne: ${_backupChain.length} entrée(s).',
+          'Chaîne: ${_backupChain.length} entrée(s).',
     );
     _scheduleWrite();
   }
@@ -346,8 +346,7 @@ class ClientDebugLogger {
   String _render() {
     final now = DateTime.now();
     String pad(int n) => n.toString().padLeft(2, '0');
-    final nowStr =
-        '${now.year}-${pad(now.month)}-${pad(now.day)} '
+    final nowStr = '${now.year}-${pad(now.month)}-${pad(now.day)} '
         '${pad(now.hour)}:${pad(now.minute)}:${pad(now.second)}';
 
     final stateIcon = switch (_globalState) {

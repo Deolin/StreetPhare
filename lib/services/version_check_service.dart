@@ -58,9 +58,11 @@ class VersionCheckService {
   /// Vérifie la version auprès du serveur principal.
   Future<void> checkVersion(BuildContext context) async {
     try {
-      final response = await http.get(
-        Uri.parse('${NetworkConfig.primaryServer}/api/version/check'),
-      ).timeout(const Duration(seconds: 5));
+      final response = await http
+          .get(
+            Uri.parse('${NetworkConfig.primaryServer}/api/version/check'),
+          )
+          .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -106,7 +108,8 @@ class VersionCheckService {
             backgroundColor: const Color(0xFF161B22),
             title: const Text(
               'Mise à jour obligatoire',
-              style: TextStyle(color: Color(0xFFF85149), fontWeight: FontWeight.bold),
+              style: TextStyle(
+                  color: Color(0xFFF85149), fontWeight: FontWeight.bold),
             ),
             content: Text(
               'Votre version actuelle ($currentVersion) est obsolète et ne permet plus '
@@ -117,12 +120,15 @@ class VersionCheckService {
             actions: [
               TextButton(
                 onPressed: () => _quitApp(),
-                child: const Text('Quitter l\'application', style: TextStyle(color: Colors.white54)),
+                child: const Text('Quitter l\'application',
+                    style: TextStyle(color: Colors.white54)),
               ),
               ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFB300)),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFB300)),
                 onPressed: () => _launchUpdateUrl(),
-                child: const Text('Mettre à jour manuellement', style: TextStyle(color: Colors.black)),
+                child: const Text('Mettre à jour manuellement',
+                    style: TextStyle(color: Colors.black)),
               ),
             ],
           ),

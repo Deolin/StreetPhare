@@ -46,7 +46,8 @@ class NotificationService {
     // Sur Windows, macOS et Linux, flutter_local_notifications requiert
     // des réglages spécifiques. On les fournit ici ; en cas d'échec
     // (runtime non supporté) on dégrade proprement.
-    if (!kIsWeb && (io.Platform.isWindows || io.Platform.isMacOS || io.Platform.isLinux)) {
+    if (!kIsWeb &&
+        (io.Platform.isWindows || io.Platform.isMacOS || io.Platform.isLinux)) {
       try {
         const windowsSettings = WindowsInitializationSettings(
           appName: 'StreetPhare',
@@ -112,7 +113,9 @@ class NotificationService {
 
   Future<void> showPersistentNotification() async {
     if (!_initialized) await init();
-    if (kIsWeb || !(io.Platform.isAndroid || io.Platform.isIOS || io.Platform.isMacOS)) return;
+    if (kIsWeb ||
+        !(io.Platform.isAndroid || io.Platform.isIOS || io.Platform.isMacOS))
+      return;
 
     const androidDetails = AndroidNotificationDetails(
       'streetphare_persistent',
@@ -293,16 +296,25 @@ Future<void> showBackgroundPermissionDialog(BuildContext context) async {
               ),
             ),
             const SizedBox(height: 16),
-            _buildPermStep(ctx, '1', 'Autoriser les notifications',
+            _buildPermStep(
+                ctx,
+                '1',
+                'Autoriser les notifications',
                 'Une notification persistante "StreetPhare actif" '
                     'sera affichée. Vous pouvez la réduire.'),
             const SizedBox(height: 10),
-            _buildPermStep(ctx, '2', 'Désactiver l\'optimisation batterie',
+            _buildPermStep(
+                ctx,
+                '2',
+                'Désactiver l\'optimisation batterie',
                 'Dans Paramètres → Batterie → StreetPhare → '
                     '"Sans restriction" (Android) ou '
                     '"Activité en arrière-plan" (iOS).'),
             const SizedBox(height: 10),
-            _buildPermStep(ctx, '3', 'Pourquoi c\'est important',
+            _buildPermStep(
+                ctx,
+                '3',
+                'Pourquoi c\'est important',
                 'Sans cette autorisation, les alertes de danger '
                     'à proximité ne seront pas reçues en veille.'),
           ],
@@ -314,10 +326,7 @@ Future<void> showBackgroundPermissionDialog(BuildContext context) async {
           child: Text(
             'Plus tard',
             style: TextStyle(
-              color: Theme.of(ctx)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.6),
+              color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
         ),
@@ -339,8 +348,7 @@ Future<void> showBackgroundPermissionDialog(BuildContext context) async {
   }
 }
 
-Widget _buildPermStep(
-    BuildContext ctx, String num, String title, String desc) {
+Widget _buildPermStep(BuildContext ctx, String num, String title, String desc) {
   final onSurface = Theme.of(ctx).colorScheme.onSurface;
   return Row(
     crossAxisAlignment: CrossAxisAlignment.start,

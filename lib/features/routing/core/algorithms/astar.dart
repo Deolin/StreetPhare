@@ -103,7 +103,8 @@ class Astar {
     for (int iter = 0; iter < maxNodes && iter < n; iter++) {
       // Phase forward : choisir le nœud forward non visité avec la meilleure
       // valeur f = g + h.
-      final fU = _selectNode(fDist, fHeuristic, fVisited, bestPathWeight, walkSpeed);
+      final fU =
+          _selectNode(fDist, fHeuristic, fVisited, bestPathWeight, walkSpeed);
       if (fU != -1) {
         fVisited[fU] = true;
         nodesExplored++;
@@ -127,7 +128,9 @@ class Astar {
           final alt = fDist[fU] + w;
           if (alt < fDist[to]) {
             fDist[to] = alt;
-            fHeuristic[to] = alt + _haversineHeuristic(graph, to, endNode) * profile.heuristicWeight;
+            fHeuristic[to] = alt +
+                _haversineHeuristic(graph, to, endNode) *
+                    profile.heuristicWeight;
             fPrev[to] = fU;
           }
         });
@@ -135,7 +138,8 @@ class Astar {
 
       // Phase backward : choisir le nœud backward non visité avec la meilleure
       // valeur f = g + h.
-      final bU = _selectNode(bDist, bHeuristic, bVisited, bestPathWeight, walkSpeed);
+      final bU =
+          _selectNode(bDist, bHeuristic, bVisited, bestPathWeight, walkSpeed);
       if (bU != -1) {
         bVisited[bU] = true;
         nodesExplored++;
@@ -159,7 +163,9 @@ class Astar {
             final alt = bDist[bU] + w;
             if (alt < bDist[v]) {
               bDist[v] = alt;
-              bHeuristic[v] = alt + _haversineHeuristic(graph, v, startNode) * profile.heuristicWeight;
+              bHeuristic[v] = alt +
+                  _haversineHeuristic(graph, v, startNode) *
+                      profile.heuristicWeight;
               bPrev[v] = bU;
             }
           });
@@ -179,7 +185,8 @@ class Astar {
     // Reconstruit le chemin complet.
     if (meetingNode == -1) {
       // Fallback : Dijkstra unidirectionnel.
-      final dijkstraResult = Dijkstra.compute(graph, startNode, endNode, maxIterations: maxNodes);
+      final dijkstraResult =
+          Dijkstra.compute(graph, startNode, endNode, maxIterations: maxNodes);
       return AstarResult(
         path: dijkstraResult,
         totalWeight: dijkstraResult.totalWeight,
@@ -212,7 +219,8 @@ class Astar {
       final bIdx = fullPath[i];
       final dLat = graph.nodeLat(bIdx) - graph.nodeLat(aIdx);
       final dLon = graph.nodeLon(bIdx) - graph.nodeLon(aIdx);
-      totalDistance += _approxDistance(dLat, dLon, (graph.nodeLat(aIdx) + graph.nodeLat(bIdx)) / 2);
+      totalDistance += _approxDistance(
+          dLat, dLon, (graph.nodeLat(aIdx) + graph.nodeLat(bIdx)) / 2);
     }
 
     final pathResult = PathResult(
@@ -256,11 +264,16 @@ class Astar {
   static double _haversineHeuristic(SpgGraph graph, int fromIdx, int toIdx) {
     final lat1 = graph.nodeLat(fromIdx) * math.pi / 180.0;
     final lat2 = graph.nodeLat(toIdx) * math.pi / 180.0;
-    final dLat = (graph.nodeLat(toIdx) - graph.nodeLat(fromIdx)) * math.pi / 180.0;
-    final dLon = (graph.nodeLon(toIdx) - graph.nodeLon(fromIdx)) * math.pi / 180.0;
+    final dLat =
+        (graph.nodeLat(toIdx) - graph.nodeLat(fromIdx)) * math.pi / 180.0;
+    final dLon =
+        (graph.nodeLon(toIdx) - graph.nodeLon(fromIdx)) * math.pi / 180.0;
 
     final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(lat1) * math.cos(lat2) * math.sin(dLon / 2) * math.sin(dLon / 2);
+        math.cos(lat1) *
+            math.cos(lat2) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
     final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return 6371000.0 * c;
   }
@@ -276,7 +289,8 @@ class Astar {
     return minVal;
   }
 
-  static double _approxDistance(double dLatDeg, double dLonDeg, double refLatDeg) {
+  static double _approxDistance(
+      double dLatDeg, double dLonDeg, double refLatDeg) {
     const double metersPerDeg = 111320.0;
     final midLat = refLatDeg * 3.141592653589793 / 180.0;
     final lonScale = metersPerDeg * _fastCos(midLat);

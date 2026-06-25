@@ -142,8 +142,7 @@ class SafePathEngine {
     for (int attempt = 0;
         altIndex < maxAlternatives && attempt < 6;
         attempt++) {
-      final jitter =
-          1.0 + alternativesJitter * (random.nextDouble() - 0.5) * 2;
+      final jitter = 1.0 + alternativesJitter * (random.nextDouble() - 0.5) * 2;
       final alt = _dijkstra(grid, grid.startIdx, grid.endIdx, jitter: jitter);
       if (alt == null || alt.points.isEmpty) continue;
       final sig = _signature(alt.points);
@@ -220,10 +219,8 @@ class SafePathEngine {
     for (int attempt = 0;
         altIndex < maxAlternatives && attempt < 6;
         attempt++) {
-      final jitter =
-          1.0 + alternativesJitter * (random.nextDouble() - 0.5) * 2;
-      final alt =
-          _dijkstra(grid, grid.startIdx, grid.endIdx, jitter: jitter);
+      final jitter = 1.0 + alternativesJitter * (random.nextDouble() - 0.5) * 2;
+      final alt = _dijkstra(grid, grid.startIdx, grid.endIdx, jitter: jitter);
       if (alt == null || alt.points.isEmpty) continue;
       final sig = _signature(alt.points);
       if (seen.contains(sig)) continue;
@@ -242,8 +239,7 @@ class SafePathEngine {
     }
 
     if (kDebugMode) {
-      debugPrint(
-          '[SafePathEngine] ${results.length} itinéraire(s) calculé(s)');
+      debugPrint('[SafePathEngine] ${results.length} itinéraire(s) calculé(s)');
       for (final r in results) {
         debugPrint(
             '  - ${r.label}: ${r.distanceLabel} risk=${r.totalRiskScore.toStringAsFixed(0)}');
@@ -413,8 +409,7 @@ class _Grid {
       if (!filters.shouldAvoid(a.type)) {
         // Danger accepté → pénalité douce (on s'éloigne si possible).
         if (dist < SafePathEngine.softPenaltyRadiusMeters) {
-          final factor =
-              1.0 - (dist / SafePathEngine.softPenaltyRadiusMeters);
+          final factor = 1.0 - (dist / SafePathEngine.softPenaltyRadiusMeters);
           penalty += SafePathEngine.softPenaltyWeight * factor;
         }
       } else {
@@ -450,12 +445,11 @@ class _Grid {
     );
     final midLat = (minLat + maxLat) / 2;
     final metersPerDegLat = 111320.0;
-    final metersPerDegLng =
-        111320.0 * math.cos(midLat * math.pi / 180.0);
+    final metersPerDegLng = 111320.0 * math.cos(midLat * math.pi / 180.0);
 
     final stepLat = effectiveStep / metersPerDegLat;
-    final stepLng = effectiveStep /
-        (metersPerDegLng.abs().clamp(1000, 1e9).toDouble());
+    final stepLng =
+        effectiveStep / (metersPerDegLng.abs().clamp(1000, 1e9).toDouble());
 
     final latCount = ((maxLat - minLat) / stepLat).ceil().clamp(2, 200);
     final lngCount = ((maxLng - minLng) / stepLng).ceil().clamp(2, 200);
@@ -521,17 +515,17 @@ class _Grid {
 
     // Voisins orthogonaux (Cardinal : N, S, E, W) — pas de pénalité piétonne.
     const cardinalNeighbors = [
-      [0, 1],   // Est
-      [1, 0],   // Sud
-      [0, -1],  // Ouest
-      [-1, 0],  // Nord
+      [0, 1], // Est
+      [1, 0], // Sud
+      [0, -1], // Ouest
+      [-1, 0], // Nord
     ];
 
     // Voisins diagonaux (NE, SE, SW, NW) — pénalisés × diagonalPenaltyFactor.
     const diagonalNeighbors = [
-      [1, 1],   // Sud-Est
-      [1, -1],  // Sud-Ouest
-      [-1, 1],  // Nord-Est
+      [1, 1], // Sud-Est
+      [1, -1], // Sud-Ouest
+      [-1, 1], // Nord-Est
       [-1, -1], // Nord-Ouest
     ];
 
@@ -569,8 +563,8 @@ class _Grid {
           final baseDist = GeofencingService.distanceBetween(cFrom, cTo);
           // Poids diagonal = distance physique × facteur de pénalité piétonne
           // + risque cellule destination.
-          final w = baseDist * constraints.diagonalPenaltyFactor
-              + cells[to].riskWeight;
+          final w = baseDist * constraints.diagonalPenaltyFactor +
+              cells[to].riskWeight;
           adjacency[from].add(_Edge(to, w));
         }
       }

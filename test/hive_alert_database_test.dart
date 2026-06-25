@@ -134,7 +134,8 @@ void main() {
       await db.insertOrMerge(incoming);
 
       final merged = db.getById('test-001');
-      expect(merged!.confirmations, containsAll(['eph-001', 'eph-002', 'eph-003']));
+      expect(merged!.confirmations,
+          containsAll(['eph-001', 'eph-002', 'eph-003']));
     });
 
     test('ne crée pas de doublon d\'id', () async {
@@ -147,7 +148,8 @@ void main() {
       expect(db.getAll().length, 1);
     });
 
-    test('passe en active quand le consensus est atteint (≥3 confirmations)', () async {
+    test('passe en active quand le consensus est atteint (≥3 confirmations)',
+        () async {
       final existing = testAlert(confirmations: {'eph-A', 'eph-B'});
       await db.upsert(existing);
 

@@ -63,6 +63,7 @@ extension NotificationFilterExt on NotificationFilter {
 /// Type de destination pour l'algorithme "Route Safe".
 enum RouteDestinationType {
   eventPoint,
+
   /// [PRIORITAIRE] Zone Safe OU Centre de soins le plus proche.
   safeZoneOrCareCenter,
   careCenter,
@@ -252,8 +253,8 @@ class AppPreferences {
   factory AppPreferences.fromJson(Map<String, dynamic> json) {
     final rawChannels = json['androidChannels'];
     final Map<String, bool> channels = rawChannels is Map
-        ? Map<String, bool>.from(
-            rawChannels.map((k, v) => MapEntry(k.toString(), v as bool? ?? true)))
+        ? Map<String, bool>.from(rawChannels
+            .map((k, v) => MapEntry(k.toString(), v as bool? ?? true)))
         : const {};
     return AppPreferences(
       batterySaverEnabled: (json['batterySaver'] as bool?) ?? false,
@@ -352,7 +353,7 @@ class AppPreferencesStore extends ValueNotifier<AppPreferences> {
   Future<void> setMessageFilter(MessageFilter filter) =>
       update(value.copyWith(messageFilter: filter));
 
-    /// Modifie la durée de cache des tuiles (en jours).
+  /// Modifie la durée de cache des tuiles (en jours).
   /// Minimum verrouillé à 7 jours pour garantir la disponibilité hors-ligne.
   Future<void> setMapCacheMaxAgeDays(int days) =>
       update(value.copyWith(mapCacheMaxAgeDays: days.clamp(7, 30)));

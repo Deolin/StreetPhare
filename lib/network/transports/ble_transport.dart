@@ -60,7 +60,8 @@ import '../p2p_mesh_service.dart';
 import '../../core/network/peer_counter_service.dart';
 
 /// UUID du service GATT StreetPhare.
-const String kStreetPhareBleServiceUuid = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const String kStreetPhareBleServiceUuid =
+    '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const String kStreetPhareBleCharUuid = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
 
 /// Nombre maximal de connexions GATT simultanées.
@@ -123,7 +124,8 @@ class BleMeshTransport implements MeshTransport {
   final Set<String> _pendingConnections = {};
 
   /// Subscriptions de connexion en cours.
-  final Map<String, StreamSubscription<ConnectionStateUpdate>> _connectSubs = {};
+  final Map<String, StreamSubscription<ConnectionStateUpdate>> _connectSubs =
+      {};
 
   // ── Ping ──────────────────────────────────────────────────────────
   Timer? _pingTimer;
@@ -172,12 +174,10 @@ class BleMeshTransport implements MeshTransport {
     PeerCounterService.instance.setLocalPeerId(_peerId);
 
     // ── Scan passif avec connexion GATT automatique ──
-    _scanSub = _ble
-        .scanForDevices(
+    _scanSub = _ble.scanForDevices(
       withServices: [serviceUuid],
       scanMode: ScanMode.lowLatency,
-    )
-        .listen(
+    ).listen(
       _onDeviceDiscovered,
       onError: (Object e) {
         if (kDebugMode) debugPrint('[BLE] scan error: $e');
@@ -469,9 +469,8 @@ class BleMeshTransport implements MeshTransport {
       }
 
       // Souscrit aux notifications pour recevoir les données.
-      final notificationSub = _ble
-          .subscribeToCharacteristic(dataChar)
-          .listen((data) {
+      final notificationSub =
+          _ble.subscribeToCharacteristic(dataChar).listen((data) {
         _onDataReceived(deviceId, data);
       }, onError: (Object e) {
         if (kDebugMode) {

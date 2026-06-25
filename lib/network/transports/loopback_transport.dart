@@ -37,7 +37,8 @@ import '../p2p_mesh_service.dart';
 /// WebSocket vers `ws://localhost:4000/sandbox`.
 class LoopbackMeshTransport implements MeshTransport {
   LoopbackMeshTransport({String? peerId})
-      : _peerId = peerId ?? 'sp-loopback-${DateTime.now().millisecondsSinceEpoch}';
+      : _peerId =
+            peerId ?? 'sp-loopback-${DateTime.now().millisecondsSinceEpoch}';
 
   // ignore: unused_field
   final String _peerId;
@@ -94,9 +95,8 @@ class LoopbackMeshTransport implements MeshTransport {
   Future<void> broadcast(String payload) async {
     // Pas de broadcast réel (le relay s'en charge).
     if (kDebugMode) {
-      final preview = payload.length > 80
-          ? '${payload.substring(0, 80)}...'
-          : payload;
+      final preview =
+          payload.length > 80 ? '${payload.substring(0, 80)}...' : payload;
       debugPrint('[LoopbackTransport] broadcast (ignoré) : $preview');
     }
   }

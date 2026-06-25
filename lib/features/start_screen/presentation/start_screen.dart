@@ -212,7 +212,8 @@ class _StartScreenState extends State<StartScreen>
                         decoration: BoxDecoration(
                           color: _carouselIndex == i
                               ? StreetPhareTheme.primary
-                              : StreetPhareTheme.textSecondary.withValues(alpha: 0.4),
+                              : StreetPhareTheme.textSecondary
+                                  .withValues(alpha: 0.4),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),

@@ -111,125 +111,125 @@ class _PermissionGuardScreenState extends State<PermissionGuardScreen> {
       backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),         
-            children: [
-              // ── Icône ─────────────────────────────────────────────
-              Icon(
-                Icons.shield_outlined,
-                size: 72,
-                color: theme.colorScheme.primary.withValues(alpha: 0.8),
-              ),
-              const SizedBox(height: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
+          children: [
+            // ── Icône ─────────────────────────────────────────────
+            Icon(
+              Icons.shield_outlined,
+              size: 72,
+              color: theme.colorScheme.primary.withValues(alpha: 0.8),
+            ),
+            const SizedBox(height: 24),
 
-              // ── Titre ─────────────────────────────────────────────
-              Text(
-                'Permissions requises',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
+            // ── Titre ─────────────────────────────────────────────
+            Text(
+              'Permissions requises',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+
+            // ── Description ───────────────────────────────────────
+            Text(
+              'StreetPhare a besoin de ces autorisations pour faire '
+              'fonctionner le réseau décentralisé P2P et détecter '
+              'les appareils à proximité.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+
+            // ── Liste des permissions ─────────────────────────────
+            if (result != null) ...[
+              for (final perm
+                  in PermissionGuardService.indispensablePermissions)
+                _PermissionTile(
+                  permission: perm,
+                  isGranted: !result.missingPermissions.contains(perm) &&
+                      !result.permanentlyDeniedPermissions.contains(perm),
+                  isPermanentlyDenied:
+                      result.permanentlyDeniedPermissions.contains(perm),
                 ),
-                textAlign: TextAlign.center,
+            ] else
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(),
+              ),
+
+            const SizedBox(height: 32),
+
+            // ── Message de statut ─────────────────────────────────
+            if (_statusMessage != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _statusMessage!.startsWith('✅')
+                      ? Colors.green.withValues(alpha: 0.1)
+                      : Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _statusMessage!.startsWith('✅')
+                        ? Colors.green.withValues(alpha: 0.3)
+                        : Colors.orange.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  _statusMessage!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: _statusMessage!.startsWith('✅')
+                        ? Colors.green.shade700
+                        : Colors.orange.shade800,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // ── Boutons d'action ──────────────────────────────────
+            if (result != null && !result.allGranted) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton.icon(
+                  onPressed: _isRequesting ? null : _onRequestPermissions,
+                  icon: _isRequesting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.check_circle_outline, size: 20),
+                  label: Text(
+                    _isRequesting
+                        ? 'Demande en cours…'
+                        : 'Activer les permissions',
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
-
-              // ── Description ───────────────────────────────────────
-              Text(
-                'StreetPhare a besoin de ces autorisations pour faire '
-                'fonctionner le réseau décentralisé P2P et détecter '
-                'les appareils à proximité.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: _onOpenSettings,
+                  icon: const Icon(Icons.settings, size: 20),
+                  label: const Text('Ouvrir les paramètres'),
                 ),
-                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 32),
-
-              // ── Liste des permissions ─────────────────────────────
-              if (result != null) ...[
-                for (final perm
-                    in PermissionGuardService.indispensablePermissions)
-                  _PermissionTile(
-                    permission: perm,
-                    isGranted: !result.missingPermissions.contains(perm) &&
-                        !result.permanentlyDeniedPermissions.contains(perm),
-                    isPermanentlyDenied:
-                        result.permanentlyDeniedPermissions.contains(perm),
-                  ),
-              ] else
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: CircularProgressIndicator(),
-                ),
-
-              const SizedBox(height: 32),
-
-              // ── Message de statut ─────────────────────────────────
-              if (_statusMessage != null) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _statusMessage!.startsWith('✅')
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: _statusMessage!.startsWith('✅')
-                          ? Colors.green.withValues(alpha: 0.3)
-                          : Colors.orange.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Text(
-                    _statusMessage!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: _statusMessage!.startsWith('✅')
-                          ? Colors.green.shade700
-                          : Colors.orange.shade800,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // ── Boutons d'action ──────────────────────────────────
-              if (result != null && !result.allGranted) ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: FilledButton.icon(
-                    onPressed: _isRequesting ? null : _onRequestPermissions,
-                    icon: _isRequesting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.check_circle_outline, size: 20),
-                    label: Text(
-                      _isRequesting
-                          ? 'Demande en cours…'
-                          : 'Activer les permissions',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton.icon(
-                    onPressed: _onOpenSettings,
-                    icon: const Icon(Icons.settings, size: 20),
-                    label: const Text('Ouvrir les paramètres'),
-                  ),
-                ),
-              ],
             ],
-          ),
+          ],
         ),
-      );
+      ),
+    );
   }
 }
 
@@ -297,8 +297,7 @@ class _PermissionTile extends StatelessWidget {
                   Text(
                     PermissionGuardResult.impactFor(permission),
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   const SizedBox(height: 6),

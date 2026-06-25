@@ -36,8 +36,7 @@ void main() {
 
     test('TTL par défaut = 24 heures', () {
       expect(baseAlert.ttlHours, 24);
-      final expectedExpiry =
-          baseAlert.createdAt.add(const Duration(hours: 24));
+      final expectedExpiry = baseAlert.createdAt.add(const Duration(hours: 24));
       expect(baseAlert.expiresAt, expectedExpiry);
     });
 

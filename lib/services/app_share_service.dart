@@ -107,25 +107,29 @@ class AppShareService {
     // ── Niveau 1 : Canal natif (ApplicationInfo.sourceDir) ─────────────────
     final nativePath = await _locateViaNativeChannel();
     if (nativePath != null) {
-      debugPrint('[AppShareService] APK localisé via canal natif : $nativePath');
+      debugPrint(
+          '[AppShareService] APK localisé via canal natif : $nativePath');
       return nativePath;
     }
 
     // ── Niveau 2 : Sauvegarde locale ApkBackupService ──────────────────────
     final backupPath = await _locateViaBackup();
     if (backupPath != null) {
-      debugPrint('[AppShareService] APK localisé via sauvegarde locale : $backupPath');
+      debugPrint(
+          '[AppShareService] APK localisé via sauvegarde locale : $backupPath');
       return backupPath;
     }
 
     // ── Niveau 3 : Scan du répertoire /data/app/ (fallback hérité) ─────────
     final scanPath = await _locateViaDataAppScan();
     if (scanPath != null) {
-      debugPrint('[AppShareService] APK localisé via scan /data/app/ : $scanPath');
+      debugPrint(
+          '[AppShareService] APK localisé via scan /data/app/ : $scanPath');
       return scanPath;
     }
 
-    debugPrint('[AppShareService] Échec de toutes les stratégies de localisation.');
+    debugPrint(
+        '[AppShareService] Échec de toutes les stratégies de localisation.');
     return null;
   }
 
@@ -134,13 +138,15 @@ class AppShareService {
   Future<String?> _locateViaNativeChannel() async {
     try {
       const channel = MethodChannel('streetphare/apk_info');
-      final String? path = await channel.invokeMethod<String>('getSourceApkPath');
+      final String? path =
+          await channel.invokeMethod<String>('getSourceApkPath');
       if (path != null && path.isNotEmpty) {
         final file = File(path);
         if (await file.exists()) {
           return path;
         }
-        debugPrint('[AppShareService] Canal natif a retourné un chemin inexistant : $path');
+        debugPrint(
+            '[AppShareService] Canal natif a retourné un chemin inexistant : $path');
       }
     } on MissingPluginException {
       debugPrint('[AppShareService] Canal natif non enregistré côté Android.');
@@ -163,7 +169,8 @@ class AppShareService {
         if (await file.exists()) {
           return backupPath;
         }
-        debugPrint('[AppShareService] Sauvegarde locale introuvable (fichier supprimé) : $backupPath');
+        debugPrint(
+            '[AppShareService] Sauvegarde locale introuvable (fichier supprimé) : $backupPath');
       }
     } catch (e) {
       debugPrint('[AppShareService] Erreur récupération sauvegarde : $e');

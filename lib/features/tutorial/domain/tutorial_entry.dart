@@ -92,7 +92,6 @@ class TutorialEntry {
 /// catégorie. Ces descriptions sont volontairement fonctionnelles :
 /// elles expliquent l'expérience utilisateur, pas l'implémentation.
 const List<TutorialEntry> kTutorialEntries = [
-
   // ── Navigation ─────────────────────────────────────────────────────────────
 
   TutorialEntry(
@@ -114,8 +113,7 @@ const List<TutorialEntry> kTutorialEntries = [
   TutorialEntry(
     category: TutorialCategory.navigation,
     feature: 'Itinéraires alternatifs',
-    description:
-        'Le moteur vous propose jusqu\'à 3 variantes d\'itinéraire. '
+    description: 'Le moteur vous propose jusqu\'à 3 variantes d\'itinéraire. '
         'Choisissez celui qui vous convient selon la distance et le '
         'niveau de risque estimé.',
   ),
@@ -133,8 +131,7 @@ const List<TutorialEntry> kTutorialEntries = [
   TutorialEntry(
     category: TutorialCategory.coordination,
     feature: 'Réseau de proximité',
-    description:
-        'L\'application échange des informations avec les appareils '
+    description: 'L\'application échange des informations avec les appareils '
         'à proximité, même sans connexion internet. Plus les participants '
         'sont nombreux et proches, plus le réseau est robuste.',
   ),
@@ -149,8 +146,7 @@ const List<TutorialEntry> kTutorialEntries = [
   TutorialEntry(
     category: TutorialCategory.coordination,
     feature: 'Étapes juste-à-temps',
-    description:
-        'Les points de rassemblement d\'un événement sont révélés '
+    description: 'Les points de rassemblement d\'un événement sont révélés '
         'progressivement, selon l\'avancement du parcours. Une étape '
         'disparaît automatiquement une fois franchie ou expirée.',
   ),
@@ -168,24 +164,21 @@ const List<TutorialEntry> kTutorialEntries = [
   TutorialEntry(
     category: TutorialCategory.securite,
     feature: 'Centre de soins',
-    description:
-        'L\'application indique sur la carte les points de secours et '
+    description: 'L\'application indique sur la carte les points de secours et '
         'd\'assistance médicale déclarés pour votre événement. '
         'Le moteur Route Safe peut vous y guider automatiquement.',
   ),
   TutorialEntry(
     category: TutorialCategory.securite,
     feature: 'Zones de repli',
-    description:
-        'Des zones de sécurité prédéfinies sont intégrées dans chaque '
+    description: 'Des zones de sécurité prédéfinies sont intégrées dans chaque '
         'événement. En cas de besoin, le moteur de navigation vous '
         'oriente vers la plus proche.',
   ),
   TutorialEntry(
     category: TutorialCategory.securite,
     feature: 'Confidentialité totale',
-    description:
-        'Aucune donnée personnelle n\'est collectée ni transmise à '
+    description: 'Aucune donnée personnelle n\'est collectée ni transmise à '
         'des serveurs tiers. Votre identité est protégée : l\'application '
         'utilise des identifiants temporaires renouvelés régulièrement.',
   ),
@@ -195,24 +188,21 @@ const List<TutorialEntry> kTutorialEntries = [
   TutorialEntry(
     category: TutorialCategory.alertes,
     feature: 'Signaler un danger',
-    description:
-        'Appuyez sur la carte pour signaler un danger (barrage, zone '
+    description: 'Appuyez sur la carte pour signaler un danger (barrage, zone '
         'encerclée, contrôle, accident...). Votre signalement est '
         'automatiquement partagé avec les participants proches.',
   ),
   TutorialEntry(
     category: TutorialCategory.alertes,
     feature: 'Confirmation collective',
-    description:
-        'Un signalement devient visible sur la carte de tous une fois '
+    description: 'Un signalement devient visible sur la carte de tous une fois '
         'confirmé par au moins 3 participants. Cela limite les fausses '
         'alertes et renforce la fiabilité de l\'information.',
   ),
   TutorialEntry(
     category: TutorialCategory.alertes,
     feature: 'Expiration automatique',
-    description:
-        'Les alertes ont une durée de vie limitée. Une alerte non '
+    description: 'Les alertes ont une durée de vie limitée. Une alerte non '
         'reconfirmée disparaît automatiquement de la carte pour que '
         'les informations restent actuelles.',
   ),
@@ -222,16 +212,14 @@ const List<TutorialEntry> kTutorialEntries = [
   TutorialEntry(
     category: TutorialCategory.configuration,
     feature: 'Mode Économe',
-    description:
-        'Active un fonctionnement réduit pour préserver la batterie '
+    description: 'Active un fonctionnement réduit pour préserver la batterie '
         'lors des longues journées. Les mises à jour sont moins fréquentes '
         'mais l\'essentiel reste opérationnel.',
   ),
   TutorialEntry(
     category: TutorialCategory.configuration,
     feature: 'Filtres d\'évitement',
-    description:
-        'Personnalisez les types de dangers que le moteur Route Safe '
+    description: 'Personnalisez les types de dangers que le moteur Route Safe '
         'doit impérativement contourner. Les autres types sont signalés '
         'mais l\'itinéraire peut les frôler si nécessaire.',
   ),

@@ -137,8 +137,7 @@ class P2PMeshService {
   final _peersController = StreamController<List<MeshPeer>>.broadcast();
   Stream<List<MeshPeer>> get peers => _peersController.stream;
 
-  final _alertsReceivedController =
-      StreamController<Alert>.broadcast();
+  final _alertsReceivedController = StreamController<Alert>.broadcast();
   Stream<Alert> get alertsReceived => _alertsReceivedController.stream;
 
   /// Stream des signaux "panic" bruts reçus des pairs.
@@ -183,7 +182,8 @@ class P2PMeshService {
             debugPrint('[P2PMeshService] transport ${t.name} démarré');
           }
         } else if (kDebugMode) {
-          debugPrint('[P2PMeshService] transport ${t.name} ignoré (non supporté)');
+          debugPrint(
+              '[P2PMeshService] transport ${t.name} ignoré (non supporté)');
         }
       } on UnimplementedError catch (e) {
         if (kDebugMode) {
@@ -212,7 +212,8 @@ class P2PMeshService {
         try {
           await t.broadcast(payload);
         } catch (e) {
-          if (kDebugMode) debugPrint('[P2PMeshService] broadcast ${t.name}: $e');
+          if (kDebugMode)
+            debugPrint('[P2PMeshService] broadcast ${t.name}: $e');
         }
       })),
     );
@@ -241,15 +242,19 @@ class P2PMeshService {
     final payload = jsonEncode(json);
     // Les transports "locaux" sont identifiés par leur nom :
     // 'ble', 'wifi', 'wifi_direct', 'nearby'. Le relay est exclu.
-    final localTransports = transports.where(
-      (t) => !t.name.toLowerCase().contains('relay') &&
-             !t.name.toLowerCase().contains('remote') &&
-             !t.name.toLowerCase().contains('server'),
-    ).toList();
+    final localTransports = transports
+        .where(
+          (t) =>
+              !t.name.toLowerCase().contains('relay') &&
+              !t.name.toLowerCase().contains('remote') &&
+              !t.name.toLowerCase().contains('server'),
+        )
+        .toList();
 
     if (localTransports.isEmpty || !localTransports.any((t) => t.isAvailable)) {
       if (kDebugMode) {
-        debugPrint('[P2PMeshService] no local transport available, fallback to all');
+        debugPrint(
+            '[P2PMeshService] no local transport available, fallback to all');
       }
       unawaited(broadcastRawJson(json));
       return;
@@ -326,8 +331,8 @@ class P2PMeshService {
   /// Ping simple pour la découverte (les vrais implémentations
   /// remontent déjà la liste via les callbacks natifs BLE/Wi-Fi).
   void _pingPeers() {
-    _peers.removeWhere((_, p) =>
-        DateTime.now().toUtc().difference(p.lastSeen).inMinutes > 5);
+    _peers.removeWhere(
+        (_, p) => DateTime.now().toUtc().difference(p.lastSeen).inMinutes > 5);
     _peersController.add(_peers.values.toList());
   }
 
@@ -395,7 +400,7 @@ class P2PMeshService {
       // Cas 4 : ping de présence.
       if (json['kind'] == 'ping' && json['id'] is String) {
         final peerId = json['id'] as String;
-        
+
         // Exclure l'hôte local (Requirement #3)
         if (peerId == localPeerId) return;
 
@@ -462,7 +467,8 @@ class P2PMeshService {
     if (missing.isEmpty) return;
 
     if (kDebugMode) {
-      debugPrint('[P2PMeshService] gossip: ${missing.length} alertes inconnues');
+      debugPrint(
+          '[P2PMeshService] gossip: ${missing.length} alertes inconnues');
     }
   }
 }

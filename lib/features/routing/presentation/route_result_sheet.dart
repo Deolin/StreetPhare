@@ -307,7 +307,9 @@ class _RouteTile extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            route.label.isEmpty ? strings.routeItinerary : route.label,
+                            route.label.isEmpty
+                                ? strings.routeItinerary
+                                : route.label,
                             style: const TextStyle(
                               color: StreetPhareTheme.textPrimary,
                               fontWeight: FontWeight.w600,
@@ -391,7 +393,8 @@ class _OsmAndLaunchButton extends StatelessWidget {
     final svc = OsmAndRoutingService.instance;
     final start = route.points.first;
     final end = route.points.last;
-    final destName = route.label.isNotEmpty ? route.label : strings.routeDestination;
+    final destName =
+        route.label.isNotEmpty ? route.label : strings.routeDestination;
 
     final success = await svc.launchExternalNavigation(
       start: start,

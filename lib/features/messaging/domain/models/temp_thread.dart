@@ -65,7 +65,8 @@ class TempThread {
     buffer.write('{"id":"$id",');
     buffer.write('"createdAt":"${createdAt.toUtc().toIso8601String()}",');
     buffer.write('"durationMinutes":$durationMinutes,');
-    buffer.write('"participantIds":[${participantIds.map((p) => '"$p"').join(',')}],');
+    buffer.write(
+        '"participantIds":[${participantIds.map((p) => '"$p"').join(',')}],');
     buffer.write('"color":$color');
     if (label != null) {
       buffer.write(',"label":"$label"');

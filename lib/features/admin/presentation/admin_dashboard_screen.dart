@@ -100,21 +100,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   label: 'Injecter Alertes (×3)',
                   icon: Icons.warning_amber,
                   color: Colors.redAccent,
-                  onTap: () => SandboxController.instance.injectAlerts(count: 3),
+                  onTap: () =>
+                      SandboxController.instance.injectAlerts(count: 3),
                 ),
                 const SizedBox(height: 8),
                 _SandboxButton(
                   label: 'Injecter Événement',
                   icon: Icons.event,
                   color: Colors.greenAccent,
-                  onTap: () => SandboxController.instance.injectEvents(count: 1),
+                  onTap: () =>
+                      SandboxController.instance.injectEvents(count: 1),
                 ),
                 const SizedBox(height: 8),
                 _SandboxButton(
                   label: 'Messages Hive (×5)',
                   icon: Icons.message,
                   color: Colors.amberAccent,
-                  onTap: () => SandboxController.instance.injectMessages(count: 5),
+                  onTap: () =>
+                      SandboxController.instance.injectMessages(count: 5),
                 ),
                 const SizedBox(height: 8),
                 ValueListenableBuilder<int>(

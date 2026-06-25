@@ -36,7 +36,8 @@ class SpgLoader {
 
     // Validation du magic number
     if (header.magic != kSpgMagic) {
-      throw FormatException('Magic number invalide: ${header.magic.toRadixString(16)}');
+      throw FormatException(
+          'Magic number invalide: ${header.magic.toRadixString(16)}');
     }
     if (header.version != kSpgVersion) {
       throw FormatException('Version .spg non supportée: ${header.version}');
@@ -86,14 +87,20 @@ class SpgLoader {
 
     // 4) Construit l'index spatial (maillage fixe ~500 m)
     final cellSizeDeg = 0.0045; // ~500 m à 50°N
-    final cellsX = ((header.maxLon - header.minLon) / cellSizeDeg).ceil().clamp(1, 500);
-    final cellsY = ((header.maxLat - header.minLat) / cellSizeDeg).ceil().clamp(1, 500);
+    final cellsX =
+        ((header.maxLon - header.minLon) / cellSizeDeg).ceil().clamp(1, 500);
+    final cellsY =
+        ((header.maxLat - header.minLat) / cellSizeDeg).ceil().clamp(1, 500);
 
     // Compte les nœuds par cellule
     final cellCounts = Uint32List(cellsX * cellsY);
     for (int i = 0; i < header.nodeCount; i++) {
-      final cx = ((nodeLons[i] - header.minLon) / cellSizeDeg).floor().clamp(0, cellsX - 1);
-      final cy = ((nodeLats[i] - header.minLat) / cellSizeDeg).floor().clamp(0, cellsY - 1);
+      final cx = ((nodeLons[i] - header.minLon) / cellSizeDeg)
+          .floor()
+          .clamp(0, cellsX - 1);
+      final cy = ((nodeLats[i] - header.minLat) / cellSizeDeg)
+          .floor()
+          .clamp(0, cellsY - 1);
       cellCounts[cy * cellsX + cx]++;
     }
 
@@ -113,8 +120,12 @@ class SpgLoader {
     }
 
     for (int i = 0; i < header.nodeCount; i++) {
-      final cx = ((nodeLons[i] - header.minLon) / cellSizeDeg).floor().clamp(0, cellsX - 1);
-      final cy = ((nodeLats[i] - header.minLat) / cellSizeDeg).floor().clamp(0, cellsY - 1);
+      final cx = ((nodeLons[i] - header.minLon) / cellSizeDeg)
+          .floor()
+          .clamp(0, cellsX - 1);
+      final cy = ((nodeLats[i] - header.minLat) / cellSizeDeg)
+          .floor()
+          .clamp(0, cellsY - 1);
       final cellIdx = cy * cellsX + cx;
       spatialNodeIds[tempOffsets[cellIdx]] = i;
       tempOffsets[cellIdx]++;

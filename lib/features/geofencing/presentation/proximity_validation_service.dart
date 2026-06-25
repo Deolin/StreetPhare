@@ -43,10 +43,8 @@ class ProximityValidationService {
 
   StreamSubscription<GeofenceEvent>? _geofenceSub;
 
-  final _filteredEventsController =
-      StreamController<GeofenceEvent>.broadcast();
-  Stream<GeofenceEvent> get filteredEvents =>
-      _filteredEventsController.stream;
+  final _filteredEventsController = StreamController<GeofenceEvent>.broadcast();
+  Stream<GeofenceEvent> get filteredEvents => _filteredEventsController.stream;
 
   /// Map id d'alerte → timestamp du dernier vote OUI/NON posé.
   final Map<String, DateTime> _lastVoteTimestamps = <String, DateTime>{};
@@ -119,8 +117,8 @@ class ProximityValidationService {
   Duration cooldownRemainingFor(String alertId) {
     final last = _lastVoteTimestamps[alertId];
     if (last == null) return Duration.zero;
-    final remaining = antiSpamCooldown -
-        DateTime.now().toUtc().difference(last);
+    final remaining =
+        antiSpamCooldown - DateTime.now().toUtc().difference(last);
     return remaining.isNegative ? Duration.zero : remaining;
   }
 

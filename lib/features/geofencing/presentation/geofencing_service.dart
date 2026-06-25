@@ -271,8 +271,7 @@ class GeofencingService extends WidgetsBindingObserver {
 
   /// Renvoie la distance grand-cercle (en m) entre deux positions
   /// (utilitaire public pour d'autres services / tests).
-  static double distanceBetween(LatLng a, LatLng b) =>
-      _distanceMeters(a, b);
+  static double distanceBetween(LatLng a, LatLng b) => _distanceMeters(a, b);
 
   void stop() {
     _posSub?.cancel();

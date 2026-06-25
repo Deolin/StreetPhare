@@ -100,12 +100,12 @@ class OsmAndNativeChannel {
         {
           'startLat': start.latitude,
           'startLon': start.longitude,
-          'endLat':   end.latitude,
-          'endLon':   end.longitude,
+          'endLat': end.latitude,
+          'endLon': end.longitude,
           'avoidPoints': avoidPoints
               .map((p) => {
-                    'lat':    p.lat,
-                    'lon':    p.lon,
+                    'lat': p.lat,
+                    'lon': p.lon,
                     'radius': p.radiusMeters,
                   })
               .toList(),
@@ -114,7 +114,6 @@ class OsmAndNativeChannel {
 
       if (rawResult == null) return NativeRouteResult.empty;
       return NativeRouteResult.fromMap(rawResult);
-
     } on PlatformException catch (e) {
       if (kDebugMode) debugPrint('[NativeChannel] PlatformException: $e');
       return NativeRouteResult.withError(e.message ?? 'Erreur native inconnue');
@@ -143,12 +142,12 @@ class OsmAndNativeChannel {
         {
           'startLat': start.latitude,
           'startLon': start.longitude,
-          'endLat':   end.latitude,
-          'endLon':   end.longitude,
+          'endLat': end.latitude,
+          'endLon': end.longitude,
           'avoidPoints': avoidPoints
               .map((p) => {
-                    'lat':    p.lat,
-                    'lon':    p.lon,
+                    'lat': p.lat,
+                    'lon': p.lon,
                     'radius': p.radiusMeters,
                   })
               .toList(),
@@ -157,7 +156,6 @@ class OsmAndNativeChannel {
 
       if (rawResult == null) return NativeRouteResult.empty;
       return NativeRouteResult.fromMap(rawResult);
-
     } on PlatformException catch (e) {
       if (kDebugMode) debugPrint('[NativeChannel] Alternatives error: $e');
       return NativeRouteResult.withError(e.message ?? 'Erreur native inconnue');
@@ -218,7 +216,7 @@ class NativeRouteResult {
   final String? errorMessage;
 
   bool get hasError => errorMessage != null;
-  bool get isEmpty  => routes.isEmpty;
+  bool get isEmpty => routes.isEmpty;
 
   static const platformUnsupported = NativeRouteResult(
     routes: [],
@@ -255,7 +253,7 @@ class NativeRouteResult {
   /// ```
   factory NativeRouteResult.fromMap(Map<String, dynamic> map) {
     final source = map['source'] as String? ?? 'unknown';
-    final error  = map['error']  as String?;
+    final error = map['error'] as String?;
 
     final rawRoutes = map['routes'] as List<dynamic>? ?? [];
     final routes = <RouteResult>[];
@@ -279,12 +277,12 @@ class NativeRouteResult {
       if (points.length < 2) continue;
 
       routes.add(RouteResult(
-        id:                   r['id']             as String? ?? 'gh_$i',
-        label:                r['label']          as String? ?? 'Itinéraire $i',
+        id: r['id'] as String? ?? 'gh_$i',
+        label: r['label'] as String? ?? 'Itinéraire $i',
         totalDistanceMeters: (r['distanceMeters'] as num?)?.toDouble() ?? 0,
-        totalRiskScore:       0,
-        pois:                 const [],
-        points:               points,
+        totalRiskScore: 0,
+        pois: const [],
+        points: points,
       ));
     }
 

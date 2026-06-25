@@ -192,8 +192,7 @@ Future<List<String>> loadPersistedBackupChain() async {
   return prefs.getStringList('streetphare_backup_chain') ?? const [];
 }
 
-String serializeBackupChain(List<String> ciphered) =>
-    jsonEncode(ciphered);
+String serializeBackupChain(List<String> ciphered) => jsonEncode(ciphered);
 
 List<String> deserializeBackupChain(String raw) {
   final list = jsonDecode(raw) as List;

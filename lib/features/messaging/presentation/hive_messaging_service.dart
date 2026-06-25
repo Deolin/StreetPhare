@@ -185,7 +185,8 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
     _outbox.add(messageJson);
     unawaited(_persistOutbox());
     if (kDebugMode) {
-      debugPrint('[HiveMessaging] message mis en outbox (${_outbox.length} en attente)');
+      debugPrint(
+          '[HiveMessaging] message mis en outbox (${_outbox.length} en attente)');
     }
   }
 
@@ -355,7 +356,8 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
 
       // [2] Filtrage des utilisateurs bloqués.
       if (HiveBlockService.instance.isBlocked(msg.senderEphemeralId)) {
-        debugPrint('[HiveMessaging] message filtré (user bloqué): ${msg.senderEphemeralId}');
+        debugPrint(
+            '[HiveMessaging] message filtré (user bloqué): ${msg.senderEphemeralId}');
         return;
       }
 
@@ -377,34 +379,32 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
     final filter = AppPreferencesStore.instance.value.messageFilter;
     final now = DateTime.now().toUtc();
 
-    final filtered = _allMessages.values
-        .where((msg) {
-          // Filtre : messages expirés.
-          if (now.difference(msg.sentAt) > _kMessageTtl) return false;
+    final filtered = _allMessages.values.where((msg) {
+      // Filtre : messages expirés.
+      if (now.difference(msg.sentAt) > _kMessageTtl) return false;
 
-          // [2] Filtre : utilisateurs bloqués (filtrage en temps réel).
-          if (HiveBlockService.instance.isBlocked(msg.senderEphemeralId)) {
-            return false;
-          }
+      // [2] Filtre : utilisateurs bloqués (filtrage en temps réel).
+      if (HiveBlockService.instance.isBlocked(msg.senderEphemeralId)) {
+        return false;
+      }
 
-          // Filtre par type configuré dans les préférences.
-          switch (filter) {
-            case MessageFilter.all:
-              return true;
+      // Filtre par type configuré dans les préférences.
+      switch (filter) {
+        case MessageFilter.all:
+          return true;
 
-            case MessageFilter.nearbyOnly:
-              if (userPosition == null || msg.position == null) return true;
-              final dist = _haversineMeters(userPosition, msg.position!);
-              return dist <= _kNearbyRadiusMeters;
+        case MessageFilter.nearbyOnly:
+          if (userPosition == null || msg.position == null) return true;
+          final dist = _haversineMeters(userPosition, msg.position!);
+          return dist <= _kNearbyRadiusMeters;
 
-            case MessageFilter.adminOnly:
-              return msg.isFromAdmin;
+        case MessageFilter.adminOnly:
+          return msg.isFromAdmin;
 
-            case MessageFilter.alertOnly:
-              return msg.type == HiveMessageType.alert;
-          }
-        })
-        .toList()
+        case MessageFilter.alertOnly:
+          return msg.type == HiveMessageType.alert;
+      }
+    }).toList()
       ..sort((a, b) => b.sentAt.compareTo(a.sentAt)); // Plus récent en premier.
 
     value = filtered;

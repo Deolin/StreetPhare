@@ -19,8 +19,7 @@ import 'dart:convert';
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flutter_streetphare/database/crypto_utils.dart'
-    as streetphare;
+import 'package:flutter_streetphare/database/crypto_utils.dart' as streetphare;
 
 void main() {
   group('CryptoUtils — AES-256-CBC + HMAC-SHA256 (sel aléatoire)', () {
@@ -60,7 +59,9 @@ void main() {
       expect(decrypted, testAddress);
     });
 
-    test('deux chiffrements produisent des ciphertexts distincts (sel aléatoire)', () async {
+    test(
+        'deux chiffrements produisent des ciphertexts distincts (sel aléatoire)',
+        () async {
       final c1 = await crypto.encryptAddress(testAddress, masterKey);
       final c2 = await crypto.encryptAddress(testAddress, masterKey);
       // Les sels étant aléatoires, les ciphertexts doivent différer
@@ -93,7 +94,8 @@ void main() {
       );
     });
 
-    test('le round-trip fonctionne avec n\'importe quelle clé maîtresse', () async {
+    test('le round-trip fonctionne avec n\'importe quelle clé maîtresse',
+        () async {
       final cipherB64 = await crypto.encryptAddress(testAddress, masterKey);
       final decrypted = await crypto.decryptAddress(cipherB64, masterKey);
       expect(decrypted, testAddress);

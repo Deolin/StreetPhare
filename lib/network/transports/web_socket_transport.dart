@@ -101,8 +101,8 @@ class WebSocketTransport {
         );
       }
 
-      _socket = await WebSocket.connect(url)
-          .timeout(const Duration(seconds: 5));
+      _socket =
+          await WebSocket.connect(url).timeout(const Duration(seconds: 5));
 
       _reconnectAttempts = 0; // Reset du compteur en cas de succès
       _isConnecting = false;

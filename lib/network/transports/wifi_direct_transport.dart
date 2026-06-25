@@ -26,7 +26,9 @@ import '../p2p_mesh_service.dart';
 /// Implémente [WidgetsBindingObserver] pour suspendre la socket UDP
 /// lorsque l'application passe en arrière-plan (Android 15+ coupe les
 /// privilèges d'émission réseau → SocketException errno=1).
-class WifiDirectMeshTransport with WidgetsBindingObserver implements MeshTransport {
+class WifiDirectMeshTransport
+    with WidgetsBindingObserver
+    implements MeshTransport {
   WifiDirectMeshTransport({
     this.multicastAddress = '239.255.42.42',
     this.port = 42424,
@@ -142,7 +144,9 @@ class WifiDirectMeshTransport with WidgetsBindingObserver implements MeshTranspo
       // Fermeture propre pour éviter les fuites
       await _sub?.cancel();
       _sub = null;
-      try { _socket?.close(); } catch (_) {}
+      try {
+        _socket?.close();
+      } catch (_) {}
       _socket = null;
     } catch (e) {
       if (kDebugMode) debugPrint('[WiFi] send error: $e');
@@ -184,7 +188,9 @@ class WifiDirectMeshTransport with WidgetsBindingObserver implements MeshTranspo
     }
     _sub?.cancel();
     _sub = null;
-    try { _socket?.close(); } catch (_) {}
+    try {
+      _socket?.close();
+    } catch (_) {}
     _socket = null;
   }
 

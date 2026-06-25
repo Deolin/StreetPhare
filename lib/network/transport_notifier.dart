@@ -233,8 +233,7 @@ class _HardwareStatusBannerState extends State<HardwareStatusBanner> {
             backgroundColor: Colors.blueGrey.shade800,
             actions: [
               TextButton(
-                onPressed: () =>
-                    NetworkManager.instance.openWifiSettings(),
+                onPressed: () => NetworkManager.instance.openWifiSettings(),
                 child: const Text('ACTIVER',
                     style: TextStyle(color: Colors.cyanAccent)),
               ),

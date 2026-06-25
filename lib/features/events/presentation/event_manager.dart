@@ -41,8 +41,7 @@ class EventManager extends ValueNotifier<List<EventModel>> {
       value.isEmpty ? 0 : _activeIndex.clamp(0, value.length - 1);
 
   /// Événement actif courant, ou `null` si aucun.
-  EventModel? get activeEvent =>
-      value.isEmpty ? null : value[activeIndex];
+  EventModel? get activeEvent => value.isEmpty ? null : value[activeIndex];
 
   /// Nombre d'événements chargés.
   int get count => value.length;
@@ -144,8 +143,7 @@ class EventManager extends ValueNotifier<List<EventModel>> {
 
   /// Supprime l'événement dont le code est [code].
   void removeByCode(String code) {
-    final newList =
-        value.where((e) => e.code != code).toList(growable: false);
+    final newList = value.where((e) => e.code != code).toList(growable: false);
     value = newList;
     if (_activeIndex >= value.length) {
       _activeIndex = value.isEmpty ? 0 : value.length - 1;
@@ -178,7 +176,6 @@ class EventManager extends ValueNotifier<List<EventModel>> {
   EventModel? _decodeEvent(String code) {
     final now = DateTime.now().toUtc();
     switch (code) {
-
       // ── FLEURUS-TOUR : Le tour de Fleurus ─────────────────────────────────
       // Marche circulaire ~4 km suivant la voirie autour du centre de Fleurus.
       // Trajet : Place Albert 1er → Rue du Transvaal → Rue de la Station →

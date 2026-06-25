@@ -119,8 +119,7 @@ class PeerCounterService extends ValueNotifier<int> {
     }
 
     // Validation par métadonnée de payload.
-    if (metadata != null &&
-        metadata.startsWith(kStreetPhareSignaturePrefix)) {
+    if (metadata != null && metadata.startsWith(kStreetPhareSignaturePrefix)) {
       return true;
     }
 
@@ -179,7 +178,8 @@ class PeerCounterService extends ValueNotifier<int> {
       // Nouveau pair StreetPhare valide.
       value = _prune(now).length;
       if (kDebugMode) {
-        debugPrint('[PeerCounter] nouveau pair StreetPhare: $peerId — total=$value');
+        debugPrint(
+            '[PeerCounter] nouveau pair StreetPhare: $peerId — total=$value');
       }
     }
     // Pair déjà connu : simple rafraîchissement du timestamp.

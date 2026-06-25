@@ -27,7 +27,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get startScreenWelcome => 'Welcome to StreetPhare';
 
   @override
-  String get startScreenSubtitle => 'Collaborative decentralized citizen mapping';
+  String get startScreenSubtitle =>
+      'Collaborative decentralized citizen mapping';
 
   @override
   String get startScreenSelectLanguage => 'Choose your language';
@@ -42,13 +43,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get languageSectionTitle => 'Language Choice';
 
   @override
-  String get languageSectionDescription => 'Change the application language in real time.';
+  String get languageSectionDescription =>
+      'Change the application language in real time.';
 
   @override
   String get themeSectionTitle => 'App Theme';
 
   @override
-  String get themeDescription => 'Dark mode is optimized for OLED screens and stays discreet at night.';
+  String get themeDescription =>
+      'Dark mode is optimized for OLED screens and stays discreet at night.';
 
   @override
   String get themeSystem => 'System';
@@ -72,10 +75,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get batterySaverTitle => 'Battery Saver';
 
   @override
-  String get batterySaverDescription => 'Reduces GPS/BLE scan frequency and extends battery life.';
+  String get batterySaverDescription =>
+      'Reduces GPS/BLE scan frequency and extends battery life.';
 
   @override
-  String get batterySaverSubtitle => 'Reduces GPS and BLE frequency to save battery';
+  String get batterySaverSubtitle =>
+      'Reduces GPS and BLE frequency to save battery';
 
   @override
   String get batterySaverEnabledLabel => 'Battery Saver enabled';
@@ -99,28 +104,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationFilterAllLabel => 'All alerts';
 
   @override
-  String get notificationFilterAllDescription => 'Notifies every micro-event on the network';
+  String get notificationFilterAllDescription =>
+      'Notifies every micro-event on the network';
 
   @override
   String get notificationFilterNearbyLabel => 'Confirmed nearby dangers only';
 
   @override
-  String get notificationFilterNearbyDescription => 'Filter: danger ≥3 votes detected within 100 m';
+  String get notificationFilterNearbyDescription =>
+      'Filter: danger ≥3 votes detected within 100 m';
 
   @override
   String get notificationFilterEventsLabel => 'Imminent event point changes';
 
   @override
-  String get notificationFilterEventsDescription => 'Notifies if the next point is revealed in <3 min';
+  String get notificationFilterEventsDescription =>
+      'Notifies if the next point is revealed in <3 min';
 
   @override
   String get lowVisionTitle => 'Low Vision Mode';
 
   @override
-  String get lowVisionSubtitle => 'Large text and adapted interface for better readability';
+  String get lowVisionSubtitle =>
+      'Large text and adapted interface for better readability';
 
   @override
-  String get lowVisionDescription => 'Enables very large characters, removes the StreetPhare title on the map and reorganizes the reporting menu into 2 columns (large touch buttons). Automatically enabled if TalkBack/VoiceOver is detected.';
+  String get lowVisionDescription =>
+      'Enables very large characters, removes the StreetPhare title on the map and reorganizes the reporting menu into 2 columns (large touch buttons). Automatically enabled if TalkBack/VoiceOver is detected.';
 
   @override
   String get lowVisionEnabled => 'Low Vision Mode enabled';
@@ -138,37 +148,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageFilterTitle => 'Message Filter';
 
   @override
-  String get messageFilterDescription => 'Filter messages received on the decentralized network.';
+  String get messageFilterDescription =>
+      'Filter messages received on the decentralized network.';
 
   @override
   String get messageFilterAllLabel => 'All messages';
 
   @override
-  String get messageFilterAllDescription => 'Receives all messages broadcast on the network';
+  String get messageFilterAllDescription =>
+      'Receives all messages broadcast on the network';
 
   @override
   String get messageFilterNearbyLabel => 'Nearby messages only';
 
   @override
-  String get messageFilterNearbyDescription => 'Messages sent within a 300 m radius';
+  String get messageFilterNearbyDescription =>
+      'Messages sent within a 300 m radius';
 
   @override
   String get messageFilterAdminLabel => 'Event administrators';
 
   @override
-  String get messageFilterAdminDescription => 'Messages signed by an event administrator';
+  String get messageFilterAdminDescription =>
+      'Messages signed by an event administrator';
 
   @override
   String get messageFilterAlertLabel => 'Alert messages only';
 
   @override
-  String get messageFilterAlertDescription => 'Only critical alerts (ALERT type)';
+  String get messageFilterAlertDescription =>
+      'Only critical alerts (ALERT type)';
 
   @override
   String get avoidanceFiltersTitle => 'Avoidance Filters (Safe Route)';
 
   @override
-  String get avoidanceFiltersDescription => 'Check the types of dangers to absolutely avoid. The routing engine will bypass these areas.';
+  String get avoidanceFiltersDescription =>
+      'Check the types of dangers to absolutely avoid. The routing engine will bypass these areas.';
 
   @override
   String get avoidBarragesTitle => 'Avoid blockades';
@@ -213,31 +229,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get routeDestEventPointLabel => 'Follow the current event point';
 
   @override
-  String get routeDestEventPointDescription => 'Default destination of the active event';
+  String get routeDestEventPointDescription =>
+      'Default destination of the active event';
 
   @override
   String get routeDestSafeZoneLabel => 'To the Safe Zone / Nearest care center';
 
   @override
-  String get routeDestSafeZoneDescription => '⭐ Absolute priority: nearest safety zone or street medic';
+  String get routeDestSafeZoneDescription =>
+      '⭐ Absolute priority: nearest safety zone or street medic';
 
   @override
   String get routeDestCareCenterLabel => 'Nearest care center';
 
   @override
-  String get routeDestCareCenterDescription => 'Nearest street medics or street help';
+  String get routeDestCareCenterDescription =>
+      'Nearest street medics or street help';
 
   @override
   String get routeDestExitPointLabel => 'Nearest exit point';
 
   @override
-  String get routeDestExitPointDescription => 'Evacuation zone defined in the event JSON';
+  String get routeDestExitPointDescription =>
+      'Evacuation zone defined in the event JSON';
 
   @override
   String get routeDestUserPointLabel => 'User point';
 
   @override
-  String get routeDestUserPointDescription => 'Custom point placed manually (3s long press)';
+  String get routeDestUserPointDescription =>
+      'Custom point placed manually (3s long press)';
 
   @override
   String get mapCacheTitle => 'Map Tile Cache';
@@ -246,7 +267,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapCacheSubtitle => 'Maximum retention duration for local cache';
 
   @override
-  String get mapCacheDescription => 'Map tiles are kept locally to save mobile data.';
+  String get mapCacheDescription =>
+      'Map tiles are kept locally to save mobile data.';
 
   @override
   String get mapCacheRetentionLabel => 'Retention duration: ';
@@ -255,7 +277,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapCacheForceUpdate => 'Force map update';
 
   @override
-  String get mapCacheCleaned => 'Map cache cleared. Tiles will be reloaded on next display.';
+  String get mapCacheCleaned =>
+      'Map cache cleared. Tiles will be reloaded on next display.';
 
   @override
   String get mapCacheDays => 'days';
@@ -264,10 +287,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backgroundServiceTitle => 'Background Service';
 
   @override
-  String get backgroundServiceSubtitle => 'Persistent \"StreetPhare active\" notification';
+  String get backgroundServiceSubtitle =>
+      'Persistent \"StreetPhare active\" notification';
 
   @override
-  String get backgroundServiceDescription => 'Allows StreetPhare to send alerts even when the application is in the background or asleep.';
+  String get backgroundServiceDescription =>
+      'Allows StreetPhare to send alerts even when the application is in the background or asleep.';
 
   @override
   String get backgroundServiceEnable => 'Enable monitoring';
@@ -276,7 +301,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get panicContactsTitle => 'Emergency Contacts (Panic)';
 
   @override
-  String get panicContactsDescription => 'These contacts will receive an alert SMS with your GPS position when you press PANIC.';
+  String get panicContactsDescription =>
+      'These contacts will receive an alert SMS with your GPS position when you press PANIC.';
 
   @override
   String get panicContactsAdd => 'Add contact';
@@ -285,7 +311,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get panicContactsEmpty => 'No emergency contacts saved';
 
   @override
-  String get panicContactsConfigError => 'No contacts configured.\nAdd at least one contact for the PANIC button.';
+  String get panicContactsConfigError =>
+      'No contacts configured.\nAdd at least one contact for the PANIC button.';
 
   @override
   String get panicContactsDeleteTitle => 'Delete this contact?';
@@ -351,7 +378,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutOpenSource => 'Citizen open-source project';
 
   @override
-  String get aboutDescription => 'StreetPhare is a decentralized collaborative mapping application designed to strengthen collective safety during citizen gatherings. No personal data is collected or transmitted to third parties. All data remains local or passes through encrypted peer-to-peer relays.';
+  String get aboutDescription =>
+      'StreetPhare is a decentralized collaborative mapping application designed to strengthen collective safety during citizen gatherings. No personal data is collected or transmitted to third parties. All data remains local or passes through encrypted peer-to-peer relays.';
 
   @override
   String get bugReportTitle => 'Bug Report';
@@ -363,16 +391,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bugReportSuggest => 'Suggest';
 
   @override
-  String get bugReportDescription => '💡 This form sends a technical report to the StreetPhare administration server. Reports help developers identify and fix issues quickly.';
+  String get bugReportDescription =>
+      '💡 This form sends a technical report to the StreetPhare administration server. Reports help developers identify and fix issues quickly.';
 
   @override
-  String get bugReportPrivacy => '🔒 No personal data is transmitted. Only the title, description, category, and app version are sent.';
+  String get bugReportPrivacy =>
+      '🔒 No personal data is transmitted. Only the title, description, category, and app version are sent.';
 
   @override
   String get bugReportSectionTitle => 'Bug Reporting & Suggestions';
 
   @override
-  String get bugReportSectionDescription => 'Bug Button (bottom left of the map): report a bug or suggestion directly from the main interface without leaving the map.';
+  String get bugReportSectionDescription =>
+      'Bug Button (bottom left of the map): report a bug or suggestion directly from the main interface without leaving the map.';
 
   @override
   String get eventsJoin => 'Join an event';
@@ -387,37 +418,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get eventsEmptyTitle => 'No event loaded';
 
   @override
-  String get eventsEmptySubtitle => 'Enter an invitation code or scan a QR Code to join up to 3 events simultaneously.';
+  String get eventsEmptySubtitle =>
+      'Enter an invitation code or scan a QR Code to join up to 3 events simultaneously.';
 
   @override
   String get eventsJoinTitle => 'Join an event';
 
   @override
-  String get eventsJoinSubtitle => 'Enter the invitation code (e.g. MANIF-123) or scan a QR Code.';
+  String get eventsJoinSubtitle =>
+      'Enter the invitation code (e.g. MANIF-123) or scan a QR Code.';
 
   @override
   String get eventsSecurityTitle => 'Just-in-time security';
 
   @override
-  String get eventsSecurityDescription => 'To prevent an event route from being hijacked in advance, StreetPhare only reveals the route at the time set by the organizers.\n\nIn addition, each step (gathering point) automatically disappears from the map as soon as its time is exceeded by 5 minutes, or if you are within 30 m of that point.';
+  String get eventsSecurityDescription =>
+      'To prevent an event route from being hijacked in advance, StreetPhare only reveals the route at the time set by the organizers.\n\nIn addition, each step (gathering point) automatically disappears from the map as soon as its time is exceeded by 5 minutes, or if you are within 30 m of that point.';
 
   @override
   String get eventsEnterCodeError => 'Please enter an invitation code.';
 
   @override
-  String get eventsMaxReachedError => 'Maximum 3 simultaneous events. Remove one before adding a new one.';
+  String get eventsMaxReachedError =>
+      'Maximum 3 simultaneous events. Remove one before adding a new one.';
 
   @override
   String get eventsUnknownCodeError => 'Unknown code or event not found.';
 
   @override
-  String get eventsFleurusCodes => 'Fleurus codes: FLEURUS-TOUR, FLEURUS-ECOLES, FLEURUS-CORTEGE.';
+  String get eventsFleurusCodes =>
+      'Fleurus codes: FLEURUS-TOUR, FLEURUS-ECOLES, FLEURUS-CORTEGE.';
 
   @override
-  String get eventsQrMaxReached => 'Maximum 3 simultaneous events. Remove one first.';
+  String get eventsQrMaxReached =>
+      'Maximum 3 simultaneous events. Remove one first.';
 
   @override
-  String get eventsQrAddError => 'Unable to add the event (already present or limit of 3 events reached).';
+  String get eventsQrAddError =>
+      'Unable to add the event (already present or limit of 3 events reached).';
 
   @override
   String get eventsQrAddSuccess => 'Event added from QR Code!';
@@ -449,7 +487,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get eventsStepTime => 'Scheduled time:';
 
   @override
-  String get eventsRouteVisible => 'Route visible — all steps completed or event without steps.';
+  String get eventsRouteVisible =>
+      'Route visible — all steps completed or event without steps.';
 
   @override
   String get mapRecenterTooltip => 'Re-center the map';
@@ -498,13 +537,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get mapNoDestinationError => 'No destination available. Join an event or place a point manually (3s long press on the map).';
+  String get mapNoDestinationError =>
+      'No destination available. Join an event or place a point manually (3s long press on the map).';
 
   @override
   String get mapAddEventButton => 'Add an event';
 
   @override
-  String get mapAddEventWarning => 'Please add an event before starting tracking.';
+  String get mapAddEventWarning =>
+      'Please add an event before starting tracking.';
 
   @override
   String get mapCollectivePanicTitle => 'Collective Panic Alert';
@@ -524,7 +565,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapNoPanicContactTitle => 'No emergency contacts';
 
   @override
-  String get mapNoPanicContactMessage => 'You must first configure at least one contact in Settings to use the PANIC button.';
+  String get mapNoPanicContactMessage =>
+      'You must first configure at least one contact in Settings to use the PANIC button.';
 
   @override
   String get mapOpenSettings => 'Open Settings';
@@ -568,7 +610,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapDestinationObjective => 'Safe Route objective';
 
   @override
-  String get mapDestinationLongPressHint => '3s long press on map → \"User point\"';
+  String get mapDestinationLongPressHint =>
+      '3s long press on map → \"User point\"';
 
   @override
   String get mapActiveEvent => 'Active event';
@@ -580,7 +623,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapIsolatedTitle => 'StreetPhare network unavailable';
 
   @override
-  String get mapIsolatedMessage => 'The application cannot operate at the moment due to lack of server connection or nearby peers (Hive).';
+  String get mapIsolatedMessage =>
+      'The application cannot operate at the moment due to lack of server connection or nearby peers (Hive).';
 
   @override
   String get eventsQrScan => 'Scan QR Code';
@@ -733,7 +777,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get locationAccessTitle => 'Location Access';
 
   @override
-  String get locationAccessMessage => 'StreetPhare needs access to your location to display the map and nearby alerts.';
+  String get locationAccessMessage =>
+      'StreetPhare needs access to your location to display the map and nearby alerts.';
 
   @override
   String get locationAccessButton => 'Allow';
@@ -742,7 +787,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get notificationPermissionTitle => 'Notifications';
 
   @override
-  String get notificationPermissionMessage => 'StreetPhare needs to send notifications for alerts and events.';
+  String get notificationPermissionMessage =>
+      'StreetPhare needs to send notifications for alerts and events.';
 
   @override
   String get notificationPermissionButton => 'Allow';
@@ -751,13 +797,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get androidChannelAlertsTitle => 'Field alerts';
 
   @override
-  String get androidChannelAlertsSubtitle => 'Blockades, kettling, tension zones';
+  String get androidChannelAlertsSubtitle =>
+      'Blockades, kettling, tension zones';
 
   @override
   String get androidChannelEventsTitle => 'Events & Trips';
 
   @override
-  String get androidChannelEventsSubtitle => 'Trip start, waypoints, end of demo';
+  String get androidChannelEventsSubtitle =>
+      'Trip start, waypoints, end of demo';
 
   @override
   String get androidChannelPanicTitle => 'Collective Panic alerts';
@@ -769,7 +817,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get androidChannelMessagesTitle => 'Hive P2P Messages';
 
   @override
-  String get androidChannelMessagesSubtitle => 'New messages on the local network';
+  String get androidChannelMessagesSubtitle =>
+      'New messages on the local network';
 
   @override
   String get androidChannelSectionTitle => 'Android Notifications by Channel';

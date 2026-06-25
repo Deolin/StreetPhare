@@ -40,8 +40,8 @@ void main() {
       when(() => mockStorage.read(key: any(named: 'key')))
           .thenAnswer((_) async => null);
       when(() => mockStorage.write(
-          key: any(named: 'key'), value: any(named: 'value')))
-          .thenAnswer((_) async => {});
+          key: any(named: 'key'),
+          value: any(named: 'value'))).thenAnswer((_) async => {});
 
       final key = await service.loadOrCreateMasterKey();
 
@@ -61,8 +61,8 @@ void main() {
       when(() => mockStorage.read(key: any(named: 'key')))
           .thenAnswer((_) async => null);
       when(() => mockStorage.write(
-          key: any(named: 'key'), value: any(named: 'value')))
-          .thenAnswer((_) async => {});
+          key: any(named: 'key'),
+          value: any(named: 'value'))).thenAnswer((_) async => {});
 
       final firstKey = await service.loadOrCreateMasterKey();
       final firstBytes = await firstKey.extractBytes();
@@ -84,8 +84,8 @@ void main() {
       when(() => mockStorage.read(key: any(named: 'key')))
           .thenAnswer((_) async => null);
       when(() => mockStorage.write(
-          key: any(named: 'key'), value: any(named: 'value')))
-          .thenAnswer((_) async => {});
+          key: any(named: 'key'),
+          value: any(named: 'value'))).thenAnswer((_) async => {});
 
       await service.loadOrCreateMasterKey();
 
@@ -98,15 +98,14 @@ void main() {
   });
 
   group('Résilience à la corruption', () {
-    test('détecte une clé corrompue (longueur invalide) et régénère',
-        () async {
+    test('détecte une clé corrompue (longueur invalide) et régénère', () async {
       // Stockage contient des données corrompues (mauvaise longueur).
       final corrupted = base64.encode([1, 2, 3]); // 3 octets au lieu de 32
       when(() => mockStorage.read(key: any(named: 'key')))
           .thenAnswer((_) async => corrupted);
       when(() => mockStorage.write(
-          key: any(named: 'key'), value: any(named: 'value')))
-          .thenAnswer((_) async => {});
+          key: any(named: 'key'),
+          value: any(named: 'value'))).thenAnswer((_) async => {});
 
       final key = await service.loadOrCreateMasterKey();
       final bytes = await key.extractBytes();
@@ -127,8 +126,8 @@ void main() {
       when(() => mockStorage.read(key: any(named: 'key')))
           .thenAnswer((_) async => 'ceci-n\'est-pas-du-base64!!!');
       when(() => mockStorage.write(
-          key: any(named: 'key'), value: any(named: 'value')))
-          .thenAnswer((_) async => {});
+          key: any(named: 'key'),
+          value: any(named: 'value'))).thenAnswer((_) async => {});
 
       final key = await service.loadOrCreateMasterKey();
 
@@ -136,8 +135,7 @@ void main() {
       verify(() => mockStorage.delete(key: 'streetphare_master_key')).called(1);
       // Une nouvelle clé doit être écrite.
       verify(() => mockStorage.write(
-          key: 'streetphare_master_key', value: any(named: 'value')))
-          .called(1);
+          key: 'streetphare_master_key', value: any(named: 'value'))).called(1);
 
       final bytes = await key.extractBytes();
       expect(bytes.length, 32);
@@ -147,8 +145,8 @@ void main() {
       when(() => mockStorage.read(key: any(named: 'key')))
           .thenThrow(Exception('Keystore inaccessible'));
       when(() => mockStorage.write(
-          key: any(named: 'key'), value: any(named: 'value')))
-          .thenAnswer((_) async => {});
+          key: any(named: 'key'),
+          value: any(named: 'value'))).thenAnswer((_) async => {});
 
       final key = await service.loadOrCreateMasterKey();
       final bytes = await key.extractBytes();

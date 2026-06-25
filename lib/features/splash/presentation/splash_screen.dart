@@ -439,8 +439,7 @@ class _TutorialThenMapBridge extends StatefulWidget {
   const _TutorialThenMapBridge();
 
   @override
-  State<_TutorialThenMapBridge> createState() =>
-      _TutorialThenMapBridgeState();
+  State<_TutorialThenMapBridge> createState() => _TutorialThenMapBridgeState();
 }
 
 class _TutorialThenMapBridgeState extends State<_TutorialThenMapBridge> {

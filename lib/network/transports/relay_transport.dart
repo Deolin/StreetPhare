@@ -136,7 +136,8 @@ class RelayMeshTransport implements MeshTransport {
     _reconnectAttempts++;
     final delay = _nextRetryDelay;
     if (kDebugMode) {
-      debugPrint('[Relay] reconnexion dans ${delay.inSeconds}s (essai #$_reconnectAttempts)');
+      debugPrint(
+          '[Relay] reconnexion dans ${delay.inSeconds}s (essai #$_reconnectAttempts)');
     }
     _reconnectTimer = Timer(delay, _connect);
   }

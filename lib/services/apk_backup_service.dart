@@ -72,7 +72,8 @@ class ApkBackupService {
           return;
         }
         // Le fichier n'existe plus (désinstallation partielle, nettoyage) → on refait.
-        debugPrint('[ApkBackup] Fichier de sauvegarde introuvable, re-copie...');
+        debugPrint(
+            '[ApkBackup] Fichier de sauvegarde introuvable, re-copie...');
       }
 
       // Premier lancement ou sauvegarde invalide : effectuer la copie.
@@ -101,7 +102,8 @@ class ApkBackupService {
     // 2. Déterminer le répertoire de destination (Documents persistant).
     final destDir = await _getBackupDirectory();
     if (destDir == null) {
-      debugPrint('[ApkBackup] Impossible d\'accéder au répertoire de sauvegarde.');
+      debugPrint(
+          '[ApkBackup] Impossible d\'accéder au répertoire de sauvegarde.');
       return;
     }
 
@@ -122,7 +124,8 @@ class ApkBackupService {
     _backupPath = destPath;
 
     final sizeKb = (await destFile.length()) ~/ 1024;
-    debugPrint('[ApkBackup] ✅ APK sauvegardé avec succès : $destPath ($sizeKb Ko)');
+    debugPrint(
+        '[ApkBackup] ✅ APK sauvegardé avec succès : $destPath ($sizeKb Ko)');
   }
 
   /// Récupère le chemin de l'APK installé via le canal natif Android.
@@ -131,11 +134,13 @@ class ApkBackupService {
   /// Retourne null en cas d'erreur ou si non-Android.
   Future<String?> _getSourceApkPath() async {
     try {
-      final String? path = await _kChannel.invokeMethod<String>('getSourceApkPath');
+      final String? path =
+          await _kChannel.invokeMethod<String>('getSourceApkPath');
       return path;
     } on MissingPluginException {
       // Canal natif non encore implémenté : fallback via path connu.
-      debugPrint('[ApkBackup] Canal natif non disponible, tentative de fallback...');
+      debugPrint(
+          '[ApkBackup] Canal natif non disponible, tentative de fallback...');
       return _fallbackApkPath();
     } on PlatformException catch (e) {
       debugPrint('[ApkBackup] PlatformException canal natif : ${e.message}');

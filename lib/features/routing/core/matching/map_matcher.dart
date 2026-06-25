@@ -93,7 +93,8 @@ class MapMatcher {
     }
 
     // 1. Recherche des k plus proches nœuds.
-    final candidates = _graph.findNearestNodes(lat, lon, k: _kCandidates, radiusMeters: _kSearchRadius);
+    final candidates = _graph.findNearestNodes(lat, lon,
+        k: _kCandidates, radiusMeters: _kSearchRadius);
 
     if (candidates.isEmpty) {
       // Aucune route trouvée → hors réseau.
@@ -124,8 +125,11 @@ class MapMatcher {
 
       // Probabilité de transition : si on avait une position précédente.
       double transitionProb = 1.0;
-      if (_lastMatched != null && _lastMatched!.onRoad && _lastMatched!.nodeIndex >= 0) {
-        final routeDist = _approxGraphDistance(_lastMatched!.nodeIndex, nodeIdx);
+      if (_lastMatched != null &&
+          _lastMatched!.onRoad &&
+          _lastMatched!.nodeIndex >= 0) {
+        final routeDist =
+            _approxGraphDistance(_lastMatched!.nodeIndex, nodeIdx);
         final directDist = _haversine(
           _lastMatched!.lat,
           _lastMatched!.lon,
@@ -134,7 +138,8 @@ class MapMatcher {
         );
         // Si la distance routière est proche de la distance directe, bonne transition.
         if (routeDist < double.infinity) {
-          transitionProb = math.exp(-(routeDist - directDist).abs() / (directDist + 10.0));
+          transitionProb =
+              math.exp(-(routeDist - directDist).abs() / (directDist + 10.0));
         } else {
           transitionProb = 0.1; // pénalité si pas de chemin direct
         }

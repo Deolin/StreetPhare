@@ -102,7 +102,8 @@ class ProfileSettings {
     walkSpeedMs: 0,
     avoidStairs: false,
     avoidUnpaved: false,
-    useContractionHierarchies: false, // pas de CH pour urgence (routes variables)
+    useContractionHierarchies:
+        false, // pas de CH pour urgence (routes variables)
     heuristicWeight: 1.5,
     penaltyFactorDiagonal: 1.0,
     penaltyFactorTurn: 0.0, // pas de pénalité de virage
@@ -121,6 +122,7 @@ class ProfileSettings {
   /// Durée estimée du trajet pour une distance donnée.
   Duration estimateDuration(double distanceMeters) {
     if (walkSpeedMs <= 0) return Duration.zero;
-    return Duration(milliseconds: (distanceMeters / walkSpeedMs * 1000).round());
+    return Duration(
+        milliseconds: (distanceMeters / walkSpeedMs * 1000).round());
   }
 }

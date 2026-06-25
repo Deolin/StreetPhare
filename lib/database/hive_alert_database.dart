@@ -269,8 +269,7 @@ class AlertAdapter extends TypeAdapter<Alert> {
         confirmations:
             ((fields[10] as List?) ?? const []).cast<String>().toSet(),
         uploadedTo: (fields[11] as String?) ?? '',
-        lastModifiedAt:
-            (fields[12] as DateTime?) ?? DateTime.now().toUtc(),
+        lastModifiedAt: (fields[12] as DateTime?) ?? DateTime.now().toUtc(),
       );
     } catch (e, st) {
       if (kDebugMode) {

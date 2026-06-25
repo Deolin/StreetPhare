@@ -73,9 +73,7 @@ class ServerHeartbeatService {
       }
 
       final url = Uri.parse('$serverUrl/api/ping');
-      final response = await http
-          .get(url)
-          .timeout(pingTimeout);
+      final response = await http.get(url).timeout(pingTimeout);
 
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body) as Map<String, dynamic>;

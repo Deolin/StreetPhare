@@ -89,7 +89,8 @@ class SyncService {
     unawaited(_performSync());
     _syncTimer = Timer.periodic(syncInterval, (_) => _performSync());
     if (kDebugMode) {
-      debugPrint('[SyncService] Timer démarré (intervalle=${syncInterval.inMinutes} min)');
+      debugPrint(
+          '[SyncService] Timer démarré (intervalle=${syncInterval.inMinutes} min)');
     }
   }
 
@@ -121,8 +122,8 @@ class SyncService {
           .replace(queryParameters: {'since': since});
 
       final response = await http.get(uri).timeout(
-        const Duration(seconds: 10),
-      );
+            const Duration(seconds: 10),
+          );
 
       if (response.statusCode != 200) return;
 
@@ -140,7 +141,8 @@ class SyncService {
           // Nouvelle alerte → insérer.
           await _db.upsert(remoteAlert);
           merged++;
-        } else if (remoteAlert.lastModifiedAt.isAfter(localAlert.lastModifiedAt)) {
+        } else if (remoteAlert.lastModifiedAt
+            .isAfter(localAlert.lastModifiedAt)) {
           // Alerte distante plus récente → mettre à jour.
           await _db.upsert(remoteAlert);
           merged++;
@@ -149,7 +151,8 @@ class SyncService {
       }
 
       if (kDebugMode && merged > 0) {
-        debugPrint('[SyncService] $merged alerte(s) fusionnée(s) depuis le serveur');
+        debugPrint(
+            '[SyncService] $merged alerte(s) fusionnée(s) depuis le serveur');
       }
     } catch (e) {
       if (kDebugMode) {

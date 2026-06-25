@@ -64,8 +64,15 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       }
 
       // Vérifications minimales des champs obligatoires.
-      final required = ['code', 'title', 'startAt', 'visibleAt', 'route',
-                        'destLat', 'destLng'];
+      final required = [
+        'code',
+        'title',
+        'startAt',
+        'visibleAt',
+        'route',
+        'destLat',
+        'destLng'
+      ];
       for (final key in required) {
         if (!decoded.containsKey(key)) {
           throw FormatException('Champ manquant dans le QR : "$key"');

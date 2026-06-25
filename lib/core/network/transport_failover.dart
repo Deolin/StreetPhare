@@ -68,8 +68,7 @@ class TransportFailoverService {
   /// Granularité du check d'escalade (par défaut 5 s).
   final Duration escalationTick;
 
-  final _stateController =
-      StreamController<FailoverState>.broadcast();
+  final _stateController = StreamController<FailoverState>.broadcast();
   Stream<FailoverState> get state => _stateController.stream;
 
   FailoverState _state = FailoverState.bleOnly;
@@ -107,7 +106,8 @@ class TransportFailoverService {
 
     // 4) Timer d'escalade : vérifie périodiquement s'il faut
     //    activer un transport plus gourmand.
-    _escalationTimer = Timer.periodic(escalationTick, (_) => _checkEscalation());
+    _escalationTimer =
+        Timer.periodic(escalationTick, (_) => _checkEscalation());
 
     // 5) Heartbeat : on relance un tick d'escalade régulièrement
     //    pour ne PAS dépendre uniquement des événements externes.

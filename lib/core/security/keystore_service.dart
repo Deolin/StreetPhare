@@ -33,8 +33,7 @@ class KeyStoreService {
                     StorageCipherAlgorithm.AES_GCM_NoPadding,
               ),
               iOptions: const IOSOptions(
-                accessibility:
-                    KeychainAccessibility.first_unlock_this_device,
+                accessibility: KeychainAccessibility.first_unlock_this_device,
               ),
             );
   static final KeyStoreService instance = KeyStoreService._();

@@ -72,12 +72,14 @@ class HiveMessage {
   final String? threadId;
 
   /// Position GPS de l'émetteur (null si non disponible).
-  LatLng? get position =>
-      latitude != null && longitude != null ? LatLng(latitude!, longitude!) : null;
+  LatLng? get position => latitude != null && longitude != null
+      ? LatLng(latitude!, longitude!)
+      : null;
 
   /// Alias court de l'émetteur (6 premiers chars de l'UUID).
-  String get senderAlias =>
-      senderEphemeralId.length >= 6 ? senderEphemeralId.substring(0, 6) : senderEphemeralId;
+  String get senderAlias => senderEphemeralId.length >= 6
+      ? senderEphemeralId.substring(0, 6)
+      : senderEphemeralId;
 
   /// Sérialisation JSON.
   Map<String, dynamic> toJson() => {
@@ -102,7 +104,8 @@ class HiveMessage {
         (e) => e.name == json['type'],
         orElse: () => HiveMessageType.text,
       ),
-      sentAt: DateTime.tryParse(json['sentAt'] as String? ?? '') ?? DateTime.now().toUtc(),
+      sentAt: DateTime.tryParse(json['sentAt'] as String? ?? '') ??
+          DateTime.now().toUtc(),
       latitude: (json['lat'] as num?)?.toDouble(),
       longitude: (json['lng'] as num?)?.toDouble(),
       isFromAdmin: (json['isAdmin'] as bool?) ?? false,

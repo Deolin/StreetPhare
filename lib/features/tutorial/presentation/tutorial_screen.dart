@@ -238,9 +238,8 @@ class _CategoryFilterBar extends StatelessWidget {
                           .onSurface
                           .withValues(alpha: 0.7),
                   fontSize: 12,
-                  fontWeight: selected == null
-                      ? FontWeight.w600
-                      : FontWeight.normal,
+                  fontWeight:
+                      selected == null ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             ),
@@ -251,8 +250,7 @@ class _CategoryFilterBar extends StatelessWidget {
                 child: FilterChip(
                   label: Text(cat.label),
                   selected: selected == cat,
-                  onSelected: (_) =>
-                      onSelected(selected == cat ? null : cat),
+                  onSelected: (_) => onSelected(selected == cat ? null : cat),
                   selectedColor:
                       StreetPhareTheme.primary.withValues(alpha: 0.25),
                   checkmarkColor: StreetPhareTheme.primary,
@@ -264,9 +262,8 @@ class _CategoryFilterBar extends StatelessWidget {
                             .onSurface
                             .withValues(alpha: 0.7),
                     fontSize: 12,
-                    fontWeight: selected == cat
-                        ? FontWeight.w600
-                        : FontWeight.normal,
+                    fontWeight:
+                        selected == cat ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
               ),

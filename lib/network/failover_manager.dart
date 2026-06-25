@@ -195,8 +195,8 @@ class FailoverManager {
     final decryptedAddrs = <String>[];
     await Future.wait(config.encryptedBackupChain.map((cipher) async {
       try {
-        final clear = await CryptoUtils.instance
-            .decryptAddress(cipher, _aesKey!);
+        final clear =
+            await CryptoUtils.instance.decryptAddress(cipher, _aesKey!);
         _standbys.add(ServerEndpoint(
           address: clear,
           encryptedAddress: cipher,
@@ -321,9 +321,8 @@ class FailoverManager {
 
     // ── Ping parallèle de tous les standbys ─────────────────────
     // On filtre les standbys déjà marqués morts pour cette session.
-    final candidates = _standbys
-        .where((s) => !_deadForSession.contains(s.address))
-        .toList();
+    final candidates =
+        _standbys.where((s) => !_deadForSession.contains(s.address)).toList();
 
     if (candidates.isEmpty) {
       if (kDebugMode) {
@@ -495,11 +494,13 @@ class FailoverManager {
 
     try {
       final uri = Uri.parse('${_current!.address}/v1/alerts/sync');
-      final resp = await _httpClient.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'alerts': alerts}),
-      ).timeout(_config!.pingTimeout);
+      final resp = await _httpClient
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'alerts': alerts}),
+          )
+          .timeout(_config!.pingTimeout);
 
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         // Tente d'extraire un nouveau backup que le serveur nous
@@ -542,8 +543,7 @@ class FailoverManager {
   /// (en le déchiffrant pour vérifier son intégrité).
   Future<void> _enqueueNextBackup(String cipher) async {
     try {
-      final clear = await CryptoUtils.instance
-          .decryptAddress(cipher, _aesKey!);
+      final clear = await CryptoUtils.instance.decryptAddress(cipher, _aesKey!);
       if (_deadForSession.contains(clear)) return;
       if (_current?.address == clear) return;
       _standbys.add(ServerEndpoint(

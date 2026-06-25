@@ -96,7 +96,8 @@ class RouteNotifier extends ValueNotifier<List<LatLng>> {
     final aVal = sinDLat * sinDLat +
         _fastCos(a.latitude * 3.141592653589793 / 180.0) *
             _fastCos(b.latitude * 3.141592653589793 / 180.0) *
-            sinDLon * sinDLon;
+            sinDLon *
+            sinDLon;
     return r * 2 * _fastAtan2(_fastSqrt(aVal), _fastSqrt(1 - aVal));
   }
 

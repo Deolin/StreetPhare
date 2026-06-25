@@ -125,10 +125,8 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
     }
 
     final blockSvc = HiveBlockService.instance;
-    final isAlreadyBlocked =
-        blockSvc.isBlocked(message.senderEphemeralId);
-    final isInThread =
-        blockSvc.isInActiveThread(message.senderEphemeralId);
+    final isAlreadyBlocked = blockSvc.isBlocked(message.senderEphemeralId);
+    final isInThread = blockSvc.isInActiveThread(message.senderEphemeralId);
     final hasActiveThread = blockSvc.activeThreads.isNotEmpty;
 
     showModalBottomSheet(
@@ -262,8 +260,8 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
               valueListenable: AppPreferencesStore.instance,
               builder: (_, prefs, o) {
                 return PopupMenuButton<MessageFilter>(
-                  icon:
-                      const Icon(Icons.filter_list, color: StreetPhareTheme.primary),
+                  icon: const Icon(Icons.filter_list,
+                      color: StreetPhareTheme.primary),
                   tooltip: 'Filtrer les messages',
                   onSelected: (filter) async {
                     await AppPreferencesStore.instance.setMessageFilter(filter);
@@ -313,8 +311,8 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
               valueListenable: AppPreferencesStore.instance,
               builder: (_, prefs, o) {
                 return Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   color: StreetPhareTheme.primary.withValues(alpha: 0.1),
                   child: Row(
                     children: [
@@ -360,9 +358,7 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
                     ? allMessages
                         .where((m) => m.threadId == widget.threadId)
                         .toList()
-                    : allMessages
-                        .where((m) => m.threadId == null)
-                        .toList();
+                    : allMessages.where((m) => m.threadId == null).toList();
 
                 if (messages.isEmpty) {
                   return Center(
@@ -374,8 +370,8 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
                               ? Icons.chat_bubble_outline
                               : Icons.forum_outlined,
                           size: 48,
-                          color: (threadColor ?? onSurface)
-                              .withValues(alpha: 0.3),
+                          color:
+                              (threadColor ?? onSurface).withValues(alpha: 0.3),
                         ),
                         const SizedBox(height: 12),
                         Text(
@@ -398,8 +394,8 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
                 return ListView.builder(
                   controller: _scrollCtrl,
                   reverse: true,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   itemCount: messages.length,
                   itemBuilder: (ctx, i) {
                     final msg = messages[i];
@@ -475,8 +471,8 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
                     borderRadius: BorderRadius.circular(24),
                     borderSide: BorderSide(color: accent, width: 1.5),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   filled: true,
                   fillColor: onSurface.withValues(alpha: 0.04),
                 ),
@@ -582,8 +578,7 @@ class _ThreadCountdownBannerState extends State<_ThreadCountdownBanner> {
     if (thread == null) {
       return Container(
         color: Colors.red.withValues(alpha: 0.15),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         child: const Row(
           children: [
             Icon(Icons.timer_off, size: 14, color: Colors.red),
@@ -894,8 +889,7 @@ class _MessageTile extends StatelessWidget {
     // Vérifie si l'émetteur est dans un fil actif (indicateur visuel).
     final threadForSender = isLocal
         ? null
-        : HiveBlockService.instance
-            .threadForUser(message.senderEphemeralId);
+        : HiveBlockService.instance.threadForUser(message.senderEphemeralId);
 
     Color bubbleColor;
     Color textColor;
@@ -919,9 +913,7 @@ class _MessageTile extends StatelessWidget {
       textColor = Colors.white;
       alignment = CrossAxisAlignment.start;
     } else {
-      bubbleColor = isDark
-          ? const Color(0xFF2A2A2A)
-          : const Color(0xFFF0F0F0);
+      bubbleColor = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF0F0F0);
       textColor = onSurface;
       alignment = CrossAxisAlignment.start;
     }
@@ -933,8 +925,7 @@ class _MessageTile extends StatelessWidget {
         children: [
           // Méta-données (alias + type + heure)
           Padding(
-            padding:
-                const EdgeInsets.only(bottom: 2, left: 4, right: 4),
+            padding: const EdgeInsets.only(bottom: 2, left: 4, right: 4),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -954,8 +945,7 @@ class _MessageTile extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(right: 4),
                     child: Icon(Icons.group,
-                        size: 12,
-                        color: Color(threadForSender.color)),
+                        size: 12, color: Color(threadForSender.color)),
                   ),
                 Text(
                   isLocal
@@ -983,8 +973,7 @@ class _MessageTile extends StatelessWidget {
             constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.78,
             ),
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: bubbleColor,
               borderRadius: BorderRadius.circular(18),

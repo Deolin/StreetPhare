@@ -115,8 +115,7 @@ class PermissionGuardService {
         // Si la permission n'est pas supportée par la plateforme,
         // on la considère comme manquante (sécurité par défaut).
         if (kDebugMode) {
-          debugPrint(
-              '[PermissionGuard] $permission non supporté: $e');
+          debugPrint('[PermissionGuard] $permission non supporté: $e');
         }
         missing.add(permission);
       }

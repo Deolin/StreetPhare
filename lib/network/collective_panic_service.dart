@@ -172,8 +172,8 @@ class CollectivePanicService {
   // --------------------------------------------------------------------------
 
   void _purgeOldSignals(DateTime now) {
-    _signals.removeWhere((_, signal) =>
-        now.difference(signal.receivedAt) > kPanicTimeWindow);
+    _signals.removeWhere(
+        (_, signal) => now.difference(signal.receivedAt) > kPanicTimeWindow);
   }
 
   Future<void> _triggerCollectiveAlert(DateTime now) async {
@@ -209,8 +209,7 @@ class CollectivePanicService {
         type: AlertType.dangerCollectif,
         latitude: center.latitude,
         longitude: center.longitude,
-        description:
-            '⚠️ Alerte Panic Collective — Tension importante détectée '
+        description: '⚠️ Alerte Panic Collective — Tension importante détectée '
             '(${signals.length} appareils)',
       );
 
@@ -221,8 +220,7 @@ class CollectivePanicService {
       ));
     } catch (e) {
       if (kDebugMode) {
-        debugPrint(
-            '[CollectivePanicService] erreur création alerte : $e');
+        debugPrint('[CollectivePanicService] erreur création alerte : $e');
       }
     }
   }

@@ -224,7 +224,10 @@ class PedestrianRouteService {
     if (eventId != null) {
       try {
         final osmRoutes = await _computeViaServer(
-          start: start, end: end, eventId: eventId, filters: filters,
+          start: start,
+          end: end,
+          eventId: eventId,
+          filters: filters,
         );
         if (osmRoutes.isNotEmpty) {
           _activeMode = PedestrianRoutingMode.osmNetwork;
@@ -238,7 +241,10 @@ class PedestrianRouteService {
     // ── MODE 2 : Grille Dijkstra locale ─────────────────────────────────────
     _activeMode = PedestrianRoutingMode.localGrid;
     return SafePathEngine.computeRoutes(
-      start: start, end: end, filters: filters, constraints: constraints,
+      start: start,
+      end: end,
+      filters: filters,
+      constraints: constraints,
     );
   }
 
@@ -253,25 +259,27 @@ class PedestrianRouteService {
     final uri = Uri.parse('$serverUrl/v1/events/$eventId/route');
 
     try {
-      final response = await http.post(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-StreetPhare-Route': 'pedestrian',
-        },
-        body: jsonEncode({
-          'from': {'lat': start.latitude, 'lon': start.longitude},
-          'to': {'lat': end.latitude, 'lon': end.longitude},
-          'avoid_filters': {
-            'barrage': filters.avoidBarrages,
-            'nasse': filters.avoidNasses,
-            'controle': filters.avoidControles,
-            'accident': filters.avoidAccidents,
-            'rassemblement': filters.avoidRassemblements,
-            'autres': filters.avoidAutres,
-          },
-        }),
-      ).timeout(const Duration(seconds: 15));
+      final response = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-StreetPhare-Route': 'pedestrian',
+            },
+            body: jsonEncode({
+              'from': {'lat': start.latitude, 'lon': start.longitude},
+              'to': {'lat': end.latitude, 'lon': end.longitude},
+              'avoid_filters': {
+                'barrage': filters.avoidBarrages,
+                'nasse': filters.avoidNasses,
+                'controle': filters.avoidControles,
+                'accident': filters.avoidAccidents,
+                'rassemblement': filters.avoidRassemblements,
+                'autres': filters.avoidAutres,
+              },
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) return [];
 

@@ -63,7 +63,8 @@ class SandboxController {
   final ValueNotifier<int> eventCount = ValueNotifier<int>(0);
   final ValueNotifier<int> cooldownSec = ValueNotifier<int>(0);
   final ValueNotifier<SandboxConnectionState> connectionState =
-      ValueNotifier<SandboxConnectionState>(SandboxConnectionState.disconnected);
+      ValueNotifier<SandboxConnectionState>(
+          SandboxConnectionState.disconnected);
 
   // ── État interne ─────────────────────────────────────────────────────────
 
@@ -181,7 +182,8 @@ class SandboxController {
       _channel!.sink.add(payload);
     } else {
       // Mode offline : injection locale directe
-      _injectAlertsLocally(count: count, centerLat: centerLat, centerLng: centerLng);
+      _injectAlertsLocally(
+          count: count, centerLat: centerLat, centerLng: centerLng);
     }
 
     alertCount.value += count;
@@ -314,7 +316,8 @@ class SandboxController {
           'id': 'msg_${DateTime.now().millisecondsSinceEpoch}_$i',
           'threadId': 'sandbox_thread_offline',
           'senderId': 'sandbox_user_offline',
-          'content': '[SANDBOX OFFLINE] Message Hive #$i à ${DateTime.now().toIso8601String()}',
+          'content':
+              '[SANDBOX OFFLINE] Message Hive #$i à ${DateTime.now().toIso8601String()}',
           'type': 'TEXT',
           'createdAt': DateTime.now().toUtc().toIso8601String(),
         },

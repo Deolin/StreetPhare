@@ -22,6 +22,7 @@
 // Toujours importer 'network_config.dart' pour rester cohérent.
 
 import 'package:flutter_streetphare/constants/app_constants.dart';
+
 /// Configuration réseau résolue pour l'environnement courant.
 class NetworkConfig {
   NetworkConfig._();

@@ -53,8 +53,7 @@ class CryptoUtils {
   ///
   /// Le [salt] DOIT être unique par ciphertext (généré aléatoirement).
   /// Si non fourni, un sel aléatoire est généré automatiquement.
-  Future<SecretKey> deriveAesKey(SecretKey masterKey,
-      {List<int>? salt}) async {
+  Future<SecretKey> deriveAesKey(SecretKey masterKey, {List<int>? salt}) async {
     final pbkdf2 = Pbkdf2(
       macAlgorithm: Hmac.sha256(),
       iterations: 100000,
@@ -151,7 +150,8 @@ class CryptoUtils {
   Future<String> decryptAddress(String cipherB64, SecretKey masterKey) async {
     final combined = base64Url.decode(cipherB64);
     if (combined.length < _saltLength + 16 + 32) {
-      throw FormatException('Ciphertext trop court : ${combined.length} octets');
+      throw FormatException(
+          'Ciphertext trop court : ${combined.length} octets');
     }
     // Extrait le sel (16 premiers octets).
     final salt = combined.sublist(0, _saltLength);

@@ -51,9 +51,9 @@ class SafeRouteLayer extends StatelessWidget {
     super.key,
     required this.routePoints,
     this.arrowStepCount = 6,
-    this.routeColor,         // null = auto-détection selon le thème
-    this.strokeWidth,        // null = auto selon le thème
-    this.isDarkMap = false,  // injecté depuis MapScreen
+    this.routeColor, // null = auto-détection selon le thème
+    this.strokeWidth, // null = auto selon le thème
+    this.isDarkMap = false, // injecté depuis MapScreen
   });
 
   /// Liste ordonnée des coordonnées de la Route Safe.

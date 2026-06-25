@@ -119,8 +119,8 @@ class _EventsSection extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return _Card(
       child: ListTile(
-        leading: const Icon(Icons.event,
-            color: StreetPhareTheme.primary, size: 26),
+        leading:
+            const Icon(Icons.event, color: StreetPhareTheme.primary, size: 26),
         title: Text(
           strings.eventsTitle,
           style: TextStyle(
@@ -170,13 +170,13 @@ class _LanguageSection extends StatelessWidget {
             padding: const EdgeInsets.only(left: 30),
             child: Text(
               strings.languageSectionDescription,
-                  style: TextStyle(
-                    color: onSurface.withValues(alpha: 0.65),
-                    fontSize: 12,
-                  ),
-                ),
+              style: TextStyle(
+                color: onSurface.withValues(alpha: 0.65),
+                fontSize: 12,
               ),
-              const SizedBox(height: 8),
+            ),
+          ),
+          const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.only(left: 30),
             child: DropdownButtonFormField<AppLanguage>(
@@ -197,9 +197,13 @@ class _LanguageSection extends StatelessWidget {
                     children: [
                       Text(lang.flag, style: const TextStyle(fontSize: 20)),
                       const SizedBox(width: 12),
-                      Text(lang.code.toUpperCase() == 'FR' ? 'Français' : 
-                           lang.code.toUpperCase() == 'EN' ? 'English' :
-                           lang.code.toUpperCase() == 'NL' ? 'Nederlands' : 'Deutsch'),
+                      Text(lang.code.toUpperCase() == 'FR'
+                          ? 'Français'
+                          : lang.code.toUpperCase() == 'EN'
+                              ? 'English'
+                              : lang.code.toUpperCase() == 'NL'
+                                  ? 'Nederlands'
+                                  : 'Deutsch'),
                     ],
                   ),
                 );
@@ -285,19 +289,23 @@ class _LowVisionSection extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Row(
                   children: [
-                    const Icon(Icons.text_fields, size: 20, color: Color(0xFF7B1FA2)),
+                    const Icon(Icons.text_fields,
+                        size: 20, color: Color(0xFF7B1FA2)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Slider(
-                        value: prefs.lowVisionMode ? 1.5 : prefs.textScaleFactor,
+                        value:
+                            prefs.lowVisionMode ? 1.5 : prefs.textScaleFactor,
                         min: 1.0,
                         max: 2.0,
                         divisions: 10,
                         activeColor: const Color(0xFF7B1FA2),
-                        label: '${(prefs.lowVisionMode ? 1.5 : prefs.textScaleFactor).toStringAsFixed(1)}×',
+                        label:
+                            '${(prefs.lowVisionMode ? 1.5 : prefs.textScaleFactor).toStringAsFixed(1)}×',
                         onChanged: prefs.lowVisionMode
                             ? null // Verrouillé à 1.5x quand le mode malvoyant est actif.
-                            : (v) => AppPreferencesStore.instance.setTextScaleFactor(v),
+                            : (v) => AppPreferencesStore.instance
+                                .setTextScaleFactor(v),
                       ),
                     ),
                     SizedBox(
@@ -782,22 +790,21 @@ class _MapCacheSection extends StatelessWidget {
                     padding: const EdgeInsets.only(left: 30),
                     child: Text(
                       strings.mapCacheRetentionLabel,
-                      style:
-                          TextStyle(color: onSurface, fontSize: 13),
+                      style: TextStyle(color: onSurface, fontSize: 13),
                     ),
                   ),
                   DropdownButton<int>(
                     value: prefs.mapCacheMaxAgeDays,
                     dropdownColor: Theme.of(context).colorScheme.surface,
-                    style: TextStyle(
-                        color: onSurface, fontSize: 13),
-                    items: [1, 3, 7, 14, 30].map((v) => 
-                      DropdownMenuItem(value: v, child: Text('$v ${strings.mapCacheDays}'))
-                    ).toList(),
+                    style: TextStyle(color: onSurface, fontSize: 13),
+                    items: [1, 3, 7, 14, 30]
+                        .map((v) => DropdownMenuItem(
+                            value: v,
+                            child: Text('$v ${strings.mapCacheDays}')))
+                        .toList(),
                     onChanged: (v) {
                       if (v != null) {
-                        AppPreferencesStore.instance
-                            .setMapCacheMaxAgeDays(v);
+                        AppPreferencesStore.instance.setMapCacheMaxAgeDays(v);
                       }
                     },
                   ),
@@ -895,7 +902,7 @@ class _BackgroundServiceSection extends StatelessWidget {
               padding: const EdgeInsets.only(left: 30),
               child: ElevatedButton.icon(
                 onPressed: () {
-                   // Appel futur : showBackgroundPermissionDialog(context)
+                  // Appel futur : showBackgroundPermissionDialog(context)
                 },
                 icon: const Icon(Icons.battery_saver, size: 18),
                 label: Text(strings.backgroundServiceEnable),
@@ -1021,10 +1028,7 @@ class _PanicContactsSection extends StatelessWidget {
         content: Text(
           '${c.name} (${c.phoneNumber}) ${strings.panicContactsDeleteMessage}',
           style: TextStyle(
-            color: Theme.of(ctx)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.7),
+            color: Theme.of(ctx).colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
         actions: [
@@ -1076,8 +1080,8 @@ class _ContactTile extends StatelessWidget {
           ),
         ),
       ),
-      title: Text(contact.name,
-          style: TextStyle(color: onSurface, fontSize: 15)),
+      title:
+          Text(contact.name, style: TextStyle(color: onSurface, fontSize: 15)),
       subtitle: Text(
         contact.phoneNumber,
         style: TextStyle(
@@ -1161,8 +1165,9 @@ class _ContactFormDialogState extends State<_ContactFormDialog> {
                 labelText: s.panicContactsFieldName,
                 hintText: s.panicContactsNameHint,
               ),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? s.panicContactsNameRequired : null,
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? s.panicContactsNameRequired
+                  : null,
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -1170,15 +1175,15 @@ class _ContactFormDialogState extends State<_ContactFormDialog> {
               keyboardType: TextInputType.phone,
               style: TextStyle(color: onSurface),
               inputFormatters: [
-                FilteringTextInputFormatter.allow(
-                    RegExp(r'[0-9+\s\-().]')),
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9+\s\-().]')),
               ],
               decoration: InputDecoration(
                 labelText: s.panicContactsFieldPhone,
                 hintText: s.panicContactsPhoneHint,
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return s.panicContactsPhoneRequired;
+                if (v == null || v.trim().isEmpty)
+                  return s.panicContactsPhoneRequired;
                 if (v.trim().length < 4) return s.panicContactsPhoneTooShort;
                 return null;
               },
@@ -1235,8 +1240,8 @@ class _TutorialSection extends StatelessWidget {
             fontSize: 12,
           ),
         ),
-        trailing: Icon(Icons.chevron_right,
-            color: onSurface.withValues(alpha: 0.4)),
+        trailing:
+            Icon(Icons.chevron_right, color: onSurface.withValues(alpha: 0.4)),
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const TutorialScreen(isFirstLaunch: false),
@@ -1273,8 +1278,8 @@ class _AboutSection extends StatelessWidget {
             fontSize: 12,
           ),
         ),
-        trailing: Icon(Icons.chevron_right,
-            color: onSurface.withValues(alpha: 0.4)),
+        trailing:
+            Icon(Icons.chevron_right, color: onSurface.withValues(alpha: 0.4)),
         onTap: () => _showAboutDialog(context),
       ),
     );
@@ -1286,8 +1291,7 @@ class _AboutSection extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(ctx).colorScheme.surface,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             const Icon(Icons.lightbulb,
@@ -1314,7 +1318,8 @@ class _AboutSection extends StatelessWidget {
               _AboutRow(label: strings.aboutLicense, value: 'GNU GPL v3'),
               const SizedBox(height: 6),
               _AboutRow(
-                  label: strings.aboutEncryption, value: 'Hive local + Ed25519'),
+                  label: strings.aboutEncryption,
+                  value: 'Hive local + Ed25519'),
               const SizedBox(height: 12),
               Text(
                 strings.aboutOpenSource,
@@ -1386,35 +1391,35 @@ class _AndroidNotificationSection extends StatelessWidget {
   final AppStrings strings;
 
   List<_AndroidChannel> get _channels => [
-    _AndroidChannel(
-      id: 'alerts',
-      icon: Icons.warning_amber_outlined,
-      title: strings.androidChannelAlertsTitle,
-      subtitle: strings.androidChannelAlertsSubtitle,
-      color: const Color(0xFFFF6F00),
-    ),
-    _AndroidChannel(
-      id: 'events',
-      icon: Icons.event_note_outlined,
-      title: strings.androidChannelEventsTitle,
-      subtitle: strings.androidChannelEventsSubtitle,
-      color: const Color(0xFF1565C0),
-    ),
-    _AndroidChannel(
-      id: 'panic',
-      icon: Icons.emergency_outlined,
-      title: strings.androidChannelPanicTitle,
-      subtitle: strings.androidChannelPanicSubtitle,
-      color: const Color(0xFFC62828),
-    ),
-    _AndroidChannel(
-      id: 'messages',
-      icon: Icons.forum_outlined,
-      title: strings.androidChannelMessagesTitle,
-      subtitle: strings.androidChannelMessagesSubtitle,
-      color: const Color(0xFF00695C),
-    ),
-  ];
+        _AndroidChannel(
+          id: 'alerts',
+          icon: Icons.warning_amber_outlined,
+          title: strings.androidChannelAlertsTitle,
+          subtitle: strings.androidChannelAlertsSubtitle,
+          color: const Color(0xFFFF6F00),
+        ),
+        _AndroidChannel(
+          id: 'events',
+          icon: Icons.event_note_outlined,
+          title: strings.androidChannelEventsTitle,
+          subtitle: strings.androidChannelEventsSubtitle,
+          color: const Color(0xFF1565C0),
+        ),
+        _AndroidChannel(
+          id: 'panic',
+          icon: Icons.emergency_outlined,
+          title: strings.androidChannelPanicTitle,
+          subtitle: strings.androidChannelPanicSubtitle,
+          color: const Color(0xFFC62828),
+        ),
+        _AndroidChannel(
+          id: 'messages',
+          icon: Icons.forum_outlined,
+          title: strings.androidChannelMessagesTitle,
+          subtitle: strings.androidChannelMessagesSubtitle,
+          color: const Color(0xFF00695C),
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -1436,7 +1441,7 @@ class _AndroidNotificationSection extends StatelessWidget {
                 padding: const EdgeInsets.only(left: 30),
                 child: Text(
                   // Un peu long à traduire exactement, on garde la structure
-                  strings.notificationFilterTitle, 
+                  strings.notificationFilterTitle,
                   style: TextStyle(
                     color: onSurface.withValues(alpha: 0.65),
                     fontSize: 12,
@@ -1479,8 +1484,7 @@ class _AndroidNotificationSection extends StatelessWidget {
 
   static Future<void> _openAndroidNotificationSettings() async {
     try {
-      const channel =
-          MethodChannel('com.streetphare.app/system');
+      const channel = MethodChannel('com.streetphare.app/system');
       await channel.invokeMethod('openNotificationSettings');
     } catch (_) {}
   }
@@ -1516,12 +1520,11 @@ class _AndroidChannelTile extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return SwitchListTile(
       secondary: Icon(channel.icon, color: channel.color, size: 22),
-      title: Text(channel.title,
-          style: TextStyle(color: onSurface, fontSize: 13)),
+      title:
+          Text(channel.title, style: TextStyle(color: onSurface, fontSize: 13)),
       subtitle: Text(
         channel.subtitle,
-        style: TextStyle(
-            color: onSurface.withValues(alpha: 0.6), fontSize: 11),
+        style: TextStyle(color: onSurface.withValues(alpha: 0.6), fontSize: 11),
       ),
       value: enabled,
       onChanged: onChanged,
@@ -1571,8 +1574,8 @@ class _BlockedUsersSection extends StatelessWidget {
               const SizedBox(height: 8),
               if (blockedIds.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 30, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 30, vertical: 8),
                   child: Text(
                     strings.blockedUsersEmpty,
                     style: TextStyle(
@@ -1721,8 +1724,7 @@ class _BugReportSection extends StatelessWidget {
                 label: Text(strings.bugReportSuggest),
                 onPressed: () => BugReportDialog.show(context),
                 style: OutlinedButton.styleFrom(
-                  side:
-                      const BorderSide(color: Color(0xFF00838F)),
+                  side: const BorderSide(color: Color(0xFF00838F)),
                   foregroundColor: const Color(0xFF00838F),
                 ),
               ),
@@ -1747,8 +1749,8 @@ class _ShareApkSection extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return _Card(
       child: ListTile(
-        leading: const Icon(Icons.share,
-            color: StreetPhareTheme.primary, size: 26),
+        leading:
+            const Icon(Icons.share, color: StreetPhareTheme.primary, size: 26),
         title: Text(
           'Partager StreetPhare',
           style: TextStyle(
@@ -1761,8 +1763,8 @@ class _ShareApkSection extends StatelessWidget {
             fontSize: 12,
           ),
         ),
-        trailing: Icon(Icons.chevron_right,
-            color: onSurface.withValues(alpha: 0.4)),
+        trailing:
+            Icon(Icons.chevron_right, color: onSurface.withValues(alpha: 0.4)),
         onTap: () => _showInstructionsDialog(context),
       ),
     );
@@ -1776,8 +1778,7 @@ class _ShareApkSection extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(ctx).colorScheme.surface,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             const Icon(Icons.share, color: StreetPhareTheme.primary, size: 28),

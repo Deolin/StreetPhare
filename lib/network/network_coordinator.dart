@@ -110,7 +110,7 @@ class NetworkCoordinator with WidgetsBindingObserver {
       _db.init(),
       _failover.init(failoverConfig),
     ]);
-    
+
     // Démarre le failover (heartbeat).
     await _failover.start();
 
@@ -122,8 +122,7 @@ class NetworkCoordinator with WidgetsBindingObserver {
 
     // Enregistre l'identifiant local auprès du compteur de pairs
     // pour qu'il soit systématiquement exclu du décompte HIVE.
-    PeerCounterService.instance
-        .setLocalPeerId(localPeerId ?? _ephemeralUserId);
+    PeerCounterService.instance.setLocalPeerId(localPeerId ?? _ephemeralUserId);
 
     // Démarre la machine d'état de basculement réseau.
     NetworkManager.instance.start();
@@ -135,12 +134,12 @@ class NetworkCoordinator with WidgetsBindingObserver {
     await _discoverPeersInPriorityOrder(transports);
 
     // Notifie ConnectivityService que les transports sont initialisés.
-    ConnectivityService.instance.updateLayerState(
-        'websocket', TransportLayerState.active);
-    ConnectivityService.instance.updateLayerState(
-        'wifi', TransportLayerState.active);
-    ConnectivityService.instance.updateLayerState(
-        'ble', TransportLayerState.active);
+    ConnectivityService.instance
+        .updateLayerState('websocket', TransportLayerState.active);
+    ConnectivityService.instance
+        .updateLayerState('wifi', TransportLayerState.active);
+    ConnectivityService.instance
+        .updateLayerState('ble', TransportLayerState.active);
 
     // À chaque mutation locale, on tente l'upload si l'alerte
     // vient d'être validée par consensus.
@@ -152,7 +151,8 @@ class NetworkCoordinator with WidgetsBindingObserver {
           _onDatabaseChanged(alerts);
         } catch (e, st) {
           if (kDebugMode) {
-            debugPrint('[NetworkCoordinator] erreur _onDatabaseChanged: $e\n$st');
+            debugPrint(
+                '[NetworkCoordinator] erreur _onDatabaseChanged: $e\n$st');
           }
         }
       }),
@@ -165,7 +165,8 @@ class NetworkCoordinator with WidgetsBindingObserver {
           _onAlertReceivedViaMesh(alert);
         } catch (e, st) {
           if (kDebugMode) {
-            debugPrint('[NetworkCoordinator] erreur _onAlertReceivedViaMesh: $e\n$st');
+            debugPrint(
+                '[NetworkCoordinator] erreur _onAlertReceivedViaMesh: $e\n$st');
           }
         }
       }),
@@ -408,8 +409,8 @@ class NetworkCoordinator with WidgetsBindingObserver {
     }
 
     if (!bleOk) {
-      ConnectivityService.instance.updateLayerState(
-          'ble', TransportLayerState.disabled);
+      ConnectivityService.instance
+          .updateLayerState('ble', TransportLayerState.disabled);
       if (kDebugMode) {
         debugPrint('[NetworkCoordinator] BLE indisponible → Wi-Fi Direct');
       }
@@ -424,7 +425,8 @@ class NetworkCoordinator with WidgetsBindingObserver {
         if (wifiTransport.name == 'wifi') {
           wifiOk = wifiTransport.isAvailable;
           if (kDebugMode) {
-            debugPrint('[NetworkCoordinator] Wi-Fi Direct disponible : $wifiOk');
+            debugPrint(
+                '[NetworkCoordinator] Wi-Fi Direct disponible : $wifiOk');
           }
         }
       } catch (_) {
@@ -432,22 +434,23 @@ class NetworkCoordinator with WidgetsBindingObserver {
       }
 
       if (!wifiOk) {
-        ConnectivityService.instance.updateLayerState(
-            'wifi', TransportLayerState.disabled);
+        ConnectivityService.instance
+            .updateLayerState('wifi', TransportLayerState.disabled);
         if (kDebugMode) {
-          debugPrint('[NetworkCoordinator] Wi-Fi Direct indisponible → WebSocket');
+          debugPrint(
+              '[NetworkCoordinator] Wi-Fi Direct indisponible → WebSocket');
         }
 
         // Étape 3 : Bascule sur le serveur Web (dernier recours).
-        ConnectivityService.instance.updateLayerState(
-            'websocket', TransportLayerState.active);
+        ConnectivityService.instance
+            .updateLayerState('websocket', TransportLayerState.active);
       } else {
-        ConnectivityService.instance.updateLayerState(
-            'wifi', TransportLayerState.active);
+        ConnectivityService.instance
+            .updateLayerState('wifi', TransportLayerState.active);
       }
     } else {
-      ConnectivityService.instance.updateLayerState(
-          'ble', TransportLayerState.active);
+      ConnectivityService.instance
+          .updateLayerState('ble', TransportLayerState.active);
     }
   }
 
@@ -508,7 +511,8 @@ class NetworkCoordinator with WidgetsBindingObserver {
       // Le message est conservé localement, le HiveMessagingService
       // dispose d'une file outbox pour retenter plus tard.
       if (kDebugMode) {
-        debugPrint('[NetworkCoordinator] échec broadcast Hive (non fatal) : $e\n$st');
+        debugPrint(
+            '[NetworkCoordinator] échec broadcast Hive (non fatal) : $e\n$st');
       }
       // Relance silencieuse : ne pas crasher l'UI ni le service.
       await Future<void>.delayed(const Duration(seconds: 2));
@@ -573,7 +577,8 @@ class NetworkCoordinator with WidgetsBindingObserver {
       await _mesh?.broadcastAlert(alert);
     } catch (e, st) {
       if (kDebugMode) {
-        debugPrint('[NetworkCoordinator] échec broadcastAlert (non fatal): $e\n$st');
+        debugPrint(
+            '[NetworkCoordinator] échec broadcastAlert (non fatal): $e\n$st');
       }
     }
 
@@ -589,8 +594,7 @@ class NetworkCoordinator with WidgetsBindingObserver {
     required double latitude,
     required double longitude,
   }) async {
-    final payload =
-        CollectivePanicService.instance.buildLocalPanicPayload(
+    final payload = CollectivePanicService.instance.buildLocalPanicPayload(
       localPeerId: _ephemeralUserId,
       lat: latitude,
       lng: longitude,
@@ -599,7 +603,8 @@ class NetworkCoordinator with WidgetsBindingObserver {
       await _mesh?.broadcastRawJson(payload);
     } catch (e, st) {
       if (kDebugMode) {
-        debugPrint('[NetworkCoordinator] échec broadcast panic (non fatal): $e\n$st');
+        debugPrint(
+            '[NetworkCoordinator] échec broadcast panic (non fatal): $e\n$st');
       }
     }
     if (kDebugMode) {
@@ -613,7 +618,7 @@ class NetworkCoordinator with WidgetsBindingObserver {
   Future<void> _reportLocalDensity() async {
     final pos = GeofencingService.instance.lastPosition;
     if (pos == null) return;
-    
+
     final count = PeerCounterService.instance.value;
     if (count == 0) return; // Pas d'intérêt si vide
 
@@ -621,7 +626,8 @@ class NetworkCoordinator with WidgetsBindingObserver {
     final alert = Alert(
       id: id,
       ephemeralUserId: _ephemeralUserId,
-      signature: 'local_density', // Pas besoin de signature lourde pour la densité
+      signature:
+          'local_density', // Pas besoin de signature lourde pour la densité
       type: AlertType.density,
       latitude: pos.latitude,
       longitude: pos.longitude,
@@ -637,15 +643,17 @@ class NetworkCoordinator with WidgetsBindingObserver {
       await _mesh?.broadcastAlert(alert);
     } catch (e, st) {
       if (kDebugMode) {
-        debugPrint('[NetworkCoordinator] échec broadcast densité (non fatal): $e\n$st');
+        debugPrint(
+            '[NetworkCoordinator] échec broadcast densité (non fatal): $e\n$st');
       }
     }
-    
+
     // Upload asynchrone secondaire vers le serveur (Requirement #4)
     unawaited(_failover.uploadAlerts([alert.toJson()]));
 
     if (kDebugMode) {
-      debugPrint('[NetworkCoordinator] densité rapportée : $count à ${pos.latitude}, ${pos.longitude}');
+      debugPrint(
+          '[NetworkCoordinator] densité rapportée : $count à ${pos.latitude}, ${pos.longitude}');
     }
   }
 
@@ -667,8 +675,7 @@ class NetworkCoordinator with WidgetsBindingObserver {
   /// l'upload pour les alertes validées.
   void _onDatabaseChanged(List<Alert> alerts) {
     final validated = alerts
-        .where((a) =>
-            a.status == AlertStatus.active && a.uploadedTo.isEmpty)
+        .where((a) => a.status == AlertStatus.active && a.uploadedTo.isEmpty)
         .toList();
     if (validated.isNotEmpty) {
       unawaited(_uploadValidatedAlerts());
@@ -770,8 +777,7 @@ class NetworkCoordinator with WidgetsBindingObserver {
   /// Purge les alertes expirées.
   Future<void> _purgeAndMaybeSync() async {
     await _db.purgeExpired(onBeforeDelete: (alert) async {
-      if (alert.status == AlertStatus.active &&
-          alert.uploadedTo.isEmpty) {
+      if (alert.status == AlertStatus.active && alert.uploadedTo.isEmpty) {
         await _failover.uploadAlerts([alert.toJson()]);
       }
     });

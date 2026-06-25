@@ -131,8 +131,7 @@ class OsmAndRoutingService {
       'https://play.google.com/store/apps/details?id=net.osmand';
 
   /// URL F-Droid pour OsmAnd (alternative libre).
-  static const _kFDroidUrl =
-      'https://f-droid.org/packages/net.osmand.plus/';
+  static const _kFDroidUrl = 'https://f-droid.org/packages/net.osmand.plus/';
 
   /// Port du serveur GraphHopper local.
   static const int _kGraphHopperPort = 8080;
@@ -288,7 +287,8 @@ class OsmAndRoutingService {
 
         if (!nativeResult.isEmpty) {
           if (kDebugMode) {
-            debugPrint('[OsmAnd] ✅ GraphHopper EMBARQUÉ (${nativeResult.source}) → '
+            debugPrint(
+                '[OsmAnd] ✅ GraphHopper EMBARQUÉ (${nativeResult.source}) → '
                 '${nativeResult.routes.first.points.length} points');
           }
           return OsmAndResult(
@@ -371,9 +371,8 @@ class OsmAndRoutingService {
     );
 
     if (avoidPoints.isNotEmpty) {
-      final blockArea = avoidPoints
-          .map((p) => '${p.latitude},${p.longitude}')
-          .join('|');
+      final blockArea =
+          avoidPoints.map((p) => '${p.latitude},${p.longitude}').join('|');
       uriBuffer.write('&block_area=${Uri.encodeComponent(blockArea)}');
     }
 
@@ -537,7 +536,6 @@ class OsmAndRoutingService {
     }
   }
 
-
   // ── Utilitaires ───────────────────────────────────────────────────────────
 
   /// Convertit une liste GeoJSON coordinates `[[lon, lat], ...]`
@@ -565,16 +563,16 @@ class OsmAndRoutingService {
   /// Points de référence pour les tests à Fleurus, Belgique (6220).
   static const Map<String, LatLng> fleurusWaypoints = {
     // Scénario 1 : Tour de Fleurus
-    'place_communale':       LatLng(50.4818, 4.5492),
-    'chateau_namur':         LatLng(50.4802, 4.5448),
+    'place_communale': LatLng(50.4818, 4.5492),
+    'chateau_namur': LatLng(50.4802, 4.5448),
 
     // Scénario 2 : Traversée des écoles
-    'institut_notre_dame':   LatLng(50.4835, 4.5512),
-    'athenee_jourdan':       LatLng(50.4849, 4.5468),
+    'institut_notre_dame': LatLng(50.4835, 4.5512),
+    'athenee_jourdan': LatLng(50.4849, 4.5468),
 
     // Scénario 3 : Cortège de la police
-    'hotel_de_ville':        LatLng(50.4820, 4.5490),
-    'place_albert':          LatLng(50.4831, 4.5502),
+    'hotel_de_ville': LatLng(50.4820, 4.5490),
+    'place_albert': LatLng(50.4831, 4.5502),
   };
 
   /// Calcule l'itinéraire pour un scénario de test Fleurus.

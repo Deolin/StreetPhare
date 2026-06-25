@@ -200,8 +200,7 @@ class ProximityValidationSheet extends StatelessWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () =>
-                          Navigator.of(context).pop(false),
+                      onPressed: () => Navigator.of(context).pop(false),
                       icon: const Icon(Icons.close,
                           color: StreetPhareTheme.danger),
                       label: const Text(

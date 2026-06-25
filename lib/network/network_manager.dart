@@ -154,8 +154,8 @@ class NetworkManager extends ChangeNotifier {
         Timer.periodic(const Duration(seconds: 30), (_) => _safeEvaluate());
 
     // Timer de vérification matérielle (Bluetooth / Wi-Fi éteint).
-    _hardwareCheckTimer = Timer.periodic(
-        const Duration(seconds: 45), (_) => _checkHardware());
+    _hardwareCheckTimer =
+        Timer.periodic(const Duration(seconds: 45), (_) => _checkHardware());
 
     if (kDebugMode) {
       debugPrint(
@@ -212,9 +212,8 @@ class NetworkManager extends ChangeNotifier {
   /// sous-jacents, puis lance l'évaluation du meilleur transport.
   void _refreshIndicators() {
     _activeBlePeers = PeerCounterService.instance.value;
-    _isWifiP2PAvailable =
-        ConnectivityService.instance.state.wifiDirect ==
-            TransportLayerState.active;
+    _isWifiP2PAvailable = ConnectivityService.instance.state.wifiDirect ==
+        TransportLayerState.active;
     _hasInternet = FailoverManager.instance.currentAddress.isNotEmpty;
   }
 
@@ -304,16 +303,15 @@ class NetworkManager extends ChangeNotifier {
     final bleOk = await _isBluetoothEnabled();
     final wifiOk = await _isWifiEnabled();
 
-    final changed = _hardwareState['ble'] != bleOk ||
-        _hardwareState['wifi'] != wifiOk;
+    final changed =
+        _hardwareState['ble'] != bleOk || _hardwareState['wifi'] != wifiOk;
 
     _hardwareState['ble'] = bleOk;
     _hardwareState['wifi'] = wifiOk;
 
     if (changed) {
       if (kDebugMode) {
-        debugPrint(
-            '[NetworkManager] Matériel : BLE=$bleOk, Wi-Fi=$wifiOk');
+        debugPrint('[NetworkManager] Matériel : BLE=$bleOk, Wi-Fi=$wifiOk');
       }
       notifyListeners();
     }

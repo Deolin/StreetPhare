@@ -136,8 +136,7 @@ class OsmAndRoutingService {
   Future<void> init() async {
     // Vérifie si le moteur natif OsmAnd est disponible.
     try {
-      final result =
-          await _channel.invokeMethod<bool>('isAvailable') ?? false;
+      final result = await _channel.invokeMethod<bool>('isAvailable') ?? false;
       _nativeAvailable = result;
       debugPrint('[OsmAnd] moteur natif ${_nativeAvailable ? "✓" : "✗"}');
     } on MissingPluginException {
@@ -253,8 +252,7 @@ class OsmAndRoutingService {
 
     final segments = <RouteSegment>[];
     for (var i = 0; i < points.length - 1; i++) {
-      final segDist =
-          _haversineMeters(points[i], points[i + 1]);
+      final segDist = _haversineMeters(points[i], points[i + 1]);
       segments.add(RouteSegment(
         from: points[i],
         to: points[i + 1],

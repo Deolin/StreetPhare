@@ -78,8 +78,7 @@ class ReportBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isLowVision =
-        AppPreferencesStore.instance.value.lowVisionMode;
+    final isLowVision = AppPreferencesStore.instance.value.lowVisionMode;
     // Mode malvoyant : 2 colonnes larges ; mode normal : 4 colonnes.
     final crossAxisCount = isLowVision ? 2 : 4;
     final childAspectRatio = isLowVision ? 1.1 : 0.85;
@@ -170,11 +169,11 @@ class ReportBottomSheet extends StatelessWidget {
                   onPressed: () => Navigator.of(context).pop(),
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(
-                      color: StreetPhareTheme.textSecondary
-                          .withValues(alpha: 0.3),
+                      color:
+                          StreetPhareTheme.textSecondary.withValues(alpha: 0.3),
                     ),
-                    padding: EdgeInsets.symmetric(
-                        vertical: isLowVision ? 18 : 14),
+                    padding:
+                        EdgeInsets.symmetric(vertical: isLowVision ? 18 : 14),
                   ),
                   child: Text(
                     'Annuler',

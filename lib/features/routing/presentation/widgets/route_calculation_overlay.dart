@@ -190,7 +190,8 @@ class RouteCalculationOverlay extends StatelessWidget {
                 Text(
                   'Profil piéton · OpenStreetMap',
                   style: TextStyle(
-                    color: StreetPhareTheme.textSecondary.withValues(alpha: 0.7),
+                    color:
+                        StreetPhareTheme.textSecondary.withValues(alpha: 0.7),
                     fontSize: 11,
                   ),
                 ),

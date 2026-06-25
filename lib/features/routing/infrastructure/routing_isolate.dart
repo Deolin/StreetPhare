@@ -191,7 +191,7 @@ class RoutingIsolate {
       final endIdx = nearest.endNodeIndex;
 
       _AstarOrDijkstraResult algoResult;
-      
+
       if (msg.profile.useContractionHierarchies) {
         // Pour le MVP, on utilise A* bidirectionnel même si CH n'est pas
         // encore pré-calculé. La structure CH est réservée pour la V2.
@@ -226,10 +226,12 @@ class RoutingIsolate {
         );
       }
 
-      final points = algoResult.nodeIds.map((id) => LatLng(
-        graph.nodeLat(id),
-        graph.nodeLon(id),
-      )).toList();
+      final points = algoResult.nodeIds
+          .map((id) => LatLng(
+                graph.nodeLat(id),
+                graph.nodeLon(id),
+              ))
+          .toList();
 
       msg.sendPort.send(ComputeResult(
         nodeIds: algoResult.nodeIds,

@@ -94,7 +94,10 @@ class SpgGraph {
   // ── Accès aux arêtes ───────────────────────────────────────────────────
 
   /// Itère sur les arêtes sortantes d'un nœud.
-  void forEachEdge(int nodeIdx, void Function(int to, double weightMeters, int flags, int speedKmh) callback) {
+  void forEachEdge(
+      int nodeIdx,
+      void Function(int to, double weightMeters, int flags, int speedKmh)
+          callback) {
     final start = edgeStarts[nodeIdx];
     final count = edgeCounts[nodeIdx];
     for (int i = 0; i < count; i++) {
@@ -115,7 +118,8 @@ class SpgGraph {
   int edgeSpeedKmh(int edgeIdx) => edgeSpeeds[edgeIdx] * 2;
 
   /// Vérifie si une arête a un flag spécifique.
-  bool edgeHasFlag(int edgeIdx, int flag) => EdgeFlags.has(edgeFlags[edgeIdx], flag);
+  bool edgeHasFlag(int edgeIdx, int flag) =>
+      EdgeFlags.has(edgeFlags[edgeIdx], flag);
 
   // ── Calcul mémoire ────────────────────────────────────────────────────
 
@@ -148,7 +152,8 @@ class SpgGraph {
   int _cellIndex(int cx, int cy) => cy * cellsX + cx;
 
   /// Trouve les k nœuds les plus proches d'une position.
-  List<int> findNearestNodes(double lat, double lon, {int k = 5, double radiusMeters = 50.0}) {
+  List<int> findNearestNodes(double lat, double lon,
+      {int k = 5, double radiusMeters = 50.0}) {
     final cx = _cellX(lon);
     final cy = _cellY(lat);
 
@@ -183,7 +188,8 @@ class SpgGraph {
   }
 
   /// Distance Haversine approximative pour les courtes distances.
-  static double _approxDistance(double dLatDeg, double dLonDeg, double refLatDeg) {
+  static double _approxDistance(
+      double dLatDeg, double dLonDeg, double refLatDeg) {
     const double metersPerDeg = 111320.0;
     final midLat = refLatDeg * 3.141592653589793 / 180.0;
     final lonScale = metersPerDeg * _fastCos(midLat);
@@ -209,18 +215,22 @@ class SpgGraph {
   }
 
   /// Trouve le nœud le plus proche d'une position.
-  NearestNodesResult findStartEndNodes(double startLat, double startLon, double endLat, double endLon) {
-    final startNodes = findNearestNodes(startLat, startLon, k: 1, radiusMeters: 200);
+  NearestNodesResult findStartEndNodes(
+      double startLat, double startLon, double endLat, double endLon) {
+    final startNodes =
+        findNearestNodes(startLat, startLon, k: 1, radiusMeters: 200);
     final endNodes = findNearestNodes(endLat, endLon, k: 1, radiusMeters: 200);
 
     return NearestNodesResult(
       startNodeIndex: startNodes.isNotEmpty ? startNodes.first : 0,
       endNodeIndex: endNodes.isNotEmpty ? endNodes.first : header.nodeCount - 1,
       startDistanceMeters: startNodes.isNotEmpty
-          ? _approxDistance(nodeLats[startNodes.first] - startLat, nodeLons[startNodes.first] - startLon, startLat)
+          ? _approxDistance(nodeLats[startNodes.first] - startLat,
+              nodeLons[startNodes.first] - startLon, startLat)
           : double.infinity,
       endDistanceMeters: endNodes.isNotEmpty
-          ? _approxDistance(nodeLats[endNodes.first] - endLat, nodeLons[endNodes.first] - endLon, endLat)
+          ? _approxDistance(nodeLats[endNodes.first] - endLat,
+              nodeLons[endNodes.first] - endLon, endLat)
           : double.infinity,
     );
   }
@@ -228,7 +238,8 @@ class SpgGraph {
   // ── Utilitaires (profils) ──────────────────────────────────────────────
 
   /// Calcule le poids d'une arête selon un profil.
-  double edgeWeightForProfile(int edgeIdx, double walkSpeedMs, double penaltyFactorDiagonal) {
+  double edgeWeightForProfile(
+      int edgeIdx, double walkSpeedMs, double penaltyFactorDiagonal) {
     final weight = edgeWeights[edgeIdx] / 1000.0; // mètres
     final speed = edgeSpeeds[edgeIdx] * 2; // km/h
 

@@ -46,11 +46,11 @@ enum EngineState {
 
 /// Étape atteinte dans la cascade de routage.
 enum CascadeStep {
-  spg,          // Nouveau moteur .spg
-  nativeAndroid,// MethodChannel Android
-  graphHopper,  // GraphHopper HTTP local
-  osrmPublic,   // OSRM public
-  safePath,     // SafePathEngine (grille)
+  spg, // Nouveau moteur .spg
+  nativeAndroid, // MethodChannel Android
+  graphHopper, // GraphHopper HTTP local
+  osrmPublic, // OSRM public
+  safePath, // SafePathEngine (grille)
 }
 
 /// Moteur de routage central.

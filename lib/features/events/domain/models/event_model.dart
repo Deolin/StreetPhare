@@ -54,8 +54,8 @@ class EventWaypoint {
   bool isPassed(DateTime now, LatLng? userPos) {
     // Critère 1 : heure dépassée de plus de 5 minutes.
     final timePassed = now.toUtc().isAfter(
-      scheduledAt.toUtc().add(const Duration(minutes: 5)),
-    );
+          scheduledAt.toUtc().add(const Duration(minutes: 5)),
+        );
     if (timePassed) return true;
 
     // Critère 2 : position GPS à moins de 30 mètres.
@@ -87,8 +87,7 @@ class EventWaypoint {
       label: json['label'] as String,
       latitude: (json['lat'] as num).toDouble(),
       longitude: (json['lng'] as num).toDouble(),
-      scheduledAt:
-          DateTime.parse(json['scheduledAt'] as String).toUtc(),
+      scheduledAt: DateTime.parse(json['scheduledAt'] as String).toUtc(),
     );
   }
 }
@@ -323,8 +322,7 @@ class EventModel {
   /// de la zone concernée via [MapCacheManager.preloadZone].
   final String? generalZone;
 
-  LatLng get destination =>
-      LatLng(destinationLatitude, destinationLongitude);
+  LatLng get destination => LatLng(destinationLatitude, destinationLongitude);
 
   /// Indique si l'itinéraire est visible à l'instant présent.
   bool isRouteVisible([DateTime? now]) {
@@ -505,8 +503,7 @@ class EventModel {
           : DateTime.now().toUtc(),
       routeGeoJson: (json['route'] as String?) ?? '[]',
       waypoints: ((json['waypoints'] as List?) ?? const [])
-          .map((w) =>
-              EventWaypoint.fromJson(w as Map<String, dynamic>))
+          .map((w) => EventWaypoint.fromJson(w as Map<String, dynamic>))
           .toList(),
       pois: ((json['pois'] as List?) ?? const [])
           .map((p) => EventPoi.fromJson(p as Map<String, dynamic>))

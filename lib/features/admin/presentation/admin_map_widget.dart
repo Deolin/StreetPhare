@@ -24,8 +24,7 @@ import '../../../network/network_coordinator.dart';
 /// URL des tuiles sombres CartoDB (dashboard admin).
 const String _kTileUrlDark =
     'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
-const String _kTileUrlLight =
-    'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const String _kTileUrlLight = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 /// Widget de carte autonome pour le Dashboard Admin.
 ///
@@ -96,7 +95,7 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
         return Colors.cyanAccent;
       case AlertType.autre:
         return Colors.grey;
-      }
+    }
   }
 
   /// Icône pour le type d'alerte.
@@ -122,14 +121,14 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
         return Icons.people;
       case AlertType.autre:
         return Icons.error;
-      }
+    }
   }
 
   /// Construit la liste des marqueurs à partir du flux d'alertes.
   List<Marker> _buildMarkers(List<Alert> alerts) {
     return alerts
-        .where((a) => a.status == AlertStatus.active ||
-            a.status == AlertStatus.pending)
+        .where((a) =>
+            a.status == AlertStatus.active || a.status == AlertStatus.pending)
         .map((alert) {
       final color = _colorForAlertType(alert.type);
       return Marker(
@@ -185,7 +184,7 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
         return 'Densité';
       case AlertType.autre:
         return 'Autre';
-      }
+    }
   }
 
   @override

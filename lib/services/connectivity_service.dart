@@ -186,18 +186,15 @@ class ConnectivityService extends ChangeNotifier {
   }
 
   void _checkState() {
-    final bool serversDown =
-        FailoverManager.instance.currentAddress.isEmpty;
+    final bool serversDown = FailoverManager.instance.currentAddress.isEmpty;
     final bool noPeers = PeerCounterService.instance.value == 0;
 
     if (serversDown && noPeers) {
       if (_isolationStartTime == null) {
         _isolationStartTime = DateTime.now();
-        debugPrint(
-            '[Connectivity] Début de la phase d\'isolement potentiel…');
+        debugPrint('[Connectivity] Début de la phase d\'isolement potentiel…');
       } else {
-        final duration =
-            DateTime.now().difference(_isolationStartTime!);
+        final duration = DateTime.now().difference(_isolationStartTime!);
         if (duration >= const Duration(minutes: 5)) {
           if (!_state.isIsolated) {
             _state = NetworkState(

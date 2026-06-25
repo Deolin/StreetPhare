@@ -205,10 +205,9 @@ class _BugReportDialogState extends State<BugReportDialog> {
                             label: Text(c.label,
                                 style: const TextStyle(fontSize: 12)),
                             selected: _category == c,
-                            selectedColor: StreetPhareTheme.primary
-                                .withValues(alpha: 0.2),
-                            onSelected: (_) =>
-                                setState(() => _category = c),
+                            selectedColor:
+                                StreetPhareTheme.primary.withValues(alpha: 0.2),
+                            onSelected: (_) => setState(() => _category = c),
                           ))
                       .toList(),
                 ),
@@ -222,8 +221,7 @@ class _BugReportDialogState extends State<BugReportDialog> {
                     labelText: 'Titre bref *',
                     hintText: 'Ex: L\'écran de la carte crash au démarrage',
                     hintStyle: TextStyle(
-                        color: onSurface.withValues(alpha: 0.4),
-                        fontSize: 12),
+                        color: onSurface.withValues(alpha: 0.4), fontSize: 12),
                     border: const OutlineInputBorder(),
                   ),
                   validator: (v) =>

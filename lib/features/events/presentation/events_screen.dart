@@ -80,8 +80,8 @@ class _EventsScreenState extends State<EventsScreen> {
 
     setState(() {
       _loading = false;
-            if (!ok) {
-                _error = '${s.eventsUnknownCodeError}\n${s.eventsFleurusCodes}';
+      if (!ok) {
+        _error = '${s.eventsUnknownCodeError}\n${s.eventsFleurusCodes}';
       } else {
         _codeController.clear();
         _preloadEventZone();
@@ -160,91 +160,92 @@ class _EventsScreenState extends State<EventsScreen> {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<AppLanguage>(
-      valueListenable: AppLocale.instance,
-      builder: (context, _, child) {
-        final s = AppLocale.instance.strings;
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(s.eventsTitle),
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            iconTheme: IconThemeData(
-              color: Theme.of(context).colorScheme.onSurface,
+        valueListenable: AppLocale.instance,
+        builder: (context, _, child) {
+          final s = AppLocale.instance.strings;
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(s.eventsTitle),
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              iconTheme: IconThemeData(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
             ),
-          ),
-          body: ValueListenableBuilder<List<EventModel>>(
-            valueListenable: EventManager.instance,
-            builder: (context, events, _) {
-              return ListView(
-                padding: const EdgeInsets.all(12),
-                children: [
-                  // ── Section : Mes événements ─────────────────────────────────
-                  _SectionHeader(
-                    icon: Icons.event_note,
-                    color: StreetPhareTheme.primary,
-                    title: '${s.eventsMyEvents} (${events.length}/${EventManager.maxEvents})',
-                  ),
-                  const SizedBox(height: 8),
+            body: ValueListenableBuilder<List<EventModel>>(
+              valueListenable: EventManager.instance,
+              builder: (context, events, _) {
+                return ListView(
+                  padding: const EdgeInsets.all(12),
+                  children: [
+                    // ── Section : Mes événements ─────────────────────────────────
+                    _SectionHeader(
+                      icon: Icons.event_note,
+                      color: StreetPhareTheme.primary,
+                      title:
+                          '${s.eventsMyEvents} (${events.length}/${EventManager.maxEvents})',
+                    ),
+                    const SizedBox(height: 8),
 
-                  if (events.isEmpty)
-                    _EmptyEventsCard(strings: s)
-                  else
-                    ...events.asMap().entries.map(
-                      (e) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _EventCard(
-                          event: e.value,
-                          color: _kEventColors[e.key % _kEventColors.length],
-                          strings: s,
-                          onRemove: () => _removeEvent(e.value.code),
+                    if (events.isEmpty)
+                      _EmptyEventsCard(strings: s)
+                    else
+                      ...events.asMap().entries.map(
+                            (e) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _EventCard(
+                                event: e.value,
+                                color:
+                                    _kEventColors[e.key % _kEventColors.length],
+                                strings: s,
+                                onRemove: () => _removeEvent(e.value.code),
+                              ),
+                            ),
+                          ),
+
+                    const SizedBox(height: 16),
+
+                    // ── Section : Rejoindre un événement ─────────────────────────
+                    if (events.length < EventManager.maxEvents) ...[
+                      _SectionHeader(
+                        icon: Icons.add_circle_outline,
+                        color: StreetPhareTheme.primary,
+                        title: s.eventsJoinTitle,
+                      ),
+                      const SizedBox(height: 8),
+                      _JoinCard(
+                        codeController: _codeController,
+                        loading: _loading,
+                        error: _error,
+                        strings: s,
+                        onLoadCode: _loadCode,
+                        onScanQr: _openQrScanner,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ── Section : Sécurité juste-à-temps ─────────────────────────
+                    _SectionHeader(
+                      icon: Icons.lock_clock,
+                      color: StreetPhareTheme.accent,
+                      title: s.eventsSecurityTitle,
+                    ),
+                    const SizedBox(height: 8),
+                    _InfoCard(
+                      child: Text(
+                        s.eventsSecurityDescription,
+                        style: const TextStyle(
+                          color: StreetPhareTheme.textSecondary,
+                          fontSize: 13,
                         ),
                       ),
                     ),
-
-                  const SizedBox(height: 16),
-
-                  // ── Section : Rejoindre un événement ─────────────────────────
-                  if (events.length < EventManager.maxEvents) ...[
-                    _SectionHeader(
-                      icon: Icons.add_circle_outline,
-                      color: StreetPhareTheme.primary,
-                      title: s.eventsJoinTitle,
-                    ),
-                    const SizedBox(height: 8),
-                    _JoinCard(
-                      codeController: _codeController,
-                      loading: _loading,
-                      error: _error,
-                      strings: s,
-                      onLoadCode: _loadCode,
-                      onScanQr: _openQrScanner,
-                    ),
                     const SizedBox(height: 16),
                   ],
-
-                  // ── Section : Sécurité juste-à-temps ─────────────────────────
-                  _SectionHeader(
-                    icon: Icons.lock_clock,
-                    color: StreetPhareTheme.accent,
-                    title: s.eventsSecurityTitle,
-                  ),
-                  const SizedBox(height: 8),
-                  _InfoCard(
-                    child: Text(
-                      s.eventsSecurityDescription,
-                      style: const TextStyle(
-                        color: StreetPhareTheme.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              );
-            },
-          ),
-        );
-      }
-    );
+                );
+              },
+            ),
+          );
+        });
   }
 }
 
@@ -286,8 +287,7 @@ class _InfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       color: Theme.of(context).colorScheme.surface,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: child,
@@ -306,8 +306,7 @@ class _EmptyEventsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       color: Theme.of(context).colorScheme.surface,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -326,8 +325,8 @@ class _EmptyEventsCard extends StatelessWidget {
             Text(
               strings.eventsEmptySubtitle,
               textAlign: TextAlign.center,
-              style:
-                  const TextStyle(color: StreetPhareTheme.textSecondary, fontSize: 13),
+              style: const TextStyle(
+                  color: StreetPhareTheme.textSecondary, fontSize: 13),
             ),
           ],
         ),
@@ -358,9 +357,8 @@ class _EventCard extends StatelessWidget {
     final remaining = event.remainingBeforeReveal(now);
     final daysUntilEvent = event.startAt.toUtc().difference(now).inDays;
     final isTooFarAhead = daysUntilEvent > _maxAdvanceDays;
-    final activeStep = event.waypoints.isNotEmpty
-        ? event.activeStepIndex(now: now)
-        : null;
+    final activeStep =
+        event.waypoints.isNotEmpty ? event.activeStepIndex(now: now) : null;
 
     return Card(
       color: color.withValues(alpha: 0.10),
@@ -489,8 +487,7 @@ class _EventCard extends StatelessWidget {
                   ],
                 ),
               )
-            else if (activeStep != null &&
-                activeStep < event.waypoints.length)
+            else if (activeStep != null && activeStep < event.waypoints.length)
               _StatusBlock(
                 icon: Icons.navigation,
                 iconColor: color,
@@ -499,7 +496,9 @@ class _EventCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      strings.eventsStepActive.replaceFirst('{index}', '${activeStep + 1}').replaceFirst('{total}', '${event.waypoints.length}'),
+                      strings.eventsStepActive
+                          .replaceFirst('{index}', '${activeStep + 1}')
+                          .replaceFirst('{total}', '${event.waypoints.length}'),
                       style: const TextStyle(
                         color: StreetPhareTheme.textSecondary,
                         fontSize: 12,
@@ -609,8 +608,7 @@ class _JoinCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       color: Theme.of(context).colorScheme.surface,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -635,8 +633,7 @@ class _JoinCard extends StatelessWidget {
                     textCapitalization: TextCapitalization.characters,
                     inputFormatters: [
                       LengthLimitingTextInputFormatter(32),
-                      FilteringTextInputFormatter.allow(
-                          RegExp(r'[A-Z0-9\-]')),
+                      FilteringTextInputFormatter.allow(RegExp(r'[A-Z0-9\-]')),
                     ],
                     decoration: InputDecoration(
                       hintText: 'MANIF-123',
@@ -665,8 +662,7 @@ class _JoinCard extends StatelessWidget {
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor:
-                                AlwaysStoppedAnimation(Colors.black),
+                            valueColor: AlwaysStoppedAnimation(Colors.black),
                           ),
                         )
                       : Text(strings.eventsLoadButton),

@@ -37,7 +37,8 @@ class PanicContactStore extends ValueNotifier<List<PanicContact>> {
   }
 
   /// Ajoute un nouveau contact et persiste.
-  Future<PanicContact> add({required String name, required String phone}) async {
+  Future<PanicContact> add(
+      {required String name, required String phone}) async {
     final contact = PanicContact(
       id: _newId(),
       name: name.trim(),
@@ -57,7 +58,8 @@ class PanicContactStore extends ValueNotifier<List<PanicContact>> {
   }) async {
     final index = value.indexWhere((c) => c.id == id);
     if (index < 0) return false;
-    final updated = value[index].copyWith(name: name.trim(), phoneNumber: phone.trim());
+    final updated =
+        value[index].copyWith(name: name.trim(), phoneNumber: phone.trim());
     final next = [...value];
     next[index] = updated;
     value = next;

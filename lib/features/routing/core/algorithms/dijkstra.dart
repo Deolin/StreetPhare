@@ -119,7 +119,8 @@ class Dijkstra {
       final bIdx = path[i];
       final dLat = graph.nodeLat(bIdx) - graph.nodeLat(aIdx);
       final dLon = graph.nodeLon(bIdx) - graph.nodeLon(aIdx);
-      totalDistance += _approxDistance(dLat, dLon, (graph.nodeLat(aIdx) + graph.nodeLat(bIdx)) / 2);
+      totalDistance += _approxDistance(
+          dLat, dLon, (graph.nodeLat(aIdx) + graph.nodeLat(bIdx)) / 2);
     }
 
     return PathResult(
@@ -130,7 +131,8 @@ class Dijkstra {
     );
   }
 
-  static double _approxDistance(double dLatDeg, double dLonDeg, double refLatDeg) {
+  static double _approxDistance(
+      double dLatDeg, double dLonDeg, double refLatDeg) {
     const double metersPerDeg = 111320.0;
     final midLat = refLatDeg * 3.141592653589793 / 180.0;
     final lonScale = metersPerDeg * _fastCos(midLat);

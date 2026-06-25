@@ -277,24 +277,23 @@ class StreetPhareApp extends StatelessWidget {
                         Locale('de', ''),
                       ],
 
-                       // Facteur d'échelle du texte global (accessibilité / malvoyant)
-                       // + bouton de débogage global permanent.
-                       builder: (context, child) {
-                         final factor = isVisualImpaired
-                             ? 1.5
-                             : prefs.textScaleFactor;
-                         return MediaQuery(
-                           data: MediaQuery.of(context).copyWith(
-                             textScaler: TextScaler.linear(factor),
-                           ),
-                           child: Stack(
-                             children: [
-                               if (child != null) child,
-                               const BugReportFab(),
-                             ],
-                           ),
-                         );
-                       },
+                      // Facteur d'échelle du texte global (accessibilité / malvoyant)
+                      // + bouton de débogage global permanent.
+                      builder: (context, child) {
+                        final factor =
+                            isVisualImpaired ? 1.5 : prefs.textScaleFactor;
+                        return MediaQuery(
+                          data: MediaQuery.of(context).copyWith(
+                            textScaler: TextScaler.linear(factor),
+                          ),
+                          child: Stack(
+                            children: [
+                              if (child != null) child,
+                              const BugReportFab(),
+                            ],
+                          ),
+                        );
+                      },
 
                       home: const SplashScreen(),
                     );

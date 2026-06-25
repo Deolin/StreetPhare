@@ -209,7 +209,8 @@ class MapCacheManager {
     }
 
     if (kDebugMode) {
-      debugPrint('[MapCacheManager] Zone "$zoneLabel" marquée pour préchargement.');
+      debugPrint(
+          '[MapCacheManager] Zone "$zoneLabel" marquée pour préchargement.');
     }
   }
 

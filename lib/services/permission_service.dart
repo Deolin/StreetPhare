@@ -112,9 +112,11 @@ class PermissionService extends ChangeNotifier {
   Future<void> checkAll() async {
     final checks = <Future<void>>[
       _check(StreetPharePermission.bluetoothScan, ph.Permission.bluetoothScan),
-      _check(StreetPharePermission.bluetoothConnect, ph.Permission.bluetoothConnect),
+      _check(StreetPharePermission.bluetoothConnect,
+          ph.Permission.bluetoothConnect),
       _check(StreetPharePermission.location, ph.Permission.location),
-      _check(StreetPharePermission.locationAlways, ph.Permission.locationAlways),
+      _check(
+          StreetPharePermission.locationAlways, ph.Permission.locationAlways),
       _check(StreetPharePermission.notification, ph.Permission.notification),
     ];
     await Future.wait(checks);
@@ -444,7 +446,8 @@ class PermissionWarningBanner extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 14),
+              const Icon(Icons.arrow_forward_ios,
+                  color: Colors.white, size: 14),
             ],
           ),
         ),
