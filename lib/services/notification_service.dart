@@ -114,8 +114,9 @@ class NotificationService {
   Future<void> showPersistentNotification() async {
     if (!_initialized) await init();
     if (kIsWeb ||
-        !(io.Platform.isAndroid || io.Platform.isIOS || io.Platform.isMacOS))
+        !(io.Platform.isAndroid || io.Platform.isIOS || io.Platform.isMacOS)) {
       return;
+    }
 
     const androidDetails = AndroidNotificationDetails(
       'streetphare_persistent',

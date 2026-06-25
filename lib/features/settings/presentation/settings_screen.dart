@@ -1182,8 +1182,9 @@ class _ContactFormDialogState extends State<_ContactFormDialog> {
                 hintText: s.panicContactsPhoneHint,
               ),
               validator: (v) {
-                if (v == null || v.trim().isEmpty)
+                if (v == null || v.trim().isEmpty) {
                   return s.panicContactsPhoneRequired;
+                }
                 if (v.trim().length < 4) return s.panicContactsPhoneTooShort;
                 return null;
               },

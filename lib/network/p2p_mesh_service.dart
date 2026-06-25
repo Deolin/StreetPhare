@@ -212,8 +212,9 @@ class P2PMeshService {
         try {
           await t.broadcast(payload);
         } catch (e) {
-          if (kDebugMode)
+          if (kDebugMode) {
             debugPrint('[P2PMeshService] broadcast ${t.name}: $e');
+          }
         }
       })),
     );
