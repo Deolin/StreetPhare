@@ -12,7 +12,7 @@
 
 import 'package:flutter/foundation.dart';
 
-import '../../../../database/alert_model.dart';
+import '../../../../core/models/alert_model.dart';
 
 /// Préférences d'évitement persistées.
 @immutable

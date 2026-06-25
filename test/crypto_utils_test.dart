@@ -70,9 +70,10 @@ void main() {
     test('déchiffrement avec une mauvaise clé échoue', () async {
       final cipherB64 = await crypto.encryptAddress(testAddress, masterKey);
 
-      // Le déchiffrement doit lever une exception (MAC invalide ou padding)
-      expect(
-        () async => crypto.decryptAddress(cipherB64, wrongKey),
+      // Le déchiffrement doit lever une exception (MAC invalide ou padding).
+      // On attend le Future car decryptAddress est asynchrone.
+      expectLater(
+        crypto.decryptAddress(cipherB64, wrongKey),
         throwsA(isA<Exception>()),
       );
     });

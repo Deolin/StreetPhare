@@ -5,7 +5,7 @@
 // via le transport loopback (sans matériel BLE/Wi-Fi).
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_streetphare/database/alert_model.dart';
+import 'package:flutter_streetphare/core/models/alert_model.dart';
 
 void main() {
   group('P2P Alert — Création et propagation', () {

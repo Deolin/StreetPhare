@@ -29,7 +29,7 @@ import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../database/alert_model.dart';
+import '../../../core/models/alert_model.dart';
 import '../../../database/alert_visibility_policy.dart';
 import '../../../database/hive_alert_database.dart';
 import '../domain/models/geofence_event.dart';

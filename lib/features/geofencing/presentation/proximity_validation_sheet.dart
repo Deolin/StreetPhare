@@ -15,7 +15,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
-import '../../../database/alert_model.dart';
+import '../../../core/models/alert_model.dart';
 import '../../../database/alert_ttl_policy.dart';
 import '../domain/models/geofence_event.dart';
 import 'proximity_validation_service.dart';

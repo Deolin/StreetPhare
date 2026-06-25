@@ -18,7 +18,7 @@
 // moins 3 signalements/votes actifs (de moins de 24h) ou s'il a
 // été validé collectivement.
 
-import 'alert_model.dart';
+import '../core/models/alert_model.dart';
 
 /// Politique de TTL différenciée par type d'alerte.
 class AlertTtlPolicy {

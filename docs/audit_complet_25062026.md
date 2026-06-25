@@ -254,7 +254,7 @@ final _storage = FlutterSecureStorage(
 | Purge à l'init                        | ✅     | `purgeExpired()` appelé dans `init()`. L.60 |
 | Purge périodique                      | ✅     | Toutes les **1 minute** via `NetworkCoordinator._purgeTimer`. `network_coordinator.dart` L.210-212 |
 | Robustesse corruption                 | ✅     | `AlertAdapter.read()` protège contre les données corrompues avec fallback. L.234-299 |
-| Éviction doublons                    | ✅     | `insertOrMerge()` fusionne les confirmations. L.97-115 |
+| Éviction doublons                     | ✅     | `insertOrMerge()` fusionne les confirmations. L.97-115 |
 
 **Évolution depuis l'audit précédent** : L'intervalle de purge est passé de 5 minutes à **1 minute** (`network_coordinator.dart` L.210-212). La fenêtre de rétention post-TTL est désormais ≤ 59 secondes.
 

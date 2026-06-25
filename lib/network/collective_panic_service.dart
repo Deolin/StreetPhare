@@ -23,7 +23,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../database/alert_model.dart';
+import '../core/models/alert_model.dart';
 
 // ============================================================================
 // Modèle d'un signal panic reçu d'un pair

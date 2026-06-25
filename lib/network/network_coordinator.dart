@@ -32,7 +32,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-import '../database/alert_model.dart';
+import '../core/models/alert_model.dart';
 import '../database/alert_ttl_policy.dart';
 import '../database/crypto_utils.dart';
 import '../database/hive_alert_database.dart';

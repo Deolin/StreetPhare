@@ -16,7 +16,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
-import 'alert_model.dart';
+import '../core/models/alert_model.dart';
 
 /// Gestionnaire singleton de la base locale d'alertes.
 class HiveAlertDatabase {

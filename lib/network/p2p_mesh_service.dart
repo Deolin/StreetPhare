@@ -48,7 +48,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 import '../core/network/peer_counter_service.dart';
-import '../database/alert_model.dart';
+import '../core/models/alert_model.dart';
 import '../database/hive_alert_database.dart';
 
 /// Représente un pair (autre appareil) découvert sur le maillage.

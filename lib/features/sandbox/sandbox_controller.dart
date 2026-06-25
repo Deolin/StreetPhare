@@ -35,7 +35,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../../database/alert_model.dart';
+import '../../core/models/alert_model.dart';
 import '../../network/network_coordinator.dart';
 import '../../network/transports/loopback_transport.dart';
 

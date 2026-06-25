@@ -21,7 +21,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'failover_manager.dart';
-import 'network_config.dart';
 
 /// Service singleton de heartbeat serveur.
 class ServerHeartbeatService {

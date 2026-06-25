@@ -6,7 +6,7 @@
 
 import 'package:latlong2/latlong.dart';
 
-import '../../../../database/alert_model.dart';
+import '../../../../core/models/alert_model.dart';
 
 /// Événement émis par le GeofencingService quand l'utilisateur
 /// entre dans la zone de proximité d'un signalement.

@@ -35,7 +35,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../database/alert_model.dart';
+import '../../../core/models/alert_model.dart';
 import '../../../database/alert_visibility_policy.dart';
 import '../../../database/hive_alert_database.dart';
 import '../../geofencing/presentation/geofencing_service.dart';

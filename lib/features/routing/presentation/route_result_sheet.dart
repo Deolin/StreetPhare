@@ -296,8 +296,7 @@ class _RouteTile extends StatelessWidget {
     required this.strings,
     required this.isSelected,
     required this.onTap,
-    this.badge,
-  });
+  }) : badge = null;
 
   final RouteResult route;
   final AppStrings strings;

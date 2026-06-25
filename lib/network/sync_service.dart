@@ -18,7 +18,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../database/alert_model.dart';
+import '../core/models/alert_model.dart';
 import '../database/hive_alert_database.dart';
 import 'failover_manager.dart';
 import 'network_manager.dart';

@@ -34,7 +34,7 @@ import '../../../core/i18n/strings.dart';
 import '../../../core/network/peer_counter_service.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
-import '../../../database/alert_model.dart';
+import '../../../core/models/alert_model.dart';
 import '../../../database/hive_alert_database.dart';
 import '../../../debug/client_debug_logger.dart';
 import '../../events/domain/models/event_model.dart';

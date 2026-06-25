@@ -1,4 +1,4 @@
-// lib/database/alert_model.dart
+// lib/core/models/alert_model.dart
 //
 // Modèle de données d'une alerte StreetPhare.
 //
@@ -108,7 +108,7 @@ class Alert {
     this.uploadedTo = '',
     DateTime? lastModifiedAt,
   })  : createdAt = createdAt ?? DateTime.now().toUtc(),
-        confirmations = confirmations ?? <String>{},
+        confirmations = Set<String>.from(confirmations ?? <String>{}),
         lastModifiedAt = lastModifiedAt ?? DateTime.now().toUtc();
 
   /// Coordonnées LatLng (utile pour flutter_map).

@@ -18,7 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../database/alert_model.dart';
+import '../../../core/models/alert_model.dart';
 import '../../../network/network_coordinator.dart';
 
 /// URL des tuiles sombres CartoDB (dashboard admin).

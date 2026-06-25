@@ -23,21 +23,32 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Service de gestion de la clé maîtresse dans le keystore OS.
 class KeyStoreService {
-  KeyStoreService._();
+  KeyStoreService._({FlutterSecureStorage? storage})
+      : _storage = storage ??
+            FlutterSecureStorage(
+              aOptions: const AndroidOptions(
+                keyCipherAlgorithm:
+                    KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
+                storageCipherAlgorithm:
+                    StorageCipherAlgorithm.AES_GCM_NoPadding,
+              ),
+              iOptions: const IOSOptions(
+                accessibility:
+                    KeychainAccessibility.first_unlock_this_device,
+              ),
+            );
   static final KeyStoreService instance = KeyStoreService._();
+
+  /// Constructeur de test : injecte un storage mocké.
+  @visibleForTesting
+  factory KeyStoreService.test({required FlutterSecureStorage storage}) {
+    return KeyStoreService._(storage: storage);
+  }
 
   static const _keyName = 'streetphare_master_key';
   static const _keyLength = 32; // 256 bits pour AES-256
 
-  final _storage = FlutterSecureStorage(
-    aOptions: const AndroidOptions(
-      keyCipherAlgorithm: KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
-      storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
-    ),
-    iOptions: const IOSOptions(
-      accessibility: KeychainAccessibility.first_unlock_this_device,
-    ),
-  );
+  final FlutterSecureStorage _storage;
 
   SecretKey? _cachedKey;
 
@@ -48,7 +59,13 @@ class KeyStoreService {
   Future<SecretKey> loadOrCreateMasterKey() async {
     if (_cachedKey != null) return _cachedKey!;
 
-    final existing = await _storage.read(key: _keyName);
+    String? existing;
+    try {
+      existing = await _storage.read(key: _keyName);
+    } catch (_) {
+      // Keystore inaccessible → on régénère.
+      existing = null;
+    }
 
     if (existing != null && existing.isNotEmpty) {
       try {

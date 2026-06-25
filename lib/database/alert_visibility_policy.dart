@@ -13,7 +13,7 @@
 // dont le TTL "Phase 2" n'est pas encore expiré. La fenêtre de
 // 24h reste la limite dure (RGPD) pour la persistance en BDD locale.
 
-import 'alert_model.dart';
+import '../core/models/alert_model.dart';
 import 'alert_ttl_policy.dart';
 
 /// Politique de visibilité (filtrage 3-votes + TTL).
