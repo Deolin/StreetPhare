@@ -44,10 +44,10 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../network/network_config.dart';
 import '../core/models/routing_profile.dart';
 import '../domain/models/avoidance_filters.dart';
 import '../domain/models/route_result.dart';
-import '../../../network/network_config.dart';
 import 'osmand_native_channel.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -363,8 +363,11 @@ class OsmAndRoutingService {
     required AvoidanceFilters filters,
     List<LatLng> avoidPoints = const [],
   }) async {
-    final host = NetworkConfig.primaryServer
-        .replaceAll(RegExp(r':3000|:3001'), ':$_kGraphHopperPort');
+    // GraphHopper local tourne en HTTP sur le port 8080.
+    // On extrait le nom d'hôte de primaryServer et on reconstruit
+    // l'URL en HTTP (et non HTTPS, qui est réservé au serveur Node.js).
+    final rawHost = Uri.parse(NetworkConfig.primaryServer).host;
+    final host = 'http://$rawHost:$_kGraphHopperPort';
 
     final ghProfile = profile == RoutingProfile.vehicle ? 'car' : 'foot';
 

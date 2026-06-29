@@ -155,6 +155,37 @@ extension MessageFilterExt on MessageFilter {
 // ============================================================================
 
 class AppPreferences {
+
+  factory AppPreferences.fromJson(Map<String, dynamic> json) {
+    final rawChannels = json['androidChannels'];
+    final Map<String, bool> channels = rawChannels is Map
+        ? Map<String, bool>.from(rawChannels
+            .map((k, v) => MapEntry(k.toString(), v as bool? ?? true)))
+        : const {};
+    return AppPreferences(
+      batterySaverEnabled: (json['batterySaver'] as bool?) ?? false,
+      notificationFilter: NotificationFilter.values.firstWhere(
+        (e) => e.name == json['notifFilter'],
+        orElse: () => NotificationFilter.nearbyDangersOnly,
+      ),
+      routeDestinationType: RouteDestinationType.values.firstWhere(
+        (e) => e.name == json['routeDest'],
+        orElse: () => RouteDestinationType.eventPoint,
+      ),
+      activeEventIndex: (json['activeEvent'] as int?) ?? 0,
+      userPointLatitude: (json['userLat'] as num?)?.toDouble(),
+      userPointLongitude: (json['userLng'] as num?)?.toDouble(),
+      androidChannelSettings: channels,
+      lowVisionMode: (json['lowVisionMode'] as bool?) ?? false,
+      textScaleFactor: (json['textScaleFactor'] as num?)?.toDouble() ?? 1.0,
+      messageFilter: MessageFilter.values.firstWhere(
+        (e) => e.name == json['messageFilter'],
+        orElse: () => MessageFilter.all,
+      ),
+      mapCacheMaxAgeDays: (json['mapCacheMaxAgeDays'] as int?) ?? 7,
+      defaultTransportMode: json['defaultTransportMode'] as String?,
+    );
+  }
   const AppPreferences({
     this.batterySaverEnabled = false,
     this.notificationFilter = NotificationFilter.nearbyDangersOnly,
@@ -249,37 +280,6 @@ class AppPreferences {
         'androidChannels': androidChannelSettings,
         'defaultTransportMode': defaultTransportMode,
       };
-
-  factory AppPreferences.fromJson(Map<String, dynamic> json) {
-    final rawChannels = json['androidChannels'];
-    final Map<String, bool> channels = rawChannels is Map
-        ? Map<String, bool>.from(rawChannels
-            .map((k, v) => MapEntry(k.toString(), v as bool? ?? true)))
-        : const {};
-    return AppPreferences(
-      batterySaverEnabled: (json['batterySaver'] as bool?) ?? false,
-      notificationFilter: NotificationFilter.values.firstWhere(
-        (e) => e.name == json['notifFilter'],
-        orElse: () => NotificationFilter.nearbyDangersOnly,
-      ),
-      routeDestinationType: RouteDestinationType.values.firstWhere(
-        (e) => e.name == json['routeDest'],
-        orElse: () => RouteDestinationType.eventPoint,
-      ),
-      activeEventIndex: (json['activeEvent'] as int?) ?? 0,
-      userPointLatitude: (json['userLat'] as num?)?.toDouble(),
-      userPointLongitude: (json['userLng'] as num?)?.toDouble(),
-      androidChannelSettings: channels,
-      lowVisionMode: (json['lowVisionMode'] as bool?) ?? false,
-      textScaleFactor: (json['textScaleFactor'] as num?)?.toDouble() ?? 1.0,
-      messageFilter: MessageFilter.values.firstWhere(
-        (e) => e.name == json['messageFilter'],
-        orElse: () => MessageFilter.all,
-      ),
-      mapCacheMaxAgeDays: (json['mapCacheMaxAgeDays'] as int?) ?? 7,
-      defaultTransportMode: json['defaultTransportMode'] as String?,
-    );
-  }
 }
 
 // ============================================================================

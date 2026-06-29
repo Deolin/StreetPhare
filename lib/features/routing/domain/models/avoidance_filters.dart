@@ -17,6 +17,18 @@ import '../../../../core/models/alert_model.dart';
 /// Préférences d'évitement persistées.
 @immutable
 class AvoidanceFilters {
+
+  factory AvoidanceFilters.fromJson(Map<String, dynamic> json) {
+    return AvoidanceFilters(
+      avoidBarrages: (json['avoidBarrages'] as bool?) ?? true,
+      avoidNasses: (json['avoidNasses'] as bool?) ?? true,
+      avoidControles: (json['avoidControles'] as bool?) ?? true,
+      avoidAccidents: (json['avoidAccidents'] as bool?) ?? false,
+      avoidRassemblements: (json['avoidRassemblements'] as bool?) ?? true,
+      avoidAutres: (json['avoidAutres'] as bool?) ?? false,
+      masterSwitch: json['masterSwitch'] as bool?,
+    );
+  }
   const AvoidanceFilters({
     this.avoidBarrages = true,
     this.avoidNasses = true,
@@ -87,18 +99,6 @@ class AvoidanceFilters {
         'avoidAutres': avoidAutres,
         'masterSwitch': masterSwitch,
       };
-
-  factory AvoidanceFilters.fromJson(Map<String, dynamic> json) {
-    return AvoidanceFilters(
-      avoidBarrages: (json['avoidBarrages'] as bool?) ?? true,
-      avoidNasses: (json['avoidNasses'] as bool?) ?? true,
-      avoidControles: (json['avoidControles'] as bool?) ?? true,
-      avoidAccidents: (json['avoidAccidents'] as bool?) ?? false,
-      avoidRassemblements: (json['avoidRassemblements'] as bool?) ?? true,
-      avoidAutres: (json['avoidAutres'] as bool?) ?? false,
-      masterSwitch: json['masterSwitch'] as bool?,
-    );
-  }
 
   /// Indique si un type d'alerte donné doit être évité selon ces filtres.
   bool shouldAvoid(AlertType type) {

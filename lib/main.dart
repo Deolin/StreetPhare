@@ -6,16 +6,18 @@
 import 'dart:async';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'database/crypto_utils.dart';
 import 'core/i18n/app_locale.dart';
+import 'core/network/url_strategy_noop.dart'
+    if (dart.library.js_util) 'package:flutter_streetphare/core/network/url_strategy_web.dart';
 import 'core/security/keystore_service.dart';
 import 'core/theme/streetphare_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'database/crypto_utils.dart';
 import 'debug/client_debug_logger.dart';
 import 'features/bug_report/presentation/bug_report_fab.dart';
 import 'features/events/presentation/event_manager.dart';
@@ -24,8 +26,8 @@ import 'features/geofencing/presentation/proximity_validation_service.dart';
 import 'features/messaging/presentation/hive_messaging_service.dart';
 import 'features/routing/data/avoidance_filter_store.dart';
 import 'features/settings/data/app_preferences_store.dart';
-import 'features/settings/data/settings_store.dart';
 import 'features/settings/data/panic_contact_store.dart';
+import 'features/settings/data/settings_store.dart';
 import 'features/splash/presentation/splash_screen.dart';
 import 'features/start_screen/data/start_screen_store.dart';
 import 'features/tutorial/data/tutorial_store.dart';
@@ -37,8 +39,6 @@ import 'services/apk_backup_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/notification_service.dart';
 import 'services/version_check_service.dart';
-import 'core/network/url_strategy_noop.dart'
-    if (dart.library.js_util) 'package:flutter_streetphare/core/network/url_strategy_web.dart';
 
 /// Point d'entrée principal de l'application StreetPhare
 void main() async {

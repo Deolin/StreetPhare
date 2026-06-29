@@ -7,13 +7,13 @@ import '../../../core/cache/cache_manager.dart';
 import '../../../core/services/permission_guard_screen.dart';
 import '../../../core/services/permission_guard_service.dart';
 import '../../../core/theme/streetphare_theme.dart';
+import '../../../services/version_check_service.dart';
 import '../../map/map_cache_manager.dart';
 import '../../map/presentation/map_screen.dart';
 import '../../start_screen/data/start_screen_store.dart';
 import '../../start_screen/presentation/start_screen.dart';
 import '../../tutorial/data/tutorial_store.dart';
 import '../../tutorial/presentation/tutorial_screen.dart';
-import '../../../services/version_check_service.dart';
 
 /// Écran de chargement (Splash Screen) de StreetPhare.
 ///

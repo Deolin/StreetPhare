@@ -6,9 +6,11 @@
 // relay) pour pointer exclusivement vers l'infrastructure de
 // production sécurisée.
 //
-//   Serveur Principal : https://streetphare.ddns.net:3000
-//   Serveur Backup   : https://streetphare.ddns.net:3001
-//   Relay WebSocket   : wss://streetphare.ddns.net:3000/mesh
+//   Serveur Principal : https://streetphare.ddns.net           (port 443 — Caddy)
+//   Serveur Backup   : https://streetphare.ddns.net:3001      (port 3001 direct)
+//   Relay WebSocket   : wss://streetphare.ddns.net/mesh       (port 443 — Caddy)
+//   Admin WebSocket   : wss://streetphare.ddns.net/admin      (port 443 — Caddy)
+//   Dashboard Admin   : https://streetphare.ddns.net:4000     (port 4000 — Caddy)
 //
 // NOTE DE SÉCURITÉ : Les fallbacks locaux (127.0.0.1 / 10.0.2.2)
 // utilisent HTTP/WS car ils ne traversent jamais le réseau public.
@@ -44,6 +46,7 @@ class NetworkConfig {
   // ---------------------------------------------------------------------------
   static const int _primaryPort = 3000;
   static const int _secondaryPort = 3001;
+  static const int _adminDashboardPort = 4000;
 
   /// Host de production (exposé pour le FailoverManager).
   static String get productionHost => _productionHost;
@@ -55,45 +58,77 @@ class NetworkConfig {
   static int get secondaryPort => _secondaryPort;
 
   // ---------------------------------------------------------------------------
-  // Adresses RÉSEAU (mode PRODUCTION — HTTPS/WSS)
+  // Adresses RÉSEAU (mode PRODUCTION — HTTPS/WSS, port standard via Caddy)
+  //
+  // Caddy écoute sur les ports 443 (HTTPS/WSS) et 4000 et termine
+  // le TLS. Node.js écoute sur 127.0.0.1:3000 en HTTP. Les URLs
+  // de production n'incluent donc PAS le port 3000.
   // ---------------------------------------------------------------------------
 
-  /// URL du serveur PRINCIPAL courant.
+  /// URL de base du serveur PRINCIPAL.
   ///
-  /// Production : https://streetphare.ddns.net:3000
-  static String get primaryServer {
-    return 'https://$_productionHost:$_primaryPort';
-  }
+  /// Production : https://streetphare.ddns.net (port 443 implicite)
+  static String get baseUrl => 'https://$_productionHost';
+
+  /// URL de l'API REST.
+  ///
+  /// https://streetphare.ddns.net/api
+  static String get apiUrl => 'https://$_productionHost/api';
+
+  /// URL du serveur PRINCIPAL courant (compatibilité ascendante).
+  ///
+  /// Synonyme de [baseUrl]. Production : https://streetphare.ddns.net
+  static String get primaryServer => baseUrl;
 
   /// URL du serveur SECONDAIRE (secours).
   ///
   /// https://streetphare.ddns.net:3001
+  /// Note : le port 3001 est conservé car le Backup n'est pas
+  ///        derrière Caddy pour le moment (accès direct en HTTP entre
+  ///        Primary et Backup sur localhost).
   static String get initialSecondaryServer {
     return 'https://$_productionHost:$_secondaryPort';
   }
 
   /// URL du relay WebSocket (utilisé par `RelayMeshTransport`).
   ///
-  /// wss://streetphare.ddns.net:3000/mesh
+  /// wss://streetphare.ddns.net/mesh (port 443 implicite)
   static String get relayUrl {
-    return 'wss://$_productionHost:$_primaryPort/mesh';
+    return 'wss://$_productionHost/mesh';
   }
+
+  /// URL du WebSocket mesh (synonyme de [relayUrl]).
+  static String get meshWebSocketUrl => relayUrl;
 
   /// URL WebSocket du relais d'administration serveur.
   ///
-  /// wss://streetphare.ddns.net:3000/admin
+  /// wss://streetphare.ddns.net/admin (port 443 implicite)
   static String get primaryUrl {
-    return 'wss://$_productionHost:$_primaryPort/admin';
+    return 'wss://$_productionHost/admin';
   }
 
-  /// La clé maîtresse est désormais gérée par `KeyStoreService`
-  /// (lib/core/security/keystore_service.dart). Elle est générée
-  /// aléatoirement au premier lancement et stockée dans le keystore
-  /// sécurisé de l'OS (Android Keystore / iOS Keychain).
+  /// URL WebSocket admin (synonyme de [primaryUrl]).
+  static String get adminWebSocketUrl => primaryUrl;
+
+  /// URL de l'API panic collective.
   ///
-  /// L'ancien getter `masterPassphrase` basé sur
-  /// `String.fromEnvironment('STREETPHARE_MASTER_KEY')` est
-  /// supprimé car il compilait la clé en dur dans le binaire.
+  /// https://streetphare.ddns.net/api/panic/collective
+  static String get collectivePanicUrl => '${baseUrl}/api/panic/collective';
+
+  /// URL du dashboard d'administration (port 4000, Caddy).
+  ///
+  /// https://streetphare.ddns.net:4000
+  static String get adminDashboardUrl => 'https://$_productionHost:$_adminDashboardPort';
+
+  /// URL de l'API kick-status (dashboard admin, port 4000).
+  ///
+  /// https://streetphare.ddns.net:4000/api/kick-status
+  static String get kickStatusBaseUrl => 'https://$_productionHost:$_adminDashboardPort';
+
+  /// URL de soumission des rapports de bug.
+  ///
+  /// https://streetphare.ddns.net/api/bug-report
+  static String get bugReportUrl => '${baseUrl}/api/bug-report';
 
   // ---------------------------------------------------------------------------
   // Fallback local (NAT Hairpinning / Loopback)
@@ -110,9 +145,6 @@ class NetworkConfig {
   // utilisent HTTP/WS car le trafic ne quitte JAMAIS la machine locale.
   // Aucun risque d'interception réseau sur ces adresses. Le certificat
   // TLS n'est pas nécessaire pour les communications intra-machine.
-  //
-  // Solution : Le FailoverManager tente automatiquement ces adresses
-  // de fallback local lorsque la résolution No-IP échoue.
 
   /// Adresse locale de fallback (dépend de la plateforme).
   ///
@@ -122,12 +154,6 @@ class NetworkConfig {
     if (kIsWeb) return '127.0.0.1';
     try {
       if (defaultTargetPlatform == TargetPlatform.android) {
-        // En mode debug sur Android, l'émulateur ou le device USB
-        // peut contacter le PC hôte via 10.0.2.2 (émulateur) ou
-        // l'IP de la passerelle USB (192.168.x.x). 10.0.2.2 est
-        // le standard émulateur Android. Pour un device physique,
-        // l'utilisateur doit configurer l'IP de son serveur dans
-        // les constantes.
         return '10.0.2.2';
       }
     } catch (_) {}
@@ -136,10 +162,11 @@ class NetworkConfig {
 
   /// URL locale du serveur PRINCIPAL (fallback loopback — DEBUG UNIQUEMENT).
   ///
-  /// http://127.0.0.1:3000 ou http://10.0.2.2:3000 sur Android
+  /// http://127.0.0.1:3000 ou http://10.0.2.2:3000 sur Android.
   ///
   /// Cette URL n'utilise PAS HTTPS car le trafic reste confiné à
-  /// la machine locale (loopback). Aucune interception réseau possible.
+  /// la machine locale (loopback). Le port 3000 est conservé car
+  /// le client se connecte directement à Node.js sans Caddy en debug.
   static String get localhostPrimaryServer {
     return 'http://$_localFallbackHost:$_primaryPort';
   }

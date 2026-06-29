@@ -1,25 +1,40 @@
 // lib/core/network/peer_counter_service.dart
 //
 // Compteur d'appareils proches ("HIVE") en fenêtre glissante.
+// Alimenté EXCLUSIVEMENT par les événements réseau réels issus de
+// `P2PMeshService._processIncomingMessage()` (pings de présence P2P)
+// et des callbacks natifs BLE / Wi-Fi Direct.
+//
+// === Alimentation réelle (production) ===
+//
+// Le flux de données est le suivant :
+//
+//   BLE scan / Wi-Fi Direct / WebSocket mesh
+//       │
+//       ▼
+//   P2PMeshService._processIncomingMessage()
+//       │  (kind: 'ping', id: peerId, svc: serviceUuid, meta: metadata)
+//       ▼
+//   PeerCounterService.instance.recordPeer(peerId, serviceUuid, metadata)
+//
+// Aucune simulation ni mock n'est utilisé en production. Le compteur
+// reflète exclusivement les appareils StreetPhare physiquement détectés
+// à portée radio (BLE, Wi-Fi Direct) ou connectés via le relay mesh.
 //
 // === Filtre Strict BLE StreetPhare ===
 //
-// À partir de la v1.2, le compteur n'incrémente le score QUE si
-// l'appareil distant signale la signature de service BLE spécifique
-// à StreetPhare :
+// Le compteur n'incrémente QUE si l'appareil distant passe la validation
+// [isStreetPharePeer] :
 //
-//   UUID de service BLE : "STREET-PHARE-HIVE-SVC-0001"
-//
-// Cette signature est diffusée dans le payload d'advertisement BLE
-// par le transport [P2PMeshService]. Un appareil Bluetooth générique
-// ou une autre application ne corresponde PAS et n'est pas compté.
+//   - peerId préfixé par `sp-` (identifiants éphémères StreetPhare).
+//   - UUID de service BLE correspondant à `kStreetPhareBleServiceUuid`.
+//   - Métadonnée préfixée par `SP_HIVE_`.
 //
 // === Contrat de déduplication (anti-double-comptage) ===
 //
-// Chaque appareil StreetPhare est identifié par un `peerId` STABLE
-// pendant la durée d'une session anonyme (son `ephemeralUserId`).
+// Chaque appareil StreetPhare est identifié par un `peerId` STABLE.
 // Le compteur n'incrémente que si un `peerId` ENTIÈREMENT NOUVEAU
-// est observé avec la signature StreetPhare valide.
+// est observé. Les ré-observations rafraîchissent simplement le timestamp.
 
 import 'dart:async';
 
@@ -30,11 +45,6 @@ import 'package:flutter/foundation.dart';
 // ============================================================================
 
 /// UUID de service BLE exclusif à StreetPhare.
-/// Seuls les appareils diffusant cet UUID dans leur advertisement
-/// seront comptés par [PeerCounterService].
-///
-/// Ce UUID DOIT correspondre à la valeur configurée dans [BleMeshTransport]
-/// (transport BLE) côté émetteur. Toute divergence empêche le comptage.
 const String kStreetPhareBleServiceUuid = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 
 /// Préfixe attendu dans le `metadata` ou `serviceId` d'un pair pour
@@ -48,30 +58,46 @@ const String kStreetPhareSignaturePrefix = 'SP_HIVE_';
 /// Service singleton : compte les pairs P2P StreetPhare vus dans la dernière
 /// fenêtre glissante de 5 minutes.
 ///
-/// Filtre strict : seuls les pairs ayant passé [isStreetPharePeer] = true
-/// sont comptabilisés. Les appareils Bluetooth génériques et les autres
-/// applications sont ignorés.
+/// **Alimenté exclusivement par les transports réseau réels** (BLE, Wi-Fi
+/// Direct, WebSocket mesh). Aucune simulation ni mock.
+///
+/// Expose deux sorties réactives :
+///   - [value] (hérité de [ValueNotifier]) : compteur actuel de pairs.
+///   - [onPeerObserved] : [Stream] émis à chaque NOUVEAU pair valide détecté.
+///     Les couches supérieures (UI, [TransportFailoverService]) s'abonnent
+///     à ce stream pour réagir en temps réel à l'activité du réseau.
 class PeerCounterService extends ValueNotifier<int> {
   PeerCounterService._() : super(0);
 
   static final PeerCounterService instance = PeerCounterService._();
 
-  /// Largeur de la fenêtre glissante (5 minutes — persistance accrue pour
-  /// mieux refléter les appareils StreetPhare présents dans la foule).
+  /// Largeur de la fenêtre glissante (5 minutes).
   static const Duration windowSize = Duration(minutes: 5);
 
   /// Période du timer de purge (1 s).
   static const Duration tickInterval = Duration(seconds: 1);
 
-  /// Identifiant éphémère → dernier timestamp observé.
   final Map<String, DateTime> _lastSeen = <String, DateTime>{};
 
-  /// Identifiant éphémère de l'appareil local. S'il est défini, il sera
-  /// exclu du décompte pour ne jamais se compter soi-même.
   String? _localPeerId;
+
+  /// Controller pour le stream de pairs nouvellement observés.
+  /// Émet le [peerId] à chaque première observation dans la fenêtre.
+  final _peerObservedController = StreamController<String>.broadcast();
 
   Timer? _ticker;
   bool _started = false;
+
+  /// Stream de pairs nouvellement observés.
+  ///
+  /// Émet le [peerId] à chaque première observation valide dans la fenêtre
+  /// glissante. Les ré-observations (rafraîchissement de timestamp) ne
+  /// déclenchent PAS d'émission.
+  ///
+  /// Les couches supérieures ([TransportFailoverService], UI) s'abonnent
+  /// à ce stream pour réagir en temps réel à la détection de nouveaux
+  /// appareils StreetPhare à proximité.
+  Stream<String> get onPeerObserved => _peerObservedController.stream;
 
   // --------------------------------------------------------------------------
   // Identité locale (exclusion du nœud courant)
@@ -111,9 +137,6 @@ class PeerCounterService extends ValueNotifier<int> {
     String? serviceUuid,
     String? metadata,
   }) {
-    // Mode demo (DEBUG uniquement) : injection de faux pairs pour l'UI.
-    if (kDebugMode && peerId.startsWith('demo_')) return true;
-
     // Validation par préfixe 'sp-' — identifiants éphémères StreetPhare
     // générés par generateEphemeralUserId() dans le NetworkCoordinator.
     if (peerId.startsWith('sp-')) return true;
@@ -177,12 +200,24 @@ class PeerCounterService extends ValueNotifier<int> {
       return;
     }
 
+    // ── Exclusion locale : ne jamais compter son propre ID ──
+    if (peerId == _localPeerId) {
+      if (kDebugMode) {
+        debugPrint('[PeerCounter] ignoré (ID local): $peerId');
+      }
+      return;
+    }
+
     final now = DateTime.now().toUtc();
     final previous = _lastSeen[peerId];
     _lastSeen[peerId] = now;
     if (previous == null) {
       // Nouveau pair StreetPhare valide.
-      value = _prune(now).length;
+      final kept = _excludeLocal(_prune(now));
+      value = kept.length;
+      // Notifie les abonnés (TransportFailoverService, UI, etc.)
+      // qu'un nouveau pair StreetPhare vient d'être détecté.
+      _peerObservedController.add(peerId);
       if (kDebugMode) {
         debugPrint(
             '[PeerCounter] nouveau pair StreetPhare: $peerId — total=$value');
@@ -221,6 +256,16 @@ class PeerCounterService extends ValueNotifier<int> {
   void reset() {
     _lastSeen.clear();
     value = 0;
+  }
+
+  /// Libère les ressources du service.
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    _ticker = null;
+    _started = false;
+    _peerObservedController.close();
+    super.dispose();
   }
 
   /// Identifiants actuellement dans la fenêtre.

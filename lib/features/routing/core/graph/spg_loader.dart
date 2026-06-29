@@ -86,7 +86,7 @@ class SpgLoader {
     }
 
     // 4) Construit l'index spatial (maillage fixe ~500 m)
-    final cellSizeDeg = 0.0045; // ~500 m à 50°N
+    const cellSizeDeg = 0.0045; // ~500 m à 50°N
     final cellsX =
         ((header.maxLon - header.minLon) / cellSizeDeg).ceil().clamp(1, 500);
     final cellsY =

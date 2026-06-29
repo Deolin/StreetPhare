@@ -53,11 +53,12 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../p2p_mesh_service.dart';
 import '../../core/network/peer_counter_service.dart';
+import '../p2p_mesh_service.dart';
 
 /// UUID du service GATT StreetPhare.
 const String kStreetPhareBleServiceUuid =
@@ -139,13 +140,27 @@ class BleMeshTransport implements MeshTransport {
   // ── Nettoyage ─────────────────────────────────────────────────────
   Timer? _deadConnectionCleanupTimer;
 
+  // ── BLE Advertising natif (MethodChannel) ─────────────────────────
+  /// Canal platform pour le BLE advertising (mode peripheral GATT server).
+  /// Ce canal n'est disponible QUE sur Android (natif via MainActivity.kt).
+  static const _advertiserChannel =
+      MethodChannel('streetphare/ble_advertiser');
+
+  // ── GATT Server natif (MethodChannel + EventChannel) ──────────────
+  /// Canal method pour piloter le serveur GATT natif.
+  static const _gattChannel = MethodChannel('streetphare/ble_gatt');
+
+  /// Canal event pour recevoir les données entrantes du serveur GATT.
+  static const _gattEventChannel = EventChannel('streetphare/ble_gatt_events');
+
   // ──────────────────────────────────────────────────────────────────
   // isAvailable
   // ──────────────────────────────────────────────────────────────────
 
   @override
   bool get isAvailable {
-    if (kIsWeb) return true;
+    // Le BLE n'est pas disponible sur le Web.
+    if (kIsWeb) return false;
     final platform = defaultTargetPlatform;
     return platform == TargetPlatform.android ||
         platform == TargetPlatform.iOS ||
@@ -172,6 +187,76 @@ class BleMeshTransport implements MeshTransport {
 
     // Enregistre l'identifiant local pour exclusion du compteur HIVE.
     PeerCounterService.instance.setLocalPeerId(_peerId);
+
+    // ── BLE Advertising natif + GATT Server ─────────────────────────
+    // ORDRE CRITIQUE : le GATT server DOIT être démarré AVANT
+    // l'advertising. Si on lance l'advertising en premier, un
+    // client distant peut se connecter et faire discoverServices()
+    // avant que addService() ait terminé → "service introuvable".
+    //
+    // PROTECTION ANTI-CRASH : certain téléphones (ex: 2201116SG) refusent
+    // GattService.registerServer même après `_requestBlePermissions()`,
+    // car la permission BLUETOOTH_CONNECT peut être révoquée après
+    // l'affichage de la popup système. On wrappe dans un try/catch
+    // pour dégrader en mode scan-only sans crasher l'app.
+    try {
+      await _startNativeGattServer();
+      // Petit délai pour laisser addService() + onServiceAdded()
+      // se propager jusqu'au Bluetooth stack.
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      _startNativeAdvertising();
+    } on MissingPluginException catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BLE] Plugin natif GATT/advertising manquant : $e');
+      }
+      // Dégrade en scan-only : pas de broadcast sortant, mais le scan
+      // passif et la connexion GATT entrante restent fonctionnels.
+    } on PlatformException catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BLE] PlatformException GATT/advertising : $e');
+      }
+      // Ex: SecurityException BLUETOOTH_CONNECT → scan-only
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BLE] Erreur GATT server/advertising : $e');
+      }
+      // Démarrage GATT échoué → BLE en mode scan passif uniquement (réception).
+    }
+
+    // ── Écoute des données entrantes du GATT server natif ──
+    // Le serveur GATT natif reçoit les writes des clients distants
+    // et les transmet à Dart via cet EventChannel.
+    try {
+      _gattEventChannel.receiveBroadcastStream().listen((event) {
+        if (event is Map) {
+          final deviceId = event['deviceId'] as String? ?? '';
+          final data = event['data'] as String?;
+          if (data != null) {
+            // Déballe le frame BLE ({"p":"peerId","t":ts,"d":"payload"})
+            // pour extraire le payload applicatif. Sans ce décodage,
+            // P2PMeshService._processIncomingMessage() ne reconnaît pas
+            // le format et ignore silencieusement le message.
+            String payload;
+            try {
+              final frame = jsonDecode(data) as Map<String, dynamic>;
+              payload = frame['d'] as String? ?? data;
+            } catch (_) {
+              payload = data; // Frame non-JSON → passe tel quel.
+            }
+            _incomingController.add(payload);
+            if (kDebugMode) {
+              debugPrint('[BLE] ← GATT natif reçu de $deviceId (${data.length} octets)');
+            }
+          }
+        }
+      }, onError: (Object e) {
+        if (kDebugMode) debugPrint('[BLE] erreur EventChannel GATT: $e');
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BLE] EventChannel GATT indisponible: $e');
+      }
+    }
 
     // ── Scan passif avec connexion GATT automatique ──
     _scanSub = _ble.scanForDevices(
@@ -211,6 +296,10 @@ class BleMeshTransport implements MeshTransport {
 
   @override
   Future<void> stop() async {
+    // ── Arrêt de la publicité BLE native et du GATT server ─────────
+    _stopNativeAdvertising();
+    _stopNativeGattServer();
+
     _pingTimer?.cancel();
     _pingTimer = null;
     _throttleCleanupTimer?.cancel();
@@ -441,7 +530,7 @@ class BleMeshTransport implements MeshTransport {
 
   void _onConnectionFailed(String deviceId) {
     _pendingConnections.remove(deviceId);
-    _connectSubs[deviceId]?.cancel();
+    unawaited(_connectSubs[deviceId]?.cancel());
     _connectSubs.remove(deviceId);
     _connections.remove(deviceId);
     _scheduleReconnect(deviceId);
@@ -453,6 +542,24 @@ class BleMeshTransport implements MeshTransport {
 
   Future<void> _discoverServices(String deviceId) async {
     try {
+      // ── Négociation MTU ───────────────────────────────────────
+      // Le MTU BLE par défaut est 23 octets → writeWithoutResponse
+      // limité à 20 octets. On négocie 512 pour permettre les
+      // payloads JSON de ~400 octets sans fragmentation.
+      try {
+        final mtu = await _ble.requestMtu(
+          deviceId: deviceId,
+          mtu: 512,
+        );
+        if (kDebugMode) {
+          debugPrint('[BLE] MTU négocié → $mtu octets avec $deviceId');
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[BLE] échec négociation MTU $deviceId: $e');
+        }
+      }
+
       await _ble.discoverAllServices(deviceId);
       final services = await _ble.getDiscoveredServices(deviceId);
 
@@ -502,7 +609,7 @@ class BleMeshTransport implements MeshTransport {
       }
 
       // Envoie immédiatement un ping de bienvenue.
-      _sendWelcomeFrame(deviceId);
+      unawaited(_sendWelcomeFrame(deviceId));
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[BLE] erreur découverte services $deviceId: $e');
@@ -571,7 +678,7 @@ class BleMeshTransport implements MeshTransport {
     if (conn != null) {
       await conn.notificationSub.cancel();
     }
-    _connectSubs[deviceId]?.cancel();
+    unawaited(_connectSubs[deviceId]?.cancel());
     _connectSubs.remove(deviceId);
     _pendingConnections.remove(deviceId);
 
@@ -625,10 +732,10 @@ class BleMeshTransport implements MeshTransport {
   // ──────────────────────────────────────────────────────────────────
 
   void _sendPresencePing() {
-    PeerCounterService.instance.recordPeer(
-      _peerId,
-      serviceUuid: kStreetPhareBleServiceUuid,
-    );
+    // NE PAS s'auto-enregistrer comme pair — l'exclusion locale est
+    // gérée par PeerCounterService._excludeLocal().
+    // Seuls les pairs DISTANTS détectés via scan/advertisement sont
+    // comptabilisés dans _onDeviceDiscovered().
 
     if (kDebugMode) {
       final connCount = _connections.values.where((c) => c.isReady).length;
@@ -695,6 +802,18 @@ class BleMeshTransport implements MeshTransport {
         connectGranted = result.isGranted;
       }
 
+      // BLUETOOTH_ADVERTISE est requis pour le mode peripheral GATT
+      // (émission d'advertisements BLE). Sans cette permission,
+      // startAdvertising() échoue sur Android 12+.
+      var advertiseGranted = await Permission.bluetoothAdvertise.isGranted;
+      if (!advertiseGranted) {
+        final result = await Permission.bluetoothAdvertise.request();
+        advertiseGranted = result.isGranted;
+      }
+      if (advertiseGranted) {
+        if (kDebugMode) debugPrint('[BLE] BLUETOOTH_ADVERTISE accordé');
+      }
+
       if (scanGranted) {
         if (kDebugMode) debugPrint('[BLE] BLUETOOTH_SCAN accordé');
         return true;
@@ -756,6 +875,62 @@ class BleMeshTransport implements MeshTransport {
   /// Nombre de connexions GATT actives.
   int get activeConnectionCount =>
       _connections.values.where((c) => c.isReady).length;
+
+  // ── BLE Advertising natif (MethodChannel) ─────────────────────────
+
+  /// Démarre la publicité BLE via le canal platform Android.
+  /// Non-bloquant : si le canal n'est pas disponible (iOS, desktop),
+  /// l'appel est silencieusement ignoré.
+  void _startNativeAdvertising() {
+    try {
+      unawaited(
+        _advertiserChannel.invokeMethod('startAdvertising', {
+          'peerId': _peerId,
+        }),
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BLE] advertising natif non disponible: $e');
+      }
+    }
+  }
+
+  /// Arrête la publicité BLE via le canal platform Android.
+  void _stopNativeAdvertising() {
+    try {
+      unawaited(_advertiserChannel.invokeMethod('stopAdvertising'));
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BLE] stop advertising natif erreur: $e');
+      }
+    }
+  }
+
+  // ── GATT Server natif (MethodChannel + EventChannel) ──────────────
+
+  Future<void> _startNativeGattServer() async {
+    try {
+      await _gattChannel.invokeMethod('startGattServer');
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BLE] GATT server natif non disponible: $e');
+      }
+    }
+  }
+
+  void _stopNativeGattServer() {
+    try {
+      unawaited(_gattChannel.invokeMethod('stopGattServer'));
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BLE] arrêt GATT server natif erreur: $e');
+      }
+    }
+  }
+
+  // _sendViaNativeGatt() supprimée — non utilisée. Le broadcast sortant
+  // passe par notifyCharacteristicChanged() via le GATT server natif.
+  // Les devices flutter_reactive_ble sont gérés dans _connections.
 
   static String _generateRandomPeerId() {
     final rng = Random.secure();

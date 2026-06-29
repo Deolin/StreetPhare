@@ -28,10 +28,10 @@ String randomId([int bytes = 16]) {
 String generateEphemeralUserId() => randomId(12);
 
 /// Résultat d'une signature anonyme.
-class SignedAlert {
-  final String signature;
-  final String publicKey; // partagée hors-ligne via le bundle
+class SignedAlert { // partagée hors-ligne via le bundle
   const SignedAlert({required this.signature, required this.publicKey});
+  final String signature;
+  final String publicKey;
 }
 
 /// Helper cryptographique pour StreetPhare.

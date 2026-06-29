@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "savedAt": "2026-06-29T19:15:35.205Z",
+  "alerts": [],
+  "events": [],
+  "panicPings": [],
+  "bugReports": [],
+  "meshMessages": [],
+  "syncState": {
+    "lastSyncAt": null,
+    "lastSyncSuccess": false,
+    "partnerUrl": "http://192.168.31.63:3001"
+  }
+}

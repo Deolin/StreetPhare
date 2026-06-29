@@ -444,7 +444,7 @@ class _Grid {
       constraints.gridStepMeters,
     );
     final midLat = (minLat + maxLat) / 2;
-    final metersPerDegLat = 111320.0;
+    const metersPerDegLat = 111320.0;
     final metersPerDegLng = 111320.0 * math.cos(midLat * math.pi / 180.0);
 
     final stepLat = effectiveStep / metersPerDegLat;

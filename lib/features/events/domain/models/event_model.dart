@@ -34,6 +34,15 @@ import 'package:latlong2/latlong.dart';
 ///
 /// Dès qu'une étape est passée, la suivante est automatiquement révélée.
 class EventWaypoint {
+
+  factory EventWaypoint.fromJson(Map<String, dynamic> json) {
+    return EventWaypoint(
+      label: json['label'] as String,
+      latitude: (json['lat'] as num).toDouble(),
+      longitude: (json['lng'] as num).toDouble(),
+      scheduledAt: DateTime.parse(json['scheduledAt'] as String).toUtc(),
+    );
+  }
   const EventWaypoint({
     required this.label,
     required this.latitude,
@@ -81,15 +90,6 @@ class EventWaypoint {
         'lng': longitude,
         'scheduledAt': scheduledAt.toUtc().toIso8601String(),
       };
-
-  factory EventWaypoint.fromJson(Map<String, dynamic> json) {
-    return EventWaypoint(
-      label: json['label'] as String,
-      latitude: (json['lat'] as num).toDouble(),
-      longitude: (json['lng'] as num).toDouble(),
-      scheduledAt: DateTime.parse(json['scheduledAt'] as String).toUtc(),
-    );
-  }
 }
 
 // ============================================================================
@@ -98,6 +98,15 @@ class EventWaypoint {
 
 /// Un point d'intérêt (POI) officiel de l'événement.
 class EventPoi {
+
+  factory EventPoi.fromJson(Map<String, dynamic> json) {
+    return EventPoi(
+      label: json['label'] as String,
+      latitude: (json['lat'] as num).toDouble(),
+      longitude: (json['lng'] as num).toDouble(),
+      icon: (json['icon'] as String?) ?? 'flag',
+    );
+  }
   const EventPoi({
     required this.label,
     required this.latitude,
@@ -118,15 +127,6 @@ class EventPoi {
         'lng': longitude,
         'icon': icon,
       };
-
-  factory EventPoi.fromJson(Map<String, dynamic> json) {
-    return EventPoi(
-      label: json['label'] as String,
-      latitude: (json['lat'] as num).toDouble(),
-      longitude: (json['lng'] as num).toDouble(),
-      icon: (json['icon'] as String?) ?? 'flag',
-    );
-  }
 }
 
 // ============================================================================
@@ -137,6 +137,16 @@ class EventPoi {
 /// défini dans le JSON de l'événement. Sert de point de repli
 /// pour l'algorithme de routage "Route Safe".
 class EventCareCenter {
+
+  factory EventCareCenter.fromJson(Map<String, dynamic> json) {
+    return EventCareCenter(
+      label: json['label'] as String,
+      latitude: (json['lat'] as num).toDouble(),
+      longitude: (json['lng'] as num).toDouble(),
+      contact: (json['contact'] as String?) ?? '',
+      notes: (json['notes'] as String?) ?? '',
+    );
+  }
   const EventCareCenter({
     required this.label,
     required this.latitude,
@@ -164,16 +174,6 @@ class EventCareCenter {
         'contact': contact,
         'notes': notes,
       };
-
-  factory EventCareCenter.fromJson(Map<String, dynamic> json) {
-    return EventCareCenter(
-      label: json['label'] as String,
-      latitude: (json['lat'] as num).toDouble(),
-      longitude: (json['lng'] as num).toDouble(),
-      contact: (json['contact'] as String?) ?? '',
-      notes: (json['notes'] as String?) ?? '',
-    );
-  }
 }
 
 // ============================================================================
@@ -184,6 +184,15 @@ class EventCareCenter {
 /// de l'événement. Utilisé comme destination de repli par
 /// l'algorithme de routage en cas de blocage.
 class EventExitPoint {
+
+  factory EventExitPoint.fromJson(Map<String, dynamic> json) {
+    return EventExitPoint(
+      label: json['label'] as String,
+      latitude: (json['lat'] as num).toDouble(),
+      longitude: (json['lng'] as num).toDouble(),
+      direction: (json['direction'] as String?) ?? '',
+    );
+  }
   const EventExitPoint({
     required this.label,
     required this.latitude,
@@ -206,15 +215,6 @@ class EventExitPoint {
         'lng': longitude,
         'direction': direction,
       };
-
-  factory EventExitPoint.fromJson(Map<String, dynamic> json) {
-    return EventExitPoint(
-      label: json['label'] as String,
-      latitude: (json['lat'] as num).toDouble(),
-      longitude: (json['lng'] as num).toDouble(),
-      direction: (json['direction'] as String?) ?? '',
-    );
-  }
 }
 
 // ============================================================================
@@ -225,6 +225,15 @@ class EventExitPoint {
 /// Sert aussi de destination de secours pour l'algorithme
 /// de routage ("failover").
 class EventSafeZone {
+
+  factory EventSafeZone.fromJson(Map<String, dynamic> json) {
+    return EventSafeZone(
+      label: json['label'] as String,
+      latitude: (json['lat'] as num).toDouble(),
+      longitude: (json['lng'] as num).toDouble(),
+      radius: (json['radius'] as num?)?.toDouble() ?? 50.0,
+    );
+  }
   const EventSafeZone({
     required this.label,
     required this.latitude,
@@ -247,15 +256,6 @@ class EventSafeZone {
         'lng': longitude,
         'radius': radius,
       };
-
-  factory EventSafeZone.fromJson(Map<String, dynamic> json) {
-    return EventSafeZone(
-      label: json['label'] as String,
-      latitude: (json['lat'] as num).toDouble(),
-      longitude: (json['lng'] as num).toDouble(),
-      radius: (json['radius'] as num?)?.toDouble() ?? 50.0,
-    );
-  }
 }
 
 // ============================================================================
@@ -264,6 +264,38 @@ class EventSafeZone {
 
 /// Un événement chargé via code d'invitation ou QR Code.
 class EventModel {
+
+  factory EventModel.fromJson(Map<String, dynamic> json) {
+    return EventModel(
+      code: (json['code'] as String?) ?? '',
+      title: (json['title'] as String?) ?? 'Événement sans nom',
+      startAt: json['startAt'] != null
+          ? DateTime.parse(json['startAt'] as String).toUtc()
+          : DateTime.now().toUtc(),
+      visibleAt: json['visibleAt'] != null
+          ? DateTime.parse(json['visibleAt'] as String).toUtc()
+          : DateTime.now().toUtc(),
+      routeGeoJson: (json['route'] as String?) ?? '[]',
+      waypoints: ((json['waypoints'] as List?) ?? const [])
+          .map((w) => EventWaypoint.fromJson(w as Map<String, dynamic>))
+          .toList(),
+      pois: ((json['pois'] as List?) ?? const [])
+          .map((p) => EventPoi.fromJson(p as Map<String, dynamic>))
+          .toList(),
+      careCenters: ((json['careCenters'] as List?) ?? const [])
+          .map((c) => EventCareCenter.fromJson(c as Map<String, dynamic>))
+          .toList(),
+      exitPoints: ((json['exitPoints'] as List?) ?? const [])
+          .map((e) => EventExitPoint.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      safeZones: ((json['safeZones'] as List?) ?? const [])
+          .map((z) => EventSafeZone.fromJson(z as Map<String, dynamic>))
+          .toList(),
+      destinationLatitude: (json['destLat'] as num).toDouble(),
+      destinationLongitude: (json['destLng'] as num).toDouble(),
+      generalZone: json['generalZone'] as String?,
+    );
+  }
   const EventModel({
     required this.code,
     required this.title,
@@ -490,36 +522,4 @@ class EventModel {
         'destLng': destinationLongitude,
         if (generalZone != null) 'generalZone': generalZone,
       };
-
-  factory EventModel.fromJson(Map<String, dynamic> json) {
-    return EventModel(
-      code: (json['code'] as String?) ?? '',
-      title: (json['title'] as String?) ?? 'Événement sans nom',
-      startAt: json['startAt'] != null
-          ? DateTime.parse(json['startAt'] as String).toUtc()
-          : DateTime.now().toUtc(),
-      visibleAt: json['visibleAt'] != null
-          ? DateTime.parse(json['visibleAt'] as String).toUtc()
-          : DateTime.now().toUtc(),
-      routeGeoJson: (json['route'] as String?) ?? '[]',
-      waypoints: ((json['waypoints'] as List?) ?? const [])
-          .map((w) => EventWaypoint.fromJson(w as Map<String, dynamic>))
-          .toList(),
-      pois: ((json['pois'] as List?) ?? const [])
-          .map((p) => EventPoi.fromJson(p as Map<String, dynamic>))
-          .toList(),
-      careCenters: ((json['careCenters'] as List?) ?? const [])
-          .map((c) => EventCareCenter.fromJson(c as Map<String, dynamic>))
-          .toList(),
-      exitPoints: ((json['exitPoints'] as List?) ?? const [])
-          .map((e) => EventExitPoint.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      safeZones: ((json['safeZones'] as List?) ?? const [])
-          .map((z) => EventSafeZone.fromJson(z as Map<String, dynamic>))
-          .toList(),
-      destinationLatitude: (json['destLat'] as num).toDouble(),
-      destinationLongitude: (json['destLng'] as num).toDouble(),
-      generalZone: json['generalZone'] as String?,
-    );
-  }
 }

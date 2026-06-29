@@ -5,605 +5,6 @@
 
 /// Regroupe toutes les traductions par écran / fonctionnalité.
 class AppStrings {
-  // ==========================================================================
-  // Constructeur privé — utiliser les factories FR, EN, NL, DE
-  // ==========================================================================
-  const AppStrings._({
-    required this.appTitle,
-    required this.settingsTitle,
-    required this.mapTitle,
-    required this.eventsTitle,
-    required this.messagingTitle,
-    required this.startScreenWelcome,
-    required this.startScreenSubtitle,
-    required this.startScreenSelectLanguage,
-    required this.startScreenButton,
-    required this.languageLabel,
-    required this.languageSectionTitle,
-    required this.languageSectionDescription,
-    required this.themeSectionTitle,
-    required this.themeDescription,
-    required this.themeSystem,
-    required this.themeSystemSubtitle,
-    required this.themeLight,
-    required this.themeLightSubtitle,
-    required this.themeDark,
-    required this.themeDarkSubtitle,
-    required this.batterySaverTitle,
-    required this.batterySaverDescription,
-    required this.batterySaverSubtitle,
-    required this.batterySaverEnabledLabel,
-    required this.batterySaverDisabledLabel,
-    required this.batterySaverStatusEnabled,
-    required this.batterySaverStatusDisabled,
-    required this.backgroundAlertsTitle,
-    required this.notificationFilterTitle,
-    required this.notificationFilterAllLabel,
-    required this.notificationFilterAllDescription,
-    required this.notificationFilterNearbyLabel,
-    required this.notificationFilterNearbyDescription,
-    required this.notificationFilterEventsLabel,
-    required this.notificationFilterEventsDescription,
-    required this.lowVisionTitle,
-    required this.lowVisionSubtitle,
-    required this.lowVisionDescription,
-    required this.lowVisionEnabled,
-    required this.lowVisionDisabled,
-    required this.lowVisionStatusEnabled,
-    required this.lowVisionStatusDisabled,
-    required this.messageFilterTitle,
-    required this.messageFilterDescription,
-    required this.messageFilterAllLabel,
-    required this.messageFilterAllDescription,
-    required this.messageFilterNearbyLabel,
-    required this.messageFilterNearbyDescription,
-    required this.messageFilterAdminLabel,
-    required this.messageFilterAdminDescription,
-    required this.messageFilterAlertLabel,
-    required this.messageFilterAlertDescription,
-    required this.avoidanceFiltersTitle,
-    required this.avoidanceFiltersDescription,
-    required this.avoidBarragesTitle,
-    required this.avoidBarragesSubtitle,
-    required this.avoidNassesTitle,
-    required this.avoidNassesSubtitle,
-    required this.avoidControlesTitle,
-    required this.avoidControlesSubtitle,
-    required this.avoidAccidentsTitle,
-    required this.avoidAccidentsSubtitle,
-    required this.avoidRassemblementsTitle,
-    required this.avoidRassemblementsSubtitle,
-    required this.avoidAutresTitle,
-    required this.avoidAutresSubtitle,
-    required this.routeDestinationSection,
-    required this.routeDestEventPointLabel,
-    required this.routeDestEventPointDescription,
-    required this.routeDestSafeZoneLabel,
-    required this.routeDestSafeZoneDescription,
-    required this.routeDestCareCenterLabel,
-    required this.routeDestCareCenterDescription,
-    required this.routeDestExitPointLabel,
-    required this.routeDestExitPointDescription,
-    required this.routeDestUserPointLabel,
-    required this.routeDestUserPointDescription,
-    required this.mapCacheTitle,
-    required this.mapCacheSubtitle,
-    required this.mapCacheDescription,
-    required this.mapCacheRetentionLabel,
-    required this.mapCacheForceUpdate,
-    required this.mapCacheCleaned,
-    required this.mapCacheDays,
-    required this.backgroundServiceTitle,
-    required this.backgroundServiceSubtitle,
-    required this.backgroundServiceDescription,
-    required this.backgroundServiceEnable,
-    required this.panicContactsTitle,
-    required this.panicContactsDescription,
-    required this.panicContactsAdd,
-    required this.panicContactsEmpty,
-    required this.panicContactsConfigError,
-    required this.panicContactsDeleteTitle,
-    required this.panicContactsDeleteMessage,
-    required this.panicContactsEditTitle,
-    required this.panicContactsNewTitle,
-    required this.panicContactsFieldName,
-    required this.panicContactsFieldPhone,
-    required this.panicContactsNameHint,
-    required this.panicContactsPhoneHint,
-    required this.panicContactsNameRequired,
-    required this.panicContactsPhoneRequired,
-    required this.panicContactsPhoneTooShort,
-    required this.tutorialTitle,
-    required this.tutorialButton,
-    required this.tutorialDescription,
-    required this.aboutTitle,
-    required this.aboutApp,
-    required this.aboutVersion,
-    required this.aboutPlatform,
-    required this.aboutLicense,
-    required this.aboutEncryption,
-    required this.aboutOpenSource,
-    required this.aboutDescription,
-    required this.bugReportTitle,
-    required this.bugReportButton,
-    required this.bugReportSuggest,
-    required this.bugReportDescription,
-    required this.bugReportPrivacy,
-    required this.bugReportSectionTitle,
-    required this.bugReportSectionDescription,
-    required this.eventsJoin,
-    required this.eventsNoEvent,
-    required this.eventsQrScan,
-    required this.qrScanTitle,
-    required this.eventsMyEvents,
-    required this.eventsEmptyTitle,
-    required this.eventsEmptySubtitle,
-    required this.eventsJoinTitle,
-    required this.eventsJoinSubtitle,
-    required this.eventsSecurityTitle,
-    required this.eventsSecurityDescription,
-    required this.eventsEnterCodeError,
-    required this.eventsMaxReachedError,
-    required this.eventsUnknownCodeError,
-    required this.eventsFleurusCodes,
-    required this.eventsQrMaxReached,
-    required this.eventsQrAddError,
-    required this.eventsQrAddSuccess,
-    required this.eventsRemoved,
-    required this.eventsLoadButton,
-    required this.eventsRemoveTooltip,
-    required this.eventsCodeLabel,
-    required this.eventsStartLabel,
-    required this.eventsRouteHidden,
-    required this.eventsStepActive,
-    required this.eventsStepTime,
-    required this.eventsRouteVisible,
-    required this.mapRecenterTooltip,
-    required this.mapLoadingTiles,
-    required this.mapGpsOff,
-    required this.mapGpsDenied,
-    required this.mapGpsDeniedForever,
-    required this.mapGpsError,
-    required this.mapUserPointDefined,
-    required this.mapDestinationEvent,
-    required this.mapDestinationSafeZone,
-    required this.mapDestinationCareCenter,
-    required this.mapDestinationExit,
-    required this.mapDestinationUserPoint,
-    required this.mapRouteSafeCalculating,
-    required this.mapRouteSafeFailover,
-    required this.mapNoDestinationError,
-    required this.mapAddEventButton,
-    required this.mapAddEventWarning,
-    required this.mapCollectivePanicTitle,
-    required this.mapCollectivePanicMessage,
-    required this.mapViewOnMap,
-    required this.mapIgnore,
-    required this.mapNoPanicContactTitle,
-    required this.mapNoPanicContactMessage,
-    required this.mapOpenSettings,
-    required this.mapPanicModeTitle,
-    required this.mapPanicModeMessage,
-    required this.mapPanicModeActivate,
-    required this.mapPanicSmsPreparedTitle,
-    required this.mapPanicSmsPreparedMessage,
-    required this.mapPanicAlertReadyTitle,
-    required this.mapPanicAlertReadyMessage,
-    required this.mapPanicMessageBody,
-    required this.mapPanicNoGps,
-    required this.mapDestinationObjective,
-    required this.mapDestinationLongPressHint,
-    required this.mapActiveEvent,
-    required this.mapPeersNearby,
-    required this.mapIsolatedTitle,
-    required this.mapIsolatedMessage,
-    required this.routeTitle,
-    required this.routeCalculate,
-    required this.routeDestination,
-    required this.routeAvoidLiked,
-    required this.routeAvoidPolice,
-    required this.routeAvoidCamera,
-    required this.routeAlternativesError,
-    required this.routeNotFound,
-    required this.routeRecommended,
-    required this.routeShowAlternatives,
-    required this.routeCalculatingAlternatives,
-    required this.routeOpenInOsmAnd,
-    required this.routeAccept,
-    required this.routeItinerary,
-    required this.routeRisk,
-    required this.routeOsmAndSuccess,
-    required this.routeOsmAndError,
-    required this.searchTitle,
-    required this.searchHint,
-    required this.searchNoResult,
-    required this.splashInitializing,
-    required this.splashCheckingVersion,
-    required this.splashCheckingCache,
-    required this.splashPurgingCache,
-    required this.splashLoadingMap,
-    required this.splashCachingTiles,
-    required this.splashReady,
-    required this.splashError,
-    required this.splashSubtitle,
-    required this.splashCheckingConnectivity,
-    required this.panicButton,
-    required this.panicAlertSent,
-    required this.onlineStatus,
-    required this.offlineStatus,
-    required this.meshStatus,
-    required this.relayStatus,
-    required this.blockedUsersTitle,
-    required this.blockedUsersDescription,
-    required this.blockedUsersEmpty,
-    required this.blockedUsersUnblock,
-    required this.blockedUsersCount,
-    required this.connectedPeers,
-    required this.proximityValidationTitle,
-    required this.proximityValidationCheck,
-    required this.proximityValid,
-    required this.proximityInvalid,
-    required this.geofenceEntered,
-    required this.geofenceExited,
-    required this.dangerReported,
-    required this.dangerConfirmed,
-    required this.ok,
-    required this.cancel,
-    required this.save,
-    required this.delete,
-    required this.confirm,
-    required this.close,
-    required this.back,
-    required this.next,
-    required this.done,
-    required this.errorGeneric,
-    required this.loading,
-    required this.retry,
-    required this.noInternet,
-    required this.locationAccessTitle,
-    required this.locationAccessMessage,
-    required this.locationAccessButton,
-    required this.notificationPermissionTitle,
-    required this.notificationPermissionMessage,
-    required this.notificationPermissionButton,
-    required this.androidChannelAlertsTitle,
-    required this.androidChannelAlertsSubtitle,
-    required this.androidChannelEventsTitle,
-    required this.androidChannelEventsSubtitle,
-    required this.androidChannelPanicTitle,
-    required this.androidChannelPanicSubtitle,
-    required this.androidChannelMessagesTitle,
-    required this.androidChannelMessagesSubtitle,
-    required this.androidChannelSectionTitle,
-    required this.androidChannelManageSystem,
-    required this.transportModePedestrian,
-    required this.transportModeCar,
-    required this.transportModeTransit,
-  });
-
-  // Général
-  final String appTitle;
-  final String settingsTitle;
-  final String mapTitle;
-  final String eventsTitle;
-  final String messagingTitle;
-
-  // Start Screen
-  final String startScreenWelcome;
-  final String startScreenSubtitle;
-  final String startScreenSelectLanguage;
-  final String startScreenButton;
-
-  // Langue
-  final String languageLabel;
-  final String languageSectionTitle;
-  final String languageSectionDescription;
-
-  // Thème
-  final String themeSectionTitle;
-  final String themeDescription;
-  final String themeSystem;
-  final String themeSystemSubtitle;
-  final String themeLight;
-  final String themeLightSubtitle;
-  final String themeDark;
-  final String themeDarkSubtitle;
-
-  // Batterie / Notifications
-  final String batterySaverTitle;
-  final String batterySaverDescription;
-  final String batterySaverSubtitle;
-  final String batterySaverEnabledLabel;
-  final String batterySaverDisabledLabel;
-  final String batterySaverStatusEnabled;
-  final String batterySaverStatusDisabled;
-  final String backgroundAlertsTitle;
-  final String notificationFilterTitle;
-  final String notificationFilterAllLabel;
-  final String notificationFilterAllDescription;
-  final String notificationFilterNearbyLabel;
-  final String notificationFilterNearbyDescription;
-  final String notificationFilterEventsLabel;
-  final String notificationFilterEventsDescription;
-
-  // Accessibilité
-  final String lowVisionTitle;
-  final String lowVisionSubtitle;
-  final String lowVisionDescription;
-  final String lowVisionEnabled;
-  final String lowVisionDisabled;
-  final String lowVisionStatusEnabled;
-  final String lowVisionStatusDisabled;
-
-  // Messagerie
-  final String messageFilterTitle;
-  final String messageFilterDescription;
-  final String messageFilterAllLabel;
-  final String messageFilterAllDescription;
-  final String messageFilterNearbyLabel;
-  final String messageFilterNearbyDescription;
-  final String messageFilterAdminLabel;
-  final String messageFilterAdminDescription;
-  final String messageFilterAlertLabel;
-  final String messageFilterAlertDescription;
-
-  // Route Safe
-  final String avoidanceFiltersTitle;
-  final String avoidanceFiltersDescription;
-  final String avoidBarragesTitle;
-  final String avoidBarragesSubtitle;
-  final String avoidNassesTitle;
-  final String avoidNassesSubtitle;
-  final String avoidControlesTitle;
-  final String avoidControlesSubtitle;
-  final String avoidAccidentsTitle;
-  final String avoidAccidentsSubtitle;
-  final String avoidRassemblementsTitle;
-  final String avoidRassemblementsSubtitle;
-  final String avoidAutresTitle;
-  final String avoidAutresSubtitle;
-  final String routeDestinationSection;
-  final String routeDestEventPointLabel;
-  final String routeDestEventPointDescription;
-  final String routeDestSafeZoneLabel;
-  final String routeDestSafeZoneDescription;
-  final String routeDestCareCenterLabel;
-  final String routeDestCareCenterDescription;
-  final String routeDestExitPointLabel;
-  final String routeDestExitPointDescription;
-  final String routeDestUserPointLabel;
-  final String routeDestUserPointDescription;
-
-  // Cache cartes
-  final String mapCacheTitle;
-  final String mapCacheSubtitle;
-  final String mapCacheDescription;
-  final String mapCacheRetentionLabel;
-  final String mapCacheForceUpdate;
-  final String mapCacheCleaned;
-  final String mapCacheDays;
-
-  // Service arrière-plan
-  final String backgroundServiceTitle;
-  final String backgroundServiceSubtitle;
-  final String backgroundServiceDescription;
-  final String backgroundServiceEnable;
-
-  // Contacts Panic
-  final String panicContactsTitle;
-  final String panicContactsDescription;
-  final String panicContactsAdd;
-  final String panicContactsEmpty;
-  final String panicContactsConfigError;
-  final String panicContactsDeleteTitle;
-  final String panicContactsDeleteMessage;
-  final String panicContactsEditTitle;
-  final String panicContactsNewTitle;
-  final String panicContactsFieldName;
-  final String panicContactsFieldPhone;
-  final String panicContactsNameHint;
-  final String panicContactsPhoneHint;
-  final String panicContactsNameRequired;
-  final String panicContactsPhoneRequired;
-  final String panicContactsPhoneTooShort;
-
-  // Tutoriel
-  final String tutorialTitle;
-  final String tutorialButton;
-  final String tutorialDescription;
-
-  // À propos
-  final String aboutTitle;
-  final String aboutApp;
-  final String aboutVersion;
-  final String aboutPlatform;
-  final String aboutLicense;
-  final String aboutEncryption;
-  final String aboutOpenSource;
-  final String aboutDescription;
-
-  // Bug report
-  final String bugReportTitle;
-  final String bugReportButton;
-  final String bugReportSuggest;
-  final String bugReportDescription;
-  final String bugReportPrivacy;
-  final String bugReportSectionTitle;
-  final String bugReportSectionDescription;
-
-  // Événements
-  final String eventsJoin;
-  final String eventsNoEvent;
-  final String eventsQrScan;
-  final String qrScanTitle;
-  final String eventsMyEvents;
-  final String eventsEmptyTitle;
-  final String eventsEmptySubtitle;
-  final String eventsJoinTitle;
-  final String eventsJoinSubtitle;
-  final String eventsSecurityTitle;
-  final String eventsSecurityDescription;
-  final String eventsEnterCodeError;
-  final String eventsMaxReachedError;
-  final String eventsUnknownCodeError;
-  final String eventsFleurusCodes;
-  final String eventsQrMaxReached;
-  final String eventsQrAddError;
-  final String eventsQrAddSuccess;
-  final String eventsRemoved;
-  final String eventsLoadButton;
-  final String eventsRemoveTooltip;
-  final String eventsCodeLabel;
-  final String eventsStartLabel;
-  final String eventsRouteHidden;
-  final String eventsStepActive;
-  final String eventsStepTime;
-  final String eventsRouteVisible;
-
-  // Map
-  final String mapRecenterTooltip;
-  final String mapLoadingTiles;
-  final String mapGpsOff;
-  final String mapGpsDenied;
-  final String mapGpsDeniedForever;
-  final String mapGpsError;
-  final String mapUserPointDefined;
-  final String mapDestinationEvent;
-  final String mapDestinationSafeZone;
-  final String mapDestinationCareCenter;
-  final String mapDestinationExit;
-  final String mapDestinationUserPoint;
-  final String mapRouteSafeCalculating;
-  final String mapRouteSafeFailover;
-  final String mapNoDestinationError;
-  final String mapAddEventButton;
-  final String mapAddEventWarning;
-  final String mapCollectivePanicTitle;
-  final String mapCollectivePanicMessage;
-  final String mapViewOnMap;
-  final String mapIgnore;
-  final String mapNoPanicContactTitle;
-  final String mapNoPanicContactMessage;
-  final String mapOpenSettings;
-  final String mapPanicModeTitle;
-  final String mapPanicModeMessage;
-  final String mapPanicModeActivate;
-  final String mapPanicSmsPreparedTitle;
-  final String mapPanicSmsPreparedMessage;
-  final String mapPanicAlertReadyTitle;
-  final String mapPanicAlertReadyMessage;
-  final String mapPanicMessageBody;
-  final String mapPanicNoGps;
-  final String mapDestinationObjective;
-  final String mapDestinationLongPressHint;
-  final String mapActiveEvent;
-  final String mapPeersNearby;
-  final String mapIsolatedTitle;
-  final String mapIsolatedMessage;
-
-  // Safe Route Result Sheet
-  final String routeTitle;
-  final String routeCalculate;
-  final String routeDestination;
-  final String routeAvoidLiked;
-  final String routeAvoidPolice;
-  final String routeAvoidCamera;
-  final String routeAlternativesError;
-  final String routeNotFound;
-  final String routeRecommended;
-  final String routeShowAlternatives;
-  final String routeCalculatingAlternatives;
-  final String routeOpenInOsmAnd;
-  final String routeAccept;
-  final String routeItinerary;
-  final String routeRisk;
-  final String routeOsmAndSuccess;
-  final String routeOsmAndError;
-
-  // Recherche
-  final String searchTitle;
-  final String searchHint;
-  final String searchNoResult;
-
-  // Splash
-  final String splashInitializing;
-  final String splashCheckingVersion;
-  final String splashCheckingCache;
-  final String splashPurgingCache;
-  final String splashLoadingMap;
-  final String splashCachingTiles;
-  final String splashReady;
-  final String splashError;
-  final String splashSubtitle;
-  final String splashCheckingConnectivity;
-
-  // Panic
-  final String panicButton;
-  final String panicAlertSent;
-
-  // Blocage utilisateurs
-  final String blockedUsersTitle;
-  final String blockedUsersDescription;
-  final String blockedUsersEmpty;
-  final String blockedUsersUnblock;
-  final String blockedUsersCount;
-
-  // Réseau
-  final String onlineStatus;
-  final String offlineStatus;
-  final String meshStatus;
-  final String relayStatus;
-  final String connectedPeers;
-
-  // Géofencing
-  final String proximityValidationTitle;
-  final String proximityValidationCheck;
-  final String proximityValid;
-  final String proximityInvalid;
-  final String geofenceEntered;
-  final String geofenceExited;
-  final String dangerReported;
-  final String dangerConfirmed;
-
-  // Boutons communs
-  final String ok;
-  final String cancel;
-  final String save;
-  final String delete;
-  final String confirm;
-  final String close;
-  final String back;
-  final String next;
-  final String done;
-
-  // Erreurs / États
-  final String errorGeneric;
-  final String loading;
-  final String retry;
-  final String noInternet;
-
-  // Permissions
-  final String locationAccessTitle;
-  final String locationAccessMessage;
-  final String locationAccessButton;
-  final String notificationPermissionTitle;
-  final String notificationPermissionMessage;
-  final String notificationPermissionButton;
-
-  // Canaux Android Notifications
-  final String androidChannelAlertsTitle;
-  final String androidChannelAlertsSubtitle;
-  final String androidChannelEventsTitle;
-  final String androidChannelEventsSubtitle;
-  final String androidChannelPanicTitle;
-  final String androidChannelPanicSubtitle;
-  final String androidChannelMessagesTitle;
-  final String androidChannelMessagesSubtitle;
-  final String androidChannelSectionTitle;
-  final String androidChannelManageSystem;
-  final String transportModePedestrian;
-  final String transportModeCar;
-  final String transportModeTransit;
 
   // ==========================================================================
   // Français (langue par défaut)
@@ -1920,4 +1321,603 @@ class AppStrings {
         transportModeCar: 'Auto',
         transportModeTransit: 'ÖPNV',
       );
+  // ==========================================================================
+  // Constructeur privé — utiliser les factories FR, EN, NL, DE
+  // ==========================================================================
+  const AppStrings._({
+    required this.appTitle,
+    required this.settingsTitle,
+    required this.mapTitle,
+    required this.eventsTitle,
+    required this.messagingTitle,
+    required this.startScreenWelcome,
+    required this.startScreenSubtitle,
+    required this.startScreenSelectLanguage,
+    required this.startScreenButton,
+    required this.languageLabel,
+    required this.languageSectionTitle,
+    required this.languageSectionDescription,
+    required this.themeSectionTitle,
+    required this.themeDescription,
+    required this.themeSystem,
+    required this.themeSystemSubtitle,
+    required this.themeLight,
+    required this.themeLightSubtitle,
+    required this.themeDark,
+    required this.themeDarkSubtitle,
+    required this.batterySaverTitle,
+    required this.batterySaverDescription,
+    required this.batterySaverSubtitle,
+    required this.batterySaverEnabledLabel,
+    required this.batterySaverDisabledLabel,
+    required this.batterySaverStatusEnabled,
+    required this.batterySaverStatusDisabled,
+    required this.backgroundAlertsTitle,
+    required this.notificationFilterTitle,
+    required this.notificationFilterAllLabel,
+    required this.notificationFilterAllDescription,
+    required this.notificationFilterNearbyLabel,
+    required this.notificationFilterNearbyDescription,
+    required this.notificationFilterEventsLabel,
+    required this.notificationFilterEventsDescription,
+    required this.lowVisionTitle,
+    required this.lowVisionSubtitle,
+    required this.lowVisionDescription,
+    required this.lowVisionEnabled,
+    required this.lowVisionDisabled,
+    required this.lowVisionStatusEnabled,
+    required this.lowVisionStatusDisabled,
+    required this.messageFilterTitle,
+    required this.messageFilterDescription,
+    required this.messageFilterAllLabel,
+    required this.messageFilterAllDescription,
+    required this.messageFilterNearbyLabel,
+    required this.messageFilterNearbyDescription,
+    required this.messageFilterAdminLabel,
+    required this.messageFilterAdminDescription,
+    required this.messageFilterAlertLabel,
+    required this.messageFilterAlertDescription,
+    required this.avoidanceFiltersTitle,
+    required this.avoidanceFiltersDescription,
+    required this.avoidBarragesTitle,
+    required this.avoidBarragesSubtitle,
+    required this.avoidNassesTitle,
+    required this.avoidNassesSubtitle,
+    required this.avoidControlesTitle,
+    required this.avoidControlesSubtitle,
+    required this.avoidAccidentsTitle,
+    required this.avoidAccidentsSubtitle,
+    required this.avoidRassemblementsTitle,
+    required this.avoidRassemblementsSubtitle,
+    required this.avoidAutresTitle,
+    required this.avoidAutresSubtitle,
+    required this.routeDestinationSection,
+    required this.routeDestEventPointLabel,
+    required this.routeDestEventPointDescription,
+    required this.routeDestSafeZoneLabel,
+    required this.routeDestSafeZoneDescription,
+    required this.routeDestCareCenterLabel,
+    required this.routeDestCareCenterDescription,
+    required this.routeDestExitPointLabel,
+    required this.routeDestExitPointDescription,
+    required this.routeDestUserPointLabel,
+    required this.routeDestUserPointDescription,
+    required this.mapCacheTitle,
+    required this.mapCacheSubtitle,
+    required this.mapCacheDescription,
+    required this.mapCacheRetentionLabel,
+    required this.mapCacheForceUpdate,
+    required this.mapCacheCleaned,
+    required this.mapCacheDays,
+    required this.backgroundServiceTitle,
+    required this.backgroundServiceSubtitle,
+    required this.backgroundServiceDescription,
+    required this.backgroundServiceEnable,
+    required this.panicContactsTitle,
+    required this.panicContactsDescription,
+    required this.panicContactsAdd,
+    required this.panicContactsEmpty,
+    required this.panicContactsConfigError,
+    required this.panicContactsDeleteTitle,
+    required this.panicContactsDeleteMessage,
+    required this.panicContactsEditTitle,
+    required this.panicContactsNewTitle,
+    required this.panicContactsFieldName,
+    required this.panicContactsFieldPhone,
+    required this.panicContactsNameHint,
+    required this.panicContactsPhoneHint,
+    required this.panicContactsNameRequired,
+    required this.panicContactsPhoneRequired,
+    required this.panicContactsPhoneTooShort,
+    required this.tutorialTitle,
+    required this.tutorialButton,
+    required this.tutorialDescription,
+    required this.aboutTitle,
+    required this.aboutApp,
+    required this.aboutVersion,
+    required this.aboutPlatform,
+    required this.aboutLicense,
+    required this.aboutEncryption,
+    required this.aboutOpenSource,
+    required this.aboutDescription,
+    required this.bugReportTitle,
+    required this.bugReportButton,
+    required this.bugReportSuggest,
+    required this.bugReportDescription,
+    required this.bugReportPrivacy,
+    required this.bugReportSectionTitle,
+    required this.bugReportSectionDescription,
+    required this.eventsJoin,
+    required this.eventsNoEvent,
+    required this.eventsQrScan,
+    required this.qrScanTitle,
+    required this.eventsMyEvents,
+    required this.eventsEmptyTitle,
+    required this.eventsEmptySubtitle,
+    required this.eventsJoinTitle,
+    required this.eventsJoinSubtitle,
+    required this.eventsSecurityTitle,
+    required this.eventsSecurityDescription,
+    required this.eventsEnterCodeError,
+    required this.eventsMaxReachedError,
+    required this.eventsUnknownCodeError,
+    required this.eventsFleurusCodes,
+    required this.eventsQrMaxReached,
+    required this.eventsQrAddError,
+    required this.eventsQrAddSuccess,
+    required this.eventsRemoved,
+    required this.eventsLoadButton,
+    required this.eventsRemoveTooltip,
+    required this.eventsCodeLabel,
+    required this.eventsStartLabel,
+    required this.eventsRouteHidden,
+    required this.eventsStepActive,
+    required this.eventsStepTime,
+    required this.eventsRouteVisible,
+    required this.mapRecenterTooltip,
+    required this.mapLoadingTiles,
+    required this.mapGpsOff,
+    required this.mapGpsDenied,
+    required this.mapGpsDeniedForever,
+    required this.mapGpsError,
+    required this.mapUserPointDefined,
+    required this.mapDestinationEvent,
+    required this.mapDestinationSafeZone,
+    required this.mapDestinationCareCenter,
+    required this.mapDestinationExit,
+    required this.mapDestinationUserPoint,
+    required this.mapRouteSafeCalculating,
+    required this.mapRouteSafeFailover,
+    required this.mapNoDestinationError,
+    required this.mapAddEventButton,
+    required this.mapAddEventWarning,
+    required this.mapCollectivePanicTitle,
+    required this.mapCollectivePanicMessage,
+    required this.mapViewOnMap,
+    required this.mapIgnore,
+    required this.mapNoPanicContactTitle,
+    required this.mapNoPanicContactMessage,
+    required this.mapOpenSettings,
+    required this.mapPanicModeTitle,
+    required this.mapPanicModeMessage,
+    required this.mapPanicModeActivate,
+    required this.mapPanicSmsPreparedTitle,
+    required this.mapPanicSmsPreparedMessage,
+    required this.mapPanicAlertReadyTitle,
+    required this.mapPanicAlertReadyMessage,
+    required this.mapPanicMessageBody,
+    required this.mapPanicNoGps,
+    required this.mapDestinationObjective,
+    required this.mapDestinationLongPressHint,
+    required this.mapActiveEvent,
+    required this.mapPeersNearby,
+    required this.mapIsolatedTitle,
+    required this.mapIsolatedMessage,
+    required this.routeTitle,
+    required this.routeCalculate,
+    required this.routeDestination,
+    required this.routeAvoidLiked,
+    required this.routeAvoidPolice,
+    required this.routeAvoidCamera,
+    required this.routeAlternativesError,
+    required this.routeNotFound,
+    required this.routeRecommended,
+    required this.routeShowAlternatives,
+    required this.routeCalculatingAlternatives,
+    required this.routeOpenInOsmAnd,
+    required this.routeAccept,
+    required this.routeItinerary,
+    required this.routeRisk,
+    required this.routeOsmAndSuccess,
+    required this.routeOsmAndError,
+    required this.searchTitle,
+    required this.searchHint,
+    required this.searchNoResult,
+    required this.splashInitializing,
+    required this.splashCheckingVersion,
+    required this.splashCheckingCache,
+    required this.splashPurgingCache,
+    required this.splashLoadingMap,
+    required this.splashCachingTiles,
+    required this.splashReady,
+    required this.splashError,
+    required this.splashSubtitle,
+    required this.splashCheckingConnectivity,
+    required this.panicButton,
+    required this.panicAlertSent,
+    required this.onlineStatus,
+    required this.offlineStatus,
+    required this.meshStatus,
+    required this.relayStatus,
+    required this.blockedUsersTitle,
+    required this.blockedUsersDescription,
+    required this.blockedUsersEmpty,
+    required this.blockedUsersUnblock,
+    required this.blockedUsersCount,
+    required this.connectedPeers,
+    required this.proximityValidationTitle,
+    required this.proximityValidationCheck,
+    required this.proximityValid,
+    required this.proximityInvalid,
+    required this.geofenceEntered,
+    required this.geofenceExited,
+    required this.dangerReported,
+    required this.dangerConfirmed,
+    required this.ok,
+    required this.cancel,
+    required this.save,
+    required this.delete,
+    required this.confirm,
+    required this.close,
+    required this.back,
+    required this.next,
+    required this.done,
+    required this.errorGeneric,
+    required this.loading,
+    required this.retry,
+    required this.noInternet,
+    required this.locationAccessTitle,
+    required this.locationAccessMessage,
+    required this.locationAccessButton,
+    required this.notificationPermissionTitle,
+    required this.notificationPermissionMessage,
+    required this.notificationPermissionButton,
+    required this.androidChannelAlertsTitle,
+    required this.androidChannelAlertsSubtitle,
+    required this.androidChannelEventsTitle,
+    required this.androidChannelEventsSubtitle,
+    required this.androidChannelPanicTitle,
+    required this.androidChannelPanicSubtitle,
+    required this.androidChannelMessagesTitle,
+    required this.androidChannelMessagesSubtitle,
+    required this.androidChannelSectionTitle,
+    required this.androidChannelManageSystem,
+    required this.transportModePedestrian,
+    required this.transportModeCar,
+    required this.transportModeTransit,
+  });
+
+  // Général
+  final String appTitle;
+  final String settingsTitle;
+  final String mapTitle;
+  final String eventsTitle;
+  final String messagingTitle;
+
+  // Start Screen
+  final String startScreenWelcome;
+  final String startScreenSubtitle;
+  final String startScreenSelectLanguage;
+  final String startScreenButton;
+
+  // Langue
+  final String languageLabel;
+  final String languageSectionTitle;
+  final String languageSectionDescription;
+
+  // Thème
+  final String themeSectionTitle;
+  final String themeDescription;
+  final String themeSystem;
+  final String themeSystemSubtitle;
+  final String themeLight;
+  final String themeLightSubtitle;
+  final String themeDark;
+  final String themeDarkSubtitle;
+
+  // Batterie / Notifications
+  final String batterySaverTitle;
+  final String batterySaverDescription;
+  final String batterySaverSubtitle;
+  final String batterySaverEnabledLabel;
+  final String batterySaverDisabledLabel;
+  final String batterySaverStatusEnabled;
+  final String batterySaverStatusDisabled;
+  final String backgroundAlertsTitle;
+  final String notificationFilterTitle;
+  final String notificationFilterAllLabel;
+  final String notificationFilterAllDescription;
+  final String notificationFilterNearbyLabel;
+  final String notificationFilterNearbyDescription;
+  final String notificationFilterEventsLabel;
+  final String notificationFilterEventsDescription;
+
+  // Accessibilité
+  final String lowVisionTitle;
+  final String lowVisionSubtitle;
+  final String lowVisionDescription;
+  final String lowVisionEnabled;
+  final String lowVisionDisabled;
+  final String lowVisionStatusEnabled;
+  final String lowVisionStatusDisabled;
+
+  // Messagerie
+  final String messageFilterTitle;
+  final String messageFilterDescription;
+  final String messageFilterAllLabel;
+  final String messageFilterAllDescription;
+  final String messageFilterNearbyLabel;
+  final String messageFilterNearbyDescription;
+  final String messageFilterAdminLabel;
+  final String messageFilterAdminDescription;
+  final String messageFilterAlertLabel;
+  final String messageFilterAlertDescription;
+
+  // Route Safe
+  final String avoidanceFiltersTitle;
+  final String avoidanceFiltersDescription;
+  final String avoidBarragesTitle;
+  final String avoidBarragesSubtitle;
+  final String avoidNassesTitle;
+  final String avoidNassesSubtitle;
+  final String avoidControlesTitle;
+  final String avoidControlesSubtitle;
+  final String avoidAccidentsTitle;
+  final String avoidAccidentsSubtitle;
+  final String avoidRassemblementsTitle;
+  final String avoidRassemblementsSubtitle;
+  final String avoidAutresTitle;
+  final String avoidAutresSubtitle;
+  final String routeDestinationSection;
+  final String routeDestEventPointLabel;
+  final String routeDestEventPointDescription;
+  final String routeDestSafeZoneLabel;
+  final String routeDestSafeZoneDescription;
+  final String routeDestCareCenterLabel;
+  final String routeDestCareCenterDescription;
+  final String routeDestExitPointLabel;
+  final String routeDestExitPointDescription;
+  final String routeDestUserPointLabel;
+  final String routeDestUserPointDescription;
+
+  // Cache cartes
+  final String mapCacheTitle;
+  final String mapCacheSubtitle;
+  final String mapCacheDescription;
+  final String mapCacheRetentionLabel;
+  final String mapCacheForceUpdate;
+  final String mapCacheCleaned;
+  final String mapCacheDays;
+
+  // Service arrière-plan
+  final String backgroundServiceTitle;
+  final String backgroundServiceSubtitle;
+  final String backgroundServiceDescription;
+  final String backgroundServiceEnable;
+
+  // Contacts Panic
+  final String panicContactsTitle;
+  final String panicContactsDescription;
+  final String panicContactsAdd;
+  final String panicContactsEmpty;
+  final String panicContactsConfigError;
+  final String panicContactsDeleteTitle;
+  final String panicContactsDeleteMessage;
+  final String panicContactsEditTitle;
+  final String panicContactsNewTitle;
+  final String panicContactsFieldName;
+  final String panicContactsFieldPhone;
+  final String panicContactsNameHint;
+  final String panicContactsPhoneHint;
+  final String panicContactsNameRequired;
+  final String panicContactsPhoneRequired;
+  final String panicContactsPhoneTooShort;
+
+  // Tutoriel
+  final String tutorialTitle;
+  final String tutorialButton;
+  final String tutorialDescription;
+
+  // À propos
+  final String aboutTitle;
+  final String aboutApp;
+  final String aboutVersion;
+  final String aboutPlatform;
+  final String aboutLicense;
+  final String aboutEncryption;
+  final String aboutOpenSource;
+  final String aboutDescription;
+
+  // Bug report
+  final String bugReportTitle;
+  final String bugReportButton;
+  final String bugReportSuggest;
+  final String bugReportDescription;
+  final String bugReportPrivacy;
+  final String bugReportSectionTitle;
+  final String bugReportSectionDescription;
+
+  // Événements
+  final String eventsJoin;
+  final String eventsNoEvent;
+  final String eventsQrScan;
+  final String qrScanTitle;
+  final String eventsMyEvents;
+  final String eventsEmptyTitle;
+  final String eventsEmptySubtitle;
+  final String eventsJoinTitle;
+  final String eventsJoinSubtitle;
+  final String eventsSecurityTitle;
+  final String eventsSecurityDescription;
+  final String eventsEnterCodeError;
+  final String eventsMaxReachedError;
+  final String eventsUnknownCodeError;
+  final String eventsFleurusCodes;
+  final String eventsQrMaxReached;
+  final String eventsQrAddError;
+  final String eventsQrAddSuccess;
+  final String eventsRemoved;
+  final String eventsLoadButton;
+  final String eventsRemoveTooltip;
+  final String eventsCodeLabel;
+  final String eventsStartLabel;
+  final String eventsRouteHidden;
+  final String eventsStepActive;
+  final String eventsStepTime;
+  final String eventsRouteVisible;
+
+  // Map
+  final String mapRecenterTooltip;
+  final String mapLoadingTiles;
+  final String mapGpsOff;
+  final String mapGpsDenied;
+  final String mapGpsDeniedForever;
+  final String mapGpsError;
+  final String mapUserPointDefined;
+  final String mapDestinationEvent;
+  final String mapDestinationSafeZone;
+  final String mapDestinationCareCenter;
+  final String mapDestinationExit;
+  final String mapDestinationUserPoint;
+  final String mapRouteSafeCalculating;
+  final String mapRouteSafeFailover;
+  final String mapNoDestinationError;
+  final String mapAddEventButton;
+  final String mapAddEventWarning;
+  final String mapCollectivePanicTitle;
+  final String mapCollectivePanicMessage;
+  final String mapViewOnMap;
+  final String mapIgnore;
+  final String mapNoPanicContactTitle;
+  final String mapNoPanicContactMessage;
+  final String mapOpenSettings;
+  final String mapPanicModeTitle;
+  final String mapPanicModeMessage;
+  final String mapPanicModeActivate;
+  final String mapPanicSmsPreparedTitle;
+  final String mapPanicSmsPreparedMessage;
+  final String mapPanicAlertReadyTitle;
+  final String mapPanicAlertReadyMessage;
+  final String mapPanicMessageBody;
+  final String mapPanicNoGps;
+  final String mapDestinationObjective;
+  final String mapDestinationLongPressHint;
+  final String mapActiveEvent;
+  final String mapPeersNearby;
+  final String mapIsolatedTitle;
+  final String mapIsolatedMessage;
+
+  // Safe Route Result Sheet
+  final String routeTitle;
+  final String routeCalculate;
+  final String routeDestination;
+  final String routeAvoidLiked;
+  final String routeAvoidPolice;
+  final String routeAvoidCamera;
+  final String routeAlternativesError;
+  final String routeNotFound;
+  final String routeRecommended;
+  final String routeShowAlternatives;
+  final String routeCalculatingAlternatives;
+  final String routeOpenInOsmAnd;
+  final String routeAccept;
+  final String routeItinerary;
+  final String routeRisk;
+  final String routeOsmAndSuccess;
+  final String routeOsmAndError;
+
+  // Recherche
+  final String searchTitle;
+  final String searchHint;
+  final String searchNoResult;
+
+  // Splash
+  final String splashInitializing;
+  final String splashCheckingVersion;
+  final String splashCheckingCache;
+  final String splashPurgingCache;
+  final String splashLoadingMap;
+  final String splashCachingTiles;
+  final String splashReady;
+  final String splashError;
+  final String splashSubtitle;
+  final String splashCheckingConnectivity;
+
+  // Panic
+  final String panicButton;
+  final String panicAlertSent;
+
+  // Blocage utilisateurs
+  final String blockedUsersTitle;
+  final String blockedUsersDescription;
+  final String blockedUsersEmpty;
+  final String blockedUsersUnblock;
+  final String blockedUsersCount;
+
+  // Réseau
+  final String onlineStatus;
+  final String offlineStatus;
+  final String meshStatus;
+  final String relayStatus;
+  final String connectedPeers;
+
+  // Géofencing
+  final String proximityValidationTitle;
+  final String proximityValidationCheck;
+  final String proximityValid;
+  final String proximityInvalid;
+  final String geofenceEntered;
+  final String geofenceExited;
+  final String dangerReported;
+  final String dangerConfirmed;
+
+  // Boutons communs
+  final String ok;
+  final String cancel;
+  final String save;
+  final String delete;
+  final String confirm;
+  final String close;
+  final String back;
+  final String next;
+  final String done;
+
+  // Erreurs / États
+  final String errorGeneric;
+  final String loading;
+  final String retry;
+  final String noInternet;
+
+  // Permissions
+  final String locationAccessTitle;
+  final String locationAccessMessage;
+  final String locationAccessButton;
+  final String notificationPermissionTitle;
+  final String notificationPermissionMessage;
+  final String notificationPermissionButton;
+
+  // Canaux Android Notifications
+  final String androidChannelAlertsTitle;
+  final String androidChannelAlertsSubtitle;
+  final String androidChannelEventsTitle;
+  final String androidChannelEventsSubtitle;
+  final String androidChannelPanicTitle;
+  final String androidChannelPanicSubtitle;
+  final String androidChannelMessagesTitle;
+  final String androidChannelMessagesSubtitle;
+  final String androidChannelSectionTitle;
+  final String androidChannelManageSystem;
+  final String transportModePedestrian;
+  final String transportModeCar;
+  final String transportModeTransit;
 }

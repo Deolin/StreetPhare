@@ -4,6 +4,24 @@
 // Durée de vie configurable, public filtré (non chiffré E2E).
 
 class TempThread {
+
+  /// Restaure un fil depuis sa représentation JSON.
+  factory TempThread.fromJson(String json) {
+    // Utilise un parseur manuel simple et robuste (pas de dépendance dart:convert
+    // pour éviter les erreurs de parsing sur des payloads corrompus).
+    final map = _parseSimpleJson(json);
+    return TempThread(
+      id: map['id'] as String,
+      createdAt: DateTime.parse(map['createdAt'] as String),
+      durationMinutes: int.parse(map['durationMinutes'].toString()),
+      participantIds: (map['participantIds'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toSet() ??
+          <String>{},
+      color: int.parse(map['color'].toString()),
+      label: map['label'] as String?,
+    );
+  }
   TempThread({
     required this.id,
     required this.createdAt,
@@ -73,24 +91,6 @@ class TempThread {
     }
     buffer.write('}');
     return buffer.toString();
-  }
-
-  /// Restaure un fil depuis sa représentation JSON.
-  factory TempThread.fromJson(String json) {
-    // Utilise un parseur manuel simple et robuste (pas de dépendance dart:convert
-    // pour éviter les erreurs de parsing sur des payloads corrompus).
-    final map = _parseSimpleJson(json);
-    return TempThread(
-      id: map['id'] as String,
-      createdAt: DateTime.parse(map['createdAt'] as String),
-      durationMinutes: int.parse(map['durationMinutes'].toString()),
-      participantIds: (map['participantIds'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toSet() ??
-          <String>{},
-      color: int.parse(map['color'].toString()),
-      label: map['label'] as String?,
-    );
   }
 
   /// Parseur JSON simpliste pour les structures plates.

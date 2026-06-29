@@ -23,26 +23,26 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Service de gestion de la clé maîtresse dans le keystore OS.
 class KeyStoreService {
-  KeyStoreService._({FlutterSecureStorage? storage})
-      : _storage = storage ??
-            FlutterSecureStorage(
-              aOptions: const AndroidOptions(
-                keyCipherAlgorithm:
-                    KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
-                storageCipherAlgorithm:
-                    StorageCipherAlgorithm.AES_GCM_NoPadding,
-              ),
-              iOptions: const IOSOptions(
-                accessibility: KeychainAccessibility.first_unlock_this_device,
-              ),
-            );
-  static final KeyStoreService instance = KeyStoreService._();
 
   /// Constructeur de test : injecte un storage mocké.
   @visibleForTesting
   factory KeyStoreService.test({required FlutterSecureStorage storage}) {
     return KeyStoreService._(storage: storage);
   }
+  KeyStoreService._({FlutterSecureStorage? storage})
+      : _storage = storage ??
+            const FlutterSecureStorage(
+              aOptions: AndroidOptions(
+                keyCipherAlgorithm:
+                    KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
+                storageCipherAlgorithm:
+                    StorageCipherAlgorithm.AES_GCM_NoPadding,
+              ),
+              iOptions: IOSOptions(
+                accessibility: KeychainAccessibility.first_unlock_this_device,
+              ),
+            );
+  static final KeyStoreService instance = KeyStoreService._();
 
   static const _keyName = 'streetphare_master_key';
   static const _keyLength = 32; // 256 bits pour AES-256

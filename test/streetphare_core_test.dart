@@ -13,8 +13,8 @@ void main() {
       // Stub ou instance de test pour simuler la grille de 20m du Safe Path Engine
       // final engine = SafePathEngine.instance;
 
-      final coutLineaire = 10;
-      final coutDiagonal =
+      const coutLineaire = 10;
+      const coutDiagonal =
           30; // Pénalité forte pour forcer le suivi de la voirie
 
       expect(coutDiagonal, greaterThan(coutLineaire * 1.414),

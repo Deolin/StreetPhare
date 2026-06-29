@@ -14,9 +14,6 @@ linter:
     # Interdire les print() hors debug (utiliser debugPrint ou ClientDebugLogger).
     avoid_print: true
 
-    # Détecter les secrets hardcodés (clés API, tokens).
-    avoid_hardcoded_secrets: true
-
     # Guillemets simples (cohérence style projet).
     prefer_single_quotes: true
 

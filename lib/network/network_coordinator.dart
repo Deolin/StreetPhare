@@ -33,19 +33,19 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../core/models/alert_model.dart';
+import '../core/network/peer_counter_service.dart';
 import '../database/alert_ttl_policy.dart';
 import '../database/crypto_utils.dart';
 import '../database/hive_alert_database.dart';
 import '../features/geofencing/presentation/geofencing_service.dart';
 import '../features/messaging/presentation/hive_messaging_service.dart';
-import '../core/network/peer_counter_service.dart';
+import '../services/connectivity_service.dart';
+import '../services/notification_service.dart';
 import 'collective_panic_service.dart';
 import 'failover_manager.dart';
 import 'network_manager.dart';
 import 'p2p_mesh_service.dart';
 import 'sync_service.dart';
-import '../services/connectivity_service.dart';
-import '../services/notification_service.dart';
 
 /// Coordinateur réseau singleton.
 ///

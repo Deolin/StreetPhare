@@ -84,7 +84,11 @@ class RelayMeshTransport implements MeshTransport {
       // sur le stream. Sans ce catchError, elles deviennent une
       // "Unhandled Exception" qui fait crasher la zone Dart.
       _channel!.ready.then<void>((_) {
-        _reconnectAttempts = 0; // Reset du backoff en cas de succès
+        // ✅ Reset du backoff UNIQUEMENT si le handshake réussit.
+        //    Avant ce fix, _reconnectAttempts était remis à 0 trop tôt
+        //    dans start(), ce qui annulait le backoff exponentiel et
+        //    provoquait une boucle de reconnexion à 2s fixes.
+        _reconnectAttempts = 0;
         if (kDebugMode) debugPrint('[Relay] ws connecté à $relayUrl');
       }).catchError((Object err, StackTrace st) {
         if (kDebugMode) debugPrint('[Relay] ws handshake error: $err');

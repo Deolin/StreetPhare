@@ -205,40 +205,6 @@ class AvoidPoint {
 
 /// Résultat renvoyé par [OsmAndNativeChannel].
 class NativeRouteResult {
-  const NativeRouteResult({
-    required this.routes,
-    required this.source,
-    this.errorMessage,
-  });
-
-  /// Liste d'itinéraires calculés.
-  final List<RouteResult> routes;
-
-  /// Source du calcul :
-  ///   'graphhopper_embedded' | 'engine_not_ready' | 'platform_unsupported' | 'error'
-  final String source;
-
-  /// Message d'erreur si échec (null si succès).
-  final String? errorMessage;
-
-  bool get hasError => errorMessage != null;
-  bool get isEmpty => routes.isEmpty;
-
-  static const platformUnsupported = NativeRouteResult(
-    routes: [],
-    source: 'platform_unsupported',
-  );
-
-  static const empty = NativeRouteResult(
-    routes: [],
-    source: 'empty',
-  );
-
-  static NativeRouteResult withError(String msg) => NativeRouteResult(
-        routes: [],
-        source: 'error',
-        errorMessage: msg,
-      );
 
   /// Parse la réponse brute du MethodChannel.
   ///
@@ -305,4 +271,38 @@ class NativeRouteResult {
       errorMessage: error,
     );
   }
+  const NativeRouteResult({
+    required this.routes,
+    required this.source,
+    this.errorMessage,
+  });
+
+  /// Liste d'itinéraires calculés.
+  final List<RouteResult> routes;
+
+  /// Source du calcul :
+  ///   'graphhopper_embedded' | 'engine_not_ready' | 'platform_unsupported' | 'error'
+  final String source;
+
+  /// Message d'erreur si échec (null si succès).
+  final String? errorMessage;
+
+  bool get hasError => errorMessage != null;
+  bool get isEmpty => routes.isEmpty;
+
+  static const platformUnsupported = NativeRouteResult(
+    routes: [],
+    source: 'platform_unsupported',
+  );
+
+  static const empty = NativeRouteResult(
+    routes: [],
+    source: 'empty',
+  );
+
+  static NativeRouteResult withError(String msg) => NativeRouteResult(
+        routes: [],
+        source: 'error',
+        errorMessage: msg,
+      );
 }

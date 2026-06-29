@@ -31,10 +31,10 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../network/network_config.dart';
 import '../core/models/routing_profile.dart';
+import '../infrastructure/osmand_routing_service.dart';
+import '../presentation/safe_path_engine.dart';
 import 'models/avoidance_filters.dart';
 import 'models/route_result.dart';
-import '../presentation/safe_path_engine.dart';
-import '../infrastructure/osmand_routing_service.dart';
 
 // ============================================================================
 // Mode de routage piéton

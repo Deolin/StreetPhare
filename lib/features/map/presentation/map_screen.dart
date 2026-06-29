@@ -31,30 +31,29 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
+import '../../../core/models/alert_model.dart';
 import '../../../core/network/peer_counter_service.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
-import '../../../core/models/alert_model.dart';
 import '../../../database/hive_alert_database.dart';
 import '../../../debug/client_debug_logger.dart';
-import '../../events/domain/models/event_model.dart';
-import '../../events/presentation/event_manager.dart';
-import '../../messaging/presentation/hive_messaging_screen.dart';
-import '../../reports/presentation/report_bottom_sheet.dart';
-import '../../settings/data/app_preferences_store.dart';
-import '../../settings/data/panic_contact_store.dart';
-import '../../settings/presentation/settings_screen.dart';
 import '../../../network/collective_panic_service.dart';
 import '../../../network/network_coordinator.dart';
 import '../../../network/server_heartbeat_service.dart';
 import '../../../services/connectivity_service.dart';
 import '../../../services/version_check_service.dart';
-
+import '../../events/domain/models/event_model.dart';
+import '../../events/presentation/event_manager.dart';
+import '../../messaging/presentation/hive_messaging_screen.dart';
+import '../../reports/presentation/report_bottom_sheet.dart';
+import '../../routing/core/models/routing_profile.dart';
+import '../../routing/core/routing_engine.dart';
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/presentation/route_result_sheet.dart';
 import '../../routing/presentation/safe_path_engine.dart';
-import '../../routing/core/routing_engine.dart';
-import '../../routing/core/models/routing_profile.dart';
+import '../../settings/data/app_preferences_store.dart';
+import '../../settings/data/panic_contact_store.dart';
+import '../../settings/presentation/settings_screen.dart';
 import 'widgets/safe_route_layer.dart';
 import 'widgets/user_heading_marker.dart';
 
@@ -90,9 +89,6 @@ class _MapScreenState extends State<MapScreen> {
 
   /// Zoom "recentrage précis" ≈ 100 m au sol (rue adjacente visible).
   static const double _kRecenterZoom = 16.0;
-
-  Timer? _demoPeerTimer;
-  final int _rng = DateTime.now().microsecondsSinceEpoch;
 
   Position? _userPosition;
   String? _positionError;
@@ -140,10 +136,6 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     PeerCounterService.instance.start();
-    _demoPeerTimer = Timer.periodic(
-      const Duration(seconds: 10),
-      (_) => _injectDemoPeer(),
-    );
     _initUserLocation();
     _collectivePanicSub =
         CollectivePanicService.instance.collectivePanicEvents.listen(
@@ -153,7 +145,6 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void dispose() {
-    _demoPeerTimer?.cancel();
     _positionSub?.cancel();
     _collectivePanicSub?.cancel();
     _mapController.dispose();
@@ -346,14 +337,6 @@ class _MapScreenState extends State<MapScreen> {
         child: const Icon(Icons.add_alert, color: Colors.white, size: 22),
       ),
     );
-  }
-
-  void _injectDemoPeer() {
-    final hit = (_rng + DateTime.now().second) % 2 == 0;
-    if (hit) {
-      PeerCounterService.instance
-          .recordPeer('demo_${DateTime.now().millisecondsSinceEpoch}');
-    }
   }
 
   // --------------------------------------------------------------------------

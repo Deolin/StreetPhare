@@ -17,9 +17,8 @@
 import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
-import 'package:flutter_test/flutter_test.dart';
-
 import 'package:flutter_streetphare/database/crypto_utils.dart' as streetphare;
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('CryptoUtils — AES-256-CBC + HMAC-SHA256 (sel aléatoire)', () {

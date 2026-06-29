@@ -34,6 +34,25 @@ extension HiveMessageTypeExt on HiveMessageType {
 
 /// Représente un message diffusé sur le réseau P2P Hive.
 class HiveMessage {
+
+  /// Désérialisation depuis JSON.
+  factory HiveMessage.fromJson(Map<String, dynamic> json) {
+    return HiveMessage(
+      id: json['id'] as String? ?? '',
+      senderEphemeralId: json['sender'] as String? ?? '??????',
+      content: json['content'] as String? ?? '',
+      type: HiveMessageType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => HiveMessageType.text,
+      ),
+      sentAt: DateTime.tryParse(json['sentAt'] as String? ?? '') ??
+          DateTime.now().toUtc(),
+      latitude: (json['lat'] as num?)?.toDouble(),
+      longitude: (json['lng'] as num?)?.toDouble(),
+      isFromAdmin: (json['isAdmin'] as bool?) ?? false,
+      threadId: json['threadId'] as String?,
+    );
+  }
   const HiveMessage({
     required this.id,
     required this.senderEphemeralId,
@@ -93,25 +112,6 @@ class HiveMessage {
         'isAdmin': isFromAdmin,
         'threadId': threadId,
       };
-
-  /// Désérialisation depuis JSON.
-  factory HiveMessage.fromJson(Map<String, dynamic> json) {
-    return HiveMessage(
-      id: json['id'] as String? ?? '',
-      senderEphemeralId: json['sender'] as String? ?? '??????',
-      content: json['content'] as String? ?? '',
-      type: HiveMessageType.values.firstWhere(
-        (e) => e.name == json['type'],
-        orElse: () => HiveMessageType.text,
-      ),
-      sentAt: DateTime.tryParse(json['sentAt'] as String? ?? '') ??
-          DateTime.now().toUtc(),
-      latitude: (json['lat'] as num?)?.toDouble(),
-      longitude: (json['lng'] as num?)?.toDouble(),
-      isFromAdmin: (json['isAdmin'] as bool?) ?? false,
-      threadId: json['threadId'] as String?,
-    );
-  }
 
   HiveMessage copyWith({
     String? id,

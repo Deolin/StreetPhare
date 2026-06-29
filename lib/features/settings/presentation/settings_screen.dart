@@ -25,17 +25,16 @@ import '../../../core/i18n/strings.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../services/apk_downloader_service.dart';
-import '../../../services/app_share_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/permission_service.dart';
+import '../../../services/version_check_service.dart';
 import '../../bug_report/presentation/bug_report_fab.dart';
 import '../../bug_report/presentation/bug_report_service.dart' show BugCategory;
-import '../../../services/version_check_service.dart';
 import '../../events/presentation/events_screen.dart';
+import '../../messaging/data/hive_block_service.dart';
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/domain/models/avoidance_filters.dart';
 import '../../tutorial/presentation/tutorial_screen.dart';
-import '../../messaging/data/hive_block_service.dart';
 import '../data/app_preferences_store.dart';
 import '../data/panic_contact.dart';
 import '../data/panic_contact_store.dart';
@@ -901,11 +900,11 @@ class _BackgroundServiceSectionState extends State<_BackgroundServiceSection> {
         setState(() => _serviceActive = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Service arrêté'),
+            const SnackBar(
+              content: Text('Service arrêté'),
               backgroundColor: StreetPhareTheme.primary,
               behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 2),
+              duration: Duration(seconds: 2),
             ),
           );
         }
@@ -917,12 +916,12 @@ class _BackgroundServiceSectionState extends State<_BackgroundServiceSection> {
         setState(() => _serviceActive = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(
+            const SnackBar(
+              content: Text(
                   'Impossible d\'arrêter le service. Vérifiez les paramètres Android.'),
               backgroundColor: StreetPhareTheme.danger,
               behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 4),
+              duration: Duration(seconds: 4),
             ),
           );
         }
@@ -964,11 +963,11 @@ class _BackgroundServiceSectionState extends State<_BackgroundServiceSection> {
       if (!mounted) return;
       setState(() => _serviceActive = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Service activé'),
-          backgroundColor: const Color(0xFF388E3C),
+        const SnackBar(
+          content: Text('Service activé'),
+          backgroundColor: Color(0xFF388E3C),
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
+          duration: Duration(seconds: 2),
         ),
       );
     } catch (e) {
@@ -977,13 +976,13 @@ class _BackgroundServiceSectionState extends State<_BackgroundServiceSection> {
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
+          const SnackBar(
+            content: Text(
                 'Échec de l\'activation du service.\n'
                 'Vérifiez les permissions Android et réessayez.'),
             backgroundColor: StreetPhareTheme.danger,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5),
+            duration: Duration(seconds: 5),
           ),
         );
       }
@@ -1495,6 +1494,8 @@ class _AboutSection extends StatelessWidget {
 }
 
 class _AboutRow extends StatelessWidget {
+
+  const _AboutRow({required this.label, required this.value});
   // Label de version dynamique (ex: v2.2.0+42).
   static String get _versionLabel {
     final vc = VersionCheckService.instance;
@@ -1503,8 +1504,6 @@ class _AboutRow extends StatelessWidget {
     }
     return 'v2.2.0';
   }
-
-  const _AboutRow({required this.label, required this.value});
   final String label;
   final String value;
 

@@ -22,6 +22,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../network/network_coordinator.dart';
 import '../../../services/connectivity_service.dart';
+import '../../../services/notification_service.dart';
 import '../../settings/data/app_preferences_store.dart';
 import '../data/hive_block_service.dart';
 import '../domain/models/hive_message.dart';
@@ -364,6 +365,18 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
       _allMessages[msg.id] = msg;
       _trimToLimit();
       _emitFiltered(userPosition: localPosition);
+
+      // ── Notification native non filtrée ──────────────────────────
+      // Affiche une notification système immédiatement à la réception
+      // du message, AVANT tout filtre applicatif (blocage, proximité,
+      // type de message). Le message est affiché tel quel, sans filtre,
+      // pour que l'utilisateur voie TOUS les messages entrants dans la
+      // zone de notification Android (style conversationnel).
+      //
+      // Cette notification est décorrélée de la liste filtrée affichée
+      // dans l'UI : même si l'utilisateur filtre "adminOnly", la
+      // notification native affichera quand même le message brut.
+      NotificationService.instance.showMessageNotification(msg);
     } catch (e) {
       debugPrint('[HiveMessaging] erreur réception: $e');
     }

@@ -15,8 +15,8 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/models/alert_model.dart';
+import '../../../core/theme/streetphare_theme.dart';
 import '../../../network/network_coordinator.dart';
 import '../../settings/data/app_preferences_store.dart';
 import '../domain/models/report_type.dart';

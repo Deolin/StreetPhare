@@ -13,6 +13,12 @@
 // reste simple.
 
 import 'dart:convert';
+// Note : L'accès à Platform est sûr car il n'est appelé que quand
+// !kIsWeb, dans describePlatform() et buildNetworkBootstrap().
+// Sur Web, dart:io est indisponible. On utilise des imports
+// conditionnels si nécessaire, mais ici on s'assure simplement
+// de ne pas appeler dart:io sur Web.
+import 'dart:io' as io;
 import 'dart:math' as math;
 
 import 'package:cryptography/cryptography.dart';
@@ -27,13 +33,6 @@ import 'transports/ble_transport.dart';
 import 'transports/loopback_transport.dart';
 import 'transports/relay_transport.dart';
 import 'transports/wifi_direct_transport_selector.dart';
-
-// Note : L'accès à Platform est sûr car il n'est appelé que quand
-// !kIsWeb, dans describePlatform() et buildNetworkBootstrap().
-// Sur Web, dart:io est indisponible. On utilise des imports
-// conditionnels si nécessaire, mais ici on s'assure simplement
-// de ne pas appeler dart:io sur Web.
-import 'dart:io' as io;
 
 /// Contient la configuration et les services construits.
 class NetworkBootstrap {
@@ -119,11 +118,11 @@ Future<NetworkBootstrap> buildNetworkBootstrap({
     RelayMeshTransport(relayUrl: relayUrl, peerId: sharedPeerId),
   );
 
-  // Sur le Web, on ajoute un transport loopback pour la sandbox
-  // (permet l'injection de paquets simulés sans hardware physique).
-  if (kIsWeb) {
-    // Import dynamique pour éviter la compilation conditionnelle
-    // Le fichier loopback_transport.dart n'importe aucune dépendance native.
+  // Sur le Web EN MODE DEBUG UNIQUEMENT, on ajoute un transport loopback
+  // pour la sandbox (permet l'injection de paquets simulés sans hardware).
+  // En production, ce transport n'est JAMAIS instancié : il ne compile pas
+  // dans les APK Android/iOS et n'est pas activé sur le Web release.
+  if (kIsWeb && kDebugMode) {
     transports.add(LoopbackMeshTransport(peerId: sharedPeerId));
   }
 

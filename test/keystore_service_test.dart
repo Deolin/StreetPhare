@@ -9,10 +9,9 @@
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_streetphare/core/security/keystore_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-
-import 'package:flutter_streetphare/core/security/keystore_service.dart';
 
 /// Mock de FlutterSecureStorage pour les tests.
 class MockFlutterSecureStorage extends Mock implements FlutterSecureStorage {}

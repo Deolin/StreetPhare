@@ -207,8 +207,17 @@ class WifiDirectMeshTransport
   }
 
   /// Recrée la socket UDP (appelé au retour au premier plan).
+  ///
+  /// Protégé contre les appels multiples simultanés : un flag
+  /// `_resumePending` empêche de lancer plusieurs `start()` en
+  /// parallèle quand `AppLifecycleState.resumed` est émis en
+  /// rafale (ce qui cause des ANR Signal 3).
+  bool _resumePending = false;
+
   Future<void> _resumeSocket() async {
     if (_socket != null) return;
+    if (_resumePending) return; // Déjà en cours de reprise
+    _resumePending = true;
     if (kDebugMode) {
       debugPrint('[WiFi] Reprise socket UDP (premier plan)');
     }
@@ -218,6 +227,8 @@ class WifiDirectMeshTransport
       if (kDebugMode) {
         debugPrint('[WiFi] Échec reprise socket : $e');
       }
+    } finally {
+      _resumePending = false;
     }
   }
 

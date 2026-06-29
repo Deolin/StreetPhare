@@ -42,6 +42,61 @@ const config = {
   // ── Synchronisation ─────────────────────────────────────────────────
   syncIntervalSeconds: parseInt(process.env.SYNC_INTERVAL_SECONDS || '30', 10),
 
+  // ── Authentification Admin (JWT + RBAC) ────────────────────────────
+  // Secret JWT en HS256. En production, le serveur REFUSE de démarrer
+  // avec la valeur par défaut.
+  jwtSecret: (() => {
+    const key = process.env.JWT_SECRET;
+    if (!key || key === 'streetphare-jwt-secret-change-in-production') {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('╔══════════════════════════════════════════════════════╗');
+        console.error('║  ERREUR FATALE : JWT_SECRET non configurée          ║');
+        console.error('║  En production, définissez la variable              ║');
+        console.error('║  d\'environnement JWT_SECRET avec une clé forte.     ║');
+        console.error('║  Exemple :                                          ║');
+        console.error('║  export JWT_SECRET="$(openssl rand -hex 32)"        ║');
+        console.error('╚══════════════════════════════════════════════════════╝');
+        process.exit(1);
+      }
+      console.warn('[CONFIG] ⚠ JWT_SECRET par défaut — développement uniquement.');
+      return 'streetphare-jwt-secret-change-in-production';
+    }
+    return key;
+  })(),
+
+  // Durée de validité des tokens JWT.
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '8h',
+
+  // Hash bcrypt du mot de passe administrateur.
+  // En production, le serveur REFUSE de démarrer avec le placeholder.
+  adminHash: (() => {
+    const hash = process.env.ADMIN_HASH;
+    const placeholder = '$2b$12$dev-placeholder-change-in-production-hash';
+    if (!hash || hash === placeholder) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('╔══════════════════════════════════════════════════════╗');
+        console.error('║  ERREUR FATALE : ADMIN_HASH non configurée          ║');
+        console.error('║  En production, générez un hash bcrypt :            ║');
+        console.error('║  node -e "require(\'bcryptjs\').hash(\'motdepasse\',   ║');
+        console.error('║    12).then(h => console.log(h))"                   ║');
+        console.error('╚══════════════════════════════════════════════════════╝');
+        process.exit(1);
+      }
+      console.warn('[CONFIG] ⚠ ADMIN_HASH placeholder — développement uniquement.');
+      return placeholder;
+    }
+    return hash;
+  })(),
+
+  // Identifiant admin (utilisé uniquement pour l'affichage du dashboard).
+  adminUsername: process.env.ADMIN_USERNAME || 'admin',
+
+  // ── Rate Limiting ──────────────────────────────────────────────────
+  // Fenêtre de rate limiting (ms) pour toutes les routes publiques.
+  rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
+  // Nombre maximum de requêtes par IP dans la fenêtre.
+  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '500', 10),
+
   // ── Logs ────────────────────────────────────────────────────────────
   logDir: process.env.LOG_DIR || './logs',
 

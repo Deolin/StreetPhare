@@ -2,12 +2,51 @@
 // Routes API REST pour l'application Flutter StreetPhare.
 
 const express = require('express');
+const rateLimit = require('express-rate-limit');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
 const store = require('../store');
 const sync = require('../sync');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
+
+// ═══════════════════════════════════════════════════════════════════════
+// RATE LIMITERS DÉDIÉS (anti-spam / anti-DoS)
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Limiteur strict pour les signalements citoyens (alertes + panic).
+/// Un citoyen réel ne déclare pas plus de 3 alertes majeures en 5 minutes.
+const reportLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  limit: 3,
+  standardHeaders: true,  // headers RateLimit-*
+  legacyHeaders: false,   // désactive X-RateLimit-* (obsolètes)
+  message: {
+    error: 'Trop de signalements émis. Veuillez patienter avant de déclarer un nouvel événement.',
+  },
+  keyGenerator: (req) => {
+    // Utilise l'IP réelle du citoyen transmise par Caddy via X-Forwarded-For.
+    // `app.set('trust proxy', true)` dans primary.js/backup.js permet
+    // à req.ip de retourner l'IP distante et non 127.0.0.1.
+    return req.ip;
+  },
+});
+
+/// Limiteur pour la messagerie / chat P2P (sync-push).
+/// 15 messages par minute et par IP : fluide pour un humain, bloque un script.
+const messageLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  limit: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Vitesse d\'envoi trop élevée. Ralentissez vos messages.',
+  },
+  keyGenerator: (req) => req.ip,
+});
 
 // ═══════════════════════════════════════════════════════════════════════
 // ALERTS (Signalements citoyens)
@@ -16,7 +55,8 @@ const router = express.Router();
 /// POST /api/alerts — Réception d'un signalement.
 /// Body: { type, lat, lng, description?, userId }
 /// Retourne l'alerte créée ou mise à jour, avec son statut de consensus.
-router.post('/alerts', (req, res) => {
+/// Protégé par reportLimiter (3 signalements max / 5 min / IP).
+router.post('/alerts', reportLimiter, (req, res) => {
   try {
     if (!req.body || Object.keys(req.body).length === 0) {
       console.error('[API] POST /api/alerts — body vide ou mal formé');
@@ -119,8 +159,8 @@ router.post('/alerts/:id/vote', (req, res) => {
   });
 });
 
-/// POST /api/alerts/:id/reject — Révoque un signalement (modération).
-router.post('/alerts/:id/reject', (req, res) => {
+/// POST /api/alerts/:id/reject — ADMIN : révoque un signalement (modération).
+router.post('/alerts/:id/reject', authenticateToken, requireRole(['admin']), (req, res) => {
   const alert = store.alerts.find(a => a.id === req.params.id);
   if (!alert) return res.status(404).json({ error: 'Alerte non trouvée' });
   alert.status = 'rejected';
@@ -153,7 +193,8 @@ router.post('/sync/event', (req, res) => {
 /// Body: { alerts: [{ id, type, lat, lng, description?, votes?: [], ... }], peerId, since }
 /// Le serveur fusionne (upsert), puis répond avec les deltas plus récents
 /// que le client n'a pas encore (push-pull bidirectionnel).
-router.post('/sync-push', (req, res) => {
+/// Protégé par messageLimiter (15 requêtes max / 1 min / IP).
+router.post('/sync-push', messageLimiter, (req, res) => {
   try {
     const { alerts, peerId, since } = req.body || {};
     if (!Array.isArray(alerts) || alerts.length === 0) {
@@ -310,7 +351,7 @@ router.post('/events/join', (req, res) => {
 });
 
 /// POST /api/events/create — ADMIN : crée un événement.
-router.post('/events/create', (req, res) => {
+router.post('/events/create', authenticateToken, requireRole(['admin']), (req, res) => {
   const { code, title, startAt, endAt, visibleAt, routeGeoJson, waypoints, pois, careCenters, exitPoints, safeZones, destinationLatitude, destinationLongitude } = req.body || {};
 
   if (!code || !title || !startAt) {
@@ -343,7 +384,8 @@ router.post('/events/create', (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════
 
 /// POST /api/panic/collective — Ping PANIC d'un utilisateur.
-router.post('/panic/collective', (req, res) => {
+/// Protégé par reportLimiter (3 signalements max / 5 min / IP).
+router.post('/panic/collective', reportLimiter, (req, res) => {
   const { lat, lng, userId } = req.body || {};
   if (lat == null || lng == null) {
     return res.status(400).json({ error: 'lat, lng requis' });
@@ -396,6 +438,96 @@ router.get('/ping', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+// AUTHENTIFICATION ADMIN (Login JWT)
+// ═══════════════════════════════════════════════════════════════════════
+
+/// POST /api/auth/login — Authentification administrateur.
+/// Body: { username: "admin", password: "..." }
+/// Retourne un token JWT signé HS256, valide 8h (configurable).
+/// Le mot de passe est vérifié contre le hash bcrypt stocké dans
+/// la variable d'environnement ADMIN_HASH (12 rounds de salage).
+///
+/// En développement, accepte le placeholder comme hash valide
+/// (mot de passe : "admin123" hashé en bcrypt).
+router.post('/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'username et password requis' });
+    }
+
+    // Vérification du nom d'utilisateur (constant, configurable).
+    if (username !== config.adminUsername) {
+      console.log(`[AUTH] Tentative de connexion — utilisateur inconnu : "${username}"`);
+      // Délai artificiel pour contrer le timing attack sur le username.
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return res.status(401).json({ error: 'Identifiants invalides' });
+    }
+
+    // Vérification du mot de passe via bcrypt (12 rounds).
+    const passwordValid = await bcrypt.compare(password, config.adminHash);
+
+    if (!passwordValid) {
+      console.log(`[AUTH] Tentative de connexion — mot de passe incorrect pour "${username}"`);
+      return res.status(401).json({ error: 'Identifiants invalides' });
+    }
+
+    // Génération du token JWT.
+    const tokenPayload = {
+      role: 'admin',
+      username: config.adminUsername,
+    };
+
+    const token = jwt.sign(tokenPayload, config.jwtSecret, {
+      algorithm: 'HS256',
+      expiresIn: config.jwtExpiresIn,
+    });
+
+    console.log(`[AUTH] Connexion réussie — "${username}" — token valide ${config.jwtExpiresIn}`);
+
+    res.json({
+      success: true,
+      token,
+      expiresIn: config.jwtExpiresIn,
+      role: 'admin',
+    });
+  } catch (err) {
+    console.error('[AUTH] Erreur login:', err.message);
+    res.status(500).json({ error: 'Erreur interne lors de l\'authentification' });
+  }
+});
+
+/// POST /api/auth/verify — Vérifie la validité d'un token JWT.
+/// Body: { token: "eyJ..." }
+/// Utile pour les clients qui veulent vérifier leur token sans
+/// accéder à une route protégée.
+router.post('/auth/verify', (req, res) => {
+  try {
+    const { token } = req.body || {};
+    if (!token) {
+      return res.status(400).json({ error: 'token requis' });
+    }
+
+    const decoded = jwt.verify(token, config.jwtSecret, {
+      algorithms: ['HS256'],
+    });
+
+    res.json({
+      valid: true,
+      role: decoded.role,
+      username: decoded.username,
+      expiresAt: new Date(decoded.exp * 1000).toISOString(),
+    });
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.json({ valid: false, error: 'Token expiré' });
+    }
+    res.json({ valid: false, error: 'Token invalide' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 // BUG REPORT (Signalement de bug depuis l'application Flutter)
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -430,7 +562,7 @@ router.post('/bug-report', (req, res) => {
 
 /// GET /api/bug-reports — ADMIN : liste des rapports de bug.
 /// Query: ?limit=50&offset=0
-router.get('/bug-reports', (req, res) => {
+router.get('/bug-reports', authenticateToken, requireRole(['admin']), (req, res) => {
   const limit = parseInt(req.query.limit, 10) || 50;
   const offset = parseInt(req.query.offset, 10) || 0;
   const result = store.getBugReports({ limit, offset });
@@ -438,10 +570,33 @@ router.get('/bug-reports', (req, res) => {
 });
 
 /// GET /api/bug-reports/:id — ADMIN : détail d'un rapport de bug.
-router.get('/bug-reports/:id', (req, res) => {
+router.get('/bug-reports/:id', authenticateToken, requireRole(['admin']), (req, res) => {
   const report = store.getBugReportById(req.params.id);
   if (!report) return res.status(404).json({ error: 'Rapport non trouvé' });
   res.json(report);
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// MESH SYNC (Store-and-Forward — HTTP de secours pour clients 5G)
+// ═══════════════════════════════════════════════════════════════════════
+
+/// GET /api/mesh/sync — Récupère les messages mesh manqués.
+/// Query: ?since=ISO8601 (timestamp de la dernière synchro du client).
+/// Retourne un tableau JSON des messages postérieurs à ce timestamp.
+/// Max 1000 messages par requête. Pas de limite hors since (retourne
+/// les 1000 derniers).
+///
+/// Cette route est le fallback HTTP pour les clients qui subissent
+/// des micro-coupures en 5G et ne peuvent pas maintenir le WebSocket.
+router.get('/mesh/sync', (req, res) => {
+  const { since } = req.query;
+  const messages = store.getMeshMessagesSince(since || null);
+  res.json({
+    success: true,
+    count: messages.length,
+    messages,
+    serverTs: new Date().toISOString(),
+  });
 });
 
 module.exports = router;

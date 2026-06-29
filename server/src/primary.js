@@ -1,29 +1,34 @@
 // server/src/primary.js
-// Serveur Principal StreetPhare — Node.js v3.1 (HTTPS/WSS)
+// Serveur Principal StreetPhare — Node.js v3.1 (HTTP — TLS terminé par Caddy)
 //
 // Rôle : PRIMARY
-//   - Écoute sur le port configuré (défaut 3000) en HTTPS (TLS).
-//   - En développement, fallback HTTP si les certificats sont absents.
+//   - Écoute sur 127.0.0.1:3000 en HTTP (le TLS est terminé par Caddy).
 //   - Reçoit les signalements, les valide (consensus), les stocke.
 //   - Réplique automatiquement les données vers le Backup.
 //   - Sert l'interface d'administration web (/admin).
-//   - Expose les API REST et le WebSocket mesh en WSS.
+//   - Expose les API REST et le WebSocket mesh.
+//
+// Architecture réseau :
+//   Client ←→ Caddy (TLS :443) ←→ Primary (HTTP :3000, 127.0.0.1)
+//                    ↕
+//              Backup (HTTP :3001, 127.0.0.1)
 
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { WebSocketServer } = require('ws');
-const https = require('https');
 const http = require('http');
-const fs = require('fs');
+const { spawn } = require('child_process');
 const cron = require('node-cron');
 
 const config = require('./config');
 const store = require('./store');
 const sync = require('./sync');
 const apiRoutes = require('./routes/api');
+const { verifyWsToken } = require('./middleware/auth');
 
 const app = express();
 
@@ -47,31 +52,20 @@ const log = (category, message) => {
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
-  hsts: {
-    maxAge: 31536000, // 1 an
-    includeSubDomains: true,
-    preload: true,
-  },
+  // HSTS désactivé : Caddy gère le TLS et les en-têtes HSTS.
+  // Le serveur Node.js ne doit PAS rediriger HTTP→HTTPS lui-même.
 }));
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ── Middleware de redirection HTTP → HTTPS ────────────────────────────────
-// Intercepte les requêtes HTTP entrantes (si le serveur écoute en HTTP)
-// et redirige vers HTTPS. Désactivé pour les requêtes loopback (debug).
-app.use((req, res, next) => {
-  const proto = req.headers['x-forwarded-proto'] || req.protocol;
-  const isLocal = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1';
-
-  // Ne redirige pas les requêtes loopback (développement local).
-  if (proto === 'http' && !isLocal && req.hostname !== 'localhost') {
-    const httpsUrl = `https://${req.hostname}${req.originalUrl}`;
-    log('SEC', `Redirection HTTP→HTTPS : ${req.originalUrl} → ${httpsUrl}`);
-    return res.redirect(301, httpsUrl);
-  }
-  next();
-});
+// ── Trust Proxy — Récupère la vraie IP du client via X-Forwarded-For ──
+// Caddy transmet l'IP réelle du citoyen dans le header X-Forwarded-For.
+// `trust proxy` est limité à 1 saut (Caddy uniquement) pour éviter
+// l'erreur ERR_ERL_PERMISSIVE_TRUST_PROXY de express-rate-limit v7.
+// Les limiters utilisent `keyGenerator: (req) => req.ip` qui exploite
+// cette confiance pour retourner l'IP distante réelle.
+app.set('trust proxy', 1);
 
 // ── Logger HTTP personnalisé [YYYY-MM-DD HH:mm:ss] [HTTP] REQ: METHOD /ROUTE - IP: CLIENT
 app.use((req, res, next) => {
@@ -94,8 +88,42 @@ morgan.token('date-streetphare', () => {
 });
 app.use(morgan(':date-streetphare - [HTTP] :method :url :status - :response-time ms'));
 
+// ── Rate Limiting — Protection anti-brute force sur toutes les routes ──
+// Configurable via RATE_LIMIT_WINDOW_MS et RATE_LIMIT_MAX.
+const limiter = rateLimit({
+  windowMs: config.rateLimitWindowMs,
+  max: config.rateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Trop de requêtes. Veuillez réessayer plus tard.',
+  },
+  handler: (req, res, /* next */ _next, options) => {
+    log('RATELIMIT', `⛔ Limite atteinte — IP: ${req.ip} — ${req.method} ${req.originalUrl}`);
+    res.status(429).json({
+      error: options.message.error,
+      retryAfterMs: options.windowMs,
+    });
+  },
+  // Routes exclues du rate limiting : WebSocket (géré par leur propre
+  // mécanisme de rate limiting) et sync interne Primary↔Backup.
+  skip: (req) => {
+    // Ne pas limiter les requêtes de synchronisation entre serveurs.
+    if (req.path.startsWith('/api/sync/')) return true;
+    // Ne pas limiter le ping (healthcheck).
+    if (req.path === '/api/ping') return true;
+    return false;
+  },
+});
+app.use(limiter);
+
 // ── Route GET /admin — DÉCLARÉE AVANT express.static pour éviter le conflit ──
 app.get('/admin', (req, res) => {
+  // Désactive le cache navigateur pour que les mises à jour du dashboard
+  // soient visibles immédiatement après un `npm run dev:primary`.
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html'));
 });
 
@@ -113,13 +141,13 @@ app.get('/', (req, res) => {
     name: 'StreetPhare Server',
     version: '3.1.0',
     role: 'PRIMARY',
-    tls: tlsOptions ? 'enabled' : 'disabled (dev mode)',
+    tls: 'terminated-by-caddy',
     endpoints: {
       api: '/api',
       admin: '/admin',
       status: '/api/status',
       ping: '/api/ping',
-      mesh: tlsOptions ? 'wss://<host>:3000/mesh' : 'ws://<host>:3000/mesh',
+      mesh: 'wss://streetphare.ddns.net/mesh',
     },
     sync: {
       partner: config.partnerUrl,
@@ -129,47 +157,8 @@ app.get('/', (req, res) => {
   });
 });
 
-// ── TLS / HTTPS — Certificats Let's Encrypt ou auto-signés ────────────────
-// En production, ces fichiers doivent pointer vers les certificats
-// délivrés par Let's Encrypt (via certbot ou acme.sh).
-// En développement local, générer un certificat auto-signé :
-//   openssl req -x509 -newkey rsa:4096 -keyout privkey.pem -out fullchain.pem -days 365 -nodes -subj "/CN=localhost"
-const TLS_KEY_PATH = config.tlsKeyPath || path.join(__dirname, '..', 'assets', 'privkey.pem');
-const TLS_CERT_PATH = config.tlsCertPath || path.join(__dirname, '..', 'assets', 'fullchain.pem');
-
-const isProduction = process.env.NODE_ENV === 'production';
-
-let tlsOptions = null;
-try {
-  tlsOptions = {
-    key: fs.readFileSync(TLS_KEY_PATH),
-    cert: fs.readFileSync(TLS_CERT_PATH),
-  };
-  log('TLS', `✅ Certificats chargés : ${TLS_CERT_PATH}`);
-} catch (err) {
-  if (isProduction) {
-    console.error('╔══════════════════════════════════════════════════════╗');
-    console.error('║  ERREUR FATALE : Certificats TLS introuvables       ║');
-    console.error('║  En production, le HTTPS est OBLIGATOIRE.           ║');
-    console.error(`║  Fichiers attendus :                                ║`);
-    console.error(`║    Clé  : ${TLS_KEY_PATH.padEnd(45)}║`);
-    console.error(`║    Cert : ${TLS_CERT_PATH.padEnd(45)}║`);
-    console.error('║  Pour générer des certificats auto-signés :         ║');
-    console.error('║    openssl req -x509 -newkey rsa:4096 \\             ║');
-    console.error('║      -keyout privkey.pem -out fullchain.pem \\       ║');
-    console.error('║      -days 365 -nodes -subj "/CN=localhost"         ║');
-    console.error('║  Pour Let\'s Encrypt : utiliser certbot ou acme.sh   ║');
-    console.error('╚══════════════════════════════════════════════════════╝');
-    process.exit(1);
-  }
-  log('TLS', `⚠ Certificats TLS introuvables — démarrage en HTTP (dev uniquement).`);
-  log('TLS', `  (${err.message})`);
-}
-
-// ── Création du serveur (HTTPS prioritaire, fallback HTTP en dev) ────
-const server = tlsOptions
-  ? https.createServer(tlsOptions, app)
-  : http.createServer(app);
+// ── Création du serveur HTTP (TLS terminé par Caddy) ─────────────────
+const server = http.createServer(app);
 
 // ── WebSocket Mesh ──────────────────────────────────────────────────────
 const wss = new WebSocketServer({ server, path: '/mesh' });
@@ -206,17 +195,25 @@ wss.on('connection', (ws) => {
     store.meshClients.add(ws);
     log('MESH', `Client connecté (total: ${store.meshClients.size})`);
 
-    // ── Envoi immédiat d'un message d'accueil (handshake) ──────────
+    // ── Handshake + synchronisation des messages manqués ──────────
+    // Envoie le welcome ET les messages du backlog des dernières 24h.
     try {
+      const syncSince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const missedMessages = store.getMeshMessagesSince(syncSince);
       ws.send(JSON.stringify({
         kind: 'welcome',
         server: 'StreetPhare-Primary',
         version: '3.1.0',
-        tls: !!tlsOptions,
+        tls: true,
         ts: new Date().toISOString(),
+        missedCount: missedMessages.length,
+        missed: missedMessages,
       }));
+      if (missedMessages.length > 0) {
+        log('MESH', `Handshake : ${missedMessages.length} messages backlog envoyés au client`);
+      }
     } catch (e) {
-      log('MESH', `Erreur envoi welcome: ${e.message}`);
+      log('MESH', `Erreur handshake/sync: ${e.message}`);
     }
 
     // Rate limiting : max 10 messages par seconde par client.
@@ -253,6 +250,23 @@ wss.on('connection', (ws) => {
 
         const msg = data.toString();
         log('MESH', `Message reçu: ${msg.substring(0, 200)}`);
+
+        // ── Store-and-Forward : persister le message dans le backlog ──
+        // Même si aucun client n'est connecté, le message est stocké
+        // pour être relayé aux clients qui se connecteront plus tard
+        // (ex: utilisateurs 5G sans P2P local).
+        try {
+          const parsed = JSON.parse(msg);
+          store.addMeshMessage({
+            kind: parsed.kind || 'mesh',
+            data: parsed,
+            sender_id: parsed.sender_id || parsed.peerId || 'unknown',
+          });
+        } catch (_) {
+          // Message non-JSON (binaire, ping, etc.) → pas de stockage.
+        }
+
+        // ── Relai aux autres clients connectés ──
         store.meshClients.forEach(client => {
           if (client !== ws && client.readyState === 1) {
             try {
@@ -281,28 +295,59 @@ wss.on('connection', (ws) => {
   }
 });
 
-// ── WebSocket Admin ─────────────────────────────────────────────────────
-const adminWss = new WebSocketServer({ server, path: '/admin-ws' });
-adminWss.on('connection', (ws) => {
+// ── WebSocket Admin (protégé par JWT) ─────────────────────────────────
+// Le client doit fournir un token JWT valide dans le query param :
+//   wss://host:3000/admin-ws?token=eyJ...
+// La vérification est effectuée par verifyClient avant l'upgrade.
+const adminWss = new WebSocketServer({
+  server,
+  path: '/admin-ws',
+  verifyClient: (info, cb) => {
+    const reqUrl = info.req.url || '';
+    log('ADMIN', `WebSocket handshake reçu → ${reqUrl.substring(0, 120)}`);
+
+    try {
+      const decoded = verifyWsToken(reqUrl);
+      info.req.adminUser = decoded;
+      cb(true);
+    } catch (err) {
+      log('ADMIN', `Tentative de connexion WebSocket admin rejetée : ${err.message}`);
+      cb(false, 401, 'Unauthorized');
+    }
+  },
+});
+
+adminWss.on('connection', (ws, req) => {
+  const adminUser = req.adminUser || { role: 'unknown' };
+
   store.adminClients.add(ws);
-  log('ADMIN', `Admin connecté (total: ${store.adminClients.size})`);
+  log('ADMIN', `Admin authentifié (rôle=${adminUser.role}, total: ${store.adminClients.size})`);
+
+  // ── Envoi immédiat du snapshot après authentification ──────────
+  try {
+    ws.send(JSON.stringify({
+      type: 'admin_snapshot',
+      alerts: store.getActiveAlerts(),
+      events: store.getAllEvents(),
+      syncState: store.syncState,
+    }));
+  } catch (e) {
+    log('ADMIN', `Erreur envoi snapshot: ${e.message}`);
+  }
+
   ws.on('message', (data) => {
     const msg = data.toString();
-    log('ADMIN', `Message admin: ${msg.substring(0, 200)}`);
+    log('ADMIN', `Message admin (${adminUser.role}): ${msg.substring(0, 200)}`);
   });
+
   ws.on('close', () => {
     store.adminClients.delete(ws);
     log('ADMIN', `Admin déconnecté (total: ${store.adminClients.size})`);
   });
+
   ws.on('error', (err) => {
     log('ADMIN', `Erreur socket: ${err.message}`);
   });
-  ws.send(JSON.stringify({
-    type: 'admin_snapshot',
-    alerts: store.getActiveAlerts(),
-    events: store.getAllEvents(),
-    syncState: store.syncState,
-  }));
 });
 
 // ── Synchronisation périodique ──────────────────────────────────────────
@@ -318,18 +363,35 @@ cron.schedule(cronExpr, () => {
 // ── Outbox de réplication (retry automatique) ───────────────────────────
 sync.startOutbox();
 
+// ── Purge périodique du backlog mesh (48h) ──────────────────────────
+cron.schedule('0 * * * *', () => {
+  try { store.purgeExpiredMeshMessages(); } catch (_) {}
+});
+
+// ── Démon Caddy (Reverse-Proxy TLS) ──────────────────────────────────
+// Lance Caddy en processus détaché. Si Caddy crashe ou est tué,
+// il n'impacte PAS le serveur Node.js. Réciproquement, si Node.js
+// crashe ou est "kické", Caddy continue de tourner en arrière-plan
+// et peut rediriger le trafic vers le Backup (port 3001).
+//
+// Utilise `spawn` avec :
+//   - `detached: true`  → nouveau groupe de processus, indépendant.
+//   - `stdio: 'ignore'` → pas d'héritage des flux stdin/stdout/stderr.
+//   - `unref()`          → Node.js ne bloque PAS l'event loop sur ce
+//                          processus enfant. Le processus Caddy survit
+//                          à l'arrêt du processus Node.js parent.
+launchCaddyIndependent();
+
 // ── Démarrage ───────────────────────────────────────────────────────────
 server.listen(config.port, config.host, () => {
-  const proto = tlsOptions ? 'https' : 'http';
-  const wsProto = tlsOptions ? 'wss' : 'ws';
   console.log('═══════════════════════════════════════════════');
-  console.log(`  StreetPhare Server v3.1 — PRIMARY (${proto.toUpperCase()})`);
-  console.log(`  Adresse : ${proto}://${config.host}:${config.port}`);
-  console.log(`  Admin   : ${proto}://${config.host}:${config.port}/admin`);
-  console.log(`  Mesh    : ${wsProto}://${config.host}:${config.port}/mesh`);
+  console.log(`  StreetPhare Server v3.1 — PRIMARY (HTTP)`);
+  console.log(`  Adresse : http://${config.host}:${config.port}`);
+  console.log(`  Admin   : http://${config.host}:${config.port}/admin`);
+  console.log(`  Mesh    : ws://${config.host}:${config.port}/mesh`);
   console.log(`  Backup  : ${config.partnerUrl}`);
   console.log(`  Sync    : toutes les ${syncSec}s`);
-  console.log(`  TLS     : ${tlsOptions ? '✅ Actif' : '⚠ Désactivé (dev)'}`);
+  console.log(`  TLS     : ✅ Terminé par Caddy (reverse-proxy)`);
   console.log(`  Store   : persistance JSON → ${store.STORE_PATH || 'data/store.json'}`);
   console.log(`  Outbox  : ${sync.outboxSize()} en attente`);
   console.log('═══════════════════════════════════════════════');
@@ -371,5 +433,66 @@ const gracefulShutdown = (signal) => {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // nodemon restart
+
+// ── Fonction : lancement indépendant de Caddy ─────────────────────────
+
+/// Lance le reverse-proxy Caddy en tant que processus démon détaché.
+///
+/// Le processus Caddy est totalement indépendant du cycle de vie de
+/// Node.js :
+///   - `detached: true` : nouveau groupe de processus (survit au
+///     kill du parent).
+///   - `stdio: 'ignore'` : pas de partage de flux I/O.
+///   - `unref()` : l'event loop de Node.js ne bloque pas sur ce
+///     processus enfant.
+///
+/// Si Caddy n'est pas installé, un avertissement est loggué sans
+/// faire crasher le serveur Node.js. Le chemin du Caddyfile est
+/// relatif au répertoire `server/`.
+function launchCaddyIndependent() {
+  // Résolution du chemin du Caddyfile.
+  // `__dirname` pointe vers `server/src/`, donc `../Caddyfile` remonte
+  // dans `server/`.
+  const caddyfilePath = path.join(__dirname, '..', 'Caddyfile');
+
+  try {
+    const caddyProcess = spawn('caddy', [
+      'run',
+      '--config', caddyfilePath,
+      '--adapter', 'caddyfile',
+    ], {
+      detached: true,
+      stdio: 'ignore',
+      // `windowsHide: true` évite un flash de console sur Windows.
+      windowsHide: true,
+    });
+
+    caddyProcess.unref();
+
+    // On laisse un court délai pour que Caddy ait le temps de
+    // rapporter une erreur de démarrage (port occupé, config
+    // invalide, etc.) avant de considérer qu'il est lancé.
+    caddyProcess.on('error', (err) => {
+      // `error` n'est émis qu'avant `unref()` ne détache le processus
+      // (ex: exécutable introuvable, permission refusée).
+      log('CADDY', `❌ Échec lancement : ${err.message}`);
+      log('CADDY', '  Vérifiez que Caddy est installé et que le Caddyfile est valide.');
+    });
+
+    // Petite temporisation pour que l'event 'error' ait le temps
+    // d'être émis si Caddy n'est pas trouvé.
+    setTimeout(() => {
+      if (caddyProcess.exitCode === null && !caddyProcess.killed) {
+        log('CADDY', '✅ Démon Caddy lancé (détaché)');
+      } else if (caddyProcess.exitCode !== null) {
+        log('CADDY', `⚠ Caddy s'est arrêté (code ${caddyProcess.exitCode})`);
+        log('CADDY', '  Le serveur Node.js fonctionne sans TLS.');
+      }
+    }, 1500);
+  } catch (err) {
+    log('CADDY', `⚠ Impossible de lancer Caddy : ${err.message}`);
+    log('CADDY', '  Le serveur Node.js fonctionne sans TLS.');
+  }
+}
 
 module.exports = app;

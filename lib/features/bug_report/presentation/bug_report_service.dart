@@ -14,8 +14,8 @@ import 'dart:convert';
 import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_streetphare/network/network_config.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_streetphare/constants/app_constants.dart';
 
 // ============================================================================
 // Modèle de rapport
@@ -81,8 +81,8 @@ class BugReportService {
 
   /// Endpoint du serveur pour les rapports de bug.
   /// Format : POST {payload JSON} → /api/bug-report
-  static Uri get _submitUrl =>
-      Uri.parse('${AppStrings.adminServerUrl}:3000/api/bug-report');
+  /// Utilise le NetworkConfig centralisé (port standard via Caddy).
+  static Uri get _submitUrl => Uri.parse(NetworkConfig.bugReportUrl);
 
   /// Envoie un rapport de bug au serveur d'administration.
   ///

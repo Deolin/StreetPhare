@@ -8,8 +8,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/streetphare_theme.dart';
 import '../../../../main.dart' show navigatorKey;
+import '../../../core/theme/streetphare_theme.dart';
 import 'bug_report_service.dart';
 
 // ============================================================================

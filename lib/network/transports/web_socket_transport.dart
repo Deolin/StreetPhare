@@ -23,6 +23,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Transport WebSocket pour le relais d'administration serveur.
 ///
@@ -81,28 +82,52 @@ class WebSocketTransport {
 
   // ── Connexion ──────────────────────────────────────────────────
 
+  // ── Constante pour le stockage du token admin ───────────────────
+  static const _adminTokenKey = 'streetphare_admin_jwt';
+
   /// Établit la connexion WebSocket au serveur d'administration.
   ///
   /// [url] : URL WebSocket du serveur d'administration
   ///         (ex: `NetworkConfig.primaryUrl`).
+  /// [adminToken] : token JWT d'authentification admin (optionnel).
+  ///   S'il est fourni, il est transmis :
+  ///     a) En header `Authorization: Bearer <token>` (standard HTTP).
+  ///     b) En query parameter `?token=<token>` (fallback WebSocket,
+  ///        utilisé par le serveur `verifyClient`).
+  ///   Si [adminToken] est `null` ou omis, on tente de récupérer
+  ///   le token depuis le stockage sécurisé (`flutter_secure_storage`).
+  ///
   /// Si une connexion est déjà active ou en cours, l'appel est ignoré.
-  Future<void> connect(String url) async {
+  Future<void> connect(
+    String url, {
+    String? adminToken,
+  }) async {
     if (_socket != null || _isConnecting || _disposed) return;
 
     _adminUrl = url;
     _isConnecting = true;
     _eventController.add(WebSocketEvent.connecting);
 
+    // Résolution du token : paramètre explicite > stockage sécurisé.
+    final token = adminToken ?? await _loadAdminToken();
+
+    // Construction de l'URL avec le token en query parameter.
+    // Le serveur `verifyWsToken()` dans `middleware/auth.js` vérifie
+    // le token depuis le query param `?token=`.
+    final connectUrl = token != null ? '$url?token=${Uri.encodeComponent(token)}' : url;
+
     try {
       if (kDebugMode) {
         debugPrint(
           '🔌 [ServerAdmin] Connexion au relais d\'administration : '
-          '$url',
+          '${token != null ? "$url?token=***" : url}',
         );
       }
 
+      // Connexion WebSocket standard avec le token dans le query param.
+      // Le serveur `verifyWsToken()` vérifie le token depuis `?token=`.
       _socket =
-          await WebSocket.connect(url).timeout(const Duration(seconds: 5));
+          await WebSocket.connect(connectUrl).timeout(const Duration(seconds: 5));
 
       _reconnectAttempts = 0; // Reset du compteur en cas de succès
       _isConnecting = false;
@@ -139,6 +164,28 @@ class WebSocketTransport {
         debugPrint('❌ [ServerAdmin] Échec de connexion au serveur : $e');
       }
       _handleDisconnect();
+    }
+  }
+
+  /// Charge le token JWT admin depuis le stockage sécurisé.
+  Future<String?> _loadAdminToken() async {
+    try {
+      const storage = FlutterSecureStorage(
+        aOptions: AndroidOptions(
+          keyCipherAlgorithm:
+              KeyCipherAlgorithm.RSA_ECB_OAEPwithSHA_256andMGF1Padding,
+          storageCipherAlgorithm: StorageCipherAlgorithm.AES_GCM_NoPadding,
+        ),
+        iOptions: IOSOptions(
+          accessibility: KeychainAccessibility.first_unlock_this_device,
+        ),
+      );
+      return await storage.read(key: _adminTokenKey);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[ServerAdmin] Échec chargement token admin : $e');
+      }
+      return null;
     }
   }
 

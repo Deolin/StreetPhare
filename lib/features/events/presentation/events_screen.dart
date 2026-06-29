@@ -9,12 +9,12 @@
 //   3. Scanner un QR CODE contenant les données JSON de l'événement.
 //   4. Supprimer un événement individuel ou tous les événements.
 
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-
-import 'dart:async';
-import 'dart:convert';
 
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
@@ -150,14 +150,14 @@ class _EventsScreenState extends State<EventsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.warning_amber, color: StreetPhareTheme.danger, size: 24),
-            const SizedBox(width: 10),
+            Icon(Icons.warning_amber, color: StreetPhareTheme.danger, size: 24),
+            SizedBox(width: 10),
             Flexible(
               child: Text(
                 'Retirer l\'événement ?',
-                style: const TextStyle(
+                style: TextStyle(
                   color: StreetPhareTheme.textPrimary,
                   fontSize: 16,
                 ),

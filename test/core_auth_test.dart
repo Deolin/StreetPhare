@@ -9,10 +9,10 @@
 //   - La sérialisation/désérialisation JSON conforme au contrat
 //     serveur Node.js
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_streetphare/core/models/alert_model.dart';
 import 'package:flutter_streetphare/database/alert_ttl_policy.dart';
 import 'package:flutter_streetphare/database/alert_visibility_policy.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('AlertModel — Cycle de vie', () {

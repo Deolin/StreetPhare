@@ -13,11 +13,11 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../core/network/peer_counter_service.dart';
 import '../services/connectivity_service.dart';
 import 'failover_manager.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 /// Ordre de priorité des transports réseau.
 /// Les valeurs sont classées par priorité décroissante (0 = meilleur).

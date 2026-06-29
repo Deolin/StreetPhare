@@ -17,9 +17,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../fixtures_fleurus.dart';
 import '../../../debug/client_debug_logger.dart';
 import '../domain/models/event_model.dart';
+import '../fixtures_fleurus.dart';
 
 /// Manager singleton des événements — supporte jusqu'à [maxEvents] en parallèle.
 class EventManager extends ValueNotifier<List<EventModel>> {

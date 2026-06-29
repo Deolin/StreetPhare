@@ -43,6 +43,63 @@ enum AlertType {
 /// couches P2P (Bluetooth / Wi-Fi Direct) où la taille du payload
 /// doit être minimale.
 class Alert {
+
+  Alert({
+    required this.id,
+    required this.ephemeralUserId,
+    required this.signature,
+    required this.type,
+    required this.latitude,
+    required this.longitude,
+    this.description = '',
+    this.densityValue,
+    DateTime? createdAt,
+    this.ttlHours = 24,
+    this.status = AlertStatus.pending,
+    Set<String>? confirmations,
+    this.uploadedTo = '',
+    DateTime? lastModifiedAt,
+  })  : createdAt = createdAt ?? DateTime.now().toUtc(),
+        confirmations = Set<String>.from(confirmations ?? <String>{}),
+        lastModifiedAt = lastModifiedAt ?? DateTime.now().toUtc();
+
+  /// Désérialisation depuis le format JSON serveur Node.js
+  /// (GET /v1/reports + POST /alerts).
+  factory Alert.fromJson(Map<String, dynamic> json) {
+    final statusStr = (json['status'] as String?) ?? 'pending';
+    final typeStr = (json['type'] as String?) ?? 'autre';
+    return Alert(
+      id: json['id'] as String,
+      ephemeralUserId: (json['reporter_id'] as String?) ?? '',
+      signature: (json['signature'] as String?) ?? '',
+      type: AlertType.values.firstWhere(
+        (t) => t.name == typeStr,
+        orElse: () => AlertType.autre,
+      ),
+      latitude: (json['lat'] as num).toDouble(),
+      longitude: (json['lon'] as num).toDouble(),
+      description: (json['description'] as String?) ?? '',
+      densityValue: json['density_value'] as int?,
+      createdAt: json['timestamp'] != null
+          ? DateTime.parse(json['timestamp'] as String).toUtc()
+          : DateTime.now().toUtc(),
+      ttlHours: (json['ttl_hours'] as int?) ?? 24,
+      status: AlertStatus.values.firstWhere(
+        (s) => s.name == statusStr,
+        orElse: () => AlertStatus.pending,
+      ),
+      confirmations: ((json['confirmations'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toSet(),
+      uploadedTo: (json['uploaded_to'] as String?) ?? '',
+      lastModifiedAt: json['last_modified_at'] != null
+          ? DateTime.parse(json['last_modified_at'] as String).toUtc()
+          : DateTime.now().toUtc(),
+    );
+  }
+
+  factory Alert.fromCompact(String raw) =>
+      Alert.fromJson(jsonDecode(raw) as Map<String, dynamic>);
   /// Identifiant unique anonyme (hash court). Généré côté client.
   final String id;
 
@@ -92,25 +149,6 @@ class Alert {
   /// Utilisé pour la synchronisation différentielle Hive ↔ Serveur.
   DateTime lastModifiedAt;
 
-  Alert({
-    required this.id,
-    required this.ephemeralUserId,
-    required this.signature,
-    required this.type,
-    required this.latitude,
-    required this.longitude,
-    this.description = '',
-    this.densityValue,
-    DateTime? createdAt,
-    this.ttlHours = 24,
-    this.status = AlertStatus.pending,
-    Set<String>? confirmations,
-    this.uploadedTo = '',
-    DateTime? lastModifiedAt,
-  })  : createdAt = createdAt ?? DateTime.now().toUtc(),
-        confirmations = Set<String>.from(confirmations ?? <String>{}),
-        lastModifiedAt = lastModifiedAt ?? DateTime.now().toUtc();
-
   /// Coordonnées LatLng (utile pour flutter_map).
   LatLng get position => LatLng(latitude, longitude);
 
@@ -156,46 +194,8 @@ class Alert {
         'last_modified_at': lastModifiedAt.toUtc().toIso8601String(),
       };
 
-  /// Désérialisation depuis le format JSON serveur Node.js
-  /// (GET /v1/reports + POST /alerts).
-  factory Alert.fromJson(Map<String, dynamic> json) {
-    final statusStr = (json['status'] as String?) ?? 'pending';
-    final typeStr = (json['type'] as String?) ?? 'autre';
-    return Alert(
-      id: json['id'] as String,
-      ephemeralUserId: (json['reporter_id'] as String?) ?? '',
-      signature: (json['signature'] as String?) ?? '',
-      type: AlertType.values.firstWhere(
-        (t) => t.name == typeStr,
-        orElse: () => AlertType.autre,
-      ),
-      latitude: (json['lat'] as num).toDouble(),
-      longitude: (json['lon'] as num).toDouble(),
-      description: (json['description'] as String?) ?? '',
-      densityValue: json['density_value'] as int?,
-      createdAt: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'] as String).toUtc()
-          : DateTime.now().toUtc(),
-      ttlHours: (json['ttl_hours'] as int?) ?? 24,
-      status: AlertStatus.values.firstWhere(
-        (s) => s.name == statusStr,
-        orElse: () => AlertStatus.pending,
-      ),
-      confirmations: ((json['confirmations'] as List?) ?? const [])
-          .map((e) => e.toString())
-          .toSet(),
-      uploadedTo: (json['uploaded_to'] as String?) ?? '',
-      lastModifiedAt: json['last_modified_at'] != null
-          ? DateTime.parse(json['last_modified_at'] as String).toUtc()
-          : DateTime.now().toUtc(),
-    );
-  }
-
   /// Sérialisation compacte (string) pour transport BLE / Wi-Fi.
   String toCompact() => jsonEncode(toJson());
-
-  factory Alert.fromCompact(String raw) =>
-      Alert.fromJson(jsonDecode(raw) as Map<String, dynamic>);
 
   @override
   String toString() =>

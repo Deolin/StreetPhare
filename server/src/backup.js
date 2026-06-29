@@ -1,8 +1,8 @@
 // server/src/backup.js
-// Serveur Miroir StreetPhare — Node.js v3.1 (HTTPS/WSS)
+// Serveur Miroir StreetPhare — Node.js v3.1 (HTTP — TLS terminé par Caddy)
 //
 // Rôle : BACKUP
-//   - Écoute sur le port configuré (défaut 3001) en HTTPS (TLS).
+//   - Écoute sur 127.0.0.1:3001 en HTTP (le TLS est terminé par Caddy).
 //   - Reçoit les données répliquées du Primary (push + sync).
 //   - Prend le relais automatiquement si le Primary est down.
 //   - Sert l'interface d'administration (/admin) en cas de basculement.
@@ -12,16 +12,16 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { WebSocketServer } = require('ws');
-const https = require('https');
 const http = require('http');
-const fs = require('fs');
 
 const config = require('./config');
 const store = require('./store');
 const sync = require('./sync');
 const apiRoutes = require('./routes/api');
+const { verifyWsToken } = require('./middleware/auth');
 
 const app = express();
 
@@ -44,11 +44,14 @@ const log = (category, message) => {
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
-  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  // HSTS désactivé : Caddy gère le TLS et les en-têtes HSTS.
 }));
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ── Trust Proxy — Récupère la vraie IP du client via X-Forwarded-For ──
+app.set('trust proxy', 1);
 
 // ── Logger HTTP ───────────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -70,6 +73,30 @@ morgan.token('date-streetphare', () => {
 });
 app.use(morgan(':date-streetphare - [HTTP] :method :url :status - :response-time ms'));
 
+// ── Rate Limiting — Protection anti-brute force sur toutes les routes ──
+const limiter = rateLimit({
+  windowMs: config.rateLimitWindowMs,
+  max: config.rateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Trop de requêtes. Veuillez réessayer plus tard.',
+  },
+  handler: (req, res, _next, options) => {
+    log('RATELIMIT', `⛔ Limite atteinte — IP: ${req.ip} — ${req.method} ${req.originalUrl}`);
+    res.status(429).json({
+      error: options.message.error,
+      retryAfterMs: options.windowMs,
+    });
+  },
+  skip: (req) => {
+    if (req.path.startsWith('/api/sync/')) return true;
+    if (req.path === '/api/ping') return true;
+    return false;
+  },
+});
+app.use(limiter);
+
 app.get('/admin', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html'));
 });
@@ -82,7 +109,7 @@ app.get('/', (req, res) => {
     name: 'StreetPhare Server',
     version: '3.1.0',
     role: 'BACKUP',
-    tls: tlsOptions ? 'enabled' : 'disabled (dev mode)',
+    tls: 'terminated-by-caddy',
     endpoints: {
       api: '/api',
       admin: '/admin',
@@ -96,24 +123,8 @@ app.get('/', (req, res) => {
   });
 });
 
-// ── TLS / HTTPS ────────────────────────────────────────────────────────────
-const TLS_KEY_PATH = config.tlsKeyPath || path.join(__dirname, '..', 'assets', 'privkey.pem');
-const TLS_CERT_PATH = config.tlsCertPath || path.join(__dirname, '..', 'assets', 'fullchain.pem');
-
-let tlsOptions = null;
-try {
-  tlsOptions = {
-    key: fs.readFileSync(TLS_KEY_PATH),
-    cert: fs.readFileSync(TLS_CERT_PATH),
-  };
-  log('TLS', `Certificats chargés : ${TLS_CERT_PATH}`);
-} catch (_) {
-  log('TLS', `⚠ Certificats TLS introuvables. Fallback HTTP (dev uniquement).`);
-}
-
-const server = tlsOptions
-  ? https.createServer(tlsOptions, app)
-  : http.createServer(app);
+// ── Création du serveur HTTP (TLS terminé par Caddy) ─────────────────
+const server = http.createServer(app);
 
 // ── WebSocket Mesh (miroir) ────────────────────────────────────────────────
 const wss = new WebSocketServer({ server, path: '/mesh' });
@@ -134,7 +145,7 @@ wss.on('connection', (ws) => {
       kind: 'welcome',
       server: 'StreetPhare-Backup',
       version: '3.1.0',
-      tls: !!tlsOptions,
+      tls: true, // TLS terminé par Caddy.
       ts: new Date().toISOString(),
     }));
   } catch (_) {}
@@ -158,38 +169,61 @@ wss.on('connection', (ws) => {
   ws.on('error', (err) => log('MESH', `Erreur socket: ${err.message}`));
 });
 
-// ── WebSocket Admin ─────────────────────────────────────────────────────
-const adminWss = new WebSocketServer({ server, path: '/admin-ws' });
-adminWss.on('connection', (ws) => {
+// ── WebSocket Admin (protégé par JWT) ─────────────────────────────────
+const adminWss = new WebSocketServer({
+  server,
+  path: '/admin-ws',
+  verifyClient: (info, cb) => {
+    const reqUrl = info.req.url || '';
+    try {
+      const decoded = verifyWsToken(reqUrl);
+      info.req.adminUser = decoded;
+      cb(true);
+    } catch (err) {
+      log('ADMIN', `Tentative de connexion WebSocket admin rejetée : ${err.message}`);
+      cb(false, 401, 'Unauthorized');
+    }
+  },
+});
+
+adminWss.on('connection', (ws, req) => {
+  const adminUser = req.adminUser || { role: 'unknown' };
+
   store.adminClients.add(ws);
-  log('ADMIN', `Admin connecté (total: ${store.adminClients.size})`);
+  log('ADMIN', `Admin authentifié (rôle=${adminUser.role}, total: ${store.adminClients.size})`);
+
+  try {
+    ws.send(JSON.stringify({
+      type: 'admin_snapshot',
+      alerts: store.getActiveAlerts(),
+      events: store.getAllEvents(),
+      syncState: store.syncState,
+    }));
+  } catch (e) {
+    log('ADMIN', `Erreur envoi snapshot: ${e.message}`);
+  }
+
   ws.on('message', (data) => {
-    log('ADMIN', `Message: ${data.toString().substring(0, 200)}`);
+    log('ADMIN', `Message (${adminUser.role}): ${data.toString().substring(0, 200)}`);
   });
+
   ws.on('close', () => {
     store.adminClients.delete(ws);
     log('ADMIN', `Admin déconnecté (total: ${store.adminClients.size})`);
   });
+
   ws.on('error', (err) => log('ADMIN', `Erreur socket: ${err.message}`));
-  ws.send(JSON.stringify({
-    type: 'admin_snapshot',
-    alerts: store.getActiveAlerts(),
-    events: store.getAllEvents(),
-    syncState: store.syncState,
-  }));
 });
 
 // ── Démarrage ───────────────────────────────────────────────────────────
 server.listen(config.backupPort, config.backupHost, () => {
-  const proto = tlsOptions ? 'https' : 'http';
-  const wsProto = tlsOptions ? 'wss' : 'ws';
   console.log('═══════════════════════════════════════════════');
-  console.log(`  StreetPhare Server v3.1 — BACKUP (${proto.toUpperCase()})`);
-  console.log(`  Adresse : ${proto}://${config.backupHost}:${config.backupPort}`);
-  console.log(`  Admin   : ${proto}://${config.backupHost}:${config.backupPort}/admin`);
-  console.log(`  Mesh    : ${wsProto}://${config.backupHost}:${config.backupPort}/mesh`);
+  console.log(`  StreetPhare Server v3.1 — BACKUP (HTTP)`);
+  console.log(`  Adresse : http://${config.backupHost}:${config.backupPort}`);
+  console.log(`  Admin   : http://${config.backupHost}:${config.backupPort}/admin`);
+  console.log(`  Mesh    : ws://${config.backupHost}:${config.backupPort}/mesh`);
   console.log(`  Primary : ${config.partnerUrl}`);
-  console.log(`  TLS     : ${tlsOptions ? '✅ Actif' : '⚠ Désactivé (dev)'}`);
+  console.log(`  TLS     : ✅ Terminé par Caddy (reverse-proxy)`);
   console.log('═══════════════════════════════════════════════');
 });
 

@@ -255,7 +255,7 @@ class SpgGraph {
 // ── Classe utilitaire interne ─────────────────────────────────────────────
 
 class _Candidate {
+  _Candidate(this.nodeIdx, this.distance);
   final int nodeIdx;
   final double distance;
-  _Candidate(this.nodeIdx, this.distance);
 }

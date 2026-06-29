@@ -28033,7 +28033,26 @@ var require_config = __commonJS({
       // ── Serveur partenaire ──────────────────────────────────────────────
       partnerUrl: process.env.PARTNER_URL || "http://192.168.31.63:3001",
       // ── Chiffrement ─────────────────────────────────────────────────────
-      masterKey: process.env.MASTER_KEY || "streetphare-dev-key-change-in-production",
+      // La clé maîtresse DOIT être fournie via la variable d'environnement
+      // MASTER_KEY. En production, le serveur REFUSE de démarrer avec la
+      // valeur par défaut (qui n'est qu'un placeholder de développement).
+      masterKey: (() => {
+        const key = process.env.MASTER_KEY;
+        if (!key || key === "streetphare-dev-key-change-in-production") {
+          if (process.env.NODE_ENV === "production") {
+            console.error("\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557");
+            console.error("\u2551  ERREUR FATALE : MASTER_KEY non configur\xE9e          \u2551");
+            console.error("\u2551  En production, d\xE9finissez la variable              \u2551");
+            console.error("\u2551  d'environnement MASTER_KEY avec une cl\xE9 forte.     \u2551");
+            console.error('\u2551  Exemple : export MASTER_KEY="$(openssl rand -hex 32)"  \u2551');
+            console.error("\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D");
+            process.exit(1);
+          }
+          console.warn("[CONFIG] \u26A0 MASTER_KEY par d\xE9faut \u2014 d\xE9veloppement uniquement.");
+          return "streetphare-dev-key-change-in-production";
+        }
+        return key;
+      })(),
       // ── Consensus ───────────────────────────────────────────────────────
       consensusThreshold: parseInt(process.env.CONSENSUS_THRESHOLD || "3", 10),
       // ── Synchronisation ─────────────────────────────────────────────────
@@ -28078,292 +28097,6 @@ var require_config = __commonJS({
       }
     };
     module2.exports = config2;
-  }
-});
-
-// src/store.js
-var require_store = __commonJS({
-  "src/store.js"(exports2, module2) {
-    var fs2 = require("fs");
-    var path2 = require("path");
-    var config2 = require_config();
-    var Store = class {
-      constructor() {
-        this.alerts = [];
-        this.events = [];
-        this.panicPings = [];
-        this.meshClients = /* @__PURE__ */ new Set();
-        this.adminClients = /* @__PURE__ */ new Set();
-        this.syncState = {
-          lastSyncAt: null,
-          lastSyncSuccess: false,
-          partnerUrl: config2.partnerUrl
-        };
-      }
-      // ── Alertes ─────────────────────────────────────────────────────────
-      addAlert(alert2) {
-        const existing = this.alerts.find((a) => a.id === alert2.id);
-        if (existing) {
-          if (alert2.votes && alert2.votes.length > 0) {
-            existing.votes.push(...alert2.votes.filter((v) => !existing.votes.includes(v)));
-          }
-          existing.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
-          return existing;
-        }
-        this.alerts.push({
-          ...alert2,
-          createdAt: alert2.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
-          updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-        });
-        return this.alerts[this.alerts.length - 1];
-      }
-      getActiveAlerts() {
-        const now = /* @__PURE__ */ new Date();
-        return this.alerts.filter((a) => {
-          if (a.status === "rejected") return false;
-          const ageMinutes = (now - new Date(a.createdAt)) / 6e4;
-          if (ageMinutes > config2.ttls.absoluteRgpd) return false;
-          const ttls = {
-            mobile_danger: config2.ttls.mobileDanger,
-            police: config2.ttls.staticDanger,
-            fire_truck: config2.ttls.staticDanger,
-            filter: config2.ttls.staticDanger,
-            panic: config2.ttls.panic,
-            collective_danger: config2.ttls.collectiveDanger
-          };
-          const maxAge = ttls[alert.type] || config2.ttls.mobileDanger;
-          if (ageMinutes > maxAge) return false;
-          return (alert.votes?.length || 0) >= config2.consensusThreshold;
-        });
-      }
-      getAllAlerts() {
-        return this.alerts;
-      }
-      deleteAlert(id) {
-        const idx = this.alerts.findIndex((a) => a.id === id);
-        if (idx !== -1) {
-          this.alerts.splice(idx, 1);
-          return true;
-        }
-        return false;
-      }
-      // ── Événements ──────────────────────────────────────────────────────
-      addEvent(event) {
-        const existing = this.events.find((e) => e.code === event.code);
-        if (existing) {
-          Object.assign(existing, event);
-          return existing;
-        }
-        this.events.push(event);
-        return event;
-      }
-      getEventByCode(code) {
-        return this.events.find((e) => e.code === code.toUpperCase());
-      }
-      getAllEvents() {
-        return this.events;
-      }
-      // ── Panic ────────────────────────────────────────────────────────────
-      addPanicPing(ping) {
-        this.panicPings.push({
-          ...ping,
-          timestamp: ping.timestamp || (/* @__PURE__ */ new Date()).toISOString()
-        });
-        const cutoff = new Date(Date.now() - 5 * 60 * 1e3);
-        this.panicPings = this.panicPings.filter((p) => new Date(p.timestamp) > cutoff);
-        return this.checkPanicAggregation(ping.lat, ping.lng);
-      }
-      /// Vérifie si 5 pings proches en < 2 min → zone de danger auto-générée.
-      checkPanicAggregation(lat2, lng2) {
-        const windowMs = config2.panic.timeWindowMinutes * 60 * 1e3;
-        const cutoff = new Date(Date.now() - windowMs);
-        const radius = config2.panic.proximityMeters;
-        const nearby = this.panicPings.filter((p) => {
-          if (new Date(p.timestamp) < cutoff) return false;
-          const dist = this._haversine(lat2, lng2, p.lat, p.lng);
-          return dist <= radius;
-        });
-        if (nearby.length >= config2.panic.threshold) {
-          return {
-            aggregated: true,
-            count: nearby.length,
-            lat: lat2,
-            lng: lng2,
-            radius: config2.panic.autoZoneRadius,
-            type: "collective_danger",
-            description: `Zone de danger collectif \u2014 ${nearby.length} pings PANIC agr\xE9g\xE9s`
-          };
-        }
-        return { aggregated: false, count: nearby.length };
-      }
-      // ── Utilitaires ─────────────────────────────────────────────────────
-      _haversine(lat1, lon1, lat2, lon2) {
-        const R = 6371e3;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      }
-      /// Hash simple de l'état pour la synchro différentielle.
-      getStateHash() {
-        const active = this.getActiveAlerts().length;
-        const total = this.alerts.length;
-        return `${active}/${total}:${this.events.length}`;
-      }
-      /// Export complet pour le dump de synchro.
-      exportAll() {
-        return {
-          alerts: this.alerts.map((a) => ({ ...a, votes: a.votes ? [...a.votes] : [] })),
-          events: this.events,
-          exportedAt: (/* @__PURE__ */ new Date()).toISOString()
-        };
-      }
-      /// Import depuis un dump de synchro.
-      importAll(data) {
-        if (!data || !data.alerts) return;
-        for (const alert2 of data.alerts) {
-          this.addAlert({ ...alert2, votes: alert2.votes || [] });
-        }
-        if (data.events) {
-          for (const event of data.events) {
-            this.addEvent(event);
-          }
-        }
-      }
-    };
-    module2.exports = new Store();
-  }
-});
-
-// src/sync.js
-var require_sync = __commonJS({
-  "src/sync.js"(exports2, module2) {
-    var config2 = require_config();
-    var store2 = require_store();
-    var https2 = require("https");
-    var http2 = require("http");
-    var log2 = (category, message) => {
-      const now = /* @__PURE__ */ new Date();
-      const ts = [
-        String(now.getHours()).padStart(2, "0"),
-        String(now.getMinutes()).padStart(2, "0"),
-        String(now.getSeconds()).padStart(2, "0"),
-        " - ",
-        String(now.getDate()).padStart(2, "0"),
-        "/",
-        String(now.getMonth() + 1).padStart(2, "0")
-      ].join("");
-      console.log(`[${ts}] - [${category}] ${message}`);
-    };
-    var fetch = (url, options) => {
-      return new Promise((resolve, reject) => {
-        const { protocol, hostname, port, pathname } = new URL(url);
-        const client = protocol === "https:" ? https2 : http2;
-        const reqOptions = {
-          ...options,
-          hostname,
-          port: port || (protocol === "https:" ? 443 : 80),
-          path: pathname,
-          timeout: 15e3
-          // augmenté de 5s → 15s
-        };
-        const req = client.request(reqOptions, (res) => {
-          let data = "";
-          res.on("data", (chunk) => data += chunk);
-          res.on("end", () => {
-            try {
-              resolve({ status: res.statusCode, body: JSON.parse(data) });
-            } catch (_) {
-              resolve({ status: res.statusCode, body: data });
-            }
-          });
-        });
-        req.on("error", (err) => reject(err));
-        req.on("timeout", () => {
-          req.destroy();
-          reject(new Error(`timeout (15s) \u2014 ${url}`));
-        });
-        if (options.body) req.write(JSON.stringify(options.body));
-        req.end();
-      });
-    };
-    async function pushAlert(alert2) {
-      if (!config2.isPrimary) return false;
-      try {
-        const url = `${config2.partnerUrl}/api/sync/alert`;
-        log2("SYNC", `Push alert ${alert2.id} \u2192 ${url}`);
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: { alert: alert2, from: config2.serverType }
-        });
-        return res.status === 200;
-      } catch (e) {
-        log2("SYNC", `Push alert ${alert2.id} \xC9CHEC: ${e.message} \u2014 cible: ${config2.partnerUrl}`);
-        return false;
-      }
-    }
-    async function pushEvent(event) {
-      if (!config2.isPrimary) return false;
-      try {
-        const url = `${config2.partnerUrl}/api/sync/event`;
-        log2("SYNC", `Push event ${event.code} \u2192 ${url}`);
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: { event, from: config2.serverType }
-        });
-        return res.status === 200;
-      } catch (e) {
-        log2("SYNC", `Push event ${event.code} \xC9CHEC: ${e.message} \u2014 cible: ${config2.partnerUrl}`);
-        return false;
-      }
-    }
-    async function pollSync() {
-      const hash = store2.getStateHash();
-      try {
-        const url = `${config2.partnerUrl}/api/sync/check`;
-        log2("SYNC", `Polling \u2192 ${url}`);
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: { hash, from: config2.serverType }
-        });
-        if (res.status === 200 && res.body && res.body.action === "full_sync") {
-          log2("SYNC", `D\xE9synchronisation d\xE9tect\xE9e \u2014 dump complet vers ${config2.partnerUrl}`);
-          const dump = store2.exportAll();
-          const fullUrl = `${config2.partnerUrl}/api/sync/full`;
-          await fetch(fullUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: { dump, from: config2.serverType }
-          });
-          log2("SYNC", `Full sync envoy\xE9 \u2014 ${dump.alerts?.length || 0} alerts, ${dump.events?.length || 0} events`);
-        }
-        store2.syncState.lastSyncAt = (/* @__PURE__ */ new Date()).toISOString();
-        store2.syncState.lastSyncSuccess = true;
-      } catch (e) {
-        store2.syncState.lastSyncSuccess = false;
-        log2("SYNC", `Polling \xC9CHEC: ${e.message} \u2014 cible: ${config2.partnerUrl}`);
-      }
-    }
-    function receiveFullSync(dump) {
-      store2.importAll(dump);
-      store2.syncState.lastSyncAt = (/* @__PURE__ */ new Date()).toISOString();
-      store2.syncState.lastSyncSuccess = true;
-      log2("SYNC", `Full sync re\xE7u \u2014 ${dump.alerts?.length || 0} alerts, ${dump.events?.length || 0} events`);
-    }
-    function checkHash(remoteHash) {
-      const localHash = store2.getStateHash();
-      return localHash !== remoteHash;
-    }
-    module2.exports = {
-      pushAlert,
-      pushEvent,
-      pollSync,
-      receiveFullSync,
-      checkHash
-    };
   }
 });
 
@@ -28865,6 +28598,614 @@ var init_dist_node = __esm({
   }
 });
 
+// src/store.js
+var require_store = __commonJS({
+  "src/store.js"(exports2, module2) {
+    var fs2 = require("fs");
+    var path2 = require("path");
+    var config2 = require_config();
+    var log2 = (category, message) => {
+      const now = /* @__PURE__ */ new Date();
+      const ts = [
+        String(now.getHours()).padStart(2, "0"),
+        String(now.getMinutes()).padStart(2, "0"),
+        String(now.getSeconds()).padStart(2, "0"),
+        " - ",
+        String(now.getDate()).padStart(2, "0"),
+        "/",
+        String(now.getMonth() + 1).padStart(2, "0")
+      ].join("");
+      console.log(`[${ts}] - [${category}] ${message}`);
+    };
+    var STORE_PATH = config2.storePath || path2.join(__dirname, "..", "data", "store.json");
+    var STORE_TMP_PATH = STORE_PATH + ".tmp";
+    var SAVE_DEBOUNCE_MS = 2e3;
+    var Store = class {
+      constructor() {
+        this.alerts = [];
+        this.events = [];
+        this.panicPings = [];
+        this.bugReports = [];
+        this.meshClients = /* @__PURE__ */ new Set();
+        this.adminClients = /* @__PURE__ */ new Set();
+        this.syncState = {
+          lastSyncAt: null,
+          lastSyncSuccess: false,
+          partnerUrl: config2.partnerUrl
+        };
+        this._saveTimer = null;
+        this._savePending = false;
+        this._loadFromDisk();
+      }
+      // ═══════════════════════════════════════════════════════════════════════
+      // PERSISTANCE DISQUE
+      // ═══════════════════════════════════════════════════════════════════════
+      /// Charge l'état depuis le fichier JSON. Si absent ou corrompu,
+      /// initialise un état vide et sauvegarde immédiatement.
+      _loadFromDisk() {
+        try {
+          if (!fs2.existsSync(STORE_PATH)) {
+            log2("STORE", `Aucun fichier de persistance trouv\xE9 \u2192 \xE9tat vide (${STORE_PATH})`);
+            this._saveToDiskSync();
+            return;
+          }
+          const raw = fs2.readFileSync(STORE_PATH, "utf-8");
+          const data = JSON.parse(raw);
+          if (!data || typeof data !== "object") {
+            throw new Error("Structure invalide");
+          }
+          if (Array.isArray(data.alerts)) {
+            this.alerts = data.alerts;
+          }
+          if (Array.isArray(data.events)) {
+            this.events = data.events;
+          }
+          if (Array.isArray(data.panicPings)) {
+            const cutoff = new Date(Date.now() - 5 * 60 * 1e3);
+            this.panicPings = data.panicPings.filter(
+              (p) => p.timestamp && new Date(p.timestamp) > cutoff
+            );
+          }
+          if (data.syncState && typeof data.syncState === "object") {
+            this.syncState = {
+              lastSyncAt: data.syncState.lastSyncAt || null,
+              lastSyncSuccess: data.syncState.lastSyncSuccess || false,
+              partnerUrl: data.syncState.partnerUrl || config2.partnerUrl
+            };
+          }
+          log2(
+            "STORE",
+            `\xC9tat charg\xE9 depuis ${STORE_PATH} : ${this.alerts.length} alertes, ${this.events.length} \xE9v\xE9nements, ${this.panicPings.length} pings panic`
+          );
+        } catch (err) {
+          log2("STORE", `\u26A0 Erreur chargement ${STORE_PATH} : ${err.message}`);
+          log2("STORE", "  Fallback \u2192 \xE9tat vide. Le fichier corrompu sera \xE9cras\xE9.");
+          try {
+            this._saveToDiskSync();
+          } catch (saveErr) {
+            log2("STORE", `\u26A0 Impossible d'\xE9crire le fichier propre : ${saveErr.message}`);
+          }
+        }
+      }
+      /// Sauvegarde immédiate (synchrone) de l'état complet sur disque.
+      /// Écriture atomique : .tmp → rename.
+      _saveToDiskSync() {
+        const dir = path2.dirname(STORE_PATH);
+        if (!fs2.existsSync(dir)) {
+          fs2.mkdirSync(dir, { recursive: true });
+        }
+        const data = this._serialize();
+        fs2.writeFileSync(STORE_TMP_PATH, JSON.stringify(data, null, 2), "utf-8");
+        fs2.renameSync(STORE_TMP_PATH, STORE_PATH);
+      }
+      /// Programme une sauvegarde asynchrone avec throttle (debounce 2s).
+      /// Appelée après chaque mutation. Si plusieurs mutations surviennent
+      /// en moins de SAVE_DEBOUNCE_MS, une seule écriture disque est effectuée.
+      _scheduleSave() {
+        this._savePending = true;
+        if (this._saveTimer) return;
+        this._saveTimer = setTimeout(() => {
+          this._saveTimer = null;
+          const wasPending = this._savePending;
+          this._savePending = false;
+          if (!wasPending) return;
+          try {
+            const dir = path2.dirname(STORE_PATH);
+            if (!fs2.existsSync(dir)) {
+              fs2.mkdirSync(dir, { recursive: true });
+            }
+            const data = this._serialize();
+            fs2.writeFileSync(STORE_TMP_PATH, JSON.stringify(data, null, 2), "utf-8");
+            fs2.renameSync(STORE_TMP_PATH, STORE_PATH);
+          } catch (err) {
+            log2("STORE", `\u26A0 Erreur sauvegarde asynchrone : ${err.message}`);
+          }
+        }, SAVE_DEBOUNCE_MS);
+      }
+      /// Force une sauvegarde immédiate (utile avant arrêt propre).
+      saveSync() {
+        if (this._saveTimer) {
+          clearTimeout(this._saveTimer);
+          this._saveTimer = null;
+        }
+        this._savePending = false;
+        try {
+          this._saveToDiskSync();
+          log2("STORE", `Sauvegarde forc\xE9e \u2192 ${STORE_PATH}`);
+          return true;
+        } catch (err) {
+          log2("STORE", `\u26A0 \xC9chec sauvegarde forc\xE9e : ${err.message}`);
+          return false;
+        }
+      }
+      /// Sérialise l'état persistable (hors Sets clients réseau).
+      _serialize() {
+        return {
+          version: 1,
+          savedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          alerts: this.alerts.map((a) => ({ ...a, votes: a.votes ? [...a.votes] : [] })),
+          events: this.events,
+          panicPings: this.panicPings,
+          bugReports: this.bugReports.slice(-200),
+          // max 200 persistés
+          syncState: { ...this.syncState }
+        };
+      }
+      // ═══════════════════════════════════════════════════════════════════════
+      // ALERTES
+      // ═══════════════════════════════════════════════════════════════════════
+      addAlert(alert2) {
+        const existing = this.alerts.find((a) => a.id === alert2.id);
+        if (existing) {
+          if (alert2.votes && alert2.votes.length > 0) {
+            existing.votes.push(...alert2.votes.filter((v) => !existing.votes.includes(v)));
+          }
+          existing.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+          this._scheduleSave();
+          return existing;
+        }
+        this.alerts.push({
+          ...alert2,
+          createdAt: alert2.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
+          updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+        this._scheduleSave();
+        return this.alerts[this.alerts.length - 1];
+      }
+      getActiveAlerts() {
+        const now = /* @__PURE__ */ new Date();
+        return this.alerts.filter((a) => {
+          if (a.status === "rejected") return false;
+          const ageMinutes = (now - new Date(a.createdAt)) / 6e4;
+          if (ageMinutes > config2.ttls.absoluteRgpd) return false;
+          const ttls = {
+            mobile_danger: config2.ttls.mobileDanger,
+            police: config2.ttls.staticDanger,
+            fire_truck: config2.ttls.staticDanger,
+            filter: config2.ttls.staticDanger,
+            panic: config2.ttls.panic,
+            collective_danger: config2.ttls.collectiveDanger
+          };
+          const maxAge = ttls[alert.type] || config2.ttls.mobileDanger;
+          if (ageMinutes > maxAge) return false;
+          return (alert.votes?.length || 0) >= config2.consensusThreshold;
+        });
+      }
+      getAllAlerts() {
+        return this.alerts;
+      }
+      deleteAlert(id) {
+        const idx = this.alerts.findIndex((a) => a.id === id);
+        if (idx !== -1) {
+          this.alerts.splice(idx, 1);
+          this._scheduleSave();
+          return true;
+        }
+        return false;
+      }
+      // ═══════════════════════════════════════════════════════════════════════
+      // ÉVÉNEMENTS
+      // ═══════════════════════════════════════════════════════════════════════
+      addEvent(event) {
+        const existing = this.events.find((e) => e.code === event.code);
+        if (existing) {
+          Object.assign(existing, event);
+          this._scheduleSave();
+          return existing;
+        }
+        this.events.push(event);
+        this._scheduleSave();
+        return event;
+      }
+      getEventByCode(code) {
+        return this.events.find((e) => e.code === code.toUpperCase());
+      }
+      getAllEvents() {
+        return this.events;
+      }
+      // ═══════════════════════════════════════════════════════════════════════
+      // PANIC
+      // ═══════════════════════════════════════════════════════════════════════
+      addPanicPing(ping) {
+        this.panicPings.push({
+          ...ping,
+          timestamp: ping.timestamp || (/* @__PURE__ */ new Date()).toISOString()
+        });
+        const cutoff = new Date(Date.now() - 5 * 60 * 1e3);
+        this.panicPings = this.panicPings.filter((p) => new Date(p.timestamp) > cutoff);
+        this._scheduleSave();
+        return this.checkPanicAggregation(ping.lat, ping.lng);
+      }
+      /// Vérifie si 5 pings proches en < 2 min → zone de danger auto-générée.
+      checkPanicAggregation(lat2, lng2) {
+        const windowMs = config2.panic.timeWindowMinutes * 60 * 1e3;
+        const cutoff = new Date(Date.now() - windowMs);
+        const radius = config2.panic.proximityMeters;
+        const nearby = this.panicPings.filter((p) => {
+          if (new Date(p.timestamp) < cutoff) return false;
+          const dist = this._haversine(lat2, lng2, p.lat, p.lng);
+          return dist <= radius;
+        });
+        if (nearby.length >= config2.panic.threshold) {
+          return {
+            aggregated: true,
+            count: nearby.length,
+            lat: lat2,
+            lng: lng2,
+            radius: config2.panic.autoZoneRadius,
+            type: "collective_danger",
+            description: `Zone de danger collectif \u2014 ${nearby.length} pings PANIC agr\xE9g\xE9s`
+          };
+        }
+        return { aggregated: false, count: nearby.length };
+      }
+      // ═══════════════════════════════════════════════════════════════════════
+      // UTILITAIRES
+      // ═══════════════════════════════════════════════════════════════════════
+      _haversine(lat1, lon1, lat2, lon2) {
+        const R = 6371e3;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+      /// Hash simple de l'état pour la synchro différentielle.
+      getStateHash() {
+        const active = this.getActiveAlerts().length;
+        const total = this.alerts.length;
+        return `${active}/${total}:${this.events.length}`;
+      }
+      // ═══════════════════════════════════════════════════════════════════════
+      // BUG REPORTS
+      // ═══════════════════════════════════════════════════════════════════════
+      /// Ajoute un rapport de bug au stockage persistant.
+      addBugReport(report) {
+        const entry = {
+          id: report.id || (init_dist_node(), __toCommonJS(dist_node_exports)).v4(),
+          type: report.type || "report",
+          message: report.message || "",
+          stackTrace: report.stackTrace || null,
+          deviceInfo: report.deviceInfo || null,
+          appVersion: report.appVersion || "unknown",
+          receivedAt: (/* @__PURE__ */ new Date()).toISOString()
+        };
+        this.bugReports.push(entry);
+        if (this.bugReports.length > 1e3) {
+          this.bugReports = this.bugReports.slice(-1e3);
+        }
+        this._scheduleSave();
+        log2("STORE", `Bug report #${entry.id} enregistr\xE9 (total: ${this.bugReports.length})`);
+        return entry;
+      }
+      /// Récupère les bug reports avec pagination optionnelle.
+      getBugReports({ limit = 50, offset = 0 } = {}) {
+        const total = this.bugReports.length;
+        const items = this.bugReports.slice().reverse().slice(offset, offset + limit);
+        return { items, total, offset, limit };
+      }
+      /// Récupère un bug report par son ID.
+      getBugReportById(id) {
+        return this.bugReports.find((r) => r.id === id) || null;
+      }
+      /// Export complet pour le dump de synchro.
+      exportAll() {
+        return {
+          alerts: this.alerts.map((a) => ({ ...a, votes: a.votes ? [...a.votes] : [] })),
+          events: this.events,
+          exportedAt: (/* @__PURE__ */ new Date()).toISOString()
+        };
+      }
+      /// Import depuis un dump de synchro.
+      importAll(data) {
+        if (!data || !data.alerts) return;
+        for (const alert2 of data.alerts) {
+          this.addAlert({ ...alert2, votes: alert2.votes || [] });
+        }
+        if (data.events) {
+          for (const event of data.events) {
+            this.addEvent(event);
+          }
+        }
+        this._scheduleSave();
+      }
+    };
+    module2.exports = new Store();
+  }
+});
+
+// src/sync.js
+var require_sync = __commonJS({
+  "src/sync.js"(exports2, module2) {
+    var config2 = require_config();
+    var store2 = require_store();
+    var https2 = require("https");
+    var http2 = require("http");
+    var outbox = [];
+    var outboxTimer = null;
+    var OUTBOX_FLUSH_INTERVAL_MS = 3e4;
+    var OUTBOX_MAX_ATTEMPTS = 3;
+    var OUTBOX_BACKOFF_BASE_MS = 1e3;
+    var log2 = (category, message) => {
+      const now = /* @__PURE__ */ new Date();
+      const ts = [
+        String(now.getHours()).padStart(2, "0"),
+        String(now.getMinutes()).padStart(2, "0"),
+        String(now.getSeconds()).padStart(2, "0"),
+        " - ",
+        String(now.getDate()).padStart(2, "0"),
+        "/",
+        String(now.getMonth() + 1).padStart(2, "0")
+      ].join("");
+      console.log(`[${ts}] - [${category}] ${message}`);
+    };
+    var fetch = (url, options) => {
+      return new Promise((resolve, reject) => {
+        const { protocol, hostname, port, pathname } = new URL(url);
+        const client = protocol === "https:" ? https2 : http2;
+        const reqOptions = {
+          ...options,
+          hostname,
+          port: port || (protocol === "https:" ? 443 : 80),
+          path: pathname,
+          timeout: 15e3
+        };
+        const req = client.request(reqOptions, (res) => {
+          let data = "";
+          res.on("data", (chunk) => data += chunk);
+          res.on("end", () => {
+            try {
+              resolve({ status: res.statusCode, body: JSON.parse(data) });
+            } catch (_) {
+              resolve({ status: res.statusCode, body: data });
+            }
+          });
+        });
+        req.on("error", (err) => reject(err));
+        req.on("timeout", () => {
+          req.destroy();
+          reject(new Error(`timeout (15s) \u2014 ${url}`));
+        });
+        if (options.body) req.write(JSON.stringify(options.body));
+        req.end();
+      });
+    };
+    function enqueueAlert(alert2) {
+      if (!config2.isPrimary) return;
+      if (!alert2 || !alert2.id) return;
+      const existing = outbox.find((e) => e.type === "alert" && e.id === alert2.id);
+      if (existing) {
+        existing.payload = alert2;
+        existing.attempts = 0;
+        existing.nextRetry = Date.now();
+        log2("OUTBOX", `Alerte ${alert2.id} mise \xE0 jour dans l'outbox (d\xE9j\xE0 en attente)`);
+        return;
+      }
+      outbox.push({
+        type: "alert",
+        id: alert2.id,
+        payload: alert2,
+        attempts: 0,
+        nextRetry: Date.now()
+        // immédiat
+      });
+      log2("OUTBOX", `Alerte ${alert2.id} ajout\xE9e \xE0 l'outbox (taille: ${outbox.length})`);
+    }
+    function enqueueEvent(event) {
+      if (!config2.isPrimary) return;
+      if (!event || !event.code) return;
+      const existing = outbox.find((e) => e.type === "event" && e.id === event.code);
+      if (existing) {
+        existing.payload = event;
+        existing.attempts = 0;
+        existing.nextRetry = Date.now();
+        log2("OUTBOX", `\xC9v\xE9nement ${event.code} mis \xE0 jour dans l'outbox`);
+        return;
+      }
+      outbox.push({
+        type: "event",
+        id: event.code,
+        payload: event,
+        attempts: 0,
+        nextRetry: Date.now()
+      });
+      log2("OUTBOX", `\xC9v\xE9nement ${event.code} ajout\xE9 \xE0 l'outbox (taille: ${outbox.length})`);
+    }
+    async function _processOutboxItem(item) {
+      try {
+        const endpoint = item.type === "alert" ? "alert" : "event";
+        const url = `${config2.partnerUrl}/api/sync/${endpoint}`;
+        const bodyKey = item.type === "alert" ? "alert" : "event";
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: { [bodyKey]: item.payload, from: config2.serverType }
+        });
+        if (res.status >= 200 && res.status < 300) {
+          log2("OUTBOX", `\u2705 ${item.type} ${item.id} r\xE9pliqu\xE9 avec succ\xE8s (tentative ${item.attempts + 1})`);
+          return true;
+        } else {
+          log2("OUTBOX", `\u26A0 ${item.type} ${item.id} \u2014 statut HTTP ${res.status} (tentative ${item.attempts + 1})`);
+          return false;
+        }
+      } catch (err) {
+        log2("OUTBOX", `\u274C ${item.type} ${item.id} \u2014 \xE9chec r\xE9seau: ${err.message} (tentative ${item.attempts + 1})`);
+        return false;
+      }
+    }
+    async function flushOutbox() {
+      if (outbox.length === 0) return;
+      const now = Date.now();
+      const toProcess = outbox.filter((item) => item.nextRetry <= now);
+      if (toProcess.length === 0) {
+        log2("OUTBOX", `${outbox.length} en attente, prochain retry dans ${Math.round((outbox[0].nextRetry - now) / 1e3)}s`);
+        return;
+      }
+      log2("OUTBOX", `Flush \u2014 ${toProcess.length}/${outbox.length} \xE9l\xE9ments \xE0 traiter`);
+      for (const item of toProcess) {
+        const success = await _processOutboxItem(item);
+        if (success) {
+          const idx = outbox.indexOf(item);
+          if (idx !== -1) outbox.splice(idx, 1);
+        } else {
+          item.attempts++;
+          if (item.attempts >= OUTBOX_MAX_ATTEMPTS) {
+            log2("OUTBOX", `\u{1F6AB} ${item.type} ${item.id} abandonn\xE9 apr\xE8s ${OUTBOX_MAX_ATTEMPTS} tentatives`);
+            const idx = outbox.indexOf(item);
+            if (idx !== -1) outbox.splice(idx, 1);
+          } else {
+            const delay = OUTBOX_BACKOFF_BASE_MS * Math.pow(2, item.attempts - 1);
+            item.nextRetry = Date.now() + delay;
+            log2("OUTBOX", `\u23F3 ${item.type} ${item.id} \u2014 retry dans ${delay / 1e3}s (tentative ${item.attempts}/${OUTBOX_MAX_ATTEMPTS})`);
+          }
+        }
+      }
+      if (outbox.length > 0) {
+        log2("OUTBOX", `Flush termin\xE9 \u2014 ${outbox.length} restants dans l'outbox`);
+      }
+    }
+    function startOutbox() {
+      if (outboxTimer) return;
+      outboxTimer = setInterval(flushOutbox, OUTBOX_FLUSH_INTERVAL_MS);
+      log2("OUTBOX", `D\xE9marr\xE9 \u2014 flush toutes les ${OUTBOX_FLUSH_INTERVAL_MS / 1e3}s`);
+    }
+    function stopOutbox() {
+      if (outboxTimer) {
+        clearInterval(outboxTimer);
+        outboxTimer = null;
+        log2("OUTBOX", "Arr\xEAt\xE9");
+      }
+    }
+    function outboxSize() {
+      return outbox.length;
+    }
+    function outboxDump() {
+      return outbox.map((item) => ({
+        type: item.type,
+        id: item.id,
+        attempts: item.attempts,
+        nextRetryMs: Math.max(0, item.nextRetry - Date.now())
+      }));
+    }
+    async function pushAlert(alert2) {
+      if (!config2.isPrimary) return false;
+      try {
+        const url = `${config2.partnerUrl}/api/sync/alert`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: { alert: alert2, from: config2.serverType }
+        });
+        if (res.status === 200) {
+          log2("SYNC", `Push direct alert ${alert2.id} OK`);
+          return true;
+        }
+        log2("SYNC", `Push direct alert ${alert2.id} \xE9chou\xE9 (${res.status}) \u2192 outbox`);
+        enqueueAlert(alert2);
+        return false;
+      } catch (e) {
+        log2("SYNC", `Push direct alert ${alert2.id} \xC9CHEC: ${e.message} \u2192 outbox`);
+        enqueueAlert(alert2);
+        return false;
+      }
+    }
+    async function pushEvent(event) {
+      if (!config2.isPrimary) return false;
+      try {
+        const url = `${config2.partnerUrl}/api/sync/event`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: { event, from: config2.serverType }
+        });
+        if (res.status === 200) {
+          log2("SYNC", `Push direct event ${event.code} OK`);
+          return true;
+        }
+        log2("SYNC", `Push direct event ${event.code} \xE9chou\xE9 (${res.status}) \u2192 outbox`);
+        enqueueEvent(event);
+        return false;
+      } catch (e) {
+        log2("SYNC", `Push direct event ${event.code} \xC9CHEC: ${e.message} \u2192 outbox`);
+        enqueueEvent(event);
+        return false;
+      }
+    }
+    async function pollSync() {
+      const hash = store2.getStateHash();
+      try {
+        const url = `${config2.partnerUrl}/api/sync/check`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: { hash, from: config2.serverType }
+        });
+        if (res.status === 200 && res.body && res.body.action === "full_sync") {
+          log2("SYNC", `D\xE9synchronisation d\xE9tect\xE9e \u2014 dump complet vers ${config2.partnerUrl}`);
+          const dump = store2.exportAll();
+          const fullUrl = `${config2.partnerUrl}/api/sync/full`;
+          await fetch(fullUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: { dump, from: config2.serverType }
+          });
+          log2("SYNC", `Full sync envoy\xE9 \u2014 ${dump.alerts?.length || 0} alerts, ${dump.events?.length || 0} events`);
+        }
+        store2.syncState.lastSyncAt = (/* @__PURE__ */ new Date()).toISOString();
+        store2.syncState.lastSyncSuccess = true;
+      } catch (e) {
+        store2.syncState.lastSyncSuccess = false;
+        log2("SYNC", `Polling \xC9CHEC: ${e.message} \u2014 cible: ${config2.partnerUrl}`);
+      }
+    }
+    function receiveFullSync(dump) {
+      store2.importAll(dump);
+      store2.syncState.lastSyncAt = (/* @__PURE__ */ new Date()).toISOString();
+      store2.syncState.lastSyncSuccess = true;
+      log2("SYNC", `Full sync re\xE7u \u2014 ${dump.alerts?.length || 0} alerts, ${dump.events?.length || 0} events`);
+    }
+    function checkHash(remoteHash) {
+      const localHash = store2.getStateHash();
+      return localHash !== remoteHash;
+    }
+    module2.exports = {
+      // API outbox (recommandée)
+      enqueueAlert,
+      enqueueEvent,
+      startOutbox,
+      stopOutbox,
+      flushOutbox,
+      outboxSize,
+      outboxDump,
+      // API directe (compatibilité ascendante)
+      pushAlert,
+      pushEvent,
+      pollSync,
+      receiveFullSync,
+      checkHash
+    };
+  }
+});
+
 // src/routes/api.js
 var require_api = __commonJS({
   "src/routes/api.js"(exports2, module2) {
@@ -28904,8 +29245,7 @@ var require_api = __commonJS({
         uploadedTo: ""
       };
       const saved = store2.addAlert(alert2);
-      sync2.pushAlert(saved).catch(() => {
-      });
+      sync2.enqueueAlert(saved);
       res.status(201).json({
         alert: { ...saved, votes: saved.votes || [] },
         votesCount: (saved.votes || []).length,
@@ -28948,8 +29288,7 @@ var require_api = __commonJS({
       if (!alert2.votes.includes(userId2)) {
         alert2.votes.push(userId2);
         alert2.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
-        sync2.pushAlert(alert2).catch(() => {
-        });
+        sync2.enqueueAlert(alert2);
       }
       const validated = alert2.votes.length >= config2.consensusThreshold;
       res.json({
@@ -28963,8 +29302,7 @@ var require_api = __commonJS({
       if (!alert2) return res.status(404).json({ error: "Alerte non trouv\xE9e" });
       alert2.status = "rejected";
       alert2.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
-      sync2.pushAlert(alert2).catch(() => {
-      });
+      sync2.enqueueAlert(alert2);
       res.json({ success: true, message: "Signalement r\xE9voqu\xE9" });
     });
     router.post("/sync/alert", (req, res) => {
@@ -28978,6 +29316,61 @@ var require_api = __commonJS({
       if (!event) return res.status(400).json({ error: "event requis" });
       store2.addEvent(event);
       res.json({ success: true });
+    });
+    router.post("/sync-push", (req, res) => {
+      try {
+        const { alerts, peerId, since } = req.body || {};
+        if (!Array.isArray(alerts) || alerts.length === 0) {
+          return res.status(400).json({ error: "alerts[] requis" });
+        }
+        let upserted = 0;
+        for (const alert2 of alerts) {
+          if (!alert2.id || !alert2.type || alert2.lat == null || alert2.lng == null) {
+            continue;
+          }
+          if (peerId && (!alert2.votes || !alert2.votes.includes(peerId))) {
+            if (!alert2.votes) alert2.votes = [];
+            alert2.votes.push(peerId);
+          }
+          store2.addAlert(alert2);
+          upserted++;
+        }
+        let deltas = [];
+        if (since) {
+          const sinceDate = new Date(since);
+          deltas = store2.getAllAlerts().filter((a) => {
+            if (a.status === "rejected") return false;
+            const updated = new Date(a.updatedAt || a.createdAt);
+            return updated > sinceDate;
+          }).map((a) => ({ ...a, votes: a.votes || [] }));
+        }
+        console.log(
+          `[SYNC-PUSH] peer=${peerId || "anon"} upserted=${upserted} deltas=${deltas.length}`
+        );
+        res.json({
+          success: true,
+          upserted,
+          deltas,
+          serverTs: (/* @__PURE__ */ new Date()).toISOString()
+        });
+      } catch (err) {
+        console.error("[SYNC-PUSH] Erreur:", err.message);
+        res.status(500).json({ error: err.message });
+      }
+    });
+    router.get("/sync-check", (req, res) => {
+      const since = req.query.since;
+      const sinceDate = since ? new Date(since) : /* @__PURE__ */ new Date(0);
+      const items = store2.getAllAlerts().filter((a) => {
+        if (a.status === "rejected") return false;
+        const updated = new Date(a.updatedAt || a.createdAt);
+        return updated > sinceDate;
+      }).slice(0, 500).map((a) => ({ ...a, votes: a.votes || [] }));
+      res.json({
+        items,
+        count: items.length,
+        serverTs: (/* @__PURE__ */ new Date()).toISOString()
+      });
     });
     router.post("/sync/check", (req, res) => {
       const { hash, from } = req.body || {};
@@ -29060,8 +29453,7 @@ var require_api = __commonJS({
         destinationLongitude
       };
       const saved = store2.addEvent(event);
-      sync2.pushEvent(saved).catch(() => {
-      });
+      sync2.enqueueEvent(saved);
       res.status(201).json(saved);
     });
     router.post("/panic/collective", (req, res) => {
@@ -29085,8 +29477,7 @@ var require_api = __commonJS({
           votes: ["SYSTEM_AUTO"],
           status: "active"
         });
-        sync2.pushAlert(dangerZone).catch(() => {
-        });
+        sync2.enqueueAlert(dangerZone);
       }
       res.json(result);
     });
@@ -29111,6 +29502,7 @@ var require_api = __commonJS({
       if (!message) {
         return res.status(400).json({ error: "message requis" });
       }
+      const saved = store2.addBugReport({ type: type2, message, stackTrace, deviceInfo, appVersion });
       const now = /* @__PURE__ */ new Date();
       const ts = [
         String(now.getHours()).padStart(2, "0"),
@@ -29121,12 +29513,23 @@ var require_api = __commonJS({
         "/",
         String(now.getMonth() + 1).padStart(2, "0")
       ].join("");
-      console.log(`[${ts}] - [BUG] ${type2 || "report"} \u2014 ${message}`);
+      console.log(`[${ts}] - [BUG] #${saved.id} ${type2 || "report"} \u2014 ${message}`);
       if (stackTrace) console.log(`[${ts}] - [BUG] Stack:
 ${stackTrace}`);
       if (deviceInfo) console.log(`[${ts}] - [BUG] Device: ${JSON.stringify(deviceInfo)}`);
       if (appVersion) console.log(`[${ts}] - [BUG] App version: ${appVersion}`);
-      res.status(201).json({ success: true, receivedAt: (/* @__PURE__ */ new Date()).toISOString() });
+      res.status(201).json({ success: true, id: saved.id, receivedAt: saved.receivedAt });
+    });
+    router.get("/bug-reports", (req, res) => {
+      const limit = parseInt(req.query.limit, 10) || 50;
+      const offset = parseInt(req.query.offset, 10) || 0;
+      const result = store2.getBugReports({ limit, offset });
+      res.json(result);
+    });
+    router.get("/bug-reports/:id", (req, res) => {
+      const report = store2.getBugReportById(req.params.id);
+      if (!report) return res.status(404).json({ error: "Rapport non trouv\xE9" });
+      res.json(report);
     });
     module2.exports = router;
   }

@@ -19,10 +19,10 @@ import 'dart:isolate';
 
 import 'package:latlong2/latlong.dart';
 
-import '../core/graph/spg_graph.dart';
-import '../core/graph/spg_loader.dart';
 import '../core/algorithms/astar.dart';
 import '../core/algorithms/dijkstra.dart';
+import '../core/graph/spg_graph.dart';
+import '../core/graph/spg_loader.dart';
 import '../core/graph/spg_types.dart';
 import '../core/models/routing_profile.dart';
 

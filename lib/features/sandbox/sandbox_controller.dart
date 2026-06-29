@@ -84,14 +84,20 @@ class SandboxController {
   /// Connecte le contrôleur au backend sandbox.
   ///
   /// [wsUrl] : URL du WebSocket sandbox.
-  /// [loopback] : transport loopback (requis sur le Web).
+  /// [loopback] : transport loopback (requis sur le Web en debug).
+  ///
+  /// ⚠️ Le paramètre [loopback] est IGNORÉ en mode release
+  /// (le LoopbackMeshTransport n'existe pas en production).
   Future<void> connect({
     String wsUrl = defaultWsUrl,
     LoopbackMeshTransport? loopback,
   }) async {
     if (_channel != null) return;
 
-    _loopback = loopback;
+    // Garde anti-production : le loopback n'existe qu'en debug.
+    // En release, on le force à null pour éviter toute injection
+    // accidentelle de paquets simulés.
+    _loopback = kDebugMode ? loopback : null;
     connectionState.value = SandboxConnectionState.connecting;
 
     try {
@@ -278,7 +284,7 @@ class SandboxController {
     required double centerLat,
     required double centerLng,
   }) {
-    final types = AlertType.values;
+    const types = AlertType.values;
     final rng = math.Random();
     final coordinator = NetworkCoordinator.instance;
 

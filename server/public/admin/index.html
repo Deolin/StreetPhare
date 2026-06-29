@@ -30,6 +30,13 @@
     .waypoint-row { display: flex; gap: 8px; margin-bottom: 4px; align-items: center; }
     .waypoint-row input { flex: 1; margin-bottom: 0; }
     .waypoint-row button { width: auto; padding: 4px 8px; background: #da3633; }
+    /* Login overlay */
+    #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    #login-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 32px; width: 360px; text-align: center; }
+    #login-box h2 { margin-bottom: 20px; }
+    #login-box input { width: 100%; background: #21262d; border: 1px solid #30363d; border-radius: 4px; padding: 10px; color: #c9d1d9; font-size: 14px; margin-bottom: 12px; }
+    #login-box button { background: #238636; color: white; border: none; border-radius: 4px; padding: 10px 16px; cursor: pointer; font-size: 14px; width: 100%; }
+    #login-error { color: #f85149; font-size: 12px; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -78,6 +85,18 @@
     </div>
   </div>
 
+  <!-- Login overlay -->
+  <div id="login-overlay">
+    <div id="login-box">
+      <h2>🔐 Connexion Admin</h2>
+      <input id="login-user" type="text" placeholder="Nom d'utilisateur" value="admin" autocomplete="username">
+      <div style="display:none"><input type="password" autocomplete="current-password" value="block-browser-autofill"></div>
+      <input id="login-pass" type="password" placeholder="Mot de passe" autocomplete="off">
+      <button onclick="doLogin()">Se connecter</button>
+      <div id="login-error"></div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const map = L.map('map').setView([50.4762, 4.5422], 15);
@@ -86,10 +105,72 @@
 
     let ws;
     let currentHash = '';
+    let adminToken = '';
+
+    // Charger le token depuis sessionStorage si disponible.
+    adminToken = sessionStorage.getItem('sp_admin_token') || '';
+
+    async function doLogin() {
+      const user = document.getElementById('login-user').value;
+      const pass = document.getElementById('login-pass').value;
+      const errorDiv = document.getElementById('login-error');
+      const btn = document.querySelector('#login-box button');
+      const overlay = document.getElementById('login-overlay');
+
+      btn.disabled = true;
+      btn.textContent = 'Connexion...';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, password: pass })
+        });
+        const data = await res.json();
+
+        if (data.success && data.token) {
+          adminToken = data.token;
+          sessionStorage.setItem('sp_admin_token', data.token);
+
+          // Recharger la page pour que le nouveau token soit utilisé
+          // par le code d'initialisation (ligne ~156). Cela vide aussi
+          // tout vieux token expiré qui pourrait être en mémoire.
+          window.location.reload();
+        } else {
+          errorDiv.textContent = data.error || 'Identifiants invalides';
+          btn.disabled = false;
+          btn.textContent = 'Se connecter';
+        }
+      } catch (e) {
+        errorDiv.textContent = 'Erreur réseau.';
+        btn.disabled = false;
+        btn.textContent = 'Se connecter';
+      }
+    }
+
+    // Si un token existe, on cache l'overlay et on tente la connexion WebSocket.
+    // Le `ws.onerror` réaffichera l'overlay si le token est véritablement invalide.
+    if (adminToken) {
+      document.getElementById('login-overlay').style.display = 'none';
+      document.getElementById('sync-status').innerHTML = '<span class="ok">● Connexion...</span>';
+      try { connect(); } catch (_) { /* ignore */ }
+    }
+
+    // Permettre la connexion via Entrée
+    document.getElementById('login-pass').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doLogin();
+    });
 
     function connect() {
+      if (!adminToken) {
+        document.getElementById('sync-status').innerHTML = '<span class="ko">● Token manquant</span>';
+        return;
+      }
+
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      ws = new WebSocket(`${protocol}//${location.host}/admin-ws`);
+      const wsUrl = `${protocol}//${location.host}/admin-ws?token=${encodeURIComponent(adminToken)}`;
+      ws = new WebSocket(wsUrl);
+
       ws.onmessage = (e) => {
         const data = JSON.parse(e.data);
         if (data.type === 'admin_snapshot') {
@@ -102,6 +183,14 @@
       ws.onclose = () => {
         document.getElementById('sync-status').innerHTML = '<span class="ko">● Déconnecté — reconnexion dans 3s</span>';
         setTimeout(connect, 3000);
+      };
+      ws.onerror = () => {
+        // Si le WebSocket échoue avec un code 400/401, le token est invalide.
+        // On efface le token et on ré-affiche l'overlay.
+        sessionStorage.removeItem('sp_admin_token');
+        adminToken = '';
+        document.getElementById('login-overlay').style.display = 'flex';
+        document.getElementById('sync-status').innerHTML = '<span class="ko">● Session expirée — reconnectez-vous</span>';
       };
     }
 
@@ -118,32 +207,46 @@
       alerts.forEach(a => {
         const key = a.id;
         if (markers[key]) { markers[key].setLatLng([a.lat, a.lng]); return; }
-        const color = a.type === 'collective_danger' ? 'red' : a.type === 'panic' ? 'orange' : 'blue';
-        markers[key] = L.circleMarker([a.lat, a.lng], { radius: 8, fillColor: color, color, weight: 2, fillOpacity: 0.6 })
-          .addTo(map).bindPopup(`<b>${a.type}</b><br>${a.description || ''}<br>${(a.votes||[]).length} votes`);
+        markers[key] = L.marker([a.lat, a.lng]).addTo(map)
+          .bindPopup(`<b>${a.type}</b><br>${a.description || ''}<br><small>${a.id}</small>`);
       });
     }
 
-    function updateStatus(sync) {
-      if (sync) {
-        document.getElementById('sync-status').innerHTML =
-          `<span class="${sync.lastSyncSuccess ? 'ok' : 'ko'}">● ${sync.lastSyncSuccess ? 'Synchronisé' : 'Erreur synchro'}</span>`;
+    function updateStatus(syncState) {
+      document.getElementById('sync-status').innerHTML = '<span class="ok">● Connecté</span>';
+      if (syncState) {
+        document.getElementById('mesh-count').textContent = syncState.meshClients || 0;
       }
     }
 
     async function rejectAlert(id) {
-      await fetch(`/api/alerts/${id}/reject`, { method: 'POST' });
-      location.reload();
+      if (!adminToken) { alert('Token admin manquant'); return; }
+      const res = await fetch(`/api/alerts/${id}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        }
+      });
+      if (res.ok) {
+        delete markers[id];
+        if (ws && ws.readyState === WebSocket.OPEN) connect(); // refresh via snapshot
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Erreur lors de la révocation');
+      }
     }
 
     function addWaypoint() {
       const div = document.createElement('div');
       div.className = 'waypoint-row';
-      div.innerHTML = `<input class="wp-label" placeholder="Label"><input class="wp-lat" type="number" step="0.0001" placeholder="Lat"><input class="wp-lng" type="number" step="0.0001" placeholder="Lng"><input class="wp-min" type="number" placeholder="Min"><button onclick="this.parentElement.remove()">✕</button>`;
+      div.innerHTML = '<input class="wp-label" placeholder="Label"><input class="wp-lat" type="number" step="0.0001" placeholder="Lat"><input class="wp-lng" type="number" step="0.0001" placeholder="Lng"><input class="wp-min" type="number" placeholder="Min"><button onclick="this.parentElement.remove()">✕</button>';
       document.getElementById('waypoints-container').appendChild(div);
     }
 
     async function createEvent() {
+      if (!adminToken) { alert('Token admin manquant'); return; }
+
       const code = document.getElementById('event-code').value;
       const title = document.getElementById('event-title').value;
       const startAt = document.getElementById('event-start').value;
@@ -166,12 +269,21 @@
         destinationLatitude: destLat, destinationLongitude: destLng
       };
 
-      const res = await fetch('/api/events/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch('/api/events/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify(body)
+      });
       const data = await res.json();
-      document.getElementById('qr-container').innerHTML = `<p><b>Code:</b> ${data.code}</p><p>QR Code (scannez avec StreetPhare) :</p><img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(JSON.stringify(data))}" alt="QR Code">`;
+      if (res.ok) {
+        document.getElementById('qr-container').innerHTML = `<p><b>Code:</b> ${data.code}</p><p>QR Code (scannez avec StreetPhare) :</p><img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(JSON.stringify(data))}" alt="QR Code">`;
+      } else {
+        alert(data.error || 'Erreur création événement');
+      }
     }
-
-    connect();
   </script>
 </body>
 </html>

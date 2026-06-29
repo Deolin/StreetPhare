@@ -17,9 +17,9 @@ import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_streetphare/network/network_config.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_streetphare/constants/app_constants.dart';
 
 /// Résultat d'un check kick.
 class KickStatus {
@@ -40,7 +40,9 @@ class KickCheckService extends ChangeNotifier {
   KickCheckService._();
   static final KickCheckService instance = KickCheckService._();
 
-  static const String _adminBase = '${AppStrings.adminServerUrl}:4000';
+  /// URL de base pour les requêtes kick-status.
+  /// Utilise le NetworkConfig centralisé (port 4000, derrière Caddy).
+  static String get _adminBase => NetworkConfig.kickStatusBaseUrl;
   static const String _uuidKey = 'streetphare_ephemeral_uuid';
   static const Duration _checkInterval = Duration(minutes: 5);
 
@@ -225,12 +227,12 @@ class _AutoLockOverlayState extends State<AutoLockOverlay>
     return Positioned.fill(
       child: Material(
         color: Colors.black.withValues(alpha: 0.92),
-        child: Column(
+        child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.lock, color: Colors.redAccent, size: 80),
-            const SizedBox(height: 24),
-            const Text(
+            Icon(Icons.lock, color: Colors.redAccent, size: 80),
+            SizedBox(height: 24),
+            Text(
               '⚠️ Application verrouillée',
               style: TextStyle(
                 color: Colors.white,
@@ -238,8 +240,8 @@ class _AutoLockOverlayState extends State<AutoLockOverlay>
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
-            const Padding(
+            SizedBox(height: 16),
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 40),
               child: Text(
                 'Votre appareil a été identifié comme source de comportements '
@@ -255,9 +257,9 @@ class _AutoLockOverlayState extends State<AutoLockOverlay>
                 ),
               ),
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
             // Affiche un compte à rebours de 30 minutes.
-            const _LockCountdown(durationMinutes: 30),
+            _LockCountdown(durationMinutes: 30),
           ],
         ),
       ),

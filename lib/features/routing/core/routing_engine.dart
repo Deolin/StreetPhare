@@ -17,14 +17,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../domain/pedestrian_route_service.dart';
-import '../domain/models/route_result.dart' as legacy;
 import '../domain/models/avoidance_filters.dart';
+import '../domain/models/route_result.dart' as legacy;
+import '../domain/pedestrian_route_service.dart';
 import '../infrastructure/osmand_native_channel.dart';
 import '../infrastructure/osmand_routing_service.dart';
 import '../infrastructure/routing_isolate.dart';
-import '../presentation/safe_path_engine.dart';
 import '../presentation/route_notifier.dart';
+import '../presentation/safe_path_engine.dart';
 import 'graph/spg_graph.dart';
 import 'graph/spg_loader.dart';
 import 'graph/spg_types.dart';
@@ -235,8 +235,8 @@ class RoutingEngine {
     }
 
     // ── ÉCHEC TOTAL ─────────────────────────────────────────────────────
-    return RouteComputeResult(
-      routes: const [],
+    return const RouteComputeResult(
+      routes: [],
       source: 'all_failed',
       errorMessage: 'Aucun moteur de routage disponible. '
           'Vérifiez la connexion réseau ou les fichiers de carte.',

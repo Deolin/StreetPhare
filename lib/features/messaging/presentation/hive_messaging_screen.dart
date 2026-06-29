@@ -423,7 +423,7 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
   Widget _buildInputBar(Color onSurface, Color? accentColor) {
     final accent = accentColor ?? StreetPhareTheme.primary;
     return Container(
-      padding: EdgeInsets.only(
+      padding: const EdgeInsets.only(
         left: 12,
         right: 8,
         top: 8,

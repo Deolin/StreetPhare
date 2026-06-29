@@ -11,12 +11,12 @@
 
 import 'package:flutter/material.dart';
 
-import '../../features/splash/presentation/splash_screen.dart';
-import '../../features/tutorial/presentation/tutorial_screen.dart';
+import '../../features/bug_report/presentation/bug_report_screen.dart';
+import '../../features/events/presentation/events_screen.dart';
 import '../../features/map/presentation/map_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
-import '../../features/events/presentation/events_screen.dart';
-import '../../features/bug_report/presentation/bug_report_screen.dart';
+import '../../features/splash/presentation/splash_screen.dart';
+import '../../features/tutorial/presentation/tutorial_screen.dart';
 
 /// Clé globale pour le navigateur racine (utilisable depuis les tests).
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();

@@ -5,8 +5,9 @@
 // Fonctionnalités :
 //   1. Notification persistante "StreetPhare actif" avec bouton "Quitter".
 //   2. Notifications d'alerte critique (danger à proximité en arrière-plan).
-//   3. Dialogue pédagogique d'autorisation arrière-plan.
-//   4. Multiplateforme : Android, iOS, Windows (graceful fallback).
+//   3. Notifications de messagerie P2P (style conversation Android MessagingStyle).
+//   4. Dialogue pédagogique d'autorisation arrière-plan.
+//   5. Multiplateforme : Android, iOS, Windows (graceful fallback).
 
 import 'dart:io' as io;
 
@@ -14,12 +15,23 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../features/messaging/domain/models/hive_message.dart';
+
 // ============================================================================
 // IDs de notifications
 // ============================================================================
 
 const int _kPersistentNotifId = 1001;
 const int _kAlertNotifBaseId = 2000;
+const int _kMessageNotifBaseId = 3000;
+
+// ============================================================================
+// ID de canaux Android
+// ============================================================================
+
+const String _kAlertChannelId = 'streetphare_alerts';
+const String _kPersistentChannelId = 'streetphare_persistent';
+const String _kMessagesChannelId = 'messages_channel';
 
 // ============================================================================
 // NotificationService
@@ -119,7 +131,7 @@ class NotificationService {
     }
 
     const androidDetails = AndroidNotificationDetails(
-      'streetphare_persistent',
+      _kPersistentChannelId,
       'StreetPhare Actif',
       channelDescription:
           'Indique que StreetPhare surveille activement votre zone.',
@@ -183,7 +195,7 @@ class NotificationService {
     final notifId = _kAlertNotifBaseId + (id % 100);
 
     const androidDetails = AndroidNotificationDetails(
-      'streetphare_alerts',
+      _kAlertChannelId,
       'Alertes StreetPhare',
       channelDescription: 'Alertes critiques de danger à proximité.',
       importance: Importance.high,
@@ -211,6 +223,170 @@ class NotificationService {
       payload: 'alert_tap',
     );
     if (kDebugMode) debugPrint('[NotificationService] alerte: $title');
+  }
+
+  // --------------------------------------------------------------------------
+  // Notification de message P2P — Style Conversation Android
+  // --------------------------------------------------------------------------
+
+  /// Affiche une notification de style "Messagerie" pour un message Hive P2P.
+  ///
+  /// Utilise [MessagingStyleInformation] sur Android pour produire un aperçu
+  /// conversationnel dans le volet de notifications (similaire à Android
+  /// Messages ou Messenger). Sur iOS, affiche un titre/corps standard.
+  ///
+  /// Le canal Android dédié `messages_channel` est créé avec
+  /// [Importance.max] et [Priority.high] pour forcer l'apparition
+  /// d'un heads-up (bannière flottante) à chaque nouveau message.
+  ///
+  /// [message] : le message Hive reçu du réseau P2P.
+  /// [summary] : texte de résumé pour le groupe de notifications
+  ///   (ex: "3 nouveaux messages"). Si omis, pas de groupe.
+  void showMessageNotification(
+    HiveMessage message, {
+    String? summary,
+  }) async {
+    if (!_initialized) await init();
+    if (kIsWeb || !io.Platform.isAndroid) return;
+
+    final notifId = _kMessageNotifBaseId + (message.id.hashCode % 1000).abs();
+
+    // ── Identifier l'expéditeur ──────────────────────────────────────
+    final Person sender = _buildSenderPerson(message);
+
+    // ── Message affiché dans le volet conversationnel ────────────────
+    final androidMessage = Message(
+      message.content.length > 200
+          ? '${message.content.substring(0, 200)}…'
+          : message.content,
+      message.sentAt.toLocal(),
+      sender,
+    );
+
+    // ── Style conversationnel Android ─────────────────────────────────
+    final messagingStyle = MessagingStyleInformation(
+      const Person(
+        name: 'StreetPhare Hive',
+        key: 'hive_thread',
+        bot: false,
+      ),
+      conversationTitle: 'Messages Hive',
+      groupConversation: true,
+      messages: <Message>[androidMessage],
+    );
+
+    // ── Détails Android avec le canal dédié ──────────────────────────
+    // Note: styleInformation est omis ici car il est déprécié dans v22.
+    // Le style est passé via le paramètre dédié ci-dessous.
+    final androidDetails = AndroidNotificationDetails(
+      _kMessagesChannelId,
+      'Messages',
+      channelDescription: 'Messages P2P reçus via le réseau Hive StreetPhare.',
+      importance: Importance.max,
+      priority: Priority.high,
+      color: const Color(0xFFFFB300),
+      autoCancel: true,
+      category: AndroidNotificationCategory.message,
+      styleInformation: messagingStyle,
+      groupKey: 'hive_messages',
+      setAsGroupSummary: summary != null,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      categoryIdentifier: 'hive_message',
+    );
+
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    // ── Titre et corps ───────────────────────────────────────────────
+    final title = message.isFromAdmin
+        ? '📟 Poste de Contrôle (Admin)'
+        : _senderDisplayName(message);
+
+    final body = message.content.length > 200
+        ? '${message.content.substring(0, 200)}…'
+        : message.content;
+
+    try {
+      await _plugin.show(
+        id: notifId,
+        title: summary ?? title,
+        body: summary != null ? title : body,
+        notificationDetails: details,
+        payload: 'message_tap:${message.id}',
+      );
+      if (kDebugMode) {
+        debugPrint(
+          '[NotificationService] message affiché: '
+          '${message.id} (${message.isFromAdmin ? "admin" : "citoyen"})',
+        );
+      }
+    } catch (e) {
+      // Fallback silencieux : si le style conversationnel échoue
+      // (ex: version Android trop ancienne), on retente sans style.
+      if (kDebugMode) {
+        debugPrint('[NotificationService] échec MessagingStyle, '
+            'fallback simple: $e');
+      }
+      await _plugin.show(
+        id: notifId,
+        title: summary ?? title,
+        body: body,
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _kMessagesChannelId,
+            'Messages',
+            channelDescription:
+                'Messages P2P reçus via le réseau Hive StreetPhare.',
+            importance: Importance.max,
+            priority: Priority.high,
+            color: Color(0xFFFFB300),
+            autoCancel: true,
+            category: AndroidNotificationCategory.message,
+          ),
+          iOS: iosDetails,
+        ),
+        payload: 'message_tap:${message.id}',
+      );
+    }
+  }
+
+  /// Construit l'objet [Person] représentant l'expéditeur du message.
+  Person _buildSenderPerson(HiveMessage message) {
+    if (message.isFromAdmin) {
+      return const Person(
+        name: 'Poste de Contrôle (Admin)',
+        key: 'admin_sender',
+        bot: false,
+      );
+    }
+
+    // Citoyen anonyme : on tronque l'identifiant éphémère.
+    final truncatedId = message.senderEphemeralId.length > 8
+        ? '${message.senderEphemeralId.substring(0, 8)}…'
+        : message.senderEphemeralId;
+
+    return Person(
+      name: 'Citoyen $truncatedId',
+      key: message.senderEphemeralId,
+      bot: false,
+    );
+  }
+
+  /// Nom lisible pour l'expéditeur (utilisé dans le titre de la notification).
+  String _senderDisplayName(HiveMessage message) {
+    if (message.isFromAdmin) return '📟 Poste de Contrôle';
+
+    final truncatedId = message.senderEphemeralId.length > 6
+        ? message.senderEphemeralId.substring(0, 6)
+        : message.senderEphemeralId;
+    return '👤 Citoyen $truncatedId';
   }
 
   // --------------------------------------------------------------------------

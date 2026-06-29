@@ -1,0 +1,50 @@
+# server/Caddyfile
+# StreetPhare v3.1 — Reverse-proxy Caddy (TLS automatique Let's Encrypt)
+
+streetphare.ddns.net {
+	tls {
+		protocols tls1.2 tls1.3
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+	}
+
+	reverse_proxy 127.0.0.1:3000 {
+		header_up Host {upstream_hostport}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	log {
+		output file /var/log/caddy/streetphare-access.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+		format json
+	}
+}
+
+streetphare.ddns.net:4000 {
+	tls {
+		protocols tls1.2 tls1.3
+	}
+
+	reverse_proxy 127.0.0.1:4000 {
+		header_up Host {upstream_hostport}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	log {
+		output file /var/log/caddy/streetphare-admin-access.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+		format json
+	}
+}

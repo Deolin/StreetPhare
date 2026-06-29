@@ -34,6 +34,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../network/p2p_mesh_service.dart';
+import 'peer_counter_service.dart';
 
 /// État courant du failover.
 enum FailoverState {
@@ -90,16 +91,21 @@ class TransportFailoverService {
     if (_started) return;
     _started = true;
 
-    // 1) On s'abonne au flux "incoming" de chaque transport pour
-    //    détecter toute activité (peu importe le canal).
+    // 1) On s'abonne au flux de pairs réels remonté par le
+    //    PeerCounterService. À chaque NOUVEAU pair StreetPhare
+    //    détecté par les transports (BLE, Wi-Fi Direct, WebSocket),
+    //    on réinitialise le timer d'inactivité.
+    _subs.add(
+      PeerCounterService.instance.onPeerObserved
+          .listen((_) => _onPeerActivity()),
+    );
+
+    // 2) On conserve aussi l'écoute des flux bruts `incoming` de
+    //    chaque transport comme filet de sécurité (un message non-ping
+    //    peut aussi indiquer une activité réseau).
     for (final t in transports) {
       _subs.add(t.incoming.listen((_) => _onPeerActivity()));
     }
-
-    // 2) On s'abonne aussi au flux de pairs remonté par P2PMeshService
-    //    (utile si une autre instance alimente ce flux).
-    //    Note : on l'écoute indirectement via l'API de la couche
-    //    réseau, mais on NE MODIFIE PAS l'autorité de P2PMeshService.
 
     // 3) Au démarrage, on n'active QUE le BLE.
     await _applyState(FailoverState.bleOnly);
@@ -124,8 +130,13 @@ class TransportFailoverService {
   /// À appeler pour signaler manuellement qu'on a vu un pair (par
   /// ex. depuis `P2PMeshService` qui a sa propre boucle de
   /// discovery). Réinitialise le timer d'inactivité.
+  ///
+  /// Force également un rafraîchissement du [PeerCounterService]
+  /// pour garantir la cohérence entre le compteur de pairs et
+  /// l'état du failover.
   void notifyPeerSeen() {
     _lastPeerSeen = DateTime.now().toUtc();
+    PeerCounterService.instance.forceRefresh();
   }
 
   /// Renvoie l'identifiant lisible du transport actuellement
@@ -142,11 +153,24 @@ class TransportFailoverService {
     }
   }
 
-  /// Helper public : enregistre l'observation d'un pair identifié
-  /// (utilisé par le `MapScreen` quand `PeerCounterService` capte
-  /// une nouvelle détection).
-  void recordPeerObservation(String peerId) {
+  /// Helper public : enregistre l'observation d'un pair identifié,
+  /// en déléguant au [PeerCounterService] qui est la source unique
+  /// de vérité pour la détection des pairs StreetPhare.
+  ///
+  /// Appelé par les couches UI (ex: `MapScreen`) ou par les
+  /// transports natifs lorsqu'ils détectent un nouvel appareil.
+  void recordPeerObservation(
+    String peerId, {
+    String? serviceUuid,
+    String? metadata,
+  }) {
     if (peerId.isEmpty) return;
+    // Délègue au PeerCounterService (source unique de vérité).
+    PeerCounterService.instance.recordPeer(
+      peerId,
+      serviceUuid: serviceUuid,
+      metadata: metadata,
+    );
     _onPeerActivity();
   }
 

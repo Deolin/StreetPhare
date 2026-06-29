@@ -8,8 +8,6 @@
 //
 // Référence : docs/STREETPHARE_AUDIT_COMPLET_v2.2.0.md — Anomalie E6
 
-import 'package:flutter/foundation.dart';
-
 import '../features/bug_report/presentation/bug_report_service.dart'
     as unified;
 

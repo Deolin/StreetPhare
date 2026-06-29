@@ -154,7 +154,7 @@ class SafeRouteLayer extends StatelessWidget {
           point: routePoints.last,
           width: 38,
           height: 38,
-          child: _EndpointDot(
+          child: const _EndpointDot(
             color: StreetPhareTheme.accent,
             icon: Icons.location_on,
             size: 24,

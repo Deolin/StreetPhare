@@ -216,8 +216,8 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
                 urlTemplate: tileUrl,
                 userAgentPackageName: 'com.streetphare.admin',
                 maxNativeZoom: 19,
-                tileDisplay: TileDisplay.fadeIn(
-                  duration: const Duration(milliseconds: 200),
+                tileDisplay: const TileDisplay.fadeIn(
+                  duration: Duration(milliseconds: 200),
                 ),
               ),
               if (markers.isNotEmpty) MarkerLayer(markers: markers),

@@ -62,6 +62,9 @@ class AppConfig {
   /// Host du serveur de production.
   static const String productionHost = 'streetphare.ddns.net';
 
+   /// Host du serveur de production backup.
+  static const String backupHost = 'streetphare-backup.myddns.me';
+
   /// Port du serveur principal.
   static const int primaryPort = 3000;
 
@@ -72,7 +75,7 @@ class AppConfig {
   static String get primaryServer => 'https://$productionHost:$primaryPort';
 
   /// URL du serveur secondaire (HTTPS).
-  static String get secondaryServer => 'https://$productionHost:$secondaryPort';
+  static String get secondaryServer => 'https://$backupHost:$secondaryPort';
 
   /// URL du relay WebSocket (WSS).
   static String get relayUrl => 'wss://$productionHost:$primaryPort/mesh';

@@ -28,8 +28,8 @@ import 'package:flutter/foundation.dart';
 
 import '../../../database/hive_alert_database.dart';
 import '../../../network/network_coordinator.dart';
-import 'geofencing_service.dart';
 import '../domain/models/geofence_event.dart';
+import 'geofencing_service.dart';
 
 /// Service singleton de validation de proximité.
 class ProximityValidationService {
