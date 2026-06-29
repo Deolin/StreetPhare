@@ -6,6 +6,8 @@
 //   - Bouton flottant persistant (bas gauche) sur tous les écrans.
 //   - Section dédiée dans les Paramètres (bouton + texte explicatif).
 //   - Envoi des rapports au serveur web d'administration.
+//   - Endpoint corrigé : POST https://streetphare.ddns.net:3000/api/bug-report
+//     (auparavant : POST sur la racine sans port ni chemin)
 
 import 'dart:async';
 import 'dart:convert';
@@ -41,7 +43,7 @@ class BugReport {
         'description': description,
         'platform': platform,
         'app_version': appVersion,
-        'category': category.name,
+        'category': category.name, // 'bug' ou 'suggestion' — unifié
         'extra_logs': extraLogs,
         'submitted_at': DateTime.now().toUtc().toIso8601String(),
       };
@@ -77,15 +79,23 @@ class BugReportService {
   BugReportService._();
   static final BugReportService instance = BugReportService._();
 
+  /// Endpoint du serveur pour les rapports de bug.
+  /// Format : POST {payload JSON} → /api/bug-report
+  static Uri get _submitUrl =>
+      Uri.parse('${AppStrings.adminServerUrl}:3000/api/bug-report');
+
   /// Envoie un rapport de bug au serveur d'administration.
+  ///
+  /// Flux unifié : les modes 'bug' et 'suggestion' empruntent le même
+  /// endpoint. Le champ `category` distingue les types côté serveur.
   Future<BugReportResult> submit(BugReport report) async {
     try {
       final payload = jsonEncode(report.toJson());
-      debugPrint('[BugReport] envoi en cours… ${report.title}');
+      debugPrint('[BugReport] envoi vers $_submitUrl : ${report.title}');
 
       final response = await http
           .post(
-            Uri.parse(AppStrings.adminServerUrl),
+            _submitUrl,
             headers: {
               'Content-Type': 'application/json',
               'X-StreetPhare-Client': '1.0',
@@ -95,22 +105,23 @@ class BugReportService {
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        debugPrint('[BugReport] rapport envoyé avec succès.');
+        debugPrint('[BugReport] ✅ Rapport envoyé avec succès.');
         return BugReportResult.success;
       } else {
-        debugPrint('[BugReport] erreur serveur: ${response.statusCode}');
+        debugPrint(
+            '[BugReport] ❌ Erreur serveur: ${response.statusCode} ${response.body}');
         return BugReportResult.serverError;
       }
     } catch (e) {
       if (!kIsWeb && e is io.SocketException) {
-        debugPrint('[BugReport] pas de connexion réseau');
+        debugPrint('[BugReport] 📶 Pas de connexion réseau: $e');
         return BugReportResult.networkError;
       }
       if (e is TimeoutException) {
-        debugPrint('[BugReport] timeout lors de l\'envoi');
+        debugPrint('[BugReport] ⏱ Timeout lors de l\'envoi');
         return BugReportResult.networkError;
       }
-      debugPrint('[BugReport] erreur inattendue: $e');
+      debugPrint('[BugReport] ❓ Erreur inattendue: $e');
       return BugReportResult.unknownError;
     }
   }
@@ -124,7 +135,9 @@ class BugReportService {
       if (io.Platform.isWindows) return 'windows';
       if (io.Platform.isMacOS) return 'macos';
       if (io.Platform.isLinux) return 'linux';
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[BugReport] ⚠ Détection plateforme échouée: $e');
+    }
     return 'unknown';
   }
 }

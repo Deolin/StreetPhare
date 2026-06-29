@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Mini-installer StreetPhare — AndroidManifest.xml
+
+  APK ultra-léger (~50-80 ko) qui, une fois installé par le destinataire,
+  télécharge automatiquement le dernier StreetPhare complet (20+ Mo)
+  depuis GitHub Releases et lance l'installation via PackageInstaller.
+
+  Permissions minimales : INTERNET uniquement pour le téléchargement.
+  Aucune autre permission demandée.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Téléchargement du fichier APK complet depuis GitHub Releases -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Installation de l'APK téléchargé (Android 8+) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- Installation de packages (Android < 8, fallback) -->
+    <uses-permission android:name="android.permission.INSTALL_PACKAGES"
+        tools:ignore="ProtectedPermissions" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="StreetPhare Installer"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        tools:targetApi="35">
+
+        <activity
+            android:name=".DownloadActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              Permet au mini-installer d'être déclenché par une notification,
+              une action système ou un intent explicite.
+            -->
+            <intent-filter>
+                <action android:name="com.streetphare.downloader.INSTALL_STREETPHARE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          FileProvider pour exposer le fichier APK téléchargé
+          via un URI de contenu sécurisé (nécessaire pour ACTION_VIEW
+          sur Android 7+ avec FileProvider).
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>

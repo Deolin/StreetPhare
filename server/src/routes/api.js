@@ -17,9 +17,21 @@ const router = express.Router();
 /// Body: { type, lat, lng, description?, userId }
 /// Retourne l'alerte créée ou mise à jour, avec son statut de consensus.
 router.post('/alerts', (req, res) => {
-  const { type, lat, lng, description, userId } = req.body || {};
-  if (!type || lat == null || lng == null) {
-    return res.status(400).json({ error: 'type, lat, lng requis' });
+  try {
+    if (!req.body || Object.keys(req.body).length === 0) {
+      console.error('[API] POST /api/alerts — body vide ou mal formé');
+      return res.status(400).json({ error: 'body JSON requis' });
+    }
+
+    const { type, lat, lng, description, userId } = req.body;
+    console.log(`[API] POST /api/alerts — type=${type} lat=${lat} lng=${lng} userId=${userId || 'anon'}`);
+
+    if (!type || lat == null || lng == null) {
+      return res.status(400).json({ error: 'type, lat, lng requis' });
+    }
+  } catch (e) {
+    console.error('[API] POST /api/alerts — erreur parsing:', e.message);
+    return res.status(400).json({ error: 'JSON invalide' });
   }
 
   const validTypes = ['mobile_danger', 'police', 'fire_truck', 'filter', 'panic', 'collective_danger'];
@@ -40,8 +52,8 @@ router.post('/alerts', (req, res) => {
 
   const saved = store.addAlert(alert);
 
-  // Réplication immédiate vers le Backup (si PRIMARY).
-  sync.pushAlert(saved).catch(() => {});
+  // Réplication vers le Backup via outbox (retry automatique).
+  sync.enqueueAlert(saved);
 
   res.status(201).json({
     alert: { ...saved, votes: saved.votes || [] },
@@ -95,8 +107,8 @@ router.post('/alerts/:id/vote', (req, res) => {
     alert.votes.push(userId);
     alert.updatedAt = new Date().toISOString();
 
-    // Réplication vers le Backup.
-    sync.pushAlert(alert).catch(() => {});
+    // Réplication vers le Backup via outbox.
+    sync.enqueueAlert(alert);
   }
 
   const validated = alert.votes.length >= config.consensusThreshold;
@@ -113,7 +125,7 @@ router.post('/alerts/:id/reject', (req, res) => {
   if (!alert) return res.status(404).json({ error: 'Alerte non trouvée' });
   alert.status = 'rejected';
   alert.updatedAt = new Date().toISOString();
-  sync.pushAlert(alert).catch(() => {});
+  sync.enqueueAlert(alert);
   res.json({ success: true, message: 'Signalement révoqué' });
 });
 
@@ -135,6 +147,82 @@ router.post('/sync/event', (req, res) => {
   if (!event) return res.status(400).json({ error: 'event requis' });
   store.addEvent(event);
   res.json({ success: true });
+});
+
+/// POST /api/v2/sync-push — Reçoit un batch d'alertes du client Flutter.
+/// Body: { alerts: [{ id, type, lat, lng, description?, votes?: [], ... }], peerId, since }
+/// Le serveur fusionne (upsert), puis répond avec les deltas plus récents
+/// que le client n'a pas encore (push-pull bidirectionnel).
+router.post('/sync-push', (req, res) => {
+  try {
+    const { alerts, peerId, since } = req.body || {};
+    if (!Array.isArray(alerts) || alerts.length === 0) {
+      return res.status(400).json({ error: 'alerts[] requis' });
+    }
+
+    let upserted = 0;
+    for (const alert of alerts) {
+      if (!alert.id || !alert.type || alert.lat == null || alert.lng == null) {
+        continue; // skip malformed
+      }
+      // Ajouter le peerId aux votes s'il n'y est pas déjà.
+      if (peerId && (!alert.votes || !alert.votes.includes(peerId))) {
+        if (!alert.votes) alert.votes = [];
+        alert.votes.push(peerId);
+      }
+      store.addAlert(alert);
+      upserted++;
+    }
+
+    // Récupérer les deltas plus récents pour le client (push-pull).
+    let deltas = [];
+    if (since) {
+      const sinceDate = new Date(since);
+      deltas = store.getAllAlerts()
+        .filter(a => {
+          if (a.status === 'rejected') return false;
+          const updated = new Date(a.updatedAt || a.createdAt);
+          return updated > sinceDate;
+        })
+        .map(a => ({ ...a, votes: a.votes || [] }));
+    }
+
+    console.log(
+      `[SYNC-PUSH] peer=${peerId || 'anon'} upserted=${upserted} deltas=${deltas.length}`
+    );
+
+    res.json({
+      success: true,
+      upserted,
+      deltas,
+      serverTs: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error('[SYNC-PUSH] Erreur:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/// GET /api/v2/sync-check — Point de pull pour le client (inchangé).
+/// Query: ?since=ISO8601
+router.get('/sync-check', (req, res) => {
+  const since = req.query.since;
+  const sinceDate = since ? new Date(since) : new Date(0);
+
+  const items = store.getAllAlerts()
+    .filter(a => {
+      if (a.status === 'rejected') return false;
+      const updated = new Date(a.updatedAt || a.createdAt);
+      return updated > sinceDate;
+    })
+    .slice(0, 500) // limite à 500 par requête
+    .map(a => ({ ...a, votes: a.votes || [] }));
+
+  res.json({
+    items,
+    count: items.length,
+    serverTs: new Date().toISOString(),
+  });
 });
 
 /// POST /api/sync/check — Vérifie l'intégrité de la synchro.
@@ -246,7 +334,7 @@ router.post('/events/create', (req, res) => {
   };
 
   const saved = store.addEvent(event);
-  sync.pushEvent(saved).catch(() => {});
+  sync.enqueueEvent(saved);
   res.status(201).json(saved);
 });
 
@@ -279,7 +367,7 @@ router.post('/panic/collective', (req, res) => {
       votes: ['SYSTEM_AUTO'],
       status: 'active',
     });
-    sync.pushAlert(dangerZone).catch(() => {});
+    sync.enqueueAlert(dangerZone);
   }
 
   res.json(result);
@@ -305,6 +393,55 @@ router.get('/status', (req, res) => {
 
 router.get('/ping', (req, res) => {
   res.json({ pong: true, role: config.serverType, ts: new Date().toISOString() });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// BUG REPORT (Signalement de bug depuis l'application Flutter)
+// ═══════════════════════════════════════════════════════════════════════
+
+/// POST /api/bug-report — Réception d'un rapport de bug.
+/// Stocké en base et loggué console. Survit aux redémarrages.
+router.post('/bug-report', (req, res) => {
+  const { type, message, stackTrace, deviceInfo, appVersion } = req.body || {};
+  if (!message) {
+    return res.status(400).json({ error: 'message requis' });
+  }
+
+  const saved = store.addBugReport({ type, message, stackTrace, deviceInfo, appVersion });
+
+  const now = new Date();
+  const ts = [
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+    String(now.getSeconds()).padStart(2, '0'),
+    ' - ',
+    String(now.getDate()).padStart(2, '0'),
+    '/',
+    String(now.getMonth() + 1).padStart(2, '0'),
+  ].join('');
+
+  console.log(`[${ts}] - [BUG] #${saved.id} ${type || 'report'} — ${message}`);
+  if (stackTrace) console.log(`[${ts}] - [BUG] Stack:\n${stackTrace}`);
+  if (deviceInfo) console.log(`[${ts}] - [BUG] Device: ${JSON.stringify(deviceInfo)}`);
+  if (appVersion) console.log(`[${ts}] - [BUG] App version: ${appVersion}`);
+
+  res.status(201).json({ success: true, id: saved.id, receivedAt: saved.receivedAt });
+});
+
+/// GET /api/bug-reports — ADMIN : liste des rapports de bug.
+/// Query: ?limit=50&offset=0
+router.get('/bug-reports', (req, res) => {
+  const limit = parseInt(req.query.limit, 10) || 50;
+  const offset = parseInt(req.query.offset, 10) || 0;
+  const result = store.getBugReports({ limit, offset });
+  res.json(result);
+});
+
+/// GET /api/bug-reports/:id — ADMIN : détail d'un rapport de bug.
+router.get('/bug-reports/:id', (req, res) => {
+  const report = store.getBugReportById(req.params.id);
+  if (!report) return res.status(404).json({ error: 'Rapport non trouvé' });
+  res.json(report);
 });
 
 module.exports = router;

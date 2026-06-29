@@ -115,7 +115,11 @@ class WifiDirectMeshTransport
     if (_mcastGroup != null && _socket != null) {
       try {
         _socket!.leaveMulticast(_mcastGroup!);
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[WiFi] Erreur leaveMulticast (socket déjà fermée ?): $e');
+        }
+      }
     }
     await _sub?.cancel();
     _sub = null;
@@ -146,7 +150,11 @@ class WifiDirectMeshTransport
       _sub = null;
       try {
         _socket?.close();
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[WiFi] Erreur close socket après SocketException: $e');
+        }
+      }
       _socket = null;
     } catch (e) {
       if (kDebugMode) debugPrint('[WiFi] send error: $e');
@@ -190,7 +198,11 @@ class WifiDirectMeshTransport
     _sub = null;
     try {
       _socket?.close();
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[WiFi] Erreur close socket (suspend): $e');
+      }
+    }
     _socket = null;
   }
 

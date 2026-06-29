@@ -9,6 +9,8 @@
 //      la grille passe à 2 colonnes (grands boutons tactiles).
 //   3. Le réseau P2P diffuse le signalement, visible des autres après ≥3 votes.
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -91,101 +93,105 @@ class ReportBottomSheet extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Poignée de saisie
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: StreetPhareTheme.textSecondary.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-
-            // Titre
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.add_alert, color: StreetPhareTheme.primary),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Nouveau signalement',
-                    style: TextStyle(
-                      color: StreetPhareTheme.textPrimary,
-                      fontSize: isLowVision ? 22 : 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Poignée de saisie
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: StreetPhareTheme.textSecondary.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'Sélectionnez la nature de l\'événement à signaler :\n'
-                'Votre position GPS sera capturée automatiquement.',
-                style: TextStyle(
-                  color: StreetPhareTheme.textSecondary,
-                  fontSize: isLowVision ? 15 : 13,
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
 
-            // Grille des types de signalement
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: crossAxisCount,
-                mainAxisSpacing: isLowVision ? 12 : 8,
-                crossAxisSpacing: isLowVision ? 12 : 8,
-                childAspectRatio: childAspectRatio,
-                children: ReportType.values
-                    .map(
-                      (type) => _ReportTypeTile(
-                        type: type,
-                        isLargeMode: isLowVision,
-                        onTap: () => _onTypeSelected(context, type),
+              // Titre
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.add_alert, color: StreetPhareTheme.primary),
+                    SizedBox(width: isLowVision ? 0 : 12),
+                    Text(
+                      'Nouveau signalement',
+                      style: TextStyle(
+                        color: StreetPhareTheme.textPrimary,
+                        fontSize: isLowVision ? 18 : 18,
+                        fontWeight: FontWeight.bold,
                       ),
-                    )
-                    .toList(),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Bouton annuler
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color:
-                          StreetPhareTheme.textSecondary.withValues(alpha: 0.3),
                     ),
-                    padding:
-                        EdgeInsets.symmetric(vertical: isLowVision ? 18 : 14),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'Sélectionnez la nature de l\'événement à signaler :\n'
+                  'Votre position GPS sera capturée automatiquement.',
+                  style: TextStyle(
+                    color: StreetPhareTheme.textSecondary,
+                    fontSize: isLowVision ? 15 : 13,
                   ),
-                  child: Text(
-                    'Annuler',
-                    style: TextStyle(
-                      color: StreetPhareTheme.textPrimary,
-                      fontSize: isLowVision ? 17 : 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Grille des types de signalement
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: crossAxisCount,
+                  mainAxisSpacing: isLowVision ? 12 : 8,
+                  crossAxisSpacing: isLowVision ? 12 : 8,
+                  childAspectRatio: childAspectRatio,
+                  children: ReportType.values
+                      .map(
+                        (type) => _ReportTypeTile(
+                          type: type,
+                          isLargeMode: isLowVision,
+                          onTap: () => _onTypeSelected(context, type),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Bouton annuler
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                        color:
+                            StreetPhareTheme.textSecondary.withValues(alpha: 0.3),
+                      ),
+                      padding:
+                          EdgeInsets.symmetric(vertical: isLowVision ? 18 : 14),
+                    ),
+                    child: Text(
+                      'Annuler',
+                      style: TextStyle(
+                        color: StreetPhareTheme.textPrimary,
+                        fontSize: isLowVision ? 17 : 14,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -225,7 +231,10 @@ class ReportBottomSheet extends StatelessWidget {
     // Le marqueur local apparaît instantanément sur la carte de l'émetteur.
     onLocalReport?.call(position, alertType);
 
-    // ── Création de l'alerte (persistance Hive + broadcast P2P) ──
+    // ── PRIORITÉ LOCALE : broadcast P2P immédiat avant toute requête HTTP ──
+    // L'alerte est persistée localement et diffusée sur le mesh BLE/WiFi
+    // AVANT de tenter l'upload vers le serveur. En cas d'échec réseau,
+    // le signalement reste actif en local et sera synchronisé plus tard.
     try {
       await NetworkCoordinator.instance.createAlert(
         type: alertType,
@@ -237,14 +246,22 @@ class ReportBottomSheet extends StatelessWidget {
         '[Report] Signalement "${type.label}" enregistré à '
         '(${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}).',
       );
+    } on SocketException {
+      // Échec réseau → le signalement est déjà dans Hive (persisté).
+      // Il sera automatiquement re-broadcasté quand un pair BLE ou
+      // le serveur redeviendra disponible.
+      debugPrint('[Report] Signalement "${type.label}" persisté localement '
+          '(réseau indisponible).');
       _showSnackBar(
         messenger,
-        '✅ Signalement "${type.label}" enregistré.\n'
-        'Visible des autres pairs dès 3 confirmations.',
-        icon: type.icon,
-        backgroundColor: type.color,
+        '📡 Signalement "${type.label}" enregistré localement.\n'
+        'En attente d\'envoi de proximité — sera diffusé '
+        'dès qu\'un pair StreetPhare est à portée.',
+        icon: Icons.cloud_off,
+        backgroundColor: StreetPhareTheme.primary,
         foregroundColor: Colors.white,
       );
+      return;
     } catch (e) {
       debugPrint('[Report] erreur createAlert: $e');
       _showSnackBar(
@@ -254,7 +271,18 @@ class ReportBottomSheet extends StatelessWidget {
         backgroundColor: StreetPhareTheme.danger,
         foregroundColor: Colors.white,
       );
+      return;
     }
+
+    // Confirmation de succès (broadcast P2P OK).
+    _showSnackBar(
+      messenger,
+      '✅ Signalement "${type.label}" enregistré.\n'
+      'Visible des autres pairs dès 3 confirmations.',
+      icon: type.icon,
+      backgroundColor: type.color,
+      foregroundColor: Colors.white,
+    );
   }
 
   Future<Position?> _capturePosition() async {

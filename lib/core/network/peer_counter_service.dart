@@ -33,9 +33,9 @@ import 'package:flutter/foundation.dart';
 /// Seuls les appareils diffusant cet UUID dans leur advertisement
 /// seront comptés par [PeerCounterService].
 ///
-/// Ce UUID doit correspondre à la valeur configurée dans [P2PMeshService]
-/// (transport BLE) côté émetteur.
-const String kStreetPhareBleServiceUuid = 'STREET-PHARE-HIVE-SVC-0001';
+/// Ce UUID DOIT correspondre à la valeur configurée dans [BleMeshTransport]
+/// (transport BLE) côté émetteur. Toute divergence empêche le comptage.
+const String kStreetPhareBleServiceUuid = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 
 /// Préfixe attendu dans le `metadata` ou `serviceId` d'un pair pour
 /// que ce pair soit considéré comme un appareil StreetPhare authentique.
@@ -98,9 +98,11 @@ class PeerCounterService extends ValueNotifier<int> {
   /// Vérifie qu'un pair correspond à un appareil exécutant StreetPhare.
   ///
   /// Règles de validation (ANY des conditions suffit) :
-  ///   1. [serviceUuid] correspond à [kStreetPhareBleServiceUuid].
-  ///   2. [metadata] commence par [kStreetPhareSignaturePrefix].
-  ///   3. [peerId] commence par [kStreetPhareSignaturePrefix] (mode demo/test).
+  ///   1. [peerId] commence par `sp-` (préfixe des identifiants éphémères
+  ///      StreetPhare générés par le NetworkCoordinator).
+  ///   2. [serviceUuid] correspond à [kStreetPhareBleServiceUuid].
+  ///   3. [metadata] commence par [kStreetPhareSignaturePrefix].
+  ///   4. [peerId] commence par [kStreetPhareSignaturePrefix].
   ///
   /// En mode DEBUG, un pair dont le [peerId] commence par "demo_" est
   /// toujours accepté pour faciliter les tests de l'interface.
@@ -112,9 +114,13 @@ class PeerCounterService extends ValueNotifier<int> {
     // Mode demo (DEBUG uniquement) : injection de faux pairs pour l'UI.
     if (kDebugMode && peerId.startsWith('demo_')) return true;
 
+    // Validation par préfixe 'sp-' — identifiants éphémères StreetPhare
+    // générés par generateEphemeralUserId() dans le NetworkCoordinator.
+    if (peerId.startsWith('sp-')) return true;
+
     // Validation par UUID de service BLE.
     if (serviceUuid != null &&
-        serviceUuid.toUpperCase() == kStreetPhareBleServiceUuid) {
+        serviceUuid.toUpperCase() == kStreetPhareBleServiceUuid.toUpperCase()) {
       return true;
     }
 

@@ -1,17 +1,19 @@
 // lib/network/network_config.dart
 //
-// Configuration réseau de StreetPhare — Version PRODUCTION No-IP.
+// Configuration réseau de StreetPhare — Version PRODUCTION HTTPS/WSS.
 //
 // Centralise TOUTES les URL de serveurs (principal + secours +
 // relay) pour pointer exclusivement vers l'infrastructure de
-// production.
+// production sécurisée.
 //
-//   Serveur Principal : http://adminServerUrl:3000
-//   Serveur Backup   : http://adminServerUrl:3001
-//   Relay WebSocket   : ws://adminServerUrl:3000/mesh
+//   Serveur Principal : https://streetphare.ddns.net:3000
+//   Serveur Backup   : https://streetphare.ddns.net:3001
+//   Relay WebSocket   : wss://streetphare.ddns.net:3000/mesh
 //
-// Le FailoverManager est configuré avec un heartbeat normal
-// (30s) et un timeout de ping standard (5s).
+// NOTE DE SÉCURITÉ : Les fallbacks locaux (127.0.0.1 / 10.0.2.2)
+// utilisent HTTP/WS car ils ne traversent jamais le réseau public.
+// Ces adresses de loopback sont isolées à la machine locale et ne
+// présentent pas de risque d'interception réseau.
 //
 // Ce fichier est consommé par :
 //   * lib/main.dart            -> valeurs passées à buildNetworkBootstrap
@@ -21,6 +23,7 @@
 // IMPORTANT : ne JAMAIS hardcoder d'URL ailleurs dans l'app.
 // Toujours importer 'network_config.dart' pour rester cohérent.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_streetphare/constants/app_constants.dart';
 
 /// Configuration réseau résolue pour l'environnement courant.
@@ -31,8 +34,8 @@ class NetworkConfig {
   // Adresse No-IP de production
   // ---------------------------------------------------------------------------
   static final String _productionHost = AppStrings.adminServerUrl
-      .replaceAll('http://', '')
       .replaceAll('https://', '')
+      .replaceAll('http://', '')
       .split(':')
       .first;
 
@@ -52,35 +55,35 @@ class NetworkConfig {
   static int get secondaryPort => _secondaryPort;
 
   // ---------------------------------------------------------------------------
-  // Adresses RÉSEAU (mode PRODUCTION)
+  // Adresses RÉSEAU (mode PRODUCTION — HTTPS/WSS)
   // ---------------------------------------------------------------------------
 
   /// URL du serveur PRINCIPAL courant.
   ///
-  /// Production : http://adminServerUrl:3000
+  /// Production : https://streetphare.ddns.net:3000
   static String get primaryServer {
-    return 'http://$_productionHost:$_primaryPort';
+    return 'https://$_productionHost:$_primaryPort';
   }
 
   /// URL du serveur SECONDAIRE (secours).
   ///
-  /// http://adminServerUrl:3001
+  /// https://streetphare.ddns.net:3001
   static String get initialSecondaryServer {
-    return 'http://$_productionHost:$_secondaryPort';
+    return 'https://$_productionHost:$_secondaryPort';
   }
 
   /// URL du relay WebSocket (utilisé par `RelayMeshTransport`).
   ///
-  /// ws://adminServerUrl:3000/mesh
+  /// wss://streetphare.ddns.net:3000/mesh
   static String get relayUrl {
-    return 'ws://$_productionHost:$_primaryPort/mesh';
+    return 'wss://$_productionHost:$_primaryPort/mesh';
   }
 
   /// URL WebSocket du relais d'administration serveur.
   ///
-  /// ws://adminServerUrl:3000/admin
+  /// wss://streetphare.ddns.net:3000/admin
   static String get primaryUrl {
-    return 'ws://$_productionHost:$_primaryPort/admin';
+    return 'wss://$_productionHost:$_primaryPort/admin';
   }
 
   /// La clé maîtresse est désormais gérée par `KeyStoreService`
@@ -93,46 +96,73 @@ class NetworkConfig {
   /// supprimé car il compilait la clé en dur dans le binaire.
 
   // ---------------------------------------------------------------------------
-  // Helpers de debug
-  // ---------------------------------------------------------------------------
-
-  // ---------------------------------------------------------------------------
   // Fallback local (NAT Hairpinning / Loopback)
   // ---------------------------------------------------------------------------
   //
   // Contexte : De nombreuses box internet bloquent le NAT Hairpinning,
   // empêchant l'application (exécutée sur le même PC que le serveur)
-  // de résoudre `adminServerUrl` → IP publique → rebouclage local.
+  // de résoudre `streetphare.ddns.net` → IP publique → rebouclage local.
+  // Sur Android (émulateur ou device en debug USB), 127.0.0.1 pointe
+  // vers l'appareil lui-même, pas vers le PC hôte. L'émulateur expose
+  // le PC hôte via 10.0.2.2.
+  //
+  // NOTE DE SÉCURITÉ : Les adresses de loopback (127.0.0.1, 10.0.2.2)
+  // utilisent HTTP/WS car le trafic ne quitte JAMAIS la machine locale.
+  // Aucun risque d'interception réseau sur ces adresses. Le certificat
+  // TLS n'est pas nécessaire pour les communications intra-machine.
   //
   // Solution : Le FailoverManager tente automatiquement ces adresses
   // de fallback local lorsque la résolution No-IP échoue.
 
-  /// URL locale du serveur PRINCIPAL (fallback loopback).
+  /// Adresse locale de fallback (dépend de la plateforme).
   ///
-  /// http://127.0.0.1:3000
+  /// - Android émulateur → 10.0.2.2 (le port 10.0.2.2 du PC hôte)
+  /// - Toutes autres plateformes → 127.0.0.1
+  static String get _localFallbackHost {
+    if (kIsWeb) return '127.0.0.1';
+    try {
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        // En mode debug sur Android, l'émulateur ou le device USB
+        // peut contacter le PC hôte via 10.0.2.2 (émulateur) ou
+        // l'IP de la passerelle USB (192.168.x.x). 10.0.2.2 est
+        // le standard émulateur Android. Pour un device physique,
+        // l'utilisateur doit configurer l'IP de son serveur dans
+        // les constantes.
+        return '10.0.2.2';
+      }
+    } catch (_) {}
+    return '127.0.0.1';
+  }
+
+  /// URL locale du serveur PRINCIPAL (fallback loopback — DEBUG UNIQUEMENT).
+  ///
+  /// http://127.0.0.1:3000 ou http://10.0.2.2:3000 sur Android
+  ///
+  /// Cette URL n'utilise PAS HTTPS car le trafic reste confiné à
+  /// la machine locale (loopback). Aucune interception réseau possible.
   static String get localhostPrimaryServer {
-    return 'http://127.0.0.1:$_primaryPort';
+    return 'http://$_localFallbackHost:$_primaryPort';
   }
 
-  /// URL locale du serveur SECONDAIRE (fallback loopback).
+  /// URL locale du serveur SECONDAIRE (fallback loopback — DEBUG UNIQUEMENT).
   ///
-  /// http://127.0.0.1:3001
+  /// http://127.0.0.1:3001 ou http://10.0.2.2:3001 sur Android
   static String get localhostSecondaryServer {
-    return 'http://127.0.0.1:$_secondaryPort';
+    return 'http://$_localFallbackHost:$_secondaryPort';
   }
 
-  /// URL locale du relay WebSocket (fallback loopback).
+  /// URL locale du relay WebSocket (fallback loopback — DEBUG UNIQUEMENT).
   ///
-  /// ws://127.0.0.1:3000/mesh
+  /// ws://127.0.0.1:3000/mesh ou ws://10.0.2.2:3000/mesh
   static String get localhostRelayUrl {
-    return 'ws://127.0.0.1:$_primaryPort/mesh';
+    return 'ws://$_localFallbackHost:$_primaryPort/mesh';
   }
 
-  /// URL locale WebSocket d'administration (fallback loopback).
+  /// URL locale WebSocket d'administration (fallback loopback — DEBUG UNIQUEMENT).
   ///
-  /// ws://127.0.0.1:3000/admin
+  /// ws://127.0.0.1:3000/admin ou ws://10.0.2.2:3000/admin
   static String get localhostPrimaryUrl {
-    return 'ws://127.0.0.1:$_primaryPort/admin';
+    return 'ws://$_localFallbackHost:$_primaryPort/admin';
   }
 
   /// Renvoie un résumé lisible de la configuration (à n'utiliser

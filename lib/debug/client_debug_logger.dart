@@ -293,8 +293,9 @@ class ClientDebugLogger {
   }
 
   void _emit(String level, String emoji, String label, String details) {
+    final now = DateTime.now();
     _events.addLast(_ClientEvent(
-      ts: DateTime.now(),
+      ts: now,
       level: level,
       emoji: emoji,
       label: label,
@@ -303,6 +304,15 @@ class ClientDebugLogger {
     while (_events.length > _maxEvents) {
       _events.removeFirst();
     }
+    // ── Log horodaté au format [HH:mm:ss.SSS] [DD/MM] [MODULE] message
+    final hh = now.hour.toString().padLeft(2, '0');
+    final min = now.minute.toString().padLeft(2, '0');
+    final sec = now.second.toString().padLeft(2, '0');
+    final mil = now.millisecond.toString().padLeft(3, '0');
+    final day = now.day.toString().padLeft(2, '0');
+    final mon = now.month.toString().padLeft(2, '0');
+    debugPrint('[$hh:$min:$sec.$mil] [$day/$mon] '
+        '[ClientDebug] $emoji $label${details.isNotEmpty ? " — $details" : ""}');
   }
 
   void _addStep(String summary, String detail) {

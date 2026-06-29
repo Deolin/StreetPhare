@@ -122,8 +122,8 @@ class MapCacheManager {
               totalSize += await entity.length();
               await entity.delete();
               purgedCount++;
-            } catch (_) {
-              // Fichier verrouillé ou supprimé entre-temps.
+            } catch (e) {
+              debugPrint('[MapCacheManager] ⚠ Impossible de supprimer le fichier cache: $e');
             }
           }
         }
@@ -164,7 +164,9 @@ class MapCacheManager {
         if (entity.listSync().isEmpty) {
           try {
             entity.deleteSync();
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('[MapCacheManager] ⚠ Dossier vide impossible à supprimer: $e');
+          }
         }
       }
     }
@@ -197,7 +199,7 @@ class MapCacheManager {
     // naviguera vers cette zone sur la carte — les tuiles seront
     // alors mises en cache automatiquement par flutter_map.
     final prefs = await SharedPreferences.getInstance();
-    final zonesKey = 'map_cache_preloaded_zones';
+    const zonesKey = 'map_cache_preloaded_zones';
     final existing = prefs.getStringList(zonesKey) ?? [];
     if (!existing.contains(zoneLabel)) {
       existing.add(zoneLabel);
@@ -222,7 +224,8 @@ class MapCacheManager {
     try {
       final files = _cacheDir!.listSync(recursive: true);
       return files.any((e) => e is File);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[MapCacheManager] ⚠ Erreur vérification tuiles: $e');
       return false;
     }
   }
@@ -238,7 +241,9 @@ class MapCacheManager {
           total += await entity.length();
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[MapCacheManager] ⚠ Erreur calcul taille cache: $e');
+    }
     return total;
   }
 

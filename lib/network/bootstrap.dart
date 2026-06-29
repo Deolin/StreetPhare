@@ -5,9 +5,9 @@
 //   - génération / chargement de la chaîne chiffrée de secours
 //   - assemblage des transports disponibles pour la plateforme
 //
-// Version TEST avec heartbeat accéléré (5s au lieu de 30s)
-// et ping timeout réduit (2s au lieu de 5s) pour un failover
-// quasi-instantané sur l'infrastructure locale.
+// Les valeurs par défaut de heartbeat (30s) et ping timeout (5s)
+// sont adaptées à la production. En développement local, les tests
+// d'intégration override ces valeurs via les paramètres nommés.
 //
 // Ce fichier isole toute la logique de "boot" pour que main.dart
 // reste simple.
@@ -37,31 +37,31 @@ import 'dart:io' as io;
 
 /// Contient la configuration et les services construits.
 class NetworkBootstrap {
-  final FailoverConfig failoverConfig;
-  final List<MeshTransport> transports;
-  final String peerId;
 
   NetworkBootstrap({
     required this.failoverConfig,
     required this.transports,
     required this.peerId,
   });
+  final FailoverConfig failoverConfig;
+  final List<MeshTransport> transports;
+  final String peerId;
 }
 
 /// Construit la configuration réseau + transports en fonction de
 /// la plateforme courante et de la config packagée dans l'app.
 ///
-/// Version TEST :
-///   - heartbeatInterval : 5s (permet un failover en ~17s max)
-///   - pingTimeout       : 2s (détection rapide de perte)
-///   - maxAttempts       : 3 (pings consécutifs avant failover)
+/// Valeurs de production :
+///   - heartbeatInterval : 30s (vérification périodique du serveur)
+///   - pingTimeout       : 5s  (délai avant déclaration de perte)
+///   - maxAttempts       : 3  (pings consécutifs avant failover)
 Future<NetworkBootstrap> buildNetworkBootstrap({
   required String primaryServer,
   required String relayUrl,
   required SecretKey masterKey,
   List<String> initialBackupChain = const [],
-  Duration heartbeatInterval = const Duration(seconds: 5),
-  Duration pingTimeout = const Duration(seconds: 2),
+  Duration heartbeatInterval = const Duration(seconds: 30),
+  Duration pingTimeout = const Duration(seconds: 5),
 }) async {
   // S'assure que la chaîne de secours contient au moins 2
   // entrées chiffrées. Si elle est vide (premier lancement), on
@@ -136,18 +136,57 @@ Future<NetworkBootstrap> buildNetworkBootstrap({
 
 /// Charge (ou génère + persiste) un identifiant de session
 /// anonyme STABLE d'un lancement de l'app à l'autre.
+///
+/// Stratégie de résilience :
+///   1. SharedPreferences (principal)
+///   2. Si SharedPreferences échoue → fallback fichier local dans
+///      le répertoire temporaire (dernier recours).
+///   3. Si TOUS les stockages échouent → génération sans persistance
+///      avec log d'erreur (l'identité changera au prochain lancement).
 Future<String> loadOrCreateStablePeerId() async {
+  const key = 'streetphare.peer_id';
+
+  // ── Tentative 1 : SharedPreferences ──────────────────────────────
   try {
     final prefs = await SharedPreferences.getInstance();
-    const key = 'streetphare.peer_id';
     final existing = prefs.getString(key);
     if (existing != null && existing.isNotEmpty) return existing;
     final id = _generatePeerId();
     await prefs.setString(key, id);
     return id;
-  } catch (_) {
-    return _generatePeerId();
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('[bootstrap] SharedPreferences indisponible '
+          'pour peer ID: $e');
+    }
   }
+
+  // ── Tentative 2 : Fichier local (fallback) ────────────────────────
+  try {
+    final tempDir = io.Directory.systemTemp;
+    final file = io.File('${tempDir.path}/streetphare_peer_id.txt');
+    if (await file.exists()) {
+      final content = await file.readAsString();
+      if (content.isNotEmpty) return content.trim();
+    }
+    final id = _generatePeerId();
+    await file.writeAsString(id);
+    if (kDebugMode) {
+      debugPrint('[bootstrap] Peer ID persisté via fichier local: $id');
+    }
+    return id;
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('[bootstrap] Échec fallback fichier peer ID: $e');
+    }
+  }
+
+  // ── Tentative 3 : Sans persistance (identité volatile) ────────────
+  if (kDebugMode) {
+    debugPrint('[bootstrap] ⚠ Aucun stockage disponible pour peer ID. '
+        'Identité volatile (changera au prochain lancement).');
+  }
+  return _generatePeerId();
 }
 
 String _generatePeerId() {
@@ -171,13 +210,26 @@ Future<List<String>> _seedInitialChain(
   try {
     final out = <String>[];
     if (debugExtraAddress.isNotEmpty) {
-      out.add(await CryptoUtils.instance
-          .encryptAddress(debugExtraAddress, masterKey));
+      final ciphered = await CryptoUtils.instance
+          .encryptAddress(debugExtraAddress, masterKey);
+      out.add(ciphered);
     }
-    out.add(await CryptoUtils.instance
-        .encryptAddress('https://backup1.streetphare.local', masterKey));
+    // Ajoute le serveur secondaire configuré comme backup de secours.
+    // L'adresse est lue depuis NetworkConfig.initialSecondaryServer
+    // (https://streetphare.ddns.net:3001) et chiffrée avec la clé
+    // maîtresse pour que seul le client puisse la déchiffrer.
+    if (NetworkConfig.initialSecondaryServer.isNotEmpty) {
+      out.add(await CryptoUtils.instance
+          .encryptAddress(NetworkConfig.initialSecondaryServer, masterKey));
+    }
+    if (kDebugMode) {
+      debugPrint('[bootstrap] Chaîne de secours amorcée : ${out.length} entrée(s)');
+    }
     return out;
-  } catch (_) {
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('[bootstrap] Erreur amorçage chaîne de secours : $e');
+    }
     return [];
   }
 }

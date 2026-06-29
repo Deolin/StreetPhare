@@ -44,7 +44,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get languageSectionDescription =>
-      'Modifiez la langue de l\'application en temps réel.';
+      'Modifiez la langue de l\'application.';
 
   @override
   String get themeSectionTitle => 'Thème de l\'application';
@@ -76,11 +76,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get batterySaverDescription =>
-      'Réduit la fréquence des scans GPS/BLE et prolonge l\'autonomie.';
+      'Réduit la fréquence des services et prolonge l\'autonomie.';
 
   @override
   String get batterySaverSubtitle =>
-      'Réduit la fréquence GPS et BLE pour économiser la batterie';
+      'Réduit la fréquence pour économiser la batterie';
 
   @override
   String get batterySaverEnabledLabel => 'Mode Économe activé';
@@ -105,7 +105,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get notificationFilterAllDescription =>
-      'Notifie chaque micro-événement du réseau';
+      'Notifie chaque événement du réseau';
 
   @override
   String get notificationFilterNearbyLabel =>
@@ -113,7 +113,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get notificationFilterNearbyDescription =>
-      'Filtre : danger ≥3 votes détecté à moins de 100 m';
+      'Filtre : danger détecté à moins de 100 m';
 
   @override
   String get notificationFilterEventsLabel => 'Changements de points imminents';
@@ -131,7 +131,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get lowVisionDescription =>
-      'Active de très grands caractères, supprime le titre StreetPhare sur la carte et réorganise le menu de signalement en 2 colonnes (grands boutons tactiles). Activé automatiquement si TalkBack/VoiceOver est détecté.';
+      'Active de très grands caractères, supprime les éléments décoratifs et réorganise les menus.';
 
   @override
   String get lowVisionEnabled => 'Mode Malvoyant activé';
@@ -141,7 +141,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get lowVisionStatusEnabled =>
-      'Grands caractères, 2 colonnes signalement';
+      'Grands caractères, menus adaptés';
 
   @override
   String get lowVisionStatusDisabled => 'Interface standard';
@@ -151,14 +151,14 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get messageFilterDescription =>
-      'Filtrez les messages reçus sur le réseau décentralisé.';
+      'Filtrez les messages reçus sur le réseau.';
 
   @override
   String get messageFilterAllLabel => 'Tous les messages';
 
   @override
   String get messageFilterAllDescription =>
-      'Reçoit tous les messages diffusés sur le réseau';
+      'Reçoit tous les messages';
 
   @override
   String get messageFilterNearbyLabel => 'Messages proches uniquement';
@@ -179,10 +179,10 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get messageFilterAlertDescription =>
-      'Uniquement les alertes critiques (type ALERT)';
+      'Uniquement les alertes critiques';
 
   @override
-  String get avoidanceFiltersTitle => 'Filtres d\'évitement (Route Safe)';
+  String get avoidanceFiltersTitle => 'Filtres d\'évitement';
 
   @override
   String get avoidanceFiltersDescription =>
@@ -237,25 +237,25 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get routeDestSafeZoneLabel =>
-      'Vers la Zone Safe / Centre de soins le plus proche';
+      'Vers Zone Safe';
 
   @override
   String get routeDestSafeZoneDescription =>
-      '⭐ Priorité absolue : zone de sécurité ou médecin de rue le plus proche';
+      '⭐ Priorité absolue : zone de sécurité';
 
   @override
-  String get routeDestCareCenterLabel => 'Centre de soins le plus proche';
+  String get routeDestCareCenterLabel => 'Centre de soins';
 
   @override
   String get routeDestCareCenterDescription =>
       'Street-medics ou secours de rue les plus proches';
 
   @override
-  String get routeDestExitPointLabel => 'Point de sortie le plus proche';
+  String get routeDestExitPointLabel => 'Point de sortie';
 
   @override
   String get routeDestExitPointDescription =>
-      'Zone d\'évacuation définie dans le JSON de l\'événement';
+      'Zone d\'évacuation définie par l\'événement';
 
   @override
   String get routeDestUserPointLabel => 'Point utilisateur';
@@ -438,7 +438,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get eventsSecurityDescription =>
-      'Pour éviter que le tracé d\'un événement ne soit détourné en amont, StreetPhare ne révèle le trajet qu à l\'heure paramétrée par les organisateurs.\n\nDe plus, chaque étape (point de rassemblement) disparaît automatiquement de la carte dès que son heure est dépassée de 5 minutes, ou que vous vous trouvez à moins de 30 m de ce point.';
+      'StreetPhare ne révèle le trajet qu à l\'heure paramétrée par les organisateurs.\n\nDe plus, chaque étape (point de rassemblement) disparaît automatiquement de la carte dès que son heure est dépassée de 5 minutes, ou que vous vous trouvez à moins de 30 m de ce point.';
 
   @override
   String get eventsEnterCodeError => 'Veuillez saisir un code d\'invitation.';

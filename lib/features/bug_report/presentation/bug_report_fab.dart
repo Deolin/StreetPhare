@@ -82,12 +82,17 @@ class BugReportFab extends StatelessWidget {
 // ============================================================================
 
 class BugReportDialog extends StatefulWidget {
-  const BugReportDialog({super.key});
+  const BugReportDialog({super.key, this.initialCategory});
 
-  static Future<void> show(BuildContext context) => showDialog(
+  /// Catégorie pré-sélectionnée (ex: `BugCategory.suggestion` pour
+  /// le bouton "Suggérer" des paramètres).
+  final BugCategory? initialCategory;
+
+  static Future<void> show(BuildContext context, {BugCategory? initialCategory}) =>
+      showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const BugReportDialog(),
+        builder: (_) => BugReportDialog(initialCategory: initialCategory),
       );
 
   @override
@@ -99,7 +104,13 @@ class _BugReportDialogState extends State<BugReportDialog> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
 
-  BugCategory _category = BugCategory.bug;
+  late BugCategory _category;
+
+  @override
+  void initState() {
+    super.initState();
+    _category = widget.initialCategory ?? BugCategory.bug;
+  }
   bool _submitting = false;
   String? _resultMessage;
 

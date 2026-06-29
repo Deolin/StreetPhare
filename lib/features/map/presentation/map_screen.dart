@@ -48,6 +48,7 @@ import '../../../network/collective_panic_service.dart';
 import '../../../network/network_coordinator.dart';
 import '../../../network/server_heartbeat_service.dart';
 import '../../../services/connectivity_service.dart';
+import '../../../services/version_check_service.dart';
 
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/presentation/route_result_sheet.dart';
@@ -277,7 +278,9 @@ class _MapScreenState extends State<MapScreen> {
       try {
         _mapController.move(
             LatLng(pos.latitude, pos.longitude), _kRecenterZoom);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[MapScreen] Échec recentrage caméra: $e');
+      }
     }
 
     try {
@@ -755,7 +758,10 @@ class _MapScreenState extends State<MapScreen> {
       case 'car':
         return RoutingProfile.vehicle;
       case 'transit':
-        return RoutingProfile.pedestrian; // Fallback piéton pour TC
+        // Les transports en commun ne sont pas encore supportés par
+        // les moteurs de routage (GraphHopper/OSRM). Fallback piéton
+        // jusqu'à intégration d'un profil TC (ex: OpenTripPlanner).
+        return RoutingProfile.pedestrian;
       default:
         return RoutingProfile.pedestrian;
     }
@@ -866,7 +872,9 @@ class _MapScreenState extends State<MapScreen> {
     void doMove() {
       try {
         _mapController.move(center, zoom);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[MapScreen] Échec animation bounds: $e');
+      }
     }
 
     try {
@@ -934,6 +942,15 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  /// Label de version dynamique (ex: v2.2.0+42).
+  String _buildVersionLabel() {
+    final vc = VersionCheckService.instance;
+    if (vc.isInitialized) {
+      return 'v${vc.currentVersion}+${vc.buildNumber}';
+    }
+    return 'v2.2.0';
+  }
+
   // --------------------------------------------------------------------------
   // Popup "À propos" (titre StreetPhare)
   // --------------------------------------------------------------------------
@@ -965,8 +982,7 @@ class _MapScreenState extends State<MapScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // TODO: Remplacer '1.2.0' statique par PackageInfo.version + PackageInfo.buildNumber (package_info_plus)
-              _AboutRow(label: s.aboutVersion, value: '1.2.0', ctx: ctx),
+              _AboutRow(label: s.aboutVersion, value: _buildVersionLabel(), ctx: ctx),
               const SizedBox(height: 6),
               _AboutRow(
                   label: s.aboutPlatform, value: 'Flutter / Dart', ctx: ctx),
@@ -1055,7 +1071,9 @@ class _MapScreenState extends State<MapScreen> {
               Navigator.of(ctx).pop();
               try {
                 _mapController.move(event.center, 15.0);
-              } catch (_) {}
+              } catch (e) {
+                debugPrint('[MapScreen] Échec navigation vers événement: $e');
+              }
             },
             child: Text(s.mapViewOnMap),
           ),
@@ -1497,8 +1515,8 @@ class _MapScreenState extends State<MapScreen> {
                                   urlTemplate: tileUrl,
                                   userAgentPackageName: 'com.streetphare.app',
                                   maxNativeZoom: 19,
-                                  tileDisplay: TileDisplay.fadeIn(
-                                    duration: const Duration(milliseconds: 350),
+                                  tileDisplay: const TileDisplay.fadeIn(
+                                    duration: Duration(milliseconds: 350),
                                   ),
                                 ),
                                 if (layers.polylines.isNotEmpty)

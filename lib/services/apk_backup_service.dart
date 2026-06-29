@@ -151,12 +151,61 @@ class ApkBackupService {
   /// Fallback : tente de localiser l'APK via les chemins Android standards.
   ///
   /// Sur Android, les APK installés se trouvent généralement dans
-  /// `/data/app/<package>/base.apk` ou `/data/app/<package>-<hash>/base.apk`.
+  /// `/data/app/<package>-<hash>/base.apk`.
+  /// On utilise `ApplicationInfo.sourceDir` via le canal natif en priorité,
+  /// mais ce fallback sonde le système de fichiers en dernier recours.
   String? _fallbackApkPath() {
-    // Sans le canal natif, on ne peut pas localiser l'APK de façon fiable.
-    // Le canal natif doit être implémenté dans MainActivity.kt.
-    debugPrint('[ApkBackup] Fallback impossible sans canal natif. '
-        'Implémenter getSourceApkPath() dans MainActivity.kt.');
+    try {
+      // Stratégie 1 : le répertoire /data/app/ contient les APK installés.
+      // On cherche un dossier correspondant au package name de l'application.
+      final dataAppDir = io.Directory('/data/app');
+      if (!dataAppDir.existsSync()) return null;
+
+      const packageName = 'com.example.flutter_streetphare';
+      final candidates = dataAppDir
+          .listSync()
+          .whereType<io.Directory>()
+          .where((d) {
+            final name = d.path.split('/').last;
+            return name.startsWith(packageName);
+          })
+          .toList();
+
+      if (candidates.isEmpty) {
+        debugPrint('[ApkBackup] Fallback : aucun dossier candidat dans /data/app');
+        return null;
+      }
+
+      // Trier par date de modification décroissante (le plus récent d'abord).
+      candidates.sort((a, b) {
+        final aTime = a.statSync().modified;
+        final bTime = b.statSync().modified;
+        return bTime.compareTo(aTime);
+      });
+
+      for (final dir in candidates) {
+        final baseApk = io.File('${dir.path}/base.apk');
+        if (baseApk.existsSync()) {
+          debugPrint('[ApkBackup] Fallback réussi : ${baseApk.path} '
+              '(${baseApk.lengthSync() ~/ 1024} Ko)');
+          return baseApk.path;
+        }
+        // Certains builds produisent un split APK (base.apk + config.xxx.apk).
+        // On prend le premier .apk trouvé dans le dossier.
+        for (final f in dir.listSync()) {
+          if (f.path.endsWith('.apk') && f is io.File && f.existsSync()) {
+            debugPrint('[ApkBackup] Fallback réussi (split APK) : ${f.path} '
+                '(${f.lengthSync() ~/ 1024} Ko)');
+            return f.path;
+          }
+        }
+      }
+
+      debugPrint('[ApkBackup] Fallback : aucun base.apk trouvé '
+          'dans ${candidates.length} dossier(s) candidat(s).');
+    } catch (e) {
+      debugPrint('[ApkBackup] Fallback exception : $e');
+    }
     return null;
   }
 

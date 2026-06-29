@@ -90,6 +90,14 @@ const esbuild = resolveEsbuild();
   console.log(`[SEA] Copying node binary → ${exePath} ...`);
   fs.copyFileSync(process.execPath, exePath);
 
+  console.log("[SEA] Removal of original signature...");
+  try {
+      // Supprime toutes les signatures du binaire copié
+      const signtool = process.env.SIGNTOOL || 'signtool';
+      execSync(`"${signtool}" remove /s "${exePath}"`);
+  } catch (err) {
+      console.log("Signtool non trouvé ou inutile, tentative alternative...");
+  }
   // Injection du blob via postject.
   console.log(`[SEA] Injecting blob into ${exeName} ...`);
   try {

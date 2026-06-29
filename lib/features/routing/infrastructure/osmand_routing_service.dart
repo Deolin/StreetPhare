@@ -44,6 +44,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/models/routing_profile.dart';
 import '../domain/models/avoidance_filters.dart';
 import '../domain/models/route_result.dart';
 import '../../../network/network_config.dart';
@@ -267,6 +268,7 @@ class OsmAndRoutingService {
   Future<OsmAndResult> computeRoutes({
     required LatLng start,
     required LatLng end,
+    RoutingProfile profile = RoutingProfile.pedestrian,
     required AvoidanceFilters filters,
     List<LatLng> avoidPoints = const [],
     String? eventId,
@@ -282,6 +284,7 @@ class OsmAndRoutingService {
         final nativeResult = await native.computeRoute(
           start: start,
           end: end,
+          profile: profile,
           avoidPoints: avoidPointsNative,
         );
 
@@ -306,6 +309,7 @@ class OsmAndRoutingService {
       final ghRoutes = await _computeViaGraphHopper(
         start: start,
         end: end,
+        profile: profile,
         avoidPoints: avoidPoints,
         filters: filters,
       );
@@ -325,6 +329,7 @@ class OsmAndRoutingService {
       final osrmRoutes = await _computeViaOsrmPublic(
         start: start,
         end: end,
+        profile: profile,
       );
       if (osrmRoutes.isNotEmpty) {
         if (kDebugMode) {
@@ -354,17 +359,20 @@ class OsmAndRoutingService {
   Future<List<RouteResult>> _computeViaGraphHopper({
     required LatLng start,
     required LatLng end,
+    RoutingProfile profile = RoutingProfile.pedestrian,
     required AvoidanceFilters filters,
     List<LatLng> avoidPoints = const [],
   }) async {
     final host = NetworkConfig.primaryServer
         .replaceAll(RegExp(r':3000|:3001'), ':$_kGraphHopperPort');
 
+    final ghProfile = profile == RoutingProfile.vehicle ? 'car' : 'foot';
+
     final uriBuffer = StringBuffer(
       '$host/route'
       '?point=${start.latitude},${start.longitude}'
       '&point=${end.latitude},${end.longitude}'
-      '&profile=foot'
+      '&profile=$ghProfile'
       '&type=json'
       '&calc_points=true'
       '&instructions=false',
@@ -383,10 +391,14 @@ class OsmAndRoutingService {
         'X-StreetPhare-Client': 'OsmAndBridge/1.3',
       }).timeout(_kHttpTimeout);
 
-      if (resp.statusCode != 200) return [];
+      if (resp.statusCode != 200) {
+        debugPrint('[OsmAnd] ⚠ GraphHopper HTTP ${resp.statusCode}: ${resp.body.length > 200 ? resp.body.substring(0, 200) : resp.body}');
+        return [];
+      }
 
       return _parseGraphHopperResponse(resp.body);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[OsmAnd] ❌ GraphHopper exception: $e');
       return [];
     }
   }
@@ -442,9 +454,12 @@ class OsmAndRoutingService {
   Future<List<RouteResult>> _computeViaOsrmPublic({
     required LatLng start,
     required LatLng end,
+    RoutingProfile profile = RoutingProfile.pedestrian,
   }) async {
+    final osrmProfile =
+        profile == RoutingProfile.vehicle ? 'driving' : 'foot';
     final uri = Uri.parse(
-      'https://routing.openstreetmap.de/routed-foot/route/v1/driving/'
+      'https://routing.openstreetmap.de/routed-foot/route/v1/$osrmProfile/'
       '${start.longitude.toStringAsFixed(6)},${start.latitude.toStringAsFixed(6)};'
       '${end.longitude.toStringAsFixed(6)},${end.latitude.toStringAsFixed(6)}'
       '?overview=full&geometries=geojson&alternatives=true',

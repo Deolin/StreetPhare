@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FileProvider — Permet d'exposer le fichier APK téléchargé via un URI
+  de contenu pour l'Intent ACTION_VIEW (installation).
+
+  Réf : android/settings.gradle.kts → include(":mini_downloader")
+-->
+<paths>
+    <external-cache-path
+        name="apk_cache"
+        path="." />
+    <cache-path
+        name="apk_cache_internal"
+        path="." />
+</paths>

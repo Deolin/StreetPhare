@@ -376,23 +376,36 @@ class BleMeshTransport implements MeshTransport {
   }
 
   Future<void> _connectToDevice(String deviceId) async {
+    final now = DateTime.now();
+    final hh = now.hour.toString().padLeft(2, '0');
+    final mm = now.minute.toString().padLeft(2, '0');
+    final ss = now.second.toString().padLeft(2, '0');
     if (kDebugMode) {
-      debugPrint('[BLE] tentative de connexion GATT → $deviceId');
+      debugPrint('[$hh:$mm:$ss] [BLE] tentative connexion GATT → $deviceId '
+          '(actives: ${_connections.length}, en attente: ${_pendingConnections.length})');
     }
 
     final sub = _ble
         .connectToDevice(
       id: deviceId,
+      servicesWithCharacteristicsToDiscover: {
+        serviceUuid: [characteristicUuid],
+      },
       connectionTimeout: _connectionTimeout,
     )
         .listen(
       (update) => _onConnectionUpdate(deviceId, update),
       onError: (Object e) {
+        final errNow = DateTime.now();
+        final ehh = errNow.hour.toString().padLeft(2, '0');
+        final emm = errNow.minute.toString().padLeft(2, '0');
+        final ess = errNow.second.toString().padLeft(2, '0');
         if (kDebugMode) {
-          debugPrint('[BLE] connexion erreur $deviceId: $e');
+          debugPrint('[$ehh:$emm:$ess] [BLE] échec connexion GATT $deviceId: $e');
         }
         _onConnectionFailed(deviceId);
       },
+      cancelOnError: true,
     );
 
     _connectSubs[deviceId] = sub;
@@ -440,7 +453,6 @@ class BleMeshTransport implements MeshTransport {
 
   Future<void> _discoverServices(String deviceId) async {
     try {
-      // TODO: BLE — vérifier compatibilité API flutter_reactive_ble pour discoverServices (actuellement en deux appels)
       await _ble.discoverAllServices(deviceId);
       final services = await _ble.getDiscoveredServices(deviceId);
 
@@ -505,18 +517,43 @@ class BleMeshTransport implements MeshTransport {
 
   void _onDataReceived(String deviceId, List<int> data) {
     try {
-      final payload = utf8.decode(data);
+      final raw = utf8.decode(data);
       if (kDebugMode) {
         debugPrint('[BLE] ← data reçue de $deviceId (${data.length} octets)');
       }
 
-      // Enregistre le pair pour le comptage HIVE.
-      PeerCounterService.instance.recordPeer(
-        deviceId,
-        serviceUuid: serviceUuid.toString(),
-      );
+      // Déballe le frame BLE externe pour extraire le payload applicatif.
+      // _buildFrame() empaquette dans {"p":"peerId","t":timestamp,"d":"payload"}.
+      // On extrait 'd' pour le passer à P2PMeshService, qui attend
+      // soit un objet alerte, soit un gossip, soit un panic, soit un ping.
+      String payload;
+      try {
+        final frame = jsonDecode(raw) as Map<String, dynamic>;
+        final p = frame['p'] as String?; // peerId émetteur
+        payload = frame['d'] as String? ?? raw;
+        if (p != null && p != _peerId) {
+          // Enregistre l'émetteur dans le comptage HIVE.
+          PeerCounterService.instance.recordPeer(
+            p,
+            serviceUuid: serviceUuid.toString(),
+          );
+        } else {
+          // Fallback : utilise le deviceId BLE.
+          PeerCounterService.instance.recordPeer(
+            deviceId,
+            serviceUuid: serviceUuid.toString(),
+          );
+        }
+      } catch (_) {
+        // Frame non-JSON → passe le raw tel quel.
+        payload = raw;
+        PeerCounterService.instance.recordPeer(
+          deviceId,
+          serviceUuid: serviceUuid.toString(),
+        );
+      }
 
-      // Pousse dans le flux incoming pour traitement par P2PMeshService.
+      // Pousse le payload applicatif (non le frame) dans incoming.
       _incomingController.add(payload);
     } catch (e) {
       if (kDebugMode) {

@@ -147,6 +147,112 @@ class PermissionService extends ChangeNotifier {
     return mapped;
   }
 
+  /// Vérifie une permission unique et retourne son état actuel.
+  Future<PermissionState> checkSingle(StreetPharePermission sp) async {
+    final perm = _toHandler(sp);
+    if (perm == null) return PermissionState.unsupported;
+    try {
+      final status = await perm.status;
+      final mapped = _map(status);
+      _states[sp] = mapped;
+      _rebuildMissingList();
+      notifyListeners();
+      return mapped;
+    } catch (e) {
+      _states[sp] = PermissionState.unsupported;
+      _rebuildMissingList();
+      notifyListeners();
+      return PermissionState.unsupported;
+    }
+  }
+
+  /// ═══ POINT D'ENTRÉE UNIQUE DU FLUX DE PERMISSION ═══
+  ///
+  /// Intercepte toute action nécessitant la permission [sp].
+  /// Si déjà accordée → exécute [onGranted] immédiatement.
+  /// Sinon → affiche un dialogue avec deux boutons :
+  ///   • "Désactiver la fonction" → ferme le dialogue, la fonction
+  ///     reste inactive (retourne `false`)
+  ///   • "Accorder la permission"  → déclenche `request()` système
+  ///     et exécute [onGranted] si l'utilisateur accepte.
+  ///
+  /// Retourne `true` si l'action a été exécutée, `false` sinon.
+  ///
+  /// [context] : BuildContext pour afficher le dialogue.
+  /// [sp] : permission à vérifier.
+  /// [featureName] : nom lisible pour le dialogue (ex: "Service
+  ///   arrière-plan", "Maillage BLE").
+  /// [onGranted] : callback exécuté si la permission est accordée
+  ///   (soit immédiatement, soit après acceptation système).
+  static Future<bool> guard(
+    BuildContext context, {
+    required StreetPharePermission sp,
+    required String featureName,
+    required FutureOr<void> Function() onGranted,
+  }) async {
+    final svc = instance;
+    final state = await svc.checkSingle(sp);
+    if (state == PermissionState.granted) {
+      await onGranted();
+      return true;
+    }
+
+    // Permission non accordée → dialogue
+    // ignore: use_build_context_synchronously
+    // Le context est toujours valide ici car la méthode est appelée
+    // depuis un State avec vérification mounted() préalable.
+    if (!context.mounted) return false;
+
+    final result = await showDialog<_GuardResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _PermissionGuardDialog(
+        permission: sp,
+        featureName: featureName,
+        state: state,
+      ),
+    );
+
+    switch (result) {
+      case _GuardResult.grantedNow:
+        // L'utilisateur a appuyé sur "Accorder" → call request()
+        final newState = await svc.requestPermission(sp);
+        if (newState == PermissionState.granted) {
+          await onGranted();
+          return true;
+        }
+        // Refus → feedback snackbar
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                backgroundColor: const Color(0xFFFF6F00),
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 3),
+                content: Text(
+                  '$featureName désactivé — permission refusée.',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            );
+        }
+        return false;
+
+      case _GuardResult.cancelled:
+        // L'utilisateur a appuyé sur "Désactiver"
+        return false;
+
+      case null:
+        return false;
+    }
+  }
+
+  /// Demande une permission unique. Retourne l'état après la demande.
+  Future<PermissionState> requestSingle(StreetPharePermission sp) async {
+    return requestPermission(sp);
+  }
+
   Future<void> openSettings() async {
     await ph.openAppSettings();
   }
@@ -236,8 +342,119 @@ class PermissionService extends ChangeNotifier {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Résultat interne du flux guard() — non exposé hors ce fichier.
+// ══════════════════════════════════════════════════════════════════════════════
+
+enum _GuardResult { grantedNow, cancelled }
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Widgets UI — Popups de permission
 // ══════════════════════════════════════════════════════════════════════════════
+
+/// Dialogue unitaire affiché par [PermissionService.guard] quand une
+/// permission unique est manquante. Propose deux options à l'utilisateur.
+class _PermissionGuardDialog extends StatelessWidget {
+  const _PermissionGuardDialog({
+    required this.permission,
+    required this.featureName,
+    required this.state,
+  });
+
+  final StreetPharePermission permission;
+  final String featureName;
+  final PermissionState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final label = PermissionService.labelForPermission(permission);
+    final description = PermissionService.descriptionForPermission(permission);
+
+    return AlertDialog(
+      backgroundColor: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          const Icon(Icons.shield_outlined,
+              color: Color(0xFFFF6F00), size: 24),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              'Permission requise',
+              style: TextStyle(
+                color: theme.colorScheme.onSurface,
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'La fonction « $featureName » nécessite l\'autorisation '
+            '« $label ».',
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _stateDescription(),
+            style: const TextStyle(
+              color: Color(0xFFFF6F00),
+              fontSize: 12,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        // ── Option A : désactiver la fonction ──────────────────────────
+        OutlinedButton(
+          onPressed: () => Navigator.of(context).pop(_GuardResult.cancelled),
+          child: const Text('Désactiver la fonction'),
+        ),
+        // ── Option B : accorder la permission ──────────────────────────
+        ElevatedButton.icon(
+          icon: const Icon(Icons.check_circle_outline, size: 18),
+          label: const Text('Accorder la permission'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFFF6F00),
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () =>
+              Navigator.of(context).pop(_GuardResult.grantedNow),
+        ),
+      ],
+    );
+  }
+
+  String _stateDescription() {
+    switch (state) {
+      case PermissionState.permanentlyDenied:
+        return 'Cette permission a été refusée définitivement. '
+            'L\'écran des paramètres Android va s\'ouvrir.';
+      case PermissionState.serviceDisabled:
+        return 'Le service système correspondant est désactivé. '
+            'Activez-le dans les paramètres.';
+      default:
+        return 'Si vous refusez, $featureName restera désactivé(e).';
+    }
+  }
+}
 
 class MissingPermissionsDialog extends StatelessWidget {
   const MissingPermissionsDialog({

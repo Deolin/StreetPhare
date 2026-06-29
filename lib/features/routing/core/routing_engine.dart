@@ -17,6 +17,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../domain/pedestrian_route_service.dart';
 import '../domain/models/route_result.dart' as legacy;
 import '../domain/models/avoidance_filters.dart';
 import '../infrastructure/osmand_native_channel.dart';
@@ -124,6 +125,8 @@ class RoutingEngine {
     AvoidanceFilters avoidFilters = const AvoidanceFilters(),
     List<LatLng> avoidPoints = const [],
   }) async {
+    // Met à jour le profil courant pour le label.
+    _lastProfile = profile;
     // ── TENTATIVE 0 : Graphe .spg (nouveau moteur) ─────────────────────
     if (_state == EngineState.ready && _graph != null) {
       try {
@@ -155,6 +158,7 @@ class RoutingEngine {
         final nativeResult = await nativeChannel.computeRoute(
           start: start,
           end: end,
+          profile: profile,
           avoidPoints: avoidPoints
               .map((p) => AvoidPoint(lat: p.latitude, lon: p.longitude))
               .toList(),
@@ -176,6 +180,7 @@ class RoutingEngine {
       final legacyResult = await OsmAndRoutingService.instance.computeRoutes(
         start: start,
         end: end,
+        profile: profile,
         filters: avoidFilters,
         avoidPoints: avoidPoints,
       );
@@ -195,6 +200,7 @@ class RoutingEngine {
       final legacyResult = await OsmAndRoutingService.instance.computeRoutes(
         start: start,
         end: end,
+        profile: profile,
         filters: avoidFilters,
         avoidPoints: avoidPoints,
       );
@@ -216,6 +222,7 @@ class RoutingEngine {
         start: start,
         end: end,
         filters: avoidFilters,
+        constraints: PedestrianConstraints.fromProfile(profile),
       );
       if (paths.isNotEmpty) {
         return RouteComputeResult(
@@ -260,7 +267,7 @@ class RoutingEngine {
     return 'urgence';
   }
 
-  final RoutingProfile _lastProfile = RoutingProfile.pedestrian;
+  RoutingProfile _lastProfile = RoutingProfile.pedestrian;
 
   /// Libère le graphe de la mémoire.
   void unloadRegion() {

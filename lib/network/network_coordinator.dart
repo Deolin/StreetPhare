@@ -86,6 +86,9 @@ class NetworkCoordinator with WidgetsBindingObserver {
   /// Durée entre pings réseau en mode DÉGRADÉ (3 min, économie batterie).
   static const Duration _kDegradedUploadInterval = Duration(minutes: 3);
 
+  /// Timer d'écoute passive BLE en arrière-plan (5 min max).
+  Timer? _backgroundBleTimeout;
+
   /// Expose l'état du mode Hive-uniquement (lecture seule pour l'UI).
   bool get isHiveOnlyMode => _hiveOnlyMode;
 
@@ -208,13 +211,32 @@ class NetworkCoordinator with WidgetsBindingObserver {
     await _mesh!.start();
 
     // Tâches périodiques : purge TTL et tentative d'upload.
+    // Chaque callback est wrappé dans un try/catch pour éviter que
+    // le Timer ne soit silencieusement annulé par une exception
+    // non capturée (ex: réseau indisponible, MissingPluginException).
     _purgeTimer = Timer.periodic(
       const Duration(minutes: 1),
-      (_) => _purgeAndMaybeSync(),
+      (_) {
+        try {
+          _purgeAndMaybeSync();
+        } catch (e, st) {
+          if (kDebugMode) {
+            debugPrint('[NetworkCoordinator] purge timer failed: $e\n$st');
+          }
+        }
+      },
     );
     _uploadTimer = Timer.periodic(
       _kNormalUploadInterval,
-      (_) => unawaited(_uploadValidatedAlerts()),
+      (_) {
+        try {
+          unawaited(_uploadValidatedAlerts());
+        } catch (e, st) {
+          if (kDebugMode) {
+            debugPrint('[NetworkCoordinator] upload timer failed: $e\n$st');
+          }
+        }
+      },
     );
 
     // [3] Vérification périodique de la disponibilité des serveurs.
@@ -225,24 +247,67 @@ class NetworkCoordinator with WidgetsBindingObserver {
     //   → repasse en mode normal (ping toutes les 2 min).
     _serverCheckTimer = Timer.periodic(
       const Duration(minutes: 1),
-      (_) => _checkServerReachabilityAndAdapt(),
+      (_) {
+        try {
+          _checkServerReachabilityAndAdapt();
+        } catch (e, st) {
+          if (kDebugMode) {
+            debugPrint(
+                '[NetworkCoordinator] server check timer failed: $e\n$st');
+          }
+        }
+      },
     );
 
     // [3] Rapport périodique de densité Bluetooth (HIVE)
     // Seuls les signalements avec une densité > 0 sont envoyés.
     _densityReportTimer = Timer.periodic(
       const Duration(minutes: 5),
-      (_) => _reportLocalDensity(),
+      (_) {
+        try {
+          _reportLocalDensity();
+        } catch (e, st) {
+          if (kDebugMode) {
+            debugPrint(
+                '[NetworkCoordinator] density report timer failed: $e\n$st');
+          }
+        }
+      },
     );
 
     // ── Santé des pairs : purge périodique des pairs inactifs ──
     _peerHealthCheckTimer = Timer.periodic(
       const Duration(minutes: 2),
-      (_) => _checkPeerHealth(),
+      (_) {
+        try {
+          _checkPeerHealth();
+        } catch (e, st) {
+          if (kDebugMode) {
+            debugPrint(
+                '[NetworkCoordinator] peer health timer failed: $e\n$st');
+          }
+        }
+      },
     );
 
     // ── Observer le cycle de vie de l'application ──
     WidgetsBinding.instance.addObserver(this);
+
+    // ── Réaction à la restauration du réseau ──
+    // Quand une couche réseau redevient active après une coupure
+    // (ex: WiFi réactivé, BLE reconnecté), on déclenche immédiatement
+    // la synchronisation des flux en attente.
+    _subs.add(
+      ConnectivityService.instance.onNetworkRestored.listen((_) {
+        if (kDebugMode) {
+          debugPrint('[NetworkCoordinator] Réseau restauré → sync immédiate');
+        }
+        unawaited(_uploadValidatedAlerts());
+        unawaited(_syncOnForeground());
+        // Flush l'outbox des messages locaux en attente (mode isolé).
+        unawaited(_mesh?.flushOutbox());
+      }),
+    );
 
     _initialized = true;
     if (kDebugMode) {
@@ -286,10 +351,27 @@ class NetworkCoordinator with WidgetsBindingObserver {
     _densityReportTimer?.cancel();
     _peerHealthCheckTimer?.cancel();
 
-    // Les transports P2P restent ouverts mais en écoute passive.
+    // ── Écoute passive BLE (5 minutes) ──────────────────────────
+    // Les transports P2P (BLE + Wi-Fi) ne sont PAS coupés immédiatement.
+    // Ils restent ouverts en mode "écoute passive optimisée" pendant
+    // 5 minutes pour permettre le transit des alertes même si le
+    // téléphone est dans la poche. Passé ce délai, les connexions
+    // sont fermées pour économiser la batterie.
+    // Le timer est annulé si l'app repasse au premier plan avant.
+    _backgroundBleTimeout?.cancel();
+    _backgroundBleTimeout = Timer(const Duration(minutes: 5), () {
+      if (_lifecyclePaused) {
+        if (kDebugMode) {
+          debugPrint('[NetworkCoordinator] BLE — arrêt écoute passive '
+              '(timeout 5 min écoulé)');
+        }
+        unawaited(_mesh?.stop());
+      }
+    });
+
     if (kDebugMode) {
       debugPrint('[NetworkCoordinator] App en arrière-plan — timers gelés, '
-          'transports en écoute passive');
+          'BLE en écoute passive (timeout 5 min)');
     }
   }
 
@@ -455,14 +537,25 @@ class NetworkCoordinator with WidgetsBindingObserver {
   }
 
   /// Traite un payload brut entrant depuis un transport P2P.
-  /// Détecte les messages Hive P2P (préfixe "hive_p2p:") et les
-  /// transmet au HiveMessagingService.
+  /// Détecte les messages Hive P2P et les transmet au HiveMessagingService.
+  ///
+  /// ⚠️ ANR fix : filtre anti-boucle — ignore les messages émis par
+  /// l'instance locale (auto-réception via BLE/Wi-Fi scan local).
   void _handleIncomingRaw(String raw) {
     try {
       final json = jsonDecode(raw) as Map<String, dynamic>;
       final kind = json['kind'] as String?;
 
       if (kind == 'hive_p2p_message') {
+        // ANR fix : ignore les messages auto-émis pour casser la boucle.
+        final senderId = json['sender_id'] as String?;
+        if (senderId == _ephemeralUserId) {
+          // Message émis par cette instance → ignoré.
+          // Le HiveMessagingService a déjà inséré le message localement
+          // lors de l'émission, pas besoin de le recevoir en double.
+          return;
+        }
+
         final payload = json['payload'] as Map<String, dynamic>?;
         if (payload != null) {
           HiveMessagingService.instance.receiveRemote(payload);

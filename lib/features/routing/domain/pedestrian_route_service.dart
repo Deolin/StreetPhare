@@ -30,6 +30,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../../../network/network_config.dart';
+import '../core/models/routing_profile.dart';
 import 'models/avoidance_filters.dart';
 import 'models/route_result.dart';
 import '../presentation/safe_path_engine.dart';
@@ -89,6 +90,20 @@ class PedestrianConstraints {
     unknownTerrainPenalty: 80.0,
     gridStepMeters: 30.0,
   );
+
+  /// Adapte les contraintes de grille en fonction du profil de transport.
+  ///
+  /// - `pedestrian` / `bicycle` → grille urbaine (pas 20 m, forte pénalité
+  ///   diagonale pour forcer le suivi des rues).
+  /// - `vehicle` → grille rurale (pas 30 m, pénalité réduite — la route
+  ///   SafePathEngine n'est pas optimale pour les véhicules, c'est un
+  ///   fallback de dernier recours).
+  static PedestrianConstraints fromProfile(RoutingProfile profile) {
+    return switch (profile) {
+      RoutingProfile.vehicle => rural,
+      _ => urban, // pedestrian, bicycle, emergency, transit
+    };
+  }
 }
 
 // ============================================================================
@@ -281,7 +296,15 @@ class PedestrianRouteService {
           )
           .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode != 200) return [];
+      if (response.statusCode != 200) {
+        if (kDebugMode) {
+          debugPrint('[PedestrianRoute] ⚠ Serveur local HTTP ${response.statusCode}: '
+              '${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+        }
+        // Fallback automatique vers OsmAnd/OSRM : l'appelant (computeRoutes)
+        // continue sa cascade de fallback quand la liste est vide.
+        return [];
+      }
 
       final parsed = jsonDecode(response.body) as Map<String, dynamic>;
       final routesJson = parsed['routes'] as List<dynamic>? ?? [];
@@ -308,6 +331,9 @@ class PedestrianRouteService {
       }
       return results;
     } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[PedestrianRoute] ❌ Échec serveur local: $e — dégradation vers fallback');
+      }
       return [];
     }
   }

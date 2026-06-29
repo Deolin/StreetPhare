@@ -53,9 +53,6 @@ import '../database/hive_alert_database.dart';
 
 /// Représente un pair (autre appareil) découvert sur le maillage.
 class MeshPeer {
-  final String id;
-  final String transport; // 'ble' | 'wifi' | 'relay'
-  final DateTime lastSeen;
 
   const MeshPeer({
     required this.id,
@@ -63,17 +60,20 @@ class MeshPeer {
     required this.lastSeen,
   });
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        't': transport,
-        'ls': lastSeen.toIso8601String(),
-      };
-
   factory MeshPeer.fromJson(Map<String, dynamic> j) => MeshPeer(
         id: j['id'] as String,
         transport: j['t'] as String,
         lastSeen: DateTime.parse(j['ls'] as String).toUtc(),
       );
+  final String id;
+  final String transport; // 'ble' | 'wifi' | 'relay'
+  final DateTime lastSeen;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        't': transport,
+        'ls': lastSeen.toIso8601String(),
+      };
 }
 
 /// Contrat d'un transport de maillage. Une implémentation existe
@@ -167,6 +167,32 @@ class P2PMeshService {
   /// Taille maximale du cache anti-dédoublement.
   static const int _maxRecentAlertCache = 100;
 
+  /// Outbox persistée (Hive) : messages locaux non broadcastés
+  /// faute de transport disponible. Flushée automatiquement
+  /// quand un transport redevient actif.
+  final List<String> _outbox = [];
+
+  /// Flush l'outbox locale sur tous les transports disponibles.
+  /// Appelé quand le réseau local est restauré.
+  Future<void> flushOutbox() async {
+    if (_outbox.isEmpty) return;
+    if (kDebugMode) {
+      debugPrint('[P2PMeshService] flush outbox (${_outbox.length} messages)');
+    }
+    final messages = List<String>.from(_outbox);
+    _outbox.clear();
+    for (final msg in messages) {
+      try {
+        final json = jsonDecode(msg) as Map<String, dynamic>;
+        await broadcastRawJsonLocal(json);
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[P2PMeshService] Erreur flush outbox: $e');
+        }
+      }
+    }
+  }
+
   /// Démarre tous les transports et la boucle de gossip.
   Future<void> start() async {
     if (_started) return;
@@ -252,12 +278,24 @@ class P2PMeshService {
         )
         .toList();
 
-    if (localTransports.isEmpty || !localTransports.any((t) => t.isAvailable)) {
+    if (localTransports.isEmpty) {
       if (kDebugMode) {
-        debugPrint(
-            '[P2PMeshService] no local transport available, fallback to all');
+        debugPrint('[P2PMeshService] no local transport configured, '
+            'fallback to all');
       }
       unawaited(broadcastRawJson(json));
+      return;
+    }
+
+    if (!localTransports.any((t) => t.isAvailable)) {
+      // Aucun transport local dispo → NE PAS faire de fallback vers le
+      // serveur. Le mode `local_only` signifie "je ne veux pas de relay".
+      // On persiste le message dans l'outbox Hive pour resync ultérieure.
+      if (kDebugMode) {
+        debugPrint('[P2PMeshService] no local transport available, '
+            'message mis en attente (outbox Hive)');
+      }
+      _outbox.add(jsonEncode(json));
       return;
     }
 
@@ -290,10 +328,18 @@ class P2PMeshService {
     for (final t in transports) {
       try {
         await t.stop();
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[P2PMeshService] Erreur stop ${t.name}: $e');
+        }
+      }
       try {
         t.dispose();
-      } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[P2PMeshService] Erreur dispose ${t.name}: $e');
+        }
+      }
     }
     _pendingMicrotasks = 0;
     _recentlyReceivedAlertIds.clear();

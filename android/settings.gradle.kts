@@ -48,3 +48,4 @@ plugins {
 }
 
 include(":app")
+include(":mini_downloader")

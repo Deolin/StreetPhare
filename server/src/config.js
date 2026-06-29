@@ -15,7 +15,26 @@ const config = {
 
 
   // ── Chiffrement ─────────────────────────────────────────────────────
-  masterKey: process.env.MASTER_KEY || 'streetphare-dev-key-change-in-production',
+  // La clé maîtresse DOIT être fournie via la variable d'environnement
+  // MASTER_KEY. En production, le serveur REFUSE de démarrer avec la
+  // valeur par défaut (qui n'est qu'un placeholder de développement).
+  masterKey: (() => {
+    const key = process.env.MASTER_KEY;
+    if (!key || key === 'streetphare-dev-key-change-in-production') {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('╔══════════════════════════════════════════════════════╗');
+        console.error('║  ERREUR FATALE : MASTER_KEY non configurée          ║');
+        console.error('║  En production, définissez la variable              ║');
+        console.error('║  d\'environnement MASTER_KEY avec une clé forte.     ║');
+        console.error('║  Exemple : export MASTER_KEY="$(openssl rand -hex 32)"  ║');
+        console.error('╚══════════════════════════════════════════════════════╝');
+        process.exit(1);
+      }
+      console.warn('[CONFIG] ⚠ MASTER_KEY par défaut — développement uniquement.');
+      return 'streetphare-dev-key-change-in-production';
+    }
+    return key;
+  })(),
 
   // ── Consensus ───────────────────────────────────────────────────────
   consensusThreshold: parseInt(process.env.CONSENSUS_THRESHOLD || '3', 10),

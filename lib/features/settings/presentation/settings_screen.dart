@@ -15,15 +15,22 @@
 //  10. Guide de l'application (tutoriel)
 //  11. À propos
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:open_settings/open_settings.dart';
 
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../../services/apk_downloader_service.dart';
 import '../../../services/app_share_service.dart';
+import '../../../services/notification_service.dart';
+import '../../../services/permission_service.dart';
 import '../../bug_report/presentation/bug_report_fab.dart';
+import '../../bug_report/presentation/bug_report_service.dart' show BugCategory;
+import '../../../services/version_check_service.dart';
 import '../../events/presentation/events_screen.dart';
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/domain/models/avoidance_filters.dart';
@@ -294,28 +301,22 @@ class _LowVisionSection extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Slider(
-                        value:
-                            prefs.lowVisionMode ? 1.5 : prefs.textScaleFactor,
+                        value: prefs.textScaleFactor,
                         min: 1.0,
                         max: 2.0,
                         divisions: 10,
                         activeColor: const Color(0xFF7B1FA2),
-                        label:
-                            '${(prefs.lowVisionMode ? 1.5 : prefs.textScaleFactor).toStringAsFixed(1)}×',
-                        onChanged: prefs.lowVisionMode
-                            ? null // Verrouillé à 1.5x quand le mode malvoyant est actif.
-                            : (v) => AppPreferencesStore.instance
-                                .setTextScaleFactor(v),
+                        label: '${prefs.textScaleFactor.toStringAsFixed(1)}×',
+                        onChanged: (v) => AppPreferencesStore.instance
+                            .setTextScaleFactor(v),
                       ),
                     ),
                     SizedBox(
                       width: 44,
                       child: Text(
-                        '${(prefs.lowVisionMode ? 1.5 : prefs.textScaleFactor).toStringAsFixed(1)}×',
+                        '${prefs.textScaleFactor.toStringAsFixed(1)}×',
                         style: TextStyle(
-                          color: prefs.lowVisionMode
-                              ? const Color(0xFF7B1FA2)
-                              : onSurface,
+                          color: onSurface,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -797,7 +798,7 @@ class _MapCacheSection extends StatelessWidget {
                     value: prefs.mapCacheMaxAgeDays,
                     dropdownColor: Theme.of(context).colorScheme.surface,
                     style: TextStyle(color: onSurface, fontSize: 13),
-                    items: [1, 3, 7, 14, 30]
+                    items: const [7, 14, 30]
                         .map((v) => DropdownMenuItem(
                             value: v,
                             child: Text('$v ${strings.mapCacheDays}')))
@@ -868,27 +869,145 @@ class _MapCacheSection extends StatelessWidget {
 // [8] Section SERVICE ARRIÈRE-PLAN
 // ============================================================================
 
-class _BackgroundServiceSection extends StatelessWidget {
+class _BackgroundServiceSection extends StatefulWidget {
   const _BackgroundServiceSection({required this.strings});
   final AppStrings strings;
 
   @override
+  State<_BackgroundServiceSection> createState() =>
+      _BackgroundServiceSectionState();
+}
+
+class _BackgroundServiceSectionState extends State<_BackgroundServiceSection> {
+  bool _serviceActive = false;
+
+  Future<void> _toggleService() async {
+    if (_serviceActive) {
+      // Désactiver
+      try {
+        await NotificationService.instance.dismissPersistentNotification();
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          try {
+            await const MethodChannel('com.streetphare.app/system')
+                .invokeMethod('stopBackgroundService');
+          } catch (_) {
+            // Le canal natif n'est pas encore implémenté → non bloquant.
+            if (kDebugMode) {
+              debugPrint(
+                  '[BackgroundService] stopBackgroundService non supporté (canal natif absent)');
+            }
+          }
+        }
+        setState(() => _serviceActive = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Service arrêté'),
+              backgroundColor: StreetPhareTheme.primary,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[BackgroundService] erreur arrêt: $e');
+        }
+        // Force l'état à false même en cas d'erreur partielle.
+        setState(() => _serviceActive = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                  'Impossible d\'arrêter le service. Vérifiez les paramètres Android.'),
+              backgroundColor: StreetPhareTheme.danger,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } else {
+      // Activer — intercepter par le flux de permission guard().
+      if (!mounted) return;
+
+      await PermissionService.guard(
+        context,
+        sp: StreetPharePermission.notification,
+        featureName: 'Service arrière-plan',
+        onGranted: () => _activateBackgroundService(),
+      );
+    }
+  }
+
+  /// Activation effective du service arrière-plan (appelé uniquement
+  /// après validation de la permission par [PermissionService.guard]).
+  Future<void> _activateBackgroundService() async {
+    try {
+      await NotificationService.instance.showPersistentNotification();
+
+      // 2. Tente le service natif (non bloquant si absent).
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        try {
+          await const MethodChannel('com.streetphare.app/system')
+              .invokeMethod('startBackgroundService');
+        } catch (_) {
+          if (kDebugMode) {
+            debugPrint(
+                '[BackgroundService] startBackgroundService non supporté '
+                '(canal natif absent). La notification persistante seule '
+                'est active.');
+          }
+        }
+      }
+
+      if (!mounted) return;
+      setState(() => _serviceActive = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Service activé'),
+          backgroundColor: const Color(0xFF388E3C),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[BackgroundService] erreur activation: $e');
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Échec de l\'activation du service.\n'
+                'Vérifiez les permissions Android et réessayez.'),
+            backgroundColor: StreetPhareTheme.danger,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
+    final s = widget.strings;
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionHeader(
             icon: Icons.notifications_active_outlined,
-            title: strings.backgroundServiceTitle,
+            title: s.backgroundServiceTitle,
             color: const Color(0xFFFFB300),
           ),
           const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.only(left: 30),
             child: Text(
-              strings.backgroundServiceDescription,
+              s.backgroundServiceDescription,
               style: TextStyle(
                 color: onSurface.withValues(alpha: 0.65),
                 fontSize: 12,
@@ -901,14 +1020,25 @@ class _BackgroundServiceSection extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.only(left: 30),
               child: ElevatedButton.icon(
-                onPressed: () {
-                  // Appel futur : showBackgroundPermissionDialog(context)
-                },
-                icon: const Icon(Icons.battery_saver, size: 18),
-                label: Text(strings.backgroundServiceEnable),
+                onPressed: _toggleService,
+                icon: Icon(
+                  _serviceActive
+                      ? Icons.stop_circle_outlined
+                      : Icons.notifications_active,
+                  size: 18,
+                ),
+                label: Text(
+                  _serviceActive
+                      ? 'Désactiver'
+                      : s.backgroundServiceEnable,
+                ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFB300),
-                  foregroundColor: Colors.black,
+                  backgroundColor: _serviceActive
+                      ? StreetPhareTheme.danger
+                      : const Color(0xFFFFB300),
+                  foregroundColor: _serviceActive
+                      ? Colors.white
+                      : Colors.black,
                 ),
               ),
             ),
@@ -1272,12 +1402,21 @@ class _AboutSection extends StatelessWidget {
           strings.aboutApp,
           style: TextStyle(color: onSurface, fontWeight: FontWeight.w500),
         ),
-        subtitle: Text(
-          '${strings.aboutVersion} 1.2.0 — ${strings.aboutLicense} GNU GPL v3',
-          style: TextStyle(
-            color: onSurface.withValues(alpha: 0.65),
-            fontSize: 12,
-          ),
+        subtitle: ValueListenableBuilder<AppLanguage>(
+          valueListenable: AppLocale.instance,
+          builder: (context, __, ___) {
+            final vc = VersionCheckService.instance;
+            final v = vc.isInitialized
+                ? 'v${vc.currentVersion}+${vc.buildNumber}'
+                : 'v2.2.0';
+            return Text(
+              '${strings.aboutVersion} $v — ${strings.aboutLicense} GNU GPL v3',
+              style: TextStyle(
+                color: onSurface.withValues(alpha: 0.65),
+                fontSize: 12,
+              ),
+            );
+          },
         ),
         trailing:
             Icon(Icons.chevron_right, color: onSurface.withValues(alpha: 0.4)),
@@ -1312,7 +1451,10 @@ class _AboutSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _AboutRow(label: strings.aboutVersion, value: '1.2.0'),
+              _AboutRow(
+                label: strings.aboutVersion,
+                value: _AboutRow._versionLabel,
+              ),
               const SizedBox(height: 6),
               _AboutRow(label: strings.aboutPlatform, value: 'Flutter / Dart'),
               const SizedBox(height: 6),
@@ -1353,6 +1495,15 @@ class _AboutSection extends StatelessWidget {
 }
 
 class _AboutRow extends StatelessWidget {
+  // Label de version dynamique (ex: v2.2.0+42).
+  static String get _versionLabel {
+    final vc = VersionCheckService.instance;
+    if (vc.isInitialized) {
+      return 'v${vc.currentVersion}+${vc.buildNumber}';
+    }
+    return 'v2.2.0';
+  }
+
   const _AboutRow({required this.label, required this.value});
   final String label;
   final String value;
@@ -1454,8 +1605,21 @@ class _AndroidNotificationSection extends StatelessWidget {
                 _AndroidChannelTile(
                   channel: ch,
                   enabled: prefs.isAndroidChannelEnabled(ch.id),
-                  onChanged: (v) => AppPreferencesStore.instance
-                      .setAndroidChannelEnabled(ch.id, v),
+                  onChanged: (v) {
+                    AppPreferencesStore.instance
+                        .setAndroidChannelEnabled(ch.id, v);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          v
+                              ? '${ch.title} : activé'
+                              : '${ch.title} : désactivé',
+                        ),
+                        duration: const Duration(seconds: 1),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
                 ),
               const Divider(height: 20),
               Align(
@@ -1484,10 +1648,7 @@ class _AndroidNotificationSection extends StatelessWidget {
   }
 
   static Future<void> _openAndroidNotificationSettings() async {
-    try {
-      const channel = MethodChannel('com.streetphare.app/system');
-      await channel.invokeMethod('openNotificationSettings');
-    } catch (_) {}
+    await OpenSettings.openNotificationSetting();
   }
 }
 
@@ -1717,13 +1878,15 @@ class _BugReportSection extends StatelessWidget {
                   backgroundColor: const Color(0xFF00838F),
                   foregroundColor: Colors.white,
                 ),
-                onPressed: () => BugReportDialog.show(context),
+                onPressed: () => BugReportDialog.show(context,
+                    initialCategory: BugCategory.bug),
               ),
               const SizedBox(width: 12),
               OutlinedButton.icon(
                 icon: const Icon(Icons.lightbulb_outline, size: 18),
                 label: Text(strings.bugReportSuggest),
-                onPressed: () => BugReportDialog.show(context),
+                onPressed: () => BugReportDialog.show(context,
+                    initialCategory: BugCategory.suggestion),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF00838F)),
                   foregroundColor: const Color(0xFF00838F),
@@ -1906,7 +2069,7 @@ class _ShareApkSection extends StatelessWidget {
             ),
             onPressed: () {
               Navigator.of(ctx).pop();
-              AppShareService.instance.shareApk(context: context);
+              ApkDownloaderService.instance.shareDownloader();
             },
           ),
         ],

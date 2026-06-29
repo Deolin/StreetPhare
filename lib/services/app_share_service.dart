@@ -120,14 +120,6 @@ class AppShareService {
       return backupPath;
     }
 
-    // ── Niveau 3 : Scan du répertoire /data/app/ (fallback hérité) ─────────
-    final scanPath = await _locateViaDataAppScan();
-    if (scanPath != null) {
-      debugPrint(
-          '[AppShareService] APK localisé via scan /data/app/ : $scanPath');
-      return scanPath;
-    }
-
     debugPrint(
         '[AppShareService] Échec de toutes les stratégies de localisation.');
     return null;
@@ -175,67 +167,6 @@ class AppShareService {
     } catch (e) {
       debugPrint('[AppShareService] Erreur récupération sauvegarde : $e');
     }
-    return null;
-  }
-
-  /// Niveau 3 : scan du répertoire `/data/app/` pour trouver l'APK.
-  /// Cette approche peut échouer sur Android 13+ (API 33+) à cause du
-  /// scoped storage qui restreint l'accès à ce répertoire.
-  Future<String?> _locateViaDataAppScan() async {
-    try {
-      final info = await PackageInfo.fromPlatform();
-      final packageName = info.packageName;
-
-      final candidates = <String>[];
-
-      final appDir = Directory('/data/app');
-      if (!await appDir.exists()) return null;
-
-      await for (final entity in appDir.list()) {
-        if (entity is Directory && entity.path.contains(packageName)) {
-          final baseApk = File('${entity.path}/base.apk');
-          if (await baseApk.exists()) {
-            return baseApk.path;
-          }
-          await for (final sub in entity.list()) {
-            if (sub is File && sub.path.endsWith('.apk')) {
-              candidates.add(sub.path);
-            }
-          }
-        }
-      }
-
-      if (candidates.isNotEmpty) {
-        return candidates.firstWhere(
-          (p) => p.endsWith('base.apk'),
-          orElse: () => candidates.first,
-        );
-      }
-    } catch (e) {
-      debugPrint('[AppShareService] Erreur scan /data/app/ : $e');
-    }
-
-    // Fallback chemins fixes (dernier recours)
-    try {
-      final info = await PackageInfo.fromPlatform();
-      final packageName = info.packageName;
-
-      final fallbackPaths = [
-        '/data/app/$packageName-1/base.apk',
-        '/data/app/$packageName-2/base.apk',
-        '/data/app/$packageName/base.apk',
-      ];
-
-      for (final path in fallbackPaths) {
-        final file = File(path);
-        if (await file.exists()) {
-          return path;
-        }
-      }
-    } catch (e) {
-      debugPrint('[AppShareService] Fallback chemins fixes échoué : $e');
-    }
-
     return null;
   }
 

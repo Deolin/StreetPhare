@@ -115,7 +115,14 @@ class RelayMeshTransport implements MeshTransport {
             'kind': 'ping',
             'ts': DateTime.now().toUtc().toIso8601String(),
           }));
-        } catch (_) {}
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('[Relay] Erreur ping heartbeat: $e');
+          }
+          // Si le ping échoue, la connexion est probablement morte.
+          // On planifie une reconnexion.
+          _scheduleReconnect();
+        }
       });
     } catch (e) {
       if (kDebugMode) debugPrint('[Relay] connect error: $e');
@@ -183,7 +190,11 @@ class RelayMeshTransport implements MeshTransport {
     _sub = null;
     try {
       _channel?.sink.close();
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[Relay] Erreur close channel (dispose): $e');
+      }
+    }
     _channel = null;
     _reconnectAttempts = 0;
     _incomingController.close();

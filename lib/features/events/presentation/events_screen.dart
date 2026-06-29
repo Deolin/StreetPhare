@@ -11,8 +11,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'dart:async';
+import 'dart:convert';
 
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
@@ -141,12 +143,57 @@ class _EventsScreenState extends State<EventsScreen> {
     }
   }
 
-  void _removeEvent(String code) {
+  Future<void> _removeEvent(String code) async {
+    final s = AppLocale.instance.strings;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber, color: StreetPhareTheme.danger, size: 24),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                'Retirer l\'événement ?',
+                style: const TextStyle(
+                  color: StreetPhareTheme.textPrimary,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Êtes-vous sûr de vouloir retirer cet événement ?\n'
+          'Cette action est définitive et supprimera le tracé de la carte.',
+          style: TextStyle(
+            color: StreetPhareTheme.textSecondary,
+            fontSize: 14,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: StreetPhareTheme.danger,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Retirer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     EventManager.instance.removeByCode(code);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocale.instance.strings.eventsRemoved),
+          content: Text(s.eventsRemoved),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -393,6 +440,14 @@ class _EventCard extends StatelessWidget {
                   ),
                 ),
                 IconButton(
+                  icon: const Icon(Icons.qr_code_2,
+                      size: 18, color: StreetPhareTheme.primary),
+                  tooltip: 'Partager via QR Code',
+                  onPressed: () => _showQrDialog(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                IconButton(
                   icon: const Icon(Icons.close,
                       size: 18, color: StreetPhareTheme.textSecondary),
                   tooltip: strings.eventsRemoveTooltip,
@@ -538,6 +593,77 @@ class _EventCard extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showQrDialog(BuildContext context) {
+    final qrData = jsonEncode({
+      'code': event.code,
+      'title': event.title,
+      'start': event.startAt.toUtc().toIso8601String(),
+      'destination': {
+        'lat': event.destinationLatitude,
+        'lng': event.destinationLongitude,
+      },
+    });
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(ctx).colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.qr_code_2,
+                color: StreetPhareTheme.primary, size: 24),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                event.title,
+                style: TextStyle(
+                  color: Theme.of(ctx).colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: QrImageView(
+                data: qrData,
+                version: QrVersions.auto,
+                size: 200,
+                backgroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              event.code,
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Fermer'),
+          ),
+        ],
       ),
     );
   }

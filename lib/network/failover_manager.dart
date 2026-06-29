@@ -43,12 +43,6 @@ enum ServerStatus { active, failed, standby }
 
 /// Représente un serveur (adresse en clair ou chiffrée).
 class ServerEndpoint {
-  final String address;
-  final String encryptedAddress;
-  final ServerStatus status;
-  final int consecutiveFailures;
-  final DateTime lastChecked;
-  final DateTime markedFailedAt;
 
   const ServerEndpoint({
     required this.address,
@@ -58,6 +52,12 @@ class ServerEndpoint {
     required this.lastChecked,
     required this.markedFailedAt,
   });
+  final String address;
+  final String encryptedAddress;
+  final ServerStatus status;
+  final int consecutiveFailures;
+  final DateTime lastChecked;
+  final DateTime markedFailedAt;
 
   ServerEndpoint copyWith({
     String? address,
@@ -82,9 +82,6 @@ class ServerEndpoint {
 /// Le serveur peut renvoyer un nouvel endpoint chiffré pour
 /// étendre la chaîne de secours.
 class SyncResponse {
-  final bool success;
-  final String serverAddress;
-  final String nextBackupCipher;
 
   const SyncResponse({
     required this.success,
@@ -97,6 +94,9 @@ class SyncResponse {
         serverAddress: (j['server'] as String?) ?? '',
         nextBackupCipher: (j['next_backup'] as String?) ?? '',
       );
+  final bool success;
+  final String serverAddress;
+  final String nextBackupCipher;
 }
 
 /// Configuration du FailoverManager.
@@ -111,6 +111,15 @@ class SyncResponse {
 /// Dès le 3ème KO consécutif (15s écoulées), le failover est
 /// déclenché instantanément.
 class FailoverConfig {
+
+  const FailoverConfig({
+    required this.primaryAddress,
+    required this.encryptedBackupChain,
+    this.maxAttempts = 3,
+    this.heartbeatInterval = const Duration(seconds: 5),
+    this.pingTimeout = const Duration(seconds: 2),
+    required this.masterKey,
+  });
   /// URL du serveur principal initial (intégré dans l'app, peut
   /// être mis à jour via OTA / build flags).
   final String primaryAddress;
@@ -131,22 +140,13 @@ class FailoverConfig {
   /// Clé maîtresse AES issue du keystore sécurisé de l'OS
   /// (Android Keystore / iOS Keychain).
   final SecretKey masterKey;
-
-  const FailoverConfig({
-    required this.primaryAddress,
-    required this.encryptedBackupChain,
-    this.maxAttempts = 3,
-    this.heartbeatInterval = const Duration(seconds: 5),
-    this.pingTimeout = const Duration(seconds: 2),
-    required this.masterKey,
-  });
 }
 
 /// Résultat d'un ping de standby (utilisé par le failover parallèle).
 class _PingResult {
+  const _PingResult({required this.address, required this.reachable});
   final ServerEndpoint address;
   final bool reachable;
-  const _PingResult({required this.address, required this.reachable});
 }
 
 /// FailoverManager singleton.
@@ -281,6 +281,12 @@ class FailoverManager {
 
     if (_current!.consecutiveFailures >= _config!.maxAttempts) {
       await _failover();
+      // Réinitialise le compteur après tentative de failover
+      // (même si le failover échoue, on ne veut pas incrémenter
+      // indéfiniment jusqu'à 26/3).
+      if (_current != null) {
+        _current = _current!.copyWith(consecutiveFailures: 0);
+      }
     }
     return false;
   }
@@ -449,8 +455,10 @@ class FailoverManager {
               }
               return true;
             }
-          } catch (_) {
-            // Même le fallback local échoue.
+          } catch (e) {
+            if (kDebugMode) {
+              debugPrint('[FailoverManager] Échec fallback local $fallback : $e');
+            }
           }
         }
       }
@@ -511,7 +519,11 @@ class FailoverManager {
           if (next.nextBackupCipher.isNotEmpty) {
             await _enqueueNextBackup(next.nextBackupCipher);
           }
-        } catch (_) {}
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('[FailoverManager] Erreur parsing backup chiffré : $e');
+          }
+        }
         ClientDebugLogger.instance.uploadAttempted(
           address: targetAddress,
           alertCount: alerts.length,

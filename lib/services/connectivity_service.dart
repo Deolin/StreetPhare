@@ -12,7 +12,6 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 
 import '../core/network/peer_counter_service.dart';
 import '../network/failover_manager.dart';
@@ -53,19 +52,16 @@ class NetworkState {
   final Duration isolationDuration;
   final List<String> missingLayers;
 
-  /// Indique si TOUTES les couches physiques sont coupées.
   bool get allLayersDown =>
       ble != TransportLayerState.active &&
       wifiDirect != TransportLayerState.active &&
       webSocket != TransportLayerState.active;
 
-  /// Indique si au moins une couche est active.
   bool get anyLayerActive =>
       ble == TransportLayerState.active ||
       wifiDirect == TransportLayerState.active ||
       webSocket == TransportLayerState.active;
 
-  /// Nombre de couches actives.
   int get activeLayerCount {
     int count = 0;
     if (ble == TransportLayerState.active) count++;
@@ -74,7 +70,6 @@ class NetworkState {
     return count;
   }
 
-  /// Couche prioritaire actuellement active (BLE > Wi-Fi > WebSocket).
   TransportLayerState? get primaryLayer {
     if (ble == TransportLayerState.active) return ble;
     if (wifiDirect == TransportLayerState.active) return wifiDirect;
@@ -83,6 +78,7 @@ class NetworkState {
   }
 }
 
+// ignore: must_be_immutable
 class ConnectivityService extends ChangeNotifier {
   ConnectivityService._();
   static final ConnectivityService instance = ConnectivityService._();
@@ -96,31 +92,39 @@ class ConnectivityService extends ChangeNotifier {
   DateTime? _isolationStartTime;
   bool _started = false;
   Timer? _periodicTimer;
+  StreamSubscription? _failoverSub;
 
-  /// Démarre la surveillance de la connectivité.
+  // ignore: prefer_final_fields
+  bool _wasAnyLayerDown = false;
+
+  final _networkRestoredController = StreamController<bool>.broadcast();
+  Stream<bool> get onNetworkRestored => _networkRestoredController.stream;
+
   void start() {
     if (_started) return;
     _started = true;
 
-    // Surveillance via FailoverManager et PeerCounterService.
-    FailoverManager.instance.activeServer.listen((_) => _checkState());
+    _failoverSub =
+        FailoverManager.instance.activeServer.listen((_) => _checkState());
     PeerCounterService.instance.addListener(_checkState);
 
-    // Vérification initiale.
     _checkState();
 
-    // Timer périodique de sécurité (30 secondes).
     _periodicTimer =
         Timer.periodic(const Duration(seconds: 30), (_) => _checkState());
   }
 
+  // ignore: must_dispose_subscriptions
   @override
   void dispose() {
     _periodicTimer?.cancel();
+    _failoverSub?.cancel();
+    _failoverSub = null;
+    PeerCounterService.instance.removeListener(_checkState);
+    _networkRestoredController.close();
     super.dispose();
   }
 
-  /// Met à jour l'état d'une couche de transport spécifique.
   void updateLayerState(String layer, TransportLayerState newState) {
     NetworkState updated;
     switch (layer) {
@@ -158,7 +162,6 @@ class ConnectivityService extends ChangeNotifier {
         return;
     }
 
-    // Recalcule les couches manquantes.
     final missing = <String>[];
     if (updated.ble != TransportLayerState.active &&
         updated.ble != TransportLayerState.unsupported) {
@@ -192,10 +195,17 @@ class ConnectivityService extends ChangeNotifier {
     if (serversDown && noPeers) {
       if (_isolationStartTime == null) {
         _isolationStartTime = DateTime.now();
-        debugPrint('[Connectivity] Début de la phase d\'isolement potentiel…');
+        _wasAnyLayerDown = true;
+        if (kDebugMode) {
+          debugPrint('[Connectivity] Phase d\'isolement potentiel — '
+              'serveurs down & 0 pairs BLE');
+        }
       } else {
         final duration = DateTime.now().difference(_isolationStartTime!);
-        if (duration >= const Duration(minutes: 5)) {
+        // Basculer en mode isolé après 30 secondes (au lieu de 5 minutes).
+        // 5 minutes est trop long : pendant ce temps, broadcastHiveMessage
+        // tente toujours le relay serveur et échoue silencieusement.
+        if (duration >= const Duration(seconds: 30)) {
           if (!_state.isIsolated) {
             _state = NetworkState(
               ble: _state.ble,
@@ -206,11 +216,19 @@ class ConnectivityService extends ChangeNotifier {
               missingLayers: _state.missingLayers,
             );
             notifyListeners();
-            debugPrint('[Connectivity] MODE ISOLÉ TOTAL ACTIVÉ');
+            if (kDebugMode) {
+              debugPrint('[Connectivity] ⚠ MODE ISOLÉ TOTAL ACTIVÉ '
+                  '(serveurs down + 0 pairs BLE depuis ${duration.inSeconds}s)');
+            }
           }
         }
       }
     } else {
+      // Réseau restauré : si on était isolé ou dégradé, déclencher sync.
+      if (_state.isIsolated || _isolationStartTime != null || _wasAnyLayerDown) {
+        _networkRestoredController.add(true);
+        _wasAnyLayerDown = false;
+      }
       if (_state.isIsolated || _isolationStartTime != null) {
         _state = NetworkState(
           ble: _state.ble,

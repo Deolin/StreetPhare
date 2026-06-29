@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'database/crypto_utils.dart';
 import 'core/i18n/app_locale.dart';
 import 'core/security/keystore_service.dart';
 import 'core/theme/streetphare_theme.dart';
@@ -198,7 +199,7 @@ void main() async {
     );
   }
 
-  runApp(StreetPhareApp());
+  runApp(const StreetPhareApp());
 
   // === Étape 6 : Services géolocalisés (démarrage différé après 1er rendu) ===
   // Le GeofencingService et ProximityValidationService ouvrent des flux
@@ -223,7 +224,22 @@ Future<List<String>> _seedSingleBackup(
   String address,
   SecretKey masterKey,
 ) async {
-  return const [];
+  if (address.isEmpty) return const [];
+  try {
+    final ciphered = await CryptoUtils.instance
+        .encryptAddress(address, masterKey);
+    return [ciphered];
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('[main] ⚠ Erreur chiffrement backup: $e');
+    }
+    ClientDebugLogger.instance.log(
+      'Erreur chiffrement backup',
+      details: e.toString(),
+      emoji: '🔑',
+    );
+    return const [];
+  }
 }
 
 /// Widget racine de l'application StreetPhare.

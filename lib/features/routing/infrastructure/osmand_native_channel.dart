@@ -18,6 +18,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../core/models/routing_profile.dart';
 import '../domain/models/route_result.dart';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -83,13 +84,17 @@ class OsmAndNativeChannel {
 
   // ── Calcul d'itinéraire principal ─────────────────────────────────────────
 
-  /// Calcule l'itinéraire piéton principal (route recommandée).
+  /// Calcule l'itinéraire principal (route recommandée).
   ///
+  /// [profile] : profil de déplacement (piéton, vélo, véhicule).
+  ///   - `pedestrian` : GraphHopper foot profile
+  ///   - `bicycle` / `vehicle` : GraphHopper car profile (adapté)
   /// [avoidPoints] : zones de danger validées par le réseau P2P
   ///   (≥3 votes, <30 m) — transmises comme `block_area` à GraphHopper.
   Future<NativeRouteResult> computeRoute({
     required LatLng start,
     required LatLng end,
+    RoutingProfile profile = RoutingProfile.pedestrian,
     List<AvoidPoint> avoidPoints = const [],
   }) async {
     if (!isSupported) return NativeRouteResult.platformUnsupported;
@@ -102,6 +107,7 @@ class OsmAndNativeChannel {
           'startLon': start.longitude,
           'endLat': end.latitude,
           'endLon': end.longitude,
+          'profile': profile.name,
           'avoidPoints': avoidPoints
               .map((p) => {
                     'lat': p.lat,

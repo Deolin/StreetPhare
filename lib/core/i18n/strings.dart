@@ -666,7 +666,7 @@ class AppStrings {
             'Filtrez les messages reçus sur le réseau décentralisé.',
         messageFilterAllLabel: 'Tous les messages',
         messageFilterAllDescription:
-            'Reçoit tous les messages diffusés sur le réseau',
+            'Reçoit tous les messages',
         messageFilterNearbyLabel: 'Messages proches uniquement',
         messageFilterNearbyDescription: 'Messages émis dans un rayon de 300 m',
         messageFilterAdminLabel: 'Administrateurs de l\'événement',
