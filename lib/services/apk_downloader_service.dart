@@ -128,8 +128,7 @@ class ApkDownloaderService {
 
       return true;
     } catch (e) {
-      debugPrint(
-          '[$timestamp] [ApkDownloader] ❌ Erreur partage : $e');
+      debugPrint('[$timestamp] [ApkDownloader] ❌ Erreur partage : $e');
       return false;
     }
   }

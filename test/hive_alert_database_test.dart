@@ -70,8 +70,7 @@ void main() {
 
     // ── 1. init() ──────────────────────────────────────────────────────
     group('init()', () {
-      test('initialise Hive CE, ouvre la box et purge les expirées',
-          () async {
+      test('initialise Hive CE, ouvre la box et purge les expirées', () async {
         expect(db.isInitialized, isTrue);
         // getAllValid() ne doit pas lever d'exception.
         expect(db.getAllValid(), isEmpty);
@@ -162,8 +161,7 @@ void main() {
         expect(retrieved.confirmations.length, 3);
       });
 
-      test('le statut passe de pending à active à ≥3 confirmations',
-          () async {
+      test('le statut passe de pending à active à ≥3 confirmations', () async {
         // 1 confirmation → pending
         await db.insertOrMerge(
           _testAlert(id: 'merge-status', confirmations: {'u1'}),
@@ -264,8 +262,7 @@ void main() {
         expect(db.getById('purge-error'), isNull);
       });
 
-      test('retourne une liste vide si aucune alerte n\'est expirée',
-          () async {
+      test('retourne une liste vide si aucune alerte n\'est expirée', () async {
         final now = DateTime.now().toUtc();
         await db.upsert(_testAlert(
           id: 'not-expired',
@@ -296,8 +293,7 @@ void main() {
         expect(valid.first.id, 'valid-1');
       });
 
-      test('trie par createdAt décroissant (plus récent en premier)',
-          () async {
+      test('trie par createdAt décroissant (plus récent en premier)', () async {
         final now = DateTime.now().toUtc();
         await db.upsert(_testAlert(
           id: 'old',

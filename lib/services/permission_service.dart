@@ -375,8 +375,7 @@ class _PermissionGuardDialog extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
         children: [
-          const Icon(Icons.shield_outlined,
-              color: Color(0xFFFF6F00), size: 24),
+          const Icon(Icons.shield_outlined, color: Color(0xFFFF6F00), size: 24),
           const SizedBox(width: 10),
           Flexible(
             child: Text(
@@ -435,8 +434,7 @@ class _PermissionGuardDialog extends StatelessWidget {
             backgroundColor: const Color(0xFFFF6F00),
             foregroundColor: Colors.white,
           ),
-          onPressed: () =>
-              Navigator.of(context).pop(_GuardResult.grantedNow),
+          onPressed: () => Navigator.of(context).pop(_GuardResult.grantedNow),
         ),
       ],
     );

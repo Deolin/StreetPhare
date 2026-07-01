@@ -22,6 +22,7 @@ enum AppLanguage {
   en('en', 'EN'),
   nl('nl', 'NL'),
   de('de', 'DE');
+
   const AppLanguage(this.code, this.flag);
   final String code;
   final String flag;

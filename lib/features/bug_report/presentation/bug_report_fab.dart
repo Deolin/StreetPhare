@@ -270,7 +270,8 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
         buf.writeln('Version OS   : ${io.Platform.operatingSystemVersion}');
         buf.writeln('Cœurs CPU    : ${io.Platform.numberOfProcessors}');
         buf.writeln('Locale       : ${io.Platform.localeName}');
-        buf.writeln('Script shell : ${io.Platform.isWindows ? 'cmd/powershell' : 'bash/sh'}');
+        buf.writeln(
+            'Script shell : ${io.Platform.isWindows ? 'cmd/powershell' : 'bash/sh'}');
       }
       buf.writeln('Mode debug   : $kDebugMode');
       buf.writeln('Mode release : $kReleaseMode');
@@ -292,7 +293,8 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
       final fm = FailoverManager.instance;
       buf.writeln('[FailoverManager]');
       buf.writeln('  Serveur courant : ${fm.currentAddress}');
-      buf.writeln('  Serveurs morts  : ${fm.deadServersForSession.join(', ')}\\n'
+      buf.writeln(
+          '  Serveurs morts  : ${fm.deadServersForSession.join(', ')}\\n'
           'ou (aucun)');
       buf.writeln();
     } catch (e) {
@@ -379,7 +381,8 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFF3E0),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFFB300), width: 1.5),
+                  border:
+                      Border.all(color: const Color(0xFFFFB300), width: 1.5),
                 ),
                 child: const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -436,8 +439,7 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
                     style: const TextStyle(
                         fontWeight: FontWeight.w600, fontSize: 15),
                   ),
-                  onPressed:
-                      _generating ? null : () => _generateAndSend(),
+                  onPressed: _generating ? null : () => _generateAndSend(),
                 ),
               ),
               const SizedBox(height: 12),
@@ -495,8 +497,7 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
                   maxLength: 2000,
                   style: TextStyle(color: onSurface, fontSize: 14),
                   decoration: InputDecoration(
-                    hintText:
-                        'Ex: J\'étais en train de naviguer sur la carte '
+                    hintText: 'Ex: J\'étais en train de naviguer sur la carte '
                         'quand l\'écran est devenu noir…',
                     hintStyle: TextStyle(
                         color: onSurface.withValues(alpha: 0.4), fontSize: 13),
@@ -523,22 +524,19 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : const Icon(Icons.send_rounded, size: 22),
                     label: Text(
-                      _generating
-                          ? 'Génération…'
-                          : 'Envoyer avec ces détails',
+                      _generating ? 'Génération…' : 'Envoyer avec ces détails',
                       style: const TextStyle(
                           fontWeight: FontWeight.w600, fontSize: 15),
                     ),
                     onPressed: _generating
                         ? null
-                        : () => _generateAndSend(
-                            userDetails: _descCtrl.text),
+                        : () => _generateAndSend(userDetails: _descCtrl.text),
                   ),
                 ),
               ],

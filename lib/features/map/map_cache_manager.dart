@@ -123,7 +123,8 @@ class MapCacheManager {
               await entity.delete();
               purgedCount++;
             } catch (e) {
-              debugPrint('[MapCacheManager] ⚠ Impossible de supprimer le fichier cache: $e');
+              debugPrint(
+                  '[MapCacheManager] ⚠ Impossible de supprimer le fichier cache: $e');
             }
           }
         }
@@ -165,7 +166,8 @@ class MapCacheManager {
           try {
             entity.deleteSync();
           } catch (e) {
-            debugPrint('[MapCacheManager] ⚠ Dossier vide impossible à supprimer: $e');
+            debugPrint(
+                '[MapCacheManager] ⚠ Dossier vide impossible à supprimer: $e');
           }
         }
       }

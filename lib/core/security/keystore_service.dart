@@ -23,7 +23,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Service de gestion de la clé maîtresse dans le keystore OS.
 class KeyStoreService {
-
   /// Constructeur de test : injecte un storage mocké.
   @visibleForTesting
   factory KeyStoreService.test({required FlutterSecureStorage storage}) {

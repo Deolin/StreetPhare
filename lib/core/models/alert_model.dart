@@ -43,7 +43,6 @@ enum AlertType {
 /// couches P2P (Bluetooth / Wi-Fi Direct) où la taille du payload
 /// doit être minimale.
 class Alert {
-
   Alert({
     required this.id,
     required this.ephemeralUserId,
@@ -100,6 +99,7 @@ class Alert {
 
   factory Alert.fromCompact(String raw) =>
       Alert.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+
   /// Identifiant unique anonyme (hash court). Généré côté client.
   final String id;
 

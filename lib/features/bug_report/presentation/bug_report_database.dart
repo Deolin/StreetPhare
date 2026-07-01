@@ -26,7 +26,6 @@ import '../../../database/crypto_utils.dart';
 /// Contient toutes les données nécessaires pour recréer un [BugReport]
 /// et suivre son cycle de vie (tentatives, dernière erreur, etc.).
 class BugReportEntry {
-
   factory BugReportEntry.fromJson(Map<String, dynamic> json) {
     return BugReportEntry(
       id: json['id'] as String? ?? '',
@@ -77,8 +76,7 @@ class BugReportEntry {
         'app_version': appVersion,
         'category': category,
         'extra_logs': extraLogs,
-        'submitted_at':
-            submittedAt ?? DateTime.now().toUtc().toIso8601String(),
+        'submitted_at': submittedAt ?? DateTime.now().toUtc().toIso8601String(),
         'attempts': attempts,
         'last_error': lastError,
         'last_attempt_at': lastAttemptAt,
@@ -262,7 +260,8 @@ class BugReportDatabase {
 
   void _ensureOpen() {
     if (_box == null) {
-      throw StateError('BugReportDatabase non initialisé. Appelez init() d\'abord.');
+      throw StateError(
+          'BugReportDatabase non initialisé. Appelez init() d\'abord.');
     }
   }
 

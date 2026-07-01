@@ -114,7 +114,8 @@ class WebSocketTransport {
     // Construction de l'URL avec le token en query parameter.
     // Le serveur `verifyWsToken()` dans `middleware/auth.js` vérifie
     // le token depuis le query param `?token=`.
-    final connectUrl = token != null ? '$url?token=${Uri.encodeComponent(token)}' : url;
+    final connectUrl =
+        token != null ? '$url?token=${Uri.encodeComponent(token)}' : url;
 
     try {
       if (kDebugMode) {
@@ -126,8 +127,8 @@ class WebSocketTransport {
 
       // Connexion WebSocket standard avec le token dans le query param.
       // Le serveur `verifyWsToken()` vérifie le token depuis `?token=`.
-      _socket =
-          await WebSocket.connect(connectUrl).timeout(const Duration(seconds: 5));
+      _socket = await WebSocket.connect(connectUrl)
+          .timeout(const Duration(seconds: 5));
 
       _reconnectAttempts = 0; // Reset du compteur en cas de succès
       _isConnecting = false;

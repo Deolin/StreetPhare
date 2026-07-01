@@ -252,8 +252,8 @@ Future<List<String>> _seedSingleBackup(
 ) async {
   if (address.isEmpty) return const [];
   try {
-    final ciphered = await CryptoUtils.instance
-        .encryptAddress(address, masterKey);
+    final ciphered =
+        await CryptoUtils.instance.encryptAddress(address, masterKey);
     return [ciphered];
   } catch (e) {
     if (kDebugMode) {

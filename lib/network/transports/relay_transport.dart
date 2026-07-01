@@ -134,7 +134,9 @@ class RelayMeshTransport implements MeshTransport {
 
     // Vérifie que le transport n'a pas été disposé pendant le await.
     if (_disposed || !_started) {
-      try { await socket.close(); } catch (_) {}
+      try {
+        await socket.close();
+      } catch (_) {}
       return;
     }
 
@@ -156,7 +158,8 @@ class RelayMeshTransport implements MeshTransport {
     _reconnecting = false;
 
     if (kDebugMode) {
-      debugPrint('[Relay] → ws connecté à $relayUrl (via dart:io WebSocket direct)');
+      debugPrint(
+          '[Relay] → ws connecté à $relayUrl (via dart:io WebSocket direct)');
     }
 
     // Écoute du stream — sûr car le handshake est déjà terminé
@@ -176,18 +179,16 @@ class RelayMeshTransport implements MeshTransport {
           }
           if (data is String) {
             if (kDebugMode) {
-              final preview = data.length > 200
-                  ? '${data.substring(0, 200)}...'
-                  : data;
+              final preview =
+                  data.length > 200 ? '${data.substring(0, 200)}...' : data;
               debugPrint('[Relay] ← $preview');
             }
             _incomingController.add(data);
           } else if (data is List<int>) {
             final str = utf8.decode(data);
             if (kDebugMode) {
-              final preview = str.length > 200
-                  ? '${str.substring(0, 200)}...'
-                  : str;
+              final preview =
+                  str.length > 200 ? '${str.substring(0, 200)}...' : str;
               debugPrint('[Relay] ← (binary) $preview');
             }
             _incomingController.add(str);
@@ -206,8 +207,7 @@ class RelayMeshTransport implements MeshTransport {
           // On intercepte toute exception pour éviter le code 1002.
           // L'erreur est loggée mais ne remonte PAS vers dart:io WebSocket.
           if (kDebugMode) {
-            debugPrint(
-                '[Relay] ⚠ exception interceptée dans le listener '
+            debugPrint('[Relay] ⚠ exception interceptée dans le listener '
                 '(protégée du code 1002): $e\n$st');
           }
         }

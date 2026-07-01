@@ -225,7 +225,9 @@ class ConnectivityService extends ChangeNotifier {
       }
     } else {
       // Réseau restauré : si on était isolé ou dégradé, déclencher sync.
-      if (_state.isIsolated || _isolationStartTime != null || _wasAnyLayerDown) {
+      if (_state.isIsolated ||
+          _isolationStartTime != null ||
+          _wasAnyLayerDown) {
         _networkRestoredController.add(true);
         _wasAnyLayerDown = false;
       }

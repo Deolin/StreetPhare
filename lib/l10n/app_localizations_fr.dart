@@ -140,8 +140,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get lowVisionDisabled => 'Mode Malvoyant désactivé';
 
   @override
-  String get lowVisionStatusEnabled =>
-      'Grands caractères, menus adaptés';
+  String get lowVisionStatusEnabled => 'Grands caractères, menus adaptés';
 
   @override
   String get lowVisionStatusDisabled => 'Interface standard';
@@ -157,8 +156,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get messageFilterAllLabel => 'Tous les messages';
 
   @override
-  String get messageFilterAllDescription =>
-      'Reçoit tous les messages';
+  String get messageFilterAllDescription => 'Reçoit tous les messages';
 
   @override
   String get messageFilterNearbyLabel => 'Messages proches uniquement';
@@ -236,8 +234,7 @@ class AppLocalizationsFr extends AppLocalizations {
       'Destination par défaut de l\'événement actif';
 
   @override
-  String get routeDestSafeZoneLabel =>
-      'Vers Zone Safe';
+  String get routeDestSafeZoneLabel => 'Vers Zone Safe';
 
   @override
   String get routeDestSafeZoneDescription =>

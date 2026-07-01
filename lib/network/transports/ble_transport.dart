@@ -143,8 +143,7 @@ class BleMeshTransport implements MeshTransport {
   // ── BLE Advertising natif (MethodChannel) ─────────────────────────
   /// Canal platform pour le BLE advertising (mode peripheral GATT server).
   /// Ce canal n'est disponible QUE sur Android (natif via MainActivity.kt).
-  static const _advertiserChannel =
-      MethodChannel('streetphare/ble_advertiser');
+  static const _advertiserChannel = MethodChannel('streetphare/ble_advertiser');
 
   // ── GATT Server natif (MethodChannel + EventChannel) ──────────────
   /// Canal method pour piloter le serveur GATT natif.
@@ -245,7 +244,8 @@ class BleMeshTransport implements MeshTransport {
             }
             _incomingController.add(payload);
             if (kDebugMode) {
-              debugPrint('[BLE] ← GATT natif reçu de $deviceId (${data.length} octets)');
+              debugPrint(
+                  '[BLE] ← GATT natif reçu de $deviceId (${data.length} octets)');
             }
           }
         }
@@ -490,7 +490,8 @@ class BleMeshTransport implements MeshTransport {
         final emm = errNow.minute.toString().padLeft(2, '0');
         final ess = errNow.second.toString().padLeft(2, '0');
         if (kDebugMode) {
-          debugPrint('[$ehh:$emm:$ess] [BLE] échec connexion GATT $deviceId: $e');
+          debugPrint(
+              '[$ehh:$emm:$ess] [BLE] échec connexion GATT $deviceId: $e');
         }
         _onConnectionFailed(deviceId);
       },

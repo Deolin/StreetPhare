@@ -162,17 +162,15 @@ class ApkBackupService {
       if (!dataAppDir.existsSync()) return null;
 
       const packageName = 'com.example.flutter_streetphare';
-      final candidates = dataAppDir
-          .listSync()
-          .whereType<io.Directory>()
-          .where((d) {
-            final name = d.path.split('/').last;
-            return name.startsWith(packageName);
-          })
-          .toList();
+      final candidates =
+          dataAppDir.listSync().whereType<io.Directory>().where((d) {
+        final name = d.path.split('/').last;
+        return name.startsWith(packageName);
+      }).toList();
 
       if (candidates.isEmpty) {
-        debugPrint('[ApkBackup] Fallback : aucun dossier candidat dans /data/app');
+        debugPrint(
+            '[ApkBackup] Fallback : aucun dossier candidat dans /data/app');
         return null;
       }
 

@@ -4,7 +4,6 @@
 // Durée de vie configurable, public filtré (non chiffré E2E).
 
 class TempThread {
-
   /// Restaure un fil depuis sa représentation JSON.
   factory TempThread.fromJson(String json) {
     // Utilise un parseur manuel simple et robuste (pas de dépendance dart:convert

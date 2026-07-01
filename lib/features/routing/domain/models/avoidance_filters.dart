@@ -17,7 +17,6 @@ import '../../../../core/models/alert_model.dart';
 /// Préférences d'évitement persistées.
 @immutable
 class AvoidanceFilters {
-
   factory AvoidanceFilters.fromJson(Map<String, dynamic> json) {
     return AvoidanceFilters(
       avoidBarrages: (json['avoidBarrages'] as bool?) ?? true,

@@ -298,7 +298,8 @@ class PedestrianRouteService {
 
       if (response.statusCode != 200) {
         if (kDebugMode) {
-          debugPrint('[PedestrianRoute] ⚠ Serveur local HTTP ${response.statusCode}: '
+          debugPrint(
+              '[PedestrianRoute] ⚠ Serveur local HTTP ${response.statusCode}: '
               '${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
         }
         // Fallback automatique vers OsmAnd/OSRM : l'appelant (computeRoutes)
@@ -332,7 +333,8 @@ class PedestrianRouteService {
       return results;
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[PedestrianRoute] ❌ Échec serveur local: $e — dégradation vers fallback');
+        debugPrint(
+            '[PedestrianRoute] ❌ Échec serveur local: $e — dégradation vers fallback');
       }
       return [];
     }

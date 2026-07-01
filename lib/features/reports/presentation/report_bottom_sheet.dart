@@ -104,7 +104,8 @@ class ReportBottomSheet extends StatelessWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: StreetPhareTheme.textSecondary.withValues(alpha: 0.4),
+                    color:
+                        StreetPhareTheme.textSecondary.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -112,10 +113,12 @@ class ReportBottomSheet extends StatelessWidget {
 
               // Titre
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Row(
                   children: [
-                    const Icon(Icons.add_alert, color: StreetPhareTheme.primary),
+                    const Icon(Icons.add_alert,
+                        color: StreetPhareTheme.primary),
                     SizedBox(width: isLowVision ? 0 : 12),
                     Text(
                       'Nouveau signalement',
@@ -174,8 +177,8 @@ class ReportBottomSheet extends StatelessWidget {
                     onPressed: () => Navigator.of(context).pop(),
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(
-                        color:
-                            StreetPhareTheme.textSecondary.withValues(alpha: 0.3),
+                        color: StreetPhareTheme.textSecondary
+                            .withValues(alpha: 0.3),
                       ),
                       padding:
                           EdgeInsets.symmetric(vertical: isLowVision ? 18 : 14),

@@ -45,7 +45,8 @@ import 'package:flutter/foundation.dart';
 // ============================================================================
 
 /// UUID de service BLE exclusif à StreetPhare.
-const String kStreetPhareBleServiceUuid = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const String kStreetPhareBleServiceUuid =
+    '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 
 /// Préfixe attendu dans le `metadata` ou `serviceId` d'un pair pour
 /// que ce pair soit considéré comme un appareil StreetPhare authentique.

@@ -233,8 +233,7 @@ void main() {
         );
 
         expect(alert.ttlHours, 24);
-        final expectedExpiry =
-            alert.createdAt.add(const Duration(hours: 24));
+        final expectedExpiry = alert.createdAt.add(const Duration(hours: 24));
         expect(
           alert.expiresAt.difference(expectedExpiry).inSeconds.abs(),
           lessThan(2),
@@ -461,10 +460,8 @@ void main() {
         final failover = MockFailoverManager();
         final crypto = MockCryptoUtils();
 
-        when(() => failover.uploadAlerts(any()))
-            .thenAnswer((_) async => true);
-        when(() => failover.currentAddress)
-            .thenReturn('https://server:3000');
+        when(() => failover.uploadAlerts(any())).thenAnswer((_) async => true);
+        when(() => failover.currentAddress).thenReturn('https://server:3000');
         when(() => db.purgeExpired(
               onBeforeDelete: any(named: 'onBeforeDelete'),
             )).thenAnswer((_) async => <Alert>[]);
@@ -495,17 +492,16 @@ void main() {
           status: AlertStatus.active,
         );
 
-        when(() => failover.uploadAlerts(any()))
-            .thenAnswer((_) async => true);
-        when(() => failover.currentAddress)
-            .thenReturn('https://server:3000');
+        when(() => failover.uploadAlerts(any())).thenAnswer((_) async => true);
+        when(() => failover.currentAddress).thenReturn('https://server:3000');
 
         // Capture le callback onBeforeDelete.
         when(() => db.purgeExpired(
               onBeforeDelete: any(named: 'onBeforeDelete'),
             )).thenAnswer((invocation) async {
-          final callback = invocation.namedArguments[const Symbol('onBeforeDelete')]
-              as Future<void> Function(Alert)?;
+          final callback =
+              invocation.namedArguments[const Symbol('onBeforeDelete')]
+                  as Future<void> Function(Alert)?;
           if (callback != null) {
             await callback(activeAlert);
           }

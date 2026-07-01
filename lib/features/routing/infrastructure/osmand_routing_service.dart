@@ -395,7 +395,8 @@ class OsmAndRoutingService {
       }).timeout(_kHttpTimeout);
 
       if (resp.statusCode != 200) {
-        debugPrint('[OsmAnd] ⚠ GraphHopper HTTP ${resp.statusCode}: ${resp.body.length > 200 ? resp.body.substring(0, 200) : resp.body}');
+        debugPrint(
+            '[OsmAnd] ⚠ GraphHopper HTTP ${resp.statusCode}: ${resp.body.length > 200 ? resp.body.substring(0, 200) : resp.body}');
         return [];
       }
 
@@ -459,8 +460,7 @@ class OsmAndRoutingService {
     required LatLng end,
     RoutingProfile profile = RoutingProfile.pedestrian,
   }) async {
-    final osrmProfile =
-        profile == RoutingProfile.vehicle ? 'driving' : 'foot';
+    final osrmProfile = profile == RoutingProfile.vehicle ? 'driving' : 'foot';
     final uri = Uri.parse(
       'https://routing.openstreetmap.de/routed-foot/route/v1/$osrmProfile/'
       '${start.longitude.toStringAsFixed(6)},${start.latitude.toStringAsFixed(6)};'

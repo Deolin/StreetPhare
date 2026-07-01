@@ -205,7 +205,6 @@ class AvoidPoint {
 
 /// Résultat renvoyé par [OsmAndNativeChannel].
 class NativeRouteResult {
-
   /// Parse la réponse brute du MethodChannel.
   ///
   /// Format attendu (de OsmAndBridgePlugin.kt) :

@@ -305,8 +305,8 @@ class _LowVisionSection extends StatelessWidget {
                         divisions: 10,
                         activeColor: const Color(0xFF7B1FA2),
                         label: '${prefs.textScaleFactor.toStringAsFixed(1)}×',
-                        onChanged: (v) => AppPreferencesStore.instance
-                            .setTextScaleFactor(v),
+                        onChanged: (v) =>
+                            AppPreferencesStore.instance.setTextScaleFactor(v),
                       ),
                     ),
                     SizedBox(
@@ -976,8 +976,7 @@ class _BackgroundServiceSectionState extends State<_BackgroundServiceSection> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-                'Échec de l\'activation du service.\n'
+            content: Text('Échec de l\'activation du service.\n'
                 'Vérifiez les permissions Android et réessayez.'),
             backgroundColor: StreetPhareTheme.danger,
             behavior: SnackBarBehavior.floating,
@@ -1026,17 +1025,13 @@ class _BackgroundServiceSectionState extends State<_BackgroundServiceSection> {
                   size: 18,
                 ),
                 label: Text(
-                  _serviceActive
-                      ? 'Désactiver'
-                      : s.backgroundServiceEnable,
+                  _serviceActive ? 'Désactiver' : s.backgroundServiceEnable,
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _serviceActive
                       ? StreetPhareTheme.danger
                       : const Color(0xFFFFB300),
-                  foregroundColor: _serviceActive
-                      ? Colors.white
-                      : Colors.black,
+                  foregroundColor: _serviceActive ? Colors.white : Colors.black,
                 ),
               ),
             ),
@@ -1493,7 +1488,6 @@ class _AboutSection extends StatelessWidget {
 }
 
 class _AboutRow extends StatelessWidget {
-
   const _AboutRow({required this.label, required this.value});
   // Label de version dynamique (ex: v2.2.0+42).
   static String get _versionLabel {
@@ -1503,6 +1497,7 @@ class _AboutRow extends StatelessWidget {
     }
     return 'v2.2.0';
   }
+
   final String label;
   final String value;
 

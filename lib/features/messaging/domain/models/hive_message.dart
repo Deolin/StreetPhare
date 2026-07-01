@@ -34,7 +34,6 @@ extension HiveMessageTypeExt on HiveMessageType {
 
 /// Représente un message diffusé sur le réseau P2P Hive.
 class HiveMessage {
-
   /// Désérialisation depuis JSON.
   factory HiveMessage.fromJson(Map<String, dynamic> json) {
     return HiveMessage(

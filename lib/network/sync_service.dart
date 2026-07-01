@@ -236,8 +236,7 @@ class SyncService {
 
     if (response.statusCode != 200 && response.statusCode != 201) {
       if (kDebugMode) {
-        debugPrint(
-            '[SyncService] Push rejeté (HTTP ${response.statusCode})');
+        debugPrint('[SyncService] Push rejeté (HTTP ${response.statusCode})');
       }
       return false;
     }
@@ -286,7 +285,8 @@ class SyncService {
       await _mergeDeltas(items);
 
       if (body['serverTs'] != null) {
-        _lastPullTs = DateTime.tryParse(body['serverTs'] as String) ?? _lastPullTs;
+        _lastPullTs =
+            DateTime.tryParse(body['serverTs'] as String) ?? _lastPullTs;
       }
     } catch (e) {
       if (kDebugMode) {

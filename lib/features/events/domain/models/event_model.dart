@@ -34,7 +34,6 @@ import 'package:latlong2/latlong.dart';
 ///
 /// Dès qu'une étape est passée, la suivante est automatiquement révélée.
 class EventWaypoint {
-
   factory EventWaypoint.fromJson(Map<String, dynamic> json) {
     return EventWaypoint(
       label: json['label'] as String,
@@ -98,7 +97,6 @@ class EventWaypoint {
 
 /// Un point d'intérêt (POI) officiel de l'événement.
 class EventPoi {
-
   factory EventPoi.fromJson(Map<String, dynamic> json) {
     return EventPoi(
       label: json['label'] as String,
@@ -137,7 +135,6 @@ class EventPoi {
 /// défini dans le JSON de l'événement. Sert de point de repli
 /// pour l'algorithme de routage "Route Safe".
 class EventCareCenter {
-
   factory EventCareCenter.fromJson(Map<String, dynamic> json) {
     return EventCareCenter(
       label: json['label'] as String,
@@ -184,7 +181,6 @@ class EventCareCenter {
 /// de l'événement. Utilisé comme destination de repli par
 /// l'algorithme de routage en cas de blocage.
 class EventExitPoint {
-
   factory EventExitPoint.fromJson(Map<String, dynamic> json) {
     return EventExitPoint(
       label: json['label'] as String,
@@ -225,7 +221,6 @@ class EventExitPoint {
 /// Sert aussi de destination de secours pour l'algorithme
 /// de routage ("failover").
 class EventSafeZone {
-
   factory EventSafeZone.fromJson(Map<String, dynamic> json) {
     return EventSafeZone(
       label: json['label'] as String,
@@ -264,7 +259,6 @@ class EventSafeZone {
 
 /// Un événement chargé via code d'invitation ou QR Code.
 class EventModel {
-
   factory EventModel.fromJson(Map<String, dynamic> json) {
     return EventModel(
       code: (json['code'] as String?) ?? '',

@@ -99,7 +99,8 @@ class _BugReportScreenState extends State<BugReportScreen> {
               Text(
                 _result!,
                 style: TextStyle(
-                  color: _result!.contains('Erreur') || _result!.contains('Impossible')
+                  color: _result!.contains('Erreur') ||
+                          _result!.contains('Impossible')
                       ? Colors.red
                       : Colors.green,
                 ),

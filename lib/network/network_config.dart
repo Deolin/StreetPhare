@@ -118,12 +118,14 @@ class NetworkConfig {
   /// URL du dashboard d'administration (port 4000, Caddy).
   ///
   /// https://streetphare.ddns.net:4000
-  static String get adminDashboardUrl => 'https://$_productionHost:$_adminDashboardPort';
+  static String get adminDashboardUrl =>
+      'https://$_productionHost:$_adminDashboardPort';
 
   /// URL de l'API kick-status (dashboard admin, port 4000).
   ///
   /// https://streetphare.ddns.net:4000/api/kick-status
-  static String get kickStatusBaseUrl => 'https://$_productionHost:$_adminDashboardPort';
+  static String get kickStatusBaseUrl =>
+      'https://$_productionHost:$_adminDashboardPort';
 
   /// URL de soumission des rapports de bug.
   ///

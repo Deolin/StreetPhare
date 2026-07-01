@@ -8,8 +8,7 @@
 //
 // Référence : docs/STREETPHARE_AUDIT_COMPLET_v2.2.0.md — Anomalie E6
 
-import '../features/bug_report/presentation/bug_report_service.dart'
-    as unified;
+import '../features/bug_report/presentation/bug_report_service.dart' as unified;
 
 // Ré-export pour compatibilité.
 export '../features/bug_report/presentation/bug_report_service.dart'
@@ -31,7 +30,8 @@ class BugReportService {
       platform: (report).platform ?? unified.BugReportService.currentPlatform,
       appVersion: (report).appVersion ?? 'unknown',
     );
-    final result = await unified.BugReportService.instance.submit(unifiedReport);
+    final result =
+        await unified.BugReportService.instance.submit(unifiedReport);
     return result == unified.BugReportResult.success;
   }
 

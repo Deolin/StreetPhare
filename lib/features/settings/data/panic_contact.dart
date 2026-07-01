@@ -11,7 +11,6 @@ import 'dart:convert';
 
 /// Contact d'urgence StreetPhare.
 class PanicContact {
-
   factory PanicContact.fromJson(Map<String, dynamic> j) => PanicContact(
         id: j['id'] as String,
         name: (j['name'] as String?) ?? '',

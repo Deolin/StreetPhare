@@ -36,7 +36,6 @@ import 'transports/wifi_direct_transport_selector.dart';
 
 /// Contient la configuration et les services construits.
 class NetworkBootstrap {
-
   NetworkBootstrap({
     required this.failoverConfig,
     required this.transports,
@@ -222,7 +221,8 @@ Future<List<String>> _seedInitialChain(
           .encryptAddress(NetworkConfig.initialSecondaryServer, masterKey));
     }
     if (kDebugMode) {
-      debugPrint('[bootstrap] Chaîne de secours amorcée : ${out.length} entrée(s)');
+      debugPrint(
+          '[bootstrap] Chaîne de secours amorcée : ${out.length} entrée(s)');
     }
     return out;
   } catch (e) {

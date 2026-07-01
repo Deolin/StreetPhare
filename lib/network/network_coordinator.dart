@@ -54,7 +54,6 @@ import 'sync_service.dart';
 /// Sauvegarde proprement l'état réseau lors de la mise en pause et
 /// restaure les connexions au retour au premier plan.
 class NetworkCoordinator with WidgetsBindingObserver {
-
   @visibleForTesting
   NetworkCoordinator.test({
     HiveAlertDatabase? database,
@@ -116,8 +115,7 @@ class NetworkCoordinator with WidgetsBindingObserver {
   // --------------------------------------------------------------------------
 
   @visibleForTesting
-  Future<void> checkServerReachability() =>
-      _checkServerReachabilityAndAdapt();
+  Future<void> checkServerReachability() => _checkServerReachabilityAndAdapt();
 
   @visibleForTesting
   Future<void> runPurge() => _purgeAndMaybeSync();

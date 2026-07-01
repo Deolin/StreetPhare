@@ -155,7 +155,6 @@ extension MessageFilterExt on MessageFilter {
 // ============================================================================
 
 class AppPreferences {
-
   factory AppPreferences.fromJson(Map<String, dynamic> json) {
     final rawChannels = json['androidChannels'];
     final Map<String, bool> channels = rawChannels is Map

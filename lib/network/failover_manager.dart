@@ -43,7 +43,6 @@ enum ServerStatus { active, failed, standby }
 
 /// Représente un serveur (adresse en clair ou chiffrée).
 class ServerEndpoint {
-
   const ServerEndpoint({
     required this.address,
     required this.encryptedAddress,
@@ -82,7 +81,6 @@ class ServerEndpoint {
 /// Le serveur peut renvoyer un nouvel endpoint chiffré pour
 /// étendre la chaîne de secours.
 class SyncResponse {
-
   const SyncResponse({
     required this.success,
     required this.serverAddress,
@@ -111,7 +109,6 @@ class SyncResponse {
 /// Dès le 3ème KO consécutif (15s écoulées), le failover est
 /// déclenché instantanément.
 class FailoverConfig {
-
   const FailoverConfig({
     required this.primaryAddress,
     required this.encryptedBackupChain,
@@ -120,6 +117,7 @@ class FailoverConfig {
     this.pingTimeout = const Duration(seconds: 2),
     required this.masterKey,
   });
+
   /// URL du serveur principal initial (intégré dans l'app, peut
   /// être mis à jour via OTA / build flags).
   final String primaryAddress;
@@ -499,7 +497,8 @@ class FailoverManager {
             }
           } catch (e) {
             if (kDebugMode) {
-              debugPrint('[FailoverManager] Échec fallback local $fallback : $e');
+              debugPrint(
+                  '[FailoverManager] Échec fallback local $fallback : $e');
             }
           }
         }

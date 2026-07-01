@@ -233,7 +233,8 @@ class BugReportService {
     try {
       final report = BugReport(
         title: 'Crash automatique',
-        description: 'Erreur: $error${stackTrace != null ? '\n\nStack:\n$stackTrace' : ''}',
+        description:
+            'Erreur: $error${stackTrace != null ? '\n\nStack:\n$stackTrace' : ''}',
         platform: currentPlatform,
         appVersion: _appVersion,
         category: BugCategory.crash,
@@ -278,7 +279,8 @@ class BugReportService {
           await _db.remove(entry.id);
           anySuccess = true;
           if (kDebugMode) {
-            debugPrint('[BugReport] ✅ Rapport "${entry.title}" envoyé et supprimé');
+            debugPrint(
+                '[BugReport] ✅ Rapport "${entry.title}" envoyé et supprimé');
           }
         } else {
           // ❌ ÉCHEC : mise à jour du compteur de tentatives.
@@ -295,7 +297,8 @@ class BugReportService {
       } catch (e) {
         // Blindage : l'échec d'un rapport ne bloque pas les autres.
         if (kDebugMode) {
-          debugPrint('[BugReport] ⚠ Exception flush rapport "${entry.title}": $e');
+          debugPrint(
+              '[BugReport] ⚠ Exception flush rapport "${entry.title}": $e');
         }
         try {
           await _db.updateAttempt(
@@ -308,7 +311,8 @@ class BugReportService {
     }
 
     // Nettoie les rapports abandonnés (> 8 tentatives).
-    if (anySuccess || pending.any((e) => e.attempts >= _kMaxAttemptsBeforeAbandon)) {
+    if (anySuccess ||
+        pending.any((e) => e.attempts >= _kMaxAttemptsBeforeAbandon)) {
       await _db.purgeAbandoned(maxAttempts: _kMaxAttemptsBeforeAbandon);
     }
 
@@ -350,8 +354,7 @@ class BugReportService {
         }
 
         if (kDebugMode) {
-          debugPrint(
-              '[BugReport] Erreur HTTP ${response.statusCode} → $url');
+          debugPrint('[BugReport] Erreur HTTP ${response.statusCode} → $url');
         }
         // Continue avec l'URL suivante.
       } on TimeoutException {
@@ -380,7 +383,8 @@ class BugReportService {
 
     // Ajoute le fallback local si on n'est pas en production pure.
     try {
-      final localFallback = '${NetworkConfig.localhostPrimaryServer}/api/bug-report';
+      final localFallback =
+          '${NetworkConfig.localhostPrimaryServer}/api/bug-report';
       if (!urls.contains(localFallback)) {
         urls.add(localFallback);
       }

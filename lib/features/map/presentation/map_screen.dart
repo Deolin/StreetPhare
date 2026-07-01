@@ -965,7 +965,8 @@ class _MapScreenState extends State<MapScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _AboutRow(label: s.aboutVersion, value: _buildVersionLabel(), ctx: ctx),
+              _AboutRow(
+                  label: s.aboutVersion, value: _buildVersionLabel(), ctx: ctx),
               const SizedBox(height: 6),
               _AboutRow(
                   label: s.aboutPlatform, value: 'Flutter / Dart', ctx: ctx),

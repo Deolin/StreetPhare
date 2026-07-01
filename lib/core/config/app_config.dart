@@ -41,7 +41,8 @@ class AppConfig {
   static final AppEnvironment environment = _resolveEnvironment();
 
   static AppEnvironment _resolveEnvironment() {
-    const env = String.fromEnvironment('STREETPHARE_ENV', defaultValue: 'production');
+    const env =
+        String.fromEnvironment('STREETPHARE_ENV', defaultValue: 'production');
     switch (env.toLowerCase()) {
       case 'development':
       case 'dev':
@@ -62,7 +63,7 @@ class AppConfig {
   /// Host du serveur de production.
   static const String productionHost = 'streetphare.ddns.net';
 
-   /// Host du serveur de production backup.
+  /// Host du serveur de production backup.
   static const String backupHost = 'streetphare-backup.myddns.me';
 
   /// Port du serveur principal.
