@@ -28,7 +28,7 @@ jobs:
         run: flutter analyze
 
       - name: Verify Dart SDK constraint
-        run: dart --versionflutter
+        run: dart --version
 
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed .
