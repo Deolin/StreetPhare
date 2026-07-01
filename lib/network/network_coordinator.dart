@@ -54,11 +54,24 @@ import 'sync_service.dart';
 /// Sauvegarde proprement l'état réseau lors de la mise en pause et
 /// restaure les connexions au retour au premier plan.
 class NetworkCoordinator with WidgetsBindingObserver {
-  NetworkCoordinator._();
+
+  @visibleForTesting
+  NetworkCoordinator.test({
+    HiveAlertDatabase? database,
+    FailoverManager? failover,
+    CryptoUtils? cryptoUtils,
+  })  : _db = database ?? HiveAlertDatabase.instance,
+        _failover = failover ?? FailoverManager.instance,
+        _cryptoUtils = cryptoUtils ?? CryptoUtils.instance;
+  NetworkCoordinator._()
+      : _db = HiveAlertDatabase.instance,
+        _failover = FailoverManager.instance,
+        _cryptoUtils = CryptoUtils.instance;
   static final NetworkCoordinator instance = NetworkCoordinator._();
 
-  final HiveAlertDatabase _db = HiveAlertDatabase.instance;
-  final FailoverManager _failover = FailoverManager.instance;
+  HiveAlertDatabase _db;
+  FailoverManager _failover;
+  CryptoUtils _cryptoUtils;
   P2PMeshService? _mesh;
 
   Timer? _purgeTimer;
@@ -97,6 +110,26 @@ class NetworkCoordinator with WidgetsBindingObserver {
 
   /// Stream d'alertes (utile pour la couche UI).
   Stream<List<Alert>> get alertsStream => _db.changes;
+
+  // --------------------------------------------------------------------------
+  // Hooks @visibleForTesting
+  // --------------------------------------------------------------------------
+
+  @visibleForTesting
+  Future<void> checkServerReachability() =>
+      _checkServerReachabilityAndAdapt();
+
+  @visibleForTesting
+  Future<void> runPurge() => _purgeAndMaybeSync();
+
+  @visibleForTesting
+  bool get isInitialized => _initialized;
+
+  @visibleForTesting
+  P2PMeshService? get mesh => _mesh;
+
+  @visibleForTesting
+  HiveAlertDatabase get database => _db;
 
   /// Initialise le coordinateur. À appeler UNE SEULE FOIS au
   /// démarrage, après `WidgetsFlutterBinding.ensureInitialized()`
@@ -638,7 +671,7 @@ class NetworkCoordinator with WidgetsBindingObserver {
   }) async {
     final id = randomId(8);
     final createdAt = DateTime.now().toUtc();
-    final signed = await CryptoUtils.instance.signAlert(
+    final signed = await _cryptoUtils.signAlert(
       alertId: id,
       type: type.name,
       lat: latitude,

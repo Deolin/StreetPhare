@@ -21,6 +21,7 @@
 // `ProximityValidationService`.
 
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -103,26 +104,95 @@ class GeofencingService extends WidgetsBindingObserver {
     }
   }
 
-  /// Souscrit au flux de position GPS (extrait pour être réutilisable
-  /// par [didChangeAppLifecycleState] lors du resume).
+  /// Souscrit au flux de position GPS.
+  ///
+  /// ═══ BUG FIX: Geolocator Thread Crash sur Desktop (Windows/macOS/Linux) ═══
+  ///
+  /// Le plugin `geolocator_windows` (et ses équivalents desktop) émet les
+  /// événements `getPositionStream` depuis un thread background natif et non
+  /// depuis le thread UI/platform principal. Cela viole le contrat de threading
+  /// Flutter sur Desktop et provoque :
+  ///   `The 'flutter.baseflow.com/geolocator_updates' channel sent a message
+  ///    from native to Flutter on a non-platform thread`
+  ///
+  /// **Stratégie par plateforme :**
+  ///   - **Android / iOS** : `getPositionStream` natif (threading correct via
+  ///     les plugins mobiles).
+  ///   - **Windows / macOS / Linux** : Polling périodique via `getCurrentPosition`
+  ///     appelé depuis un `Timer.periodic` (toutes les 5 secondes). Cette approche
+  ///     est thread-safe car chaque appel est initié depuis le thread Dart principal.
+  ///   - **Web** : `getPositionStream` (le plugin web est correct).
   void _subscribeToPositionStream() {
     // Annule d'abord tout abonnement existant pour éviter les doublons.
     _posSub?.cancel();
     _posSub = null;
 
-    _posSub = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10, // mètres
-      ),
-    ).listen(
-      (pos) => _onPositionUpdate(pos),
-      onError: (e) {
-        if (kDebugMode) {
-          debugPrint('[Geofencing] erreur GPS : $e');
-        }
-      },
+    if (_isDesktop) {
+      // ── Desktop : Polling périodique getCurrentPosition (thread-safe) ──
+      _startDesktopPolling();
+    } else {
+      // ── Mobile / Web : getPositionStream natif ─────────────────────────
+      _posSub = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 10, // mètres
+        ),
+      ).listen(
+        (pos) => _onPositionUpdate(pos),
+        onError: (e) {
+          if (kDebugMode) {
+            debugPrint('[Geofencing] erreur GPS : $e');
+          }
+        },
+      );
+    }
+  }
+
+  /// Détecte si l'app tourne sur un OS Desktop (Windows, macOS, Linux).
+  /// On utilise `Platform.isWindows || Platform.isMacOS || Platform.isLinux`
+  /// car `kIsWeb` exclut déjà dart:io, et sur mobile c'est Android/iOS.
+  bool get _isDesktop {
+    try {
+      return Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+    } catch (_) {
+      // Sur web, dart:io Platform n'est pas disponible — pas Desktop.
+      return false;
+    }
+  }
+
+  /// Polling Desktop : appelle getCurrentPosition toutes les 5 secondes.
+  /// Thread-safe car chaque appel est initié depuis le thread principal Dart.
+  Timer? _desktopPollingTimer;
+
+  void _startDesktopPolling() {
+    _desktopPollingTimer?.cancel();
+    _desktopPollingTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _pollDesktopPosition(),
     );
+    // Premier appel immédiat pour ne pas attendre 5s.
+    _pollDesktopPosition();
+
+    if (kDebugMode) {
+      debugPrint(
+          '[Geofencing] Mode Desktop détecté — polling GPS toutes les 5s '
+          '(thread-safe, évite le crash non-platform thread)');
+    }
+  }
+
+  Future<void> _pollDesktopPosition() async {
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      _onPositionUpdate(pos);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[Geofencing] erreur polling Desktop GPS : $e');
+      }
+    }
   }
 
   // ── Cycle de vie de l'application ──────────────────────────────────
@@ -140,6 +210,8 @@ class GeofencingService extends WidgetsBindingObserver {
         // Android est détruite alors que le canal Geolocator est actif.
         _posSub?.cancel();
         _posSub = null;
+        _desktopPollingTimer?.cancel();
+        _desktopPollingTimer = null;
         _alertsSub?.cancel();
         _alertsSub = null;
         _recheckTimer?.cancel();
@@ -179,6 +251,8 @@ class GeofencingService extends WidgetsBindingObserver {
         // L'app est en transition ou se ferme : on coupe tout.
         _posSub?.cancel();
         _posSub = null;
+        _desktopPollingTimer?.cancel();
+        _desktopPollingTimer = null;
         break;
 
       case AppLifecycleState.hidden:
@@ -276,6 +350,8 @@ class GeofencingService extends WidgetsBindingObserver {
   void stop() {
     _posSub?.cancel();
     _posSub = null;
+    _desktopPollingTimer?.cancel();
+    _desktopPollingTimer = null;
     _alertsSub?.cancel();
     _alertsSub = null;
     _recheckTimer?.cancel();

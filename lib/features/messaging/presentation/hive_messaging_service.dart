@@ -110,7 +110,7 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
       (_) => _purgeExpired(),
     );
     // Charge les préférences de blocage.
-    HiveBlockService.instance.load();
+    unawaited(HiveBlockService.instance.load());
     // Restaure l'outbox persistée.
     await _loadOutbox();
     // Flush immédiat de l'outbox (au cas où on aurait redémarré avec

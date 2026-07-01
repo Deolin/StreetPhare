@@ -199,7 +199,7 @@ class _MapScreenState extends State<MapScreen> {
         _locating = false;
       });
       _animateToUser();
-      _positionSub?.cancel();
+      unawaited(_positionSub?.cancel());
       _isTracking = true;
       _positionSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
@@ -1115,9 +1115,9 @@ class _MapScreenState extends State<MapScreen> {
         ),
       );
       if (go == true && mounted) {
-        Navigator.of(context).push(
+        unawaited(Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const SettingsScreen()),
-        );
+        ));
       }
       return;
     }
@@ -1192,7 +1192,7 @@ class _MapScreenState extends State<MapScreen> {
       if (!mounted) return;
       await Clipboard.setData(ClipboardData(text: message));
       if (!mounted) return;
-      showDialog(
+      unawaited(showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: StreetPhareTheme.surface,
@@ -1215,12 +1215,12 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ],
         ),
-      );
+      ));
       return;
     }
 
     if (!mounted) return;
-    showDialog(
+    unawaited(showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: StreetPhareTheme.surface,
@@ -1245,7 +1245,7 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   Future<Position?> _getCurrentPositionSafe() async {

@@ -285,7 +285,59 @@ async function pushEvent(event) {
   }
 }
 
+// ── Exponential Backoff pour pollSync ──────────────────────────────────
+// Évite de bombarder le serveur partenaire en continu quand il est down.
+// Backoff : 30s → 60s → 120s → 240s → 480s max, avec jitter ±25%.
+// Réinitialisé dès qu'un pollSync réussit.
+let _pollBackoffMs = 30000; // 30s initial
+const _POLL_BACKOFF_MIN_MS = 30000;
+const _POLL_BACKOFF_MAX_MS = 480000; // 8 min max
+let _pollTimer = null;
+let _pollActive = false;
+
+function _jitter(ms) {
+  const factor = 0.75 + Math.random() * 0.5; // 75% à 125% (jitter ±25%)
+  return Math.round(ms * factor);
+}
+
+function _schedulePoll() {
+  if (!_pollActive) return;
+  if (_pollTimer) clearTimeout(_pollTimer);
+  const delay = _jitter(_pollBackoffMs);
+  log('SYNC', `Prochaine tentative dans ${Math.round(delay / 1000)}s (backoff=${Math.round(_pollBackoffMs / 1000)}s)`);
+  _pollTimer = setTimeout(async () => {
+    if (!_pollActive) return;
+    const ok = await pollSync();
+    if (ok) {
+      // Réinitialise le backoff dès qu'une synchro réussit.
+      _pollBackoffMs = _POLL_BACKOFF_MIN_MS;
+    } else {
+      // Double le backoff, plafonné au max.
+      _pollBackoffMs = Math.min(_pollBackoffMs * 2, _POLL_BACKOFF_MAX_MS);
+    }
+    _schedulePoll(); // replanifie
+  }, delay);
+}
+
+function startPolling() {
+  if (_pollActive) return;
+  _pollActive = true;
+  _pollBackoffMs = _POLL_BACKOFF_MIN_MS;
+  log('SYNC', `Polling démarré — intervalle initial ${_POLL_BACKOFF_MIN_MS / 1000}s`);
+  _schedulePoll();
+}
+
+function stopPolling() {
+  _pollActive = false;
+  if (_pollTimer) {
+    clearTimeout(_pollTimer);
+    _pollTimer = null;
+  }
+  log('SYNC', 'Polling arrêté');
+}
+
 /// Hash polling : le Primary envoie son hash ; le Backup vérifie.
+/// Retourne `true` si la synchro a réussi, `false` sinon.
 async function pollSync() {
   const hash = store.getStateHash();
   try {
@@ -310,9 +362,11 @@ async function pollSync() {
 
     store.syncState.lastSyncAt = new Date().toISOString();
     store.syncState.lastSyncSuccess = true;
+    return true;
   } catch (e) {
     store.syncState.lastSyncSuccess = false;
     log('SYNC', `Polling ÉCHEC: ${e.message} — cible: ${config.partnerUrl}`);
+    return false;
   }
 }
 
@@ -345,4 +399,7 @@ module.exports = {
   pollSync,
   receiveFullSync,
   checkHash,
+  // Polling adaptatif avec exponential backoff
+  startPolling,
+  stopPolling,
 };

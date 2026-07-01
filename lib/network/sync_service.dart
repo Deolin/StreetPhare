@@ -225,7 +225,7 @@ class SyncService {
       'since': since,
     };
 
-    final uri = Uri.parse('$serverBase/api/v2/sync-push');
+    final uri = Uri.parse('$serverBase/api/sync-push');
     final response = await http
         .post(
           uri,
@@ -272,7 +272,7 @@ class SyncService {
     try {
       final since = _lastPullTs?.toUtc().toIso8601String() ?? '';
 
-      final uri = Uri.parse('$serverBase/api/v2/sync-check')
+      final uri = Uri.parse('$serverBase/api/sync-check')
           .replace(queryParameters: {'since': since});
 
       final response = await http.get(uri).timeout(syncTimeout);

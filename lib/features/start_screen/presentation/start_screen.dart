@@ -125,7 +125,7 @@ class _StartScreenState extends State<StartScreen>
 
     if (!mounted) return;
     // Navigue vers l'écran principal avec remplacement complet
-    Navigator.of(context).pushAndRemoveUntil(
+    await Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const MapScreen()),
       (route) => false,
     );

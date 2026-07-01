@@ -160,65 +160,202 @@ app.get('/', (req, res) => {
 // ── Création du serveur HTTP (TLS terminé par Caddy) ─────────────────
 const server = http.createServer(app);
 
-// ── WebSocket Mesh ──────────────────────────────────────────────────────
-const wss = new WebSocketServer({ server, path: '/mesh' });
+// ── DIAGNOSTIC v3.2.1 : Log toutes les requêtes d'upgrade WebSocket ──
+// Intercepte l'événement `upgrade` AVANT que le WebSocketServer ne
+// le traite, pour voir exactement ce que Caddy transmet.
+server.on('upgrade', (request, socket, head) => {
+  const headers = request.headers;
+  log('MESH', `[UPGRADE] ${request.url} — Upgrade: ${headers['upgrade'] || 'N/A'} — Connection: ${headers['connection'] || 'N/A'} — Origin: ${headers['origin'] || 'N/A'} — IP: ${headers['x-forwarded-for'] || request.socket.remoteAddress}`);
+});
 
-// Intervalle de ping/pong pour maintenir les connexions WebSocket
-// ouvertes malgré les proxy/timeout réseau (30s).
-// Détection des clients fantômes : 3 pings échoués consécutifs → déconnexion.
-const pingFailures = new WeakMap(); // ws → compteur d'échecs
+// ── WebSocket Mesh ──────────────────────────────────────────────────────
+// FIX v3.2 : Options de heartbeat intégrées à WebSocketServer pour
+// détecter les connexions mortes au niveau du protocole (RFC 6455).
+// - maxPayload: limite la taille des messages pour éviter les crashs OOM
+// - skipUTF8Validation: true pour les clients compatibles (perf)
+const wss = new WebSocketServer({
+  server,
+  path: '/mesh',
+  maxPayload: 512 * 1024, // 512 Ko max par message (évite crash OOM sur welcome massif)
+  clientTracking: true,
+});
+
+// ── Heartbeat serveur : détection des clients fantômes ──────────────────
+// Envoie un ping natif (RFC 6455) toutes les 30 secondes.
+// Attend un pong dans les 10 secondes. Après 2 échecs consécutifs,
+// le client est considéré comme fantôme et déconnecté.
+//
+// FIX v3.2 : Le compteur était remis à 0 APRÈS chaque ping sans
+// attendre le pong (bug). Maintenant, on enregistre l'heure du
+// dernier pong reçu et on vérifie l'écart.
+const PING_INTERVAL_MS = 30000;
+const PONG_TIMEOUT_MS = 10000;
+const MAX_MISSED_PONGS = 2;
+const lastPongSeen = new WeakMap(); // ws → timestamp du dernier pong
+
+// Écoute les pongs reçus (réponses aux pings serveur).
+wss.on('pong', (ws) => {
+  lastPongSeen.set(ws, Date.now());
+});
 
 const meshPingInterval = setInterval(() => {
+  const now = Date.now();
   wss.clients.forEach((client) => {
     if (client.readyState === 1) {
       try {
         client.ping();
-        // Reset du compteur en cas de succès (pong implicite).
-        pingFailures.set(client, 0);
       } catch (_) {
-        // Échec du ping → incrémenter le compteur.
-        const fails = (pingFailures.get(client) || 0) + 1;
-        pingFailures.set(client, fails);
-        if (fails >= 3) {
-          log('MESH', `Client fantôme détecté (${fails} pings échoués) → déconnexion`);
+        // Échec du ping → socket probablement déjà fermé.
+        const missed = lastPongSeen.has(client)
+          ? Math.floor((now - lastPongSeen.get(client)) / PONG_TIMEOUT_MS)
+          : MAX_MISSED_PONGS;
+        if (missed >= MAX_MISSED_PONGS) {
+          log('MESH', `Client fantôme détecté (${missed}+ pings sans pong) → déconnexion`);
           try { client.close(1001, 'Ping timeout'); } catch (__) {}
           store.meshClients.delete(client);
         }
       }
     }
   });
-}, 30000);
+
+  // Vérifie les clients qui n'ont jamais répondu à un pong
+  // (connexions récentes qui n'ont pas encore eu de heartbeat).
+  wss.clients.forEach((client) => {
+    if (client.readyState === 1 && lastPongSeen.has(client)) {
+      const elapsed = now - lastPongSeen.get(client);
+      if (elapsed > PING_INTERVAL_MS * MAX_MISSED_PONGS + PONG_TIMEOUT_MS) {
+        log('MESH', `Client silencieux (dernier pong il y a ${Math.round(elapsed / 1000)}s) → déconnexion`);
+        try { client.close(1001, 'Pong timeout'); } catch (_) {}
+        store.meshClients.delete(client);
+      }
+    }
+  });
+}, PING_INTERVAL_MS);
 wss.on('close', () => clearInterval(meshPingInterval));
 
-wss.on('connection', (ws) => {
+// ── Anti-tempête de reconnexion WebSocket ──────────────────────────
+// FIX v3.3.0 — Cooldown réduit + nettoyage CGNAT :
+//   Clients WAN derrière NAT/CGNAT partagent la même IP publique.
+//   2000ms rejetait des clients légitimes → code 1006 côté Flutter.
+//   Réduit à 500ms (anti-boucle rapide uniquement).
+const _meshReconnectCooldowns = new Map(); // ip → timestamp prochaine connexion autorisée
+const MESH_RECONNECT_COOLDOWN_MS = 500;
+
+// Nettoyage périodique pour éviter les fuites mémoire.
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, until] of _meshReconnectCooldowns.entries()) {
+    if (until < now) _meshReconnectCooldowns.delete(ip);
+  }
+}, 60000);
+
+// FIX v3.2 : Limite la taille du welcome (backlog) à 50 messages max
+// pour éviter d'envoyer un payload de plusieurs Mo qui saturerait
+// le client et causerait une déconnexion immédiate.
+const MAX_WELCOME_BACKLOG = 50;
+
+// DIAGNOSTIC v3.2.1 : Logs de timing pour identifier la cause
+// du code 1006 (fermeture anormale immédiate).
+wss.on('connection', (ws, req) => {
+  const connId = Math.random().toString(36).slice(2, 8);
+  const t0 = Date.now();
   try {
+    // ── Vérification du cooldown de reconnexion par IP ──────────
+    const clientIp = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown').toString().split(',')[0].trim();
+    const now = t0;
+    const cooldownUntil = _meshReconnectCooldowns.get(clientIp) || 0;
+    if (now < cooldownUntil) {
+      log('MESH', `[${connId}] Reconnexion trop rapide (IP=${clientIp}, ${Math.round((cooldownUntil - now) / 1000)}s restantes) → rejetée`);
+      try { ws.close(4001, 'Reconnect too fast'); } catch (_) {}
+      return;
+    }
+    _meshReconnectCooldowns.set(clientIp, now + MESH_RECONNECT_COOLDOWN_MS);
+
+    // DIAGNOSTIC : Enregistre les handlers AVANT d'envoyer le welcome
+    // pour capturer toute fermeture précoce.
+    let closeCaptured = false;
+    ws.on('close', (code, reason) => {
+      closeCaptured = true;
+      store.meshClients.delete(ws);
+      lastPongSeen.delete(ws);
+      const reasonStr = reason ? reason.toString() : 'non spécifiée';
+      const elapsed = Date.now() - t0;
+      log('MESH', `[${connId}] Client déconnecté (code=${code || '?'}, raison=${reasonStr}, elapsed=${elapsed}ms, total: ${store.meshClients.size})`);
+    });
+
+    ws.on('error', (err) => {
+      log('MESH', `[${connId}] Erreur socket: ${err.message}`);
+    });
+
     store.meshClients.add(ws);
-    log('MESH', `Client connecté (total: ${store.meshClients.size})`);
+    log('MESH', `[${connId}] Client connecté (total: ${store.meshClients.size}, IP: ${clientIp})`);
+
+    // Enregistre un premier pong "virtuel" pour éviter que le client
+    // soit considéré comme fantôme avant le premier cycle de ping.
+    lastPongSeen.set(ws, Date.now());
 
     // ── Handshake + synchronisation des messages manqués ──────────
-    // Envoie le welcome ET les messages du backlog des dernières 24h.
     try {
       const syncSince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const missedMessages = store.getMeshMessagesSince(syncSince);
-      ws.send(JSON.stringify({
+      const truncated = missedMessages.slice(-MAX_WELCOME_BACKLOG);
+      const welcomePayload = JSON.stringify({
         kind: 'welcome',
         server: 'StreetPhare-Primary',
-        version: '3.1.0',
+        version: '3.2.1',
         tls: true,
         ts: new Date().toISOString(),
-        missedCount: missedMessages.length,
-        missed: missedMessages,
-      }));
-      if (missedMessages.length > 0) {
-        log('MESH', `Handshake : ${missedMessages.length} messages backlog envoyés au client`);
+        missedCount: truncated.length,
+        totalMissed: missedMessages.length,
+        missed: truncated,
+      });
+
+      const payloadSize = Buffer.byteLength(welcomePayload, 'utf-8');
+      if (payloadSize > 256 * 1024) {
+        log('MESH', `[${connId}] ⚠ Welcome trop volumineux (${Math.round(payloadSize / 1024)} Ko) → envoi sans backlog`);
+        ws.send(JSON.stringify({
+          kind: 'welcome',
+          server: 'StreetPhare-Primary',
+          version: '3.2.1',
+          tls: true,
+          ts: new Date().toISOString(),
+          missedCount: 0,
+          totalMissed: missedMessages.length,
+          missed: [],
+          note: 'Backlog trop volumineux, synchronisation différée',
+        }), (err) => {
+          if (err) log('MESH', `[${connId}] Erreur envoi welcome (fallback): ${err.message}`);
+          else log('MESH', `[${connId}] Welcome fallback envoyé (${Date.now() - t0}ms)`);
+        });
+      } else {
+        ws.send(welcomePayload, (err) => {
+          if (err) {
+            log('MESH', `[${connId}] Erreur envoi welcome: ${err.message}`);
+          } else if (!closeCaptured) {
+            log('MESH', `[${connId}] Welcome envoyé (${Math.round(payloadSize / 1024)} Ko, ${Date.now() - t0}ms)`);
+            if (truncated.length > 0) {
+              log('MESH', `[${connId}] Handshake : ${truncated.length}/${missedMessages.length} messages backlog`);
+            }
+          }
+        });
       }
     } catch (e) {
-      log('MESH', `Erreur handshake/sync: ${e.message}`);
+      log('MESH', `[${connId}] Erreur handshake/sync: ${e.message}`);
+      try {
+        ws.send(JSON.stringify({
+          kind: 'welcome',
+          server: 'StreetPhare-Primary',
+          version: '3.2.1',
+          tls: true,
+          ts: new Date().toISOString(),
+          missedCount: 0,
+          missed: [],
+        }));
+      } catch (_) {}
     }
 
     // Rate limiting : max 10 messages par seconde par client.
-    // Au-delà → blacklist temporaire de 30 secondes.
-    const msgTimestamps = []; // horodatages des messages de ce client
+    const msgTimestamps = [];
     const RATE_LIMIT_MAX = 10;
     const RATE_LIMIT_WINDOW_MS = 1000;
     const RATE_LIMIT_BLACKLIST_MS = 30000;
@@ -228,33 +365,26 @@ wss.on('connection', (ws) => {
       try {
         const now = Date.now();
 
-        // Blacklist active ?
         if (now < blacklistedUntil) {
-          log('MESH', `Message bloqué (blacklist ${Math.round((blacklistedUntil - now) / 1000)}s restantes)`);
+          log('MESH', `[${connId}] Message bloqué (blacklist ${Math.round((blacklistedUntil - now) / 1000)}s restantes)`);
           return;
         }
 
-        // Nettoyage des timestamps hors fenêtre.
         while (msgTimestamps.length > 0 && msgTimestamps[0] < now - RATE_LIMIT_WINDOW_MS) {
           msgTimestamps.shift();
         }
 
         msgTimestamps.push(now);
 
-        // Vérification du rate limit.
         if (msgTimestamps.length > RATE_LIMIT_MAX) {
           blacklistedUntil = now + RATE_LIMIT_BLACKLIST_MS;
-          log('MESH', `⛔ Rate limit dépassé (${msgTimestamps.length} msg/s) → blacklist 30s`);
+          log('MESH', `[${connId}] ⛔ Rate limit dépassé → blacklist 30s`);
           return;
         }
 
         const msg = data.toString();
-        log('MESH', `Message reçu: ${msg.substring(0, 200)}`);
+        log('MESH', `[${connId}] Message reçu (${Date.now() - t0}ms): ${msg.substring(0, 150)}`);
 
-        // ── Store-and-Forward : persister le message dans le backlog ──
-        // Même si aucun client n'est connecté, le message est stocké
-        // pour être relayé aux clients qui se connecteront plus tard
-        // (ex: utilisateurs 5G sans P2P local).
         try {
           const parsed = JSON.parse(msg);
           store.addMeshMessage({
@@ -262,36 +392,22 @@ wss.on('connection', (ws) => {
             data: parsed,
             sender_id: parsed.sender_id || parsed.peerId || 'unknown',
           });
-        } catch (_) {
-          // Message non-JSON (binaire, ping, etc.) → pas de stockage.
-        }
+        } catch (_) {}
 
-        // ── Relai aux autres clients connectés ──
         store.meshClients.forEach(client => {
           if (client !== ws && client.readyState === 1) {
-            try {
-              client.send(msg);
-            } catch (sendErr) {
-              log('MESH', `Erreur envoi à client: ${sendErr.message}`);
+            try { client.send(msg); } catch (sendErr) {
+              log('MESH', `[${connId}] Erreur relai: ${sendErr.message}`);
             }
           }
         });
       } catch (e) {
-        log('MESH', `Erreur traitement message: ${e.message}`);
+        log('MESH', `[${connId}] Erreur traitement message: ${e.message}`);
       }
     });
-
-    ws.on('close', () => {
-      store.meshClients.delete(ws);
-      log('MESH', `Client déconnecté (total: ${store.meshClients.size})`);
-    });
-
-    ws.on('error', (err) => {
-      log('MESH', `Erreur socket: ${err.message}`);
-    });
   } catch (e) {
-    log('MESH', `Erreur critique connexion: ${e.message}`);
-    try { ws.close(); } catch (_) {}
+    log('MESH', `[${connId}] Erreur critique connexion: ${e.message}`);
+    try { ws.close(1011, 'Internal server error'); } catch (_) {}
   }
 });
 
@@ -302,6 +418,7 @@ wss.on('connection', (ws) => {
 const adminWss = new WebSocketServer({
   server,
   path: '/admin-ws',
+  maxPayload: 512 * 1024,
   verifyClient: (info, cb) => {
     const reqUrl = info.req.url || '';
     log('ADMIN', `WebSocket handshake reçu → ${reqUrl.substring(0, 120)}`);
@@ -350,15 +467,10 @@ adminWss.on('connection', (ws, req) => {
   });
 });
 
-// ── Synchronisation périodique ──────────────────────────────────────────
-const syncSec = Math.max(config.syncIntervalSeconds, 5);
-const cronExpr = `*/${syncSec} * * * * *`;
-cron.schedule(cronExpr, () => {
-  log('SYNC', `Tentative synchro → ${config.partnerUrl}`);
-  sync.pollSync().catch(e => {
-    log('SYNC', `Échec vers ${config.partnerUrl}: ${e.message}`);
-  });
-});
+// ── Synchronisation périodique avec exponential backoff ─────────────────
+// Remplace le cron fixe `*/30 * * * * *` par un timer auto-adaptatif
+// qui espace les tentatives quand le Backup est injoignable (30s → 8 min).
+sync.startPolling();
 
 // ── Outbox de réplication (retry automatique) ───────────────────────────
 sync.startOutbox();
@@ -385,15 +497,16 @@ launchCaddyIndependent();
 // ── Démarrage ───────────────────────────────────────────────────────────
 server.listen(config.port, config.host, () => {
   console.log('═══════════════════════════════════════════════');
-  console.log(`  StreetPhare Server v3.1 — PRIMARY (HTTP)`);
+  console.log(`  StreetPhare Server v3.2 — PRIMARY (HTTP)`);
   console.log(`  Adresse : http://${config.host}:${config.port}`);
   console.log(`  Admin   : http://${config.host}:${config.port}/admin`);
   console.log(`  Mesh    : ws://${config.host}:${config.port}/mesh`);
   console.log(`  Backup  : ${config.partnerUrl}`);
-  console.log(`  Sync    : toutes les ${syncSec}s`);
+  console.log(`  Sync    : polling adaptatif (backoff 30s → 8 min)`);
   console.log(`  TLS     : ✅ Terminé par Caddy (reverse-proxy)`);
   console.log(`  Store   : persistance JSON → ${store.STORE_PATH || 'data/store.json'}`);
   console.log(`  Outbox  : ${sync.outboxSize()} en attente`);
+  console.log(`  Heartbeat: ping/${PING_INTERVAL_MS / 1000}s, timeout pong/${PONG_TIMEOUT_MS / 1000}s`);
   console.log('═══════════════════════════════════════════════');
 });
 

@@ -1,9 +1,9 @@
-# server/Caddyfile
-# StreetPhare v3.1 — Reverse-proxy Caddy (TLS automatique Let's Encrypt)
+# StreetPhare v3.3.2 — Reverse-proxy Caddy (TLS automatique Let's Encrypt)
 
 streetphare.ddns.net {
 	tls {
 		protocols tls1.2 tls1.3
+		reverse_proxy localhost:3000
 	}
 
 	header {
@@ -12,11 +12,28 @@ streetphare.ddns.net {
 		X-Frame-Options "DENY"
 	}
 
-	reverse_proxy 127.0.0.1:3000 {
-		header_up Host {upstream_hostport}
-		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Proto {scheme}
+	# ── Chemin WebSocket /mesh ─────────────────────────────────────────
+	handle /mesh* {
+		reverse_proxy 127.0.0.1:3000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up Origin {host}
+
+			# Flush immédiat pour le streaming WebSocket WAN (évite le code 1006)
+			flush_interval -1
+
+			transport http {
+				dial_timeout 10s
+			}
+		}
+	}
+
+	# ── Toutes les autres routes (API REST, admin, etc.) ───────────────
+	handle {
+		reverse_proxy 127.0.0.1:3000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+		}
 	}
 
 	log {
@@ -34,10 +51,8 @@ streetphare.ddns.net:4000 {
 	}
 
 	reverse_proxy 127.0.0.1:4000 {
-		header_up Host {upstream_hostport}
+		header_up Host {host}
 		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Proto {scheme}
 	}
 
 	log {

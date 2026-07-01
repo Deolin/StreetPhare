@@ -166,7 +166,7 @@ class _SplashScreenState extends State<SplashScreen>
           ),
         );
       } else {
-        Navigator.of(context).pushReplacement(
+        await Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const MapScreen()),
         );
       }
@@ -206,7 +206,7 @@ class _SplashScreenState extends State<SplashScreen>
           ),
         );
       } else {
-        Navigator.of(context).pushReplacement(
+        await Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const MapScreen()),
         );
       }
@@ -460,7 +460,7 @@ class _TutorialThenMapBridgeState extends State<_TutorialThenMapBridge> {
     );
     // Une fois le tutoriel fermé, on navigue vers MapScreen.
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
+    await Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const MapScreen()),
     );
   }
@@ -513,7 +513,7 @@ class _StartScreenBridgeState extends State<_StartScreenBridge> {
     );
     // Une fois le StartScreen fermé, on navigue vers MapScreen.
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
+    await Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const MapScreen()),
     );
   }

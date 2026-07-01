@@ -20,6 +20,7 @@ import 'core/theme/theme_controller.dart';
 import 'database/crypto_utils.dart';
 import 'debug/client_debug_logger.dart';
 import 'features/bug_report/presentation/bug_report_fab.dart';
+import 'features/bug_report/presentation/bug_report_service.dart';
 import 'features/events/presentation/event_manager.dart';
 import 'features/geofencing/presentation/geofencing_service.dart';
 import 'features/geofencing/presentation/proximity_validation_service.dart';
@@ -45,23 +46,45 @@ void main() async {
   configureUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ═══ Correctif Windows : geolocator_updates thread non-platform ═══
-  // Le plugin geolocator_windows envoie les mises à jour GPS depuis un
-  // thread natif non-UI, ce qui déclenche une erreur Flutter :
-  //   "The 'flutter.baseflow.com/geolocator_updates' channel sent a
-  //    message from native to Flutter on a non-platform thread."
-  // Cette erreur est purement cosmétique (les données GPS arrivent
-  // correctement via addPostFrameCallback). On la filtre ici en
-  // attendant un correctif upstream du plugin.
-  // Voir : https://github.com/Baseflow/flutter-geolocator/issues
+  // ═══════════════════════════════════════════════════════════════════
+  // Catcher de crash global — StreetPhare Offline-First Bug Report
+  // ═══════════════════════════════════════════════════════════════════
+  // Capture TOUTES les erreurs Flutter non interceptées et les
+  // envoie au BugReportService pour stockage local + envoi différé.
+  // Le service est blindé : il ne peut PAS provoquer un crash
+  // secondaire (try-catch dans toutes les méthodes).
+  //
+  // Inclut le filtre du bug connu geolocator_windows (thread non-UI).
   FlutterError.onError = (details) {
     final msg = details.exceptionAsString();
+    // Filtre le bug connu geolocator_windows.
     if (msg.contains('geolocator_updates') &&
         msg.contains('non-platform thread')) {
-      // Ignorée : bug connu geolocator_windows, données GPS OK.
-      return;
+      return; // Ignorée : bug connu, données GPS OK.
+    }
+    // Capture le crash pour le bug report.
+    try {
+      BugReportService.instance.submitCrash(
+        error: msg,
+        stackTrace: details.stack.toString(),
+      );
+    } catch (_) {
+      // Silence absolu — le catcher ne doit jamais crasher.
     }
     FlutterError.presentError(details);
+  };
+
+  // Capture les erreurs de la PlatformDispatcher (isolate principal).
+  PlatformDispatcher.instance.onError = (error, stack) {
+    try {
+      BugReportService.instance.submitCrash(
+        error: error.toString(),
+        stackTrace: stack.toString(),
+      );
+    } catch (_) {
+      // Silence.
+    }
+    return false; // Laisse Flutter gérer l'erreur normalement aussi.
   };
 
   // Orientation verrouillée en portrait
@@ -188,6 +211,9 @@ void main() async {
 
     // Démarre le heartbeat serveur après l'init réseau (FailoverManager prêt).
     ServerHeartbeatService.instance.start();
+
+    // Démarre le service de bug report offline-first.
+    unawaited(BugReportService.instance.start());
   } catch (e, st) {
     if (kDebugMode) {
       debugPrint('[main] ERREUR initialisation réseau : $e\n$st');

@@ -72,7 +72,7 @@ void main() {
 
       // Le déchiffrement doit lever une exception (MAC invalide ou padding).
       // On attend le Future car decryptAddress est asynchrone.
-      expectLater(
+      await expectLater(
         crypto.decryptAddress(cipherB64, wrongKey),
         throwsA(isA<Exception>()),
       );

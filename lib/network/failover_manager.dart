@@ -160,9 +160,20 @@ class FailoverManager {
   /// File des endpoints de secours (chiffrés) en attente.
   final List<ServerEndpoint> _standbys = [];
 
-  /// Cache des serveurs définitivement marqués défaillants
-  /// pour la session (jamais retentés).
-  final Set<String> _deadForSession = {};
+  /// Cache de cooldown des serveurs temporairement exclus.
+  /// Clé = adresse du serveur, Valeur = DateTime jusqu'à laquelle
+  /// il est exclu. Passé ce délai, le serveur redevient candidat.
+  /// Remplace l'ancien blacklisting permanent `_deadForSession`.
+  final Map<String, DateTime> _cooldownUntil = {};
+
+  /// Cooldown de base après un premier échec (60 secondes).
+  static const Duration _baseCooldown = Duration(seconds: 60);
+
+  /// Cooldown maximum (15 minutes).
+  static const Duration _maxCooldown = Duration(minutes: 15);
+
+  /// Nombre d'échecs consécutifs par serveur (pour le backoff).
+  final Map<String, int> _failureCount = {};
 
   SecretKey? _aesKey;
   Timer? _heartbeatTimer;
@@ -247,15 +258,46 @@ class FailoverManager {
     _started = false;
     // Fermeture explicite du StreamController et du client HTTP
     // pour éviter les fuites mémoire.
-    _activeServerController.close();
+    unawaited(_activeServerController.close());
     _httpClient.close();
   }
 
   /// Adresse du serveur central courant.
   String get currentAddress => _current?.address ?? '';
 
-  /// Liste des serveurs définitivement défaillants dans la session.
-  Set<String> get deadServersForSession => Set.unmodifiable(_deadForSession);
+  /// Liste des serveurs actuellement en cooldown (exclus temporairement).
+  Set<String> get deadServersForSession =>
+      Set.unmodifiable(_cooldownUntil.keys.toSet());
+
+  /// Vérifie si un serveur est actuellement en période de cooldown.
+  bool _isInCooldown(String address) {
+    final until = _cooldownUntil[address];
+    if (until == null) return false;
+    if (DateTime.now().toUtc().isAfter(until)) {
+      // Cooldown expiré → le serveur redevient candidat.
+      _cooldownUntil.remove(address);
+      _failureCount.remove(address);
+      return false;
+    }
+    return true;
+  }
+
+  /// Place un serveur en cooldown avec backoff exponentiel.
+  void _setCooldown(String address) {
+    final failures = (_failureCount[address] ?? 0) + 1;
+    _failureCount[address] = failures;
+    // Backoff exponentiel : 60s × 2^(failures-1), max 15 min.
+    final seconds = (_baseCooldown.inSeconds * (1 << (failures - 1)))
+        .clamp(_baseCooldown.inSeconds, _maxCooldown.inSeconds);
+    _cooldownUntil[address] =
+        DateTime.now().toUtc().add(Duration(seconds: seconds));
+    if (kDebugMode) {
+      debugPrint(
+        '[FailoverManager] $address en cooldown ${seconds}s '
+        '(échec #$failures)',
+      );
+    }
+  }
 
   /// Effectue un ping sur le serveur courant.
   /// En cas d'échec répété, bascule vers le premier standby.
@@ -302,7 +344,7 @@ class FailoverManager {
   Future<void> _failover() async {
     if (_current == null) return;
     final dying = _current!.address;
-    _deadForSession.add(dying);
+    _setCooldown(dying);
     _current = _current!.copyWith(
       status: ServerStatus.failed,
       markedFailedAt: DateTime.now().toUtc(),
@@ -328,7 +370,7 @@ class FailoverManager {
     // ── Ping parallèle de tous les standbys ─────────────────────
     // On filtre les standbys déjà marqués morts pour cette session.
     final candidates =
-        _standbys.where((s) => !_deadForSession.contains(s.address)).toList();
+        _standbys.where((s) => !_isInCooldown(s.address)).toList();
 
     if (candidates.isEmpty) {
       if (kDebugMode) {
@@ -359,7 +401,7 @@ class FailoverManager {
         firstReachable = r;
         break;
       } else {
-        _deadForSession.add(r.address.address);
+        _setCooldown(r.address.address);
         _standbys.remove(r.address);
         ClientDebugLogger.instance.serverMarkedDead(r.address.address);
         if (kDebugMode) {
@@ -556,7 +598,7 @@ class FailoverManager {
   Future<void> _enqueueNextBackup(String cipher) async {
     try {
       final clear = await CryptoUtils.instance.decryptAddress(cipher, _aesKey!);
-      if (_deadForSession.contains(clear)) return;
+      if (_isInCooldown(clear)) return;
       if (_current?.address == clear) return;
       _standbys.add(ServerEndpoint(
         address: clear,
@@ -587,7 +629,8 @@ class FailoverManager {
     _heartbeatTimer = null;
     _current = null;
     _standbys.clear();
-    _deadForSession.clear();
+    _cooldownUntil.clear();
+    _failureCount.clear();
     _aesKey = null;
     _config = null;
   }

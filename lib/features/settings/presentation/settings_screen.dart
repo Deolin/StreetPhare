@@ -29,7 +29,6 @@ import '../../../services/notification_service.dart';
 import '../../../services/permission_service.dart';
 import '../../../services/version_check_service.dart';
 import '../../bug_report/presentation/bug_report_fab.dart';
-import '../../bug_report/presentation/bug_report_service.dart' show BugCategory;
 import '../../events/presentation/events_screen.dart';
 import '../../messaging/data/hive_block_service.dart';
 import '../../routing/data/avoidance_filter_store.dart';
@@ -1877,15 +1876,13 @@ class _BugReportSection extends StatelessWidget {
                   backgroundColor: const Color(0xFF00838F),
                   foregroundColor: Colors.white,
                 ),
-                onPressed: () => BugReportDialog.show(context,
-                    initialCategory: BugCategory.bug),
+                onPressed: () => UnifiedBugReportDialog.show(context),
               ),
               const SizedBox(width: 12),
               OutlinedButton.icon(
                 icon: const Icon(Icons.lightbulb_outline, size: 18),
                 label: Text(strings.bugReportSuggest),
-                onPressed: () => BugReportDialog.show(context,
-                    initialCategory: BugCategory.suggestion),
+                onPressed: () => UnifiedBugReportDialog.show(context),
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF00838F)),
                   foregroundColor: const Color(0xFF00838F),
