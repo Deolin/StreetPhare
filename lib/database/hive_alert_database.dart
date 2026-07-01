@@ -143,7 +143,8 @@ class HiveAlertDatabase {
         }
       } catch (e, st) {
         if (kDebugMode) {
-          debugPrint('[HiveAlertDatabase] erreur callback purge ${alert.id} : $e\n$st');
+          debugPrint(
+              '[HiveAlertDatabase] erreur callback purge ${alert.id} : $e\n$st');
         }
       }
       // Effacement systématique (règle de protection de la vie privée),
