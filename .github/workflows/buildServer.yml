@@ -1,15 +1,12 @@
-name: StreetPhare CI/CD Build
+name: StreetPhare CD Build server
 
 on:
   push:
     branches:
-      - admin
-      - ios
-      - android
-      - windows
+      - server
   pull_request:
     branches:
-      - admin
+      - server
   workflow_dispatch:
 
 jobs:

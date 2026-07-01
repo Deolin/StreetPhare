@@ -1,0 +1,81 @@
+name: StreetPhare CD Build Windows
+
+on:
+  push:
+    branches:
+      - admin
+      - ios
+      - android
+      - windows
+  pull_request:
+    branches:
+      - admin
+  workflow_dispatch:
+
+jobs:
+ 
+  # ═════════════════════════════════════════════════════════════════════════════
+  # Windows Build (EXE)
+  # ═════════════════════════════════════════════════════════════════════════════
+  build-windows:
+    if: |
+      github.ref == 'refs/heads/windows' ||
+      github.ref == 'refs/heads/admin'
+    name: Windows (EXE)
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows (release)
+        run: flutter build windows --release
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: build/windows/x64/runner/Release/
+          retention-days: 30
+
+  # ═════════════════════════════════════════════════════════════════════════════
+  # Analyse statique & Tests
+  # ═════════════════════════════════════════════════════════════════════════════
+  analyze:
+    name: Analyse & Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyse statique
+        run: flutter analyze
+
+      - name: Tests unitaires
+        run: flutter test

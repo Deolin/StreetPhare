@@ -1,0 +1,60 @@
+name: StreetPhare CD Build IOS
+
+on:
+  push:
+    branches:
+      - ios
+  pull_request:
+    branches:
+      - ios
+  workflow_dispatch:
+
+jobs:
+ 
+  # ═════════════════════════════════════════════════════════════════════════════
+  # iOS Build (IPA)
+  # ═════════════════════════════════════════════════════════════════════════════
+  build-ios:
+    if: |
+      github.ref == 'refs/heads/ios' ||
+      github.ref == 'refs/heads/admin'
+    name: iOS (IPA)
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: ios/Pods
+          key: pods-${{ runner.os }}-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            pods-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Pod install
+        working-directory: ios
+        run: pod install --repo-update
+
+      - name: Build iOS (no codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: build/ios/iphoneos/Runner.app
+          retention-days: 30
