@@ -38060,6 +38060,10 @@ app.get("/", (req, res) => {
   });
 });
 var server = http.createServer(app);
+server.on("upgrade", (request, socket, head) => {
+  const headers = request.headers;
+  log("MESH", `[UPGRADE] ${request.url} \u2014 Upgrade: ${headers["upgrade"] || "N/A"} \u2014 Connection: ${headers["connection"] || "N/A"} \u2014 Origin: ${headers["origin"] || "N/A"} \u2014 IP: ${headers["x-forwarded-for"] || request.socket.remoteAddress}`);
+});
 var wss = new WebSocketServer({
   server,
   path: "/mesh",
@@ -38109,15 +38113,23 @@ var meshPingInterval = setInterval(() => {
 }, PING_INTERVAL_MS);
 wss.on("close", () => clearInterval(meshPingInterval));
 var _meshReconnectCooldowns = /* @__PURE__ */ new Map();
-var MESH_RECONNECT_COOLDOWN_MS = 2e3;
+var MESH_RECONNECT_COOLDOWN_MS = 500;
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, until] of _meshReconnectCooldowns.entries()) {
+    if (until < now) _meshReconnectCooldowns.delete(ip);
+  }
+}, 6e4);
 var MAX_WELCOME_BACKLOG = 50;
 wss.on("connection", (ws, req) => {
+  const connId = Math.random().toString(36).slice(2, 8);
+  const t0 = Date.now();
   try {
     const clientIp = (req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").toString().split(",")[0].trim();
-    const now = Date.now();
+    const now = t0;
     const cooldownUntil = _meshReconnectCooldowns.get(clientIp) || 0;
     if (now < cooldownUntil) {
-      log("MESH", `Reconnexion trop rapide (IP=${clientIp}, ${Math.round((cooldownUntil - now) / 1e3)}s restantes) \u2192 rejet\xE9e`);
+      log("MESH", `[${connId}] Reconnexion trop rapide (IP=${clientIp}, ${Math.round((cooldownUntil - now) / 1e3)}s restantes) \u2192 rejet\xE9e`);
       try {
         ws.close(4001, "Reconnect too fast");
       } catch (_) {
@@ -38125,8 +38137,21 @@ wss.on("connection", (ws, req) => {
       return;
     }
     _meshReconnectCooldowns.set(clientIp, now + MESH_RECONNECT_COOLDOWN_MS);
+    let closeCaptured = false;
+    ws.on("close", (code, reason) => {
+      closeCaptured = true;
+      store.meshClients.delete(ws);
+      lastPongSeen.delete(ws);
+      const reasonStr = reason ? reason.toString() : "non sp\xE9cifi\xE9e";
+      const elapsed = Date.now() - t0;
+      log("MESH", `[${connId}] Client d\xE9connect\xE9 (code=${code || "?"}, raison=${reasonStr}, elapsed=${elapsed}ms, total: ${store.meshClients.size})`);
+    });
+    ws.on("error", (err) => {
+      log("MESH", `[${connId}] Erreur socket: ${err.message}`);
+    });
     store.meshClients.add(ws);
-    log("MESH", `Client connect\xE9 (total: ${store.meshClients.size})`);
+    log("MESH", `[${connId}] Client connect\xE9 (total: ${store.meshClients.size}, IP: ${clientIp})`);
+    lastPongSeen.set(ws, Date.now());
     try {
       const syncSince = new Date(Date.now() - 24 * 60 * 60 * 1e3).toISOString();
       const missedMessages = store.getMeshMessagesSince(syncSince);
@@ -38134,7 +38159,7 @@ wss.on("connection", (ws, req) => {
       const welcomePayload = JSON.stringify({
         kind: "welcome",
         server: "StreetPhare-Primary",
-        version: "3.2.0",
+        version: "3.2.1",
         tls: true,
         ts: (/* @__PURE__ */ new Date()).toISOString(),
         missedCount: truncated.length,
@@ -38143,31 +38168,40 @@ wss.on("connection", (ws, req) => {
       });
       const payloadSize = Buffer.byteLength(welcomePayload, "utf-8");
       if (payloadSize > 256 * 1024) {
-        log("MESH", `\u26A0 Welcome trop volumineux (${Math.round(payloadSize / 1024)} Ko) \u2192 envoi sans backlog`);
+        log("MESH", `[${connId}] \u26A0 Welcome trop volumineux (${Math.round(payloadSize / 1024)} Ko) \u2192 envoi sans backlog`);
         ws.send(JSON.stringify({
           kind: "welcome",
           server: "StreetPhare-Primary",
-          version: "3.2.0",
+          version: "3.2.1",
           tls: true,
           ts: (/* @__PURE__ */ new Date()).toISOString(),
           missedCount: 0,
           totalMissed: missedMessages.length,
           missed: [],
           note: "Backlog trop volumineux, synchronisation diff\xE9r\xE9e"
-        }));
+        }), (err) => {
+          if (err) log("MESH", `[${connId}] Erreur envoi welcome (fallback): ${err.message}`);
+          else log("MESH", `[${connId}] Welcome fallback envoy\xE9 (${Date.now() - t0}ms)`);
+        });
       } else {
-        ws.send(welcomePayload);
-        if (truncated.length > 0) {
-          log("MESH", `Handshake : ${truncated.length}/${missedMessages.length} messages backlog envoy\xE9s au client (${Math.round(payloadSize / 1024)} Ko)`);
-        }
+        ws.send(welcomePayload, (err) => {
+          if (err) {
+            log("MESH", `[${connId}] Erreur envoi welcome: ${err.message}`);
+          } else if (!closeCaptured) {
+            log("MESH", `[${connId}] Welcome envoy\xE9 (${Math.round(payloadSize / 1024)} Ko, ${Date.now() - t0}ms)`);
+            if (truncated.length > 0) {
+              log("MESH", `[${connId}] Handshake : ${truncated.length}/${missedMessages.length} messages backlog`);
+            }
+          }
+        });
       }
     } catch (e) {
-      log("MESH", `Erreur handshake/sync: ${e.message}`);
+      log("MESH", `[${connId}] Erreur handshake/sync: ${e.message}`);
       try {
         ws.send(JSON.stringify({
           kind: "welcome",
           server: "StreetPhare-Primary",
-          version: "3.2.0",
+          version: "3.2.1",
           tls: true,
           ts: (/* @__PURE__ */ new Date()).toISOString(),
           missedCount: 0,
@@ -38176,7 +38210,6 @@ wss.on("connection", (ws, req) => {
       } catch (_) {
       }
     }
-    lastPongSeen.set(ws, Date.now());
     const msgTimestamps = [];
     const RATE_LIMIT_MAX = 10;
     const RATE_LIMIT_WINDOW_MS = 1e3;
@@ -38186,7 +38219,7 @@ wss.on("connection", (ws, req) => {
       try {
         const now2 = Date.now();
         if (now2 < blacklistedUntil) {
-          log("MESH", `Message bloqu\xE9 (blacklist ${Math.round((blacklistedUntil - now2) / 1e3)}s restantes)`);
+          log("MESH", `[${connId}] Message bloqu\xE9 (blacklist ${Math.round((blacklistedUntil - now2) / 1e3)}s restantes)`);
           return;
         }
         while (msgTimestamps.length > 0 && msgTimestamps[0] < now2 - RATE_LIMIT_WINDOW_MS) {
@@ -38195,11 +38228,11 @@ wss.on("connection", (ws, req) => {
         msgTimestamps.push(now2);
         if (msgTimestamps.length > RATE_LIMIT_MAX) {
           blacklistedUntil = now2 + RATE_LIMIT_BLACKLIST_MS;
-          log("MESH", `\u26D4 Rate limit d\xE9pass\xE9 (${msgTimestamps.length} msg/s) \u2192 blacklist 30s`);
+          log("MESH", `[${connId}] \u26D4 Rate limit d\xE9pass\xE9 \u2192 blacklist 30s`);
           return;
         }
         const msg = data.toString();
-        log("MESH", `Message re\xE7u: ${msg.substring(0, 200)}`);
+        log("MESH", `[${connId}] Message re\xE7u (${Date.now() - t0}ms): ${msg.substring(0, 150)}`);
         try {
           const parsed = JSON.parse(msg);
           store.addMeshMessage({
@@ -38214,25 +38247,16 @@ wss.on("connection", (ws, req) => {
             try {
               client.send(msg);
             } catch (sendErr) {
-              log("MESH", `Erreur envoi \xE0 client: ${sendErr.message}`);
+              log("MESH", `[${connId}] Erreur relai: ${sendErr.message}`);
             }
           }
         });
       } catch (e) {
-        log("MESH", `Erreur traitement message: ${e.message}`);
+        log("MESH", `[${connId}] Erreur traitement message: ${e.message}`);
       }
     });
-    ws.on("close", (code, reason) => {
-      store.meshClients.delete(ws);
-      lastPongSeen.delete(ws);
-      const reasonStr = reason ? reason.toString() : "non sp\xE9cifi\xE9e";
-      log("MESH", `Client d\xE9connect\xE9 (code=${code || "?"}, raison=${reasonStr}, total: ${store.meshClients.size})`);
-    });
-    ws.on("error", (err) => {
-      log("MESH", `Erreur socket: ${err.message}`);
-    });
   } catch (e) {
-    log("MESH", `Erreur critique connexion: ${e.message}`);
+    log("MESH", `[${connId}] Erreur critique connexion: ${e.message}`);
     try {
       ws.close(1011, "Internal server error");
     } catch (_) {
