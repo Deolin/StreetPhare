@@ -15,10 +15,16 @@
 //
 // Réf: docs/plan_et_audit_complet_28062026.md#Anomalie-A3
 
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_streetphare/core/models/alert_model.dart';
 import 'package:flutter_streetphare/database/hive_alert_database.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive_ce.dart';
+import 'package:hive_ce/src/binary/binary_reader_impl.dart';
+import 'package:hive_ce/src/registry/type_registry_impl.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 // ---------------------------------------------------------------------------
@@ -53,6 +59,36 @@ Alert _testAlert({
 }
 
 void main() {
+  late Directory tempDir;
+
+  setUpAll(() async {
+    // ---- Binding Flutter pour les tests ----
+    TestWidgetsFlutterBinding.ensureInitialized();
+
+    // ---- Mock du MethodChannel path_provider ----
+    const MethodChannel channel =
+        MethodChannel('plugins.flutter.io/path_provider');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+      if (methodCall.method == 'getApplicationDocumentsDirectory') {
+        return tempDir.path;
+      }
+      return null;
+    });
+
+    // ---- Création d’un dossier temporaire dédié aux tests ----
+    tempDir = Directory.systemTemp.createTempSync('streetphare_test_');
+  });
+
+  tearDownAll(() async {
+    // ---- Fermeture de Hive avant suppression du dossier ----
+    await HiveAlertDatabase.instance.close();
+    // ---- Nettoyage des fichiers Hive et du dossier temporaire ----
+    if (tempDir.existsSync()) {
+      tempDir.deleteSync(recursive: true);
+    }
+  });
+
   // -----------------------------------------------------------------------
   // HiveAlertDatabase — tests CRUD et métier
   // -----------------------------------------------------------------------
@@ -540,6 +576,14 @@ void main() {
   group('AlertAdapter', () {
     late AlertAdapter adapter;
 
+    setUpAll(() async {
+      // Garantit que Hive est initialisé (même si ce groupe est exécuté seul).
+      // NOTE : le mock path_provider est déjà en place via le setUpAll global.
+      if (!Hive.isAdapterRegistered(1)) {
+        Hive.registerAdapter(AlertAdapter());
+      }
+    });
+
     setUp(() {
       adapter = AlertAdapter();
     });
@@ -638,39 +682,33 @@ void main() {
       }
     });
 
-    test('read with corrupted stored data returns fallback alert', () async {
-      // Test de corruption : injecte des bytes bruts invalides dans une box
-      // non-typée, puis la relit via la box typée Alert.
-      // Hive CE ouvre les box sans type générique comme Box (raw).
+    test('read with corrupted bytes returns fallback alert', () {
+      // Injecte des bytes corrompus dans un BinaryReader et vérifie que
+      // AlertAdapter.read() ne lève pas d'exception mais retourne un
+      // fallback (ex: données d'une version antérieure du schéma ou
+      // corruption disque). Hive CE ne fait pas de cast avant d'appeler
+      // read(), donc le fallback de l'adaptateur protège l'ouverture
+      // de la box même avec des données binaires invalides.
+      //
+      // On construit un BinaryReader avec des bytes qui ne respectent
+      // pas le format attendu (un champ count absurde suivi de
+      // données invalides).
+      final corruptBytes = Uint8List.fromList([
+        255, // byte: un count absurde (bien au-delà de 13)
+        0, // key 0
+        42, // une valeur int non convertible en String
+        1, // key 1
+        99, // une autre valeur aléatoire
+      ]);
 
-      // Étape 1 : ouvrir une box non-typée et y injecter des données corrompues.
-      final rawBox = await Hive.openBox('adapter_corrupt_box');
-      try {
-        // Stocke une valeur qui n'est pas un Alert valide
-        await rawBox.put('corrupt_key', 'not-an-alert-object');
-      } finally {
-        await rawBox.close();
-      }
+      final reader = BinaryReaderImpl(corruptBytes, TypeRegistryImpl());
+      final result = adapter.read(reader);
 
-      // Étape 2 : rouvrir la même box typée Alert — force l'adaptateur
-      // AlertAdapter.read() à tenter de désérialiser la valeur corrompue.
-      Box<Alert>? typedBox;
-      try {
-        typedBox = await Hive.openBox<Alert>('adapter_corrupt_box');
-        // Le read() de l'adapter doit intercepter l'erreur et retourner
-        // un fallback, donc get() ne doit pas lever.
-        final result = typedBox.get('corrupt_key');
-        expect(result, isNotNull);
-        if (result != null) {
-          expect(result.id, contains('corrupted_'));
-          expect(result.status, AlertStatus.rejected);
-          expect(result.ttlHours, 1);
-          expect(result.ephemeralUserId, 'corrupted');
-        }
-      } finally {
-        await typedBox?.close();
-        await Hive.deleteBoxFromDisk('adapter_corrupt_box');
-      }
+      // Le fallback doit avoir les marqueurs "corrupted_"
+      expect(result.id, contains('corrupted_'));
+      expect(result.status, AlertStatus.rejected);
+      expect(result.ttlHours, 1);
+      expect(result.ephemeralUserId, 'corrupted');
     });
 
     test('AlertAdapter hashCode and operator== are consistent', () {

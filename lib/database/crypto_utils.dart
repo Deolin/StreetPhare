@@ -49,6 +49,10 @@ class CryptoUtils {
   /// PBKDF2. Chaque ciphertext embarque son propre sel en préfixe.
   static const int _saltLength = 16;
 
+  /// Nombre d'itérations PBKDF2. Exposé pour permettre aux tests
+  /// d'utiliser une valeur réduite. En production, 100 000 (OWASP 2023).
+  static const int pbkdf2Iterations = 100000;
+
   /// Dérive une clé AES-256 depuis une clé maîtresse et un sel
   /// via PBKDF2-HMAC-SHA256 (100 000 itérations, OWASP 2023).
   ///
@@ -57,7 +61,7 @@ class CryptoUtils {
   Future<SecretKey> deriveAesKey(SecretKey masterKey, {List<int>? salt}) async {
     final pbkdf2 = Pbkdf2(
       macAlgorithm: Hmac.sha256(),
-      iterations: 100000,
+      iterations: pbkdf2Iterations,
       bits: 256,
     );
     return pbkdf2.deriveKey(

@@ -22,16 +22,13 @@ jobs:
           cache: true
 
       - name: get dependencies
-        run: flutter pub get
+        run: flutter clean && flutter pub get
 
       - name: Analyze project source
         run: flutter analyze
 
       - name: Verify Dart SDK constraint
-        run: dart --version
-
-      - name: Install dependencies
-        run: flutter pub get
+        run: dart --versionflutter
 
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed .

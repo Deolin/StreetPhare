@@ -141,8 +141,15 @@ class HiveAlertDatabase {
         if (onBeforeDelete != null) {
           await onBeforeDelete(alert);
         }
+      } catch (e, st) {
+        if (kDebugMode) {
+          debugPrint('[HiveAlertDatabase] erreur callback purge ${alert.id} : $e\n$st');
+        }
+      }
+      // Effacement systématique (règle de protection de la vie privée),
+      // même si le callback onBeforeDelete a échoué.
+      try {
         alert.status = AlertStatus.rejected;
-        // Effacement systématique (règle de protection de la vie privée).
         await _box!.delete(alert.id);
         if (kDebugMode) {
           debugPrint('[HiveAlertDatabase] alerte purgée : ${alert.id}');
