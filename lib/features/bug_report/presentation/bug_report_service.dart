@@ -126,9 +126,14 @@ class BugReportService {
   /// Réinitialisé dès qu'un envoi réussit.
   int _consecutiveFlushFailures = 0;
 
+  /// Timestamp jusqu'auquel tout flush est suspendu (rate-limit 429).
+  DateTime? _rateLimitedUntil;
+
   static const Duration _kFlushInterval = Duration(minutes: 5);
+  static const Duration _kMinFlushInterval = Duration(seconds: 30);
   static const Duration _kRequestTimeout = Duration(seconds: 10);
   static const int _kMaxAttemptsBeforeAbandon = 8;
+  static const Duration _kMaxRateLimitBackoff = Duration(minutes: 5);
 
   /// Démarre le service de bug report.
   ///
@@ -257,8 +262,19 @@ class BugReportService {
   ///   - En cas d'échec réseau, essaye le fallback local.
   ///   - Les rapports envoyés avec succès sont supprimés du stockage local.
   ///   - Les échecs restent stockés pour retry ultérieur.
+  ///   - Si le serveur répond 429 (rate-limit), le flush est suspendu
+  ///     avec un backoff exponentiel pour éviter les boucles de retry.
   Future<void> _flushQueue() async {
     if (!_started) return;
+
+    // Vérifie si on est en backoff rate-limit.
+    if (_isRateLimited()) {
+      if (kDebugMode) {
+        debugPrint('[BugReport] ⏸ Flush suspendu (backoff rate-limit)');
+      }
+      return;
+    }
+
     final pending = _db.getAllPending();
     if (pending.isEmpty) return;
 
@@ -270,11 +286,19 @@ class BugReportService {
     bool anySuccess = false;
 
     for (final entry in pending) {
+      // Double-check après chaque envoi : le 429 peut arriver en cours de flush.
+      if (_isRateLimited()) {
+        if (kDebugMode) {
+          debugPrint('[BugReport] ⏸ Flush interrompu (rate-limit reçu en cours)');
+        }
+        break;
+      }
+
       try {
         final payload = _buildPayload(entry);
-        final ok = await _trySend(payload);
+        final statusCode = await _trySend(payload);
 
-        if (ok) {
+        if (statusCode == 200) {
           // ✅ SUCCÈS : suppression du stockage local UNIQUEMENT maintenant.
           await _db.remove(entry.id);
           anySuccess = true;
@@ -282,6 +306,20 @@ class BugReportService {
             debugPrint(
                 '[BugReport] ✅ Rapport "${entry.title}" envoyé et supprimé');
           }
+        } else if (statusCode == 429) {
+          // ⛔ RATE-LIMIT : on arrête tout le flush.
+          // Le backoff a déjà été configuré dans _trySend.
+          // On met à jour le compteur mais on ne réessaie pas.
+          await _db.updateAttempt(
+            entry.id,
+            attempts: entry.attempts + 1,
+            lastError: 'Rate-limit serveur (429)',
+          );
+          if (kDebugMode) {
+            debugPrint(
+                '[BugReport] ⛔ Rate-limit — flush suspendu, ${pending.length - 1} rapport(s) restant(s)');
+          }
+          break;
         } else {
           // ❌ ÉCHEC : mise à jour du compteur de tentatives.
           await _db.updateAttempt(
@@ -316,20 +354,47 @@ class BugReportService {
       await _db.purgeAbandoned(maxAttempts: _kMaxAttemptsBeforeAbandon);
     }
 
-    // Ajuste le backoff du flush périodique.
+    // Ajuste le backoff exponentiel du flush périodique.
     if (anySuccess) {
       _consecutiveFlushFailures = 0;
     } else if (pending.isNotEmpty) {
       _consecutiveFlushFailures++;
     }
-    if (_consecutiveFlushFailures > 3) {
-      _consecutiveFlushFailures = 0;
+    // Remet à zéro si on dépasse 6 échecs consécutifs
+    // (backoff déjà maximal atteint).
+    if (_consecutiveFlushFailures > 6) {
+      _consecutiveFlushFailures = 6; // Plafonne à 6 (backoff max ~64s).
     }
+  }
+
+  /// Calcule l'intervalle de backoff exponentiel basé sur le nombre
+  /// d'échecs consécutifs : 5s → 10s → 20s → 40s → 60s max.
+  Duration _currentBackoff() {
+    const base = _kMinFlushInterval;
+    final factor = 1 << _consecutiveFlushFailures; // 2^failures
+    final computed = base * factor;
+    return computed > _kMaxRateLimitBackoff ? _kMaxRateLimitBackoff : computed;
+  }
+
+  /// Vérifie si le flush est en backoff rate-limit.
+  bool _isRateLimited() {
+    final until = _rateLimitedUntil;
+    if (until == null) return false;
+    if (DateTime.now().isAfter(until)) {
+      _rateLimitedUntil = null;
+      return false;
+    }
+    return true;
   }
 
   /// Tente d'envoyer un payload vers le serveur en essayant d'abord
   /// l'URL publique, puis le fallback local en cas d'échec réseau.
-  Future<bool> _trySend(Map<String, dynamic> payload) async {
+  ///
+  /// Retourne :
+  ///   - `200` : succès HTTP (2xx)
+  ///   - `429` : rate-limit (backoff automatique configuré)
+  ///   - `0`   : autre échec
+  Future<int> _trySend(Map<String, dynamic> payload) async {
     final urls = _resolveUrls();
 
     for (final url in urls) {
@@ -350,7 +415,18 @@ class BugReportService {
             .timeout(_kRequestTimeout);
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          return true; // Succès avec cette URL.
+          return 200; // Succès.
+        }
+
+        // Détection du 429 (Rate Limit).
+        if (response.statusCode == 429) {
+          final retryAfterMs = _parseRateLimitRetry(response);
+          _setRateLimitBackoff(retryAfterMs);
+          if (kDebugMode) {
+            debugPrint(
+                '[BugReport] ⛔ 429 reçu → backoff ${retryAfterMs ~/ 1000}s');
+          }
+          return 429;
         }
 
         if (kDebugMode) {
@@ -372,7 +448,26 @@ class BugReportService {
       }
     }
 
-    return false; // Aucune URL n'a fonctionné.
+    return 0; // Aucune URL n'a fonctionné.
+  }
+
+  /// Extrait retryAfterMs du corps de la réponse 429, ou utilise un fallback.
+  int _parseRateLimitRetry(http.Response response) {
+    try {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (body['retryAfterMs'] is int) {
+        return body['retryAfterMs'] as int;
+      }
+    } catch (_) {}
+    return 60000; // Fallback : 1 minute.
+  }
+
+  /// Active le backoff rate-limit (plafonné à _kMaxRateLimitBackoff).
+  void _setRateLimitBackoff(int retryAfterMs) {
+    final delay = Duration(
+      milliseconds: retryAfterMs.clamp(0, _kMaxRateLimitBackoff.inMilliseconds),
+    );
+    _rateLimitedUntil = DateTime.now().add(delay);
   }
 
   /// Résout la liste des URLs à essayer dans l'ordre :
@@ -398,8 +493,8 @@ class BugReportService {
   /// Envoi direct (fallback ultime si le stockage local échoue).
   Future<BugReportResult> _sendDirectly(Map<String, dynamic> payload) async {
     try {
-      final ok = await _trySend(payload);
-      if (ok) return BugReportResult.success;
+      final statusCode = await _trySend(payload);
+      if (statusCode == 200) return BugReportResult.success;
 
       // Même en échec, on retourne "saved" car on a fait de notre mieux.
       return BugReportResult.saved;

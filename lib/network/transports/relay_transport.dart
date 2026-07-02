@@ -3,40 +3,12 @@
 // Implémentation "Relay" (données mobiles 3G/4G/5G) du contrat
 // MeshTransport.
 //
-// Quand Internet est disponible, on relaie les alertes à un serveur
-// de relay (différent du serveur central de synchronisation), qui
-// les rediffuse à TOUS les appareils StreetPhare connectés.
-//
-// Le serveur relay agit comme un "super-pair" qui couvre la zone
-// non couverte par BLE / Wi-Fi. Le transport utilise WebSocket
-// (full-duplex) avec reconnexion automatique.
-//
-// FIX v3.3.0 — Bypass GuaranteeChannel via dart:io WebSocket direct
-//
-//   web_socket_channel 3.x introduit deux couches de wrapping sur Android :
-//     1. AdapterWebSocketChannel  (adapte package:web_socket → dart:io sink)
-//     2. GuaranteeChannel         (stream_channel — garantit l'ordre des events)
-//
-//   Sur Android, le handshake TCP/TLS/WS produit parfois des Ping frames
-//   RFC 6455 (opcode 0x9) émis par le serveur Node.js/ws ou par Caddy.
-//   Ces frames de contrôle traversent AdapterWebSocketChannel, qui les
-//   traite comme données, déclenchant _GuaranteeSink.close() → onDone
-//   immédiat (code 1006) exactement 2ms après le message "welcome".
-//
-//   Solution : utiliser dart:io WebSocket.connect() DIRECTEMENT, enveloppé
-//   dans IOWebSocketChannel (web_socket_channel/io.dart). Ce chemin court-
-//   circuite complètement GuaranteeChannel et AdapterWebSocketChannel. La
-//   gestion native des Ping/Pong/Close frames est assurée par dart:io, qui
-//   répond automatiquement aux Pings avec des Pongs sans les exposer comme
-//   données applicatives.
-//
-//   Avantages de cette approche vs downgrade 2.4.0 :
-//     - Compatibilité avec web_socket_channel 3.x conservée.
-//     - API sink.add() / stream.listen() identique.
-//     - Pas besoin de .ready (WebSocket.connect() est un Future — le
-//       handshake est terminé quand le Future se résout).
-//     - pingInterval: null désactive les pings automatiques dart:io pour
-//       éviter toute interférence avec les pings applicatifs du serveur.
+// v3.3.5 — BYPASS COMPLET de web_socket_channel
+//   Le wrapper IOWebSocketChannel (même sans GuaranteeChannel) causait
+//   des fermetures 1002 (Protocol Error) après chaque welcome.
+//   Solution : utiliser dart:io WebSocket directement, sans AUCUN
+//   wrapper. On gère nous-mêmes le sink via socket.add() et le
+//   stream via socket.listen().
 
 import 'dart:async';
 import 'dart:convert';
@@ -44,8 +16,8 @@ import 'dart:io' show WebSocket;
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
-import 'package:web_socket_channel/io.dart';
 
+import '../network_config.dart';
 import '../p2p_mesh_service.dart';
 
 /// Transport relay sur Internet (WebSocket).
@@ -67,8 +39,9 @@ class RelayMeshTransport implements MeshTransport {
   /// Intervalle du heartbeat applicatif. 0 = désactivé.
   final Duration heartbeat;
 
-  IOWebSocketChannel? _channel;
-  StreamSubscription? _sub;
+  // v3.3.5 : on utilise dart:io WebSocket directement, sans wrapper.
+  WebSocket? _socket;
+  StreamSubscription<dynamic>? _sub;
   Timer? _heartbeatTimer;
   Timer? _reconnectTimer;
   bool _started = false;
@@ -96,43 +69,60 @@ class RelayMeshTransport implements MeshTransport {
   Future<void> start() async {
     if (_started) return;
     _started = true;
-    // _connect() est async — on ne l'await pas pour ne pas bloquer
-    // le démarrage des autres transports.
     unawaited(_connect());
   }
 
-  /// Établit la connexion WebSocket via dart:io WebSocket directement.
+  /// Établit la connexion WebSocket via dart:io WebSocket DIRECTEMENT.
+  /// AUCUN wrapper (IOWebSocketChannel, GuaranteeChannel, etc.).
   ///
-  /// FIX v3.3.0 — Court-circuit de GuaranteeChannel/AdapterWebSocketChannel :
-  ///   `WebSocket.connect()` est un Future qui se résout APRÈS completion du
-  ///   handshake TCP+TLS+WS (code 101 Switching Protocols reçu). À ce stade,
-  ///   la connexion est pleinement établie et les Ping frames de contrôle sont
-  ///   gérés nativement par dart:io (réponse Pong automatique, invisible pour
-  ///   le code applicatif). On enveloppe ensuite dans IOWebSocketChannel pour
-  ///   garder l'API sink/stream standard.
+  /// FIX v3.3.5 — Bypass total de web_socket_channel :
+  ///   Même IOWebSocketChannel (qui wrap juste dart:io WebSocket sans
+  ///   GuaranteeChannel) causait des fermetures 1002 après le welcome.
+  ///   La cause exacte est subtile : IOWebSocketChannel écoute le stream
+  ///   dart:io et peut fermer le socket si le stream émet une erreur
+  ///   ou se ferme de façon inattendue. En utilisant dart:io WebSocket
+  ///   directement, on garde le contrôle total.
   Future<void> _connect() async {
     if (_disposed) return;
-    if (kDebugMode) debugPrint('[Relay] → tentative connexion à $relayUrl');
+
+    // FIX v3.3.4 : Si le DNS WAN échoue, bascule vers l'adresse locale.
+    final urlsToTry = <String>[relayUrl];
+    final localFallback = NetworkConfig.localhostRelayUrl;
+    if (localFallback != relayUrl) {
+      urlsToTry.add(localFallback);
+    }
 
     WebSocket? socket;
-    try {
-      // WebSocket.connect() complète SEULEMENT quand le handshake 101 est reçu.
-      // pingInterval: null = pas de pings automatiques dart:io (on évite toute
-      // interférence entre les pings natifs RFC 6455 et les heartbeats applicatifs).
-      socket = await WebSocket.connect(
-        relayUrl,
-        // ignore: avoid_redundant_argument_values
-        headers: const <String, dynamic>{},
-      );
-    } catch (e, st) {
+    String? connectedUrl;
+
+    for (final url in urlsToTry) {
+      if (_disposed) return;
+      if (kDebugMode) debugPrint('[Relay] → tentative connexion à $url');
+
+      try {
+        socket = await WebSocket.connect(
+          url,
+          headers: <String, dynamic>{
+            'Origin': 'https://streetphare.ddns.net',
+          },
+        );
+        connectedUrl = url;
+        break;
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[Relay] → échec connexion à $url: $e');
+        }
+      }
+    }
+
+    if (socket == null || connectedUrl == null) {
       if (kDebugMode) {
-        debugPrint('[Relay] → connect error: $e\n$st');
+        debugPrint('[Relay] → tous les URLs ont échoué');
       }
       _scheduleReconnect();
       return;
     }
 
-    // Vérifie que le transport n'a pas été disposé pendant le await.
     if (_disposed || !_started) {
       try {
         await socket.close();
@@ -140,43 +130,28 @@ class RelayMeshTransport implements MeshTransport {
       return;
     }
 
-    // Désactiver les pings automatiques dart:io (ils peuvent causer
-    // des interférences si le serveur envoie ses propres pings RFC 6455).
-    // Sur dart:io, la propriété pingInterval est accessible après connect().
+    // Désactiver les pings automatiques dart:io.
     try {
       socket.pingInterval = null;
-    } catch (_) {
-      // Ignoré : certaines versions de dart:io ne supportent pas
-      // la modification après connexion — ce n'est pas bloquant.
-    }
+    } catch (_) {}
 
-    // Enveloppe dans IOWebSocketChannel pour l'API sink/stream standard.
-    // IOWebSocketChannel utilise dart:io WebSocket directement, sans
-    // GuaranteeChannel ni AdapterWebSocketChannel.
-    _channel = IOWebSocketChannel(socket);
+    _socket = socket;
     _reconnectAttempts = 0;
     _reconnecting = false;
 
     if (kDebugMode) {
-      debugPrint(
-          '[Relay] → ws connecté à $relayUrl (via dart:io WebSocket direct)');
+      debugPrint('[Relay] → ws connecté (dart:io natif, sans wrapper)');
     }
 
-    // Écoute du stream — sûr car le handshake est déjà terminé
-    // (WebSocket.connect() est un Future qui attend le 101).
-    _sub = _channel!.stream.listen(
+    // ── Écoute DIRECTE du stream dart:io WebSocket ────────────────────
+    // On écoute le socket natif. Les données arrivent comme String
+    // (messages texte) ou List<int> (messages binaires).
+    // Les frames de contrôle (ping/pong/close) sont gérées automatiquement
+    // par dart:io et n'apparaissent PAS dans ce stream.
+    _sub = _socket!.listen(
       (data) {
-        // ═══ PROTOCOL ERROR GUARD (Bug fix: code 1002) ═══════════════
-        // Si un listener du _incomingController (ex: NetworkCoordinator)
-        // throw une exception non attrapée, elle remonte comme erreur
-        // sur le stream WebSocket natif → dart:io ferme la connexion avec
-        // le code 1002 (Protocol Error). On wrappe l'intégralité du
-        // listener pour intercepter TOUTE exception avant qu'elle
-        // n'atteigne la couche dart:io.
+        // ═══ PROTOCOL ERROR GUARD ═══════════════════════════════════
         try {
-          if (kDebugMode) {
-            debugPrint('[Relay] ← ws message reçu (${data.runtimeType})');
-          }
           if (data is String) {
             if (kDebugMode) {
               final preview =
@@ -192,37 +167,23 @@ class RelayMeshTransport implements MeshTransport {
               debugPrint('[Relay] ← (binary) $preview');
             }
             _incomingController.add(str);
-          } else {
-            if (kDebugMode) {
-              debugPrint(
-                  '[Relay] ← type inattendu ignoré: ${data.runtimeType}');
-            }
-          }
-
-          if (heartbeat > Duration.zero) {
-            _heartbeatTimer?.cancel();
-            _startHeartbeat();
           }
         } catch (e, st) {
-          // On intercepte toute exception pour éviter le code 1002.
-          // L'erreur est loggée mais ne remonte PAS vers dart:io WebSocket.
           if (kDebugMode) {
-            debugPrint('[Relay] ⚠ exception interceptée dans le listener '
+            debugPrint('[Relay] ⚠ exception interceptée '
                 '(protégée du code 1002): $e\n$st');
           }
         }
       },
       onError: (Object err) {
         if (kDebugMode) {
-          debugPrint(
-              '[Relay] ⚠ ws stream error: $err (type: ${err.runtimeType})');
+          debugPrint('[Relay] ⚠ ws stream error: $err');
         }
-        // L'erreur sera suivie de onDone — on laisse onDone gérer
-        // la reconnexion.
+        _cleanupAndReconnect();
       },
       onDone: () {
-        final code = socket?.closeCode;
-        final reason = socket?.closeReason;
+        final code = _socket?.closeCode;
+        final reason = _socket?.closeReason;
         if (kDebugMode) {
           debugPrint('[Relay] ⚠ ws fermé (code=$code, reason=$reason)');
         } else {
@@ -230,6 +191,7 @@ class RelayMeshTransport implements MeshTransport {
         }
         _cleanupAndReconnect();
       },
+      cancelOnError: false, // CRITIQUE : ne pas fermer le stream sur erreur.
     );
 
     if (heartbeat > Duration.zero) {
@@ -237,13 +199,15 @@ class RelayMeshTransport implements MeshTransport {
     }
   }
 
-  /// Planifie une reconnexion (utilisé après échec connect ET après onDone).
   void _scheduleReconnect() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
-    _sub?.cancel();
+    unawaited(_sub?.cancel());
     _sub = null;
-    _channel = null;
+    try {
+      _socket?.close();
+    } catch (_) {}
+    _socket = null;
 
     if (!_started || _disposed) return;
     if (_reconnecting) return;
@@ -266,7 +230,7 @@ class RelayMeshTransport implements MeshTransport {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(heartbeat, (_) {
       try {
-        _channel?.sink.add(jsonEncode({
+        _socket?.add(jsonEncode({
           'kind': 'ping',
           'ts': DateTime.now().toUtc().toIso8601String(),
         }));
@@ -282,15 +246,16 @@ class RelayMeshTransport implements MeshTransport {
   void _cleanupAndReconnect() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
-    _sub?.cancel();
+    unawaited(_sub?.cancel());
     _sub = null;
-    _channel = null;
+    try {
+      _socket?.close();
+    } catch (_) {}
+    _socket = null;
 
     if (!_started || _disposed) return;
-
     if (_reconnecting) return;
     _reconnecting = true;
-
     if (_reconnectTimer?.isActive ?? false) return;
 
     _reconnectAttempts++;
@@ -315,15 +280,17 @@ class RelayMeshTransport implements MeshTransport {
     _reconnectTimer = null;
     await _sub?.cancel();
     _sub = null;
-    await _channel?.sink.close();
-    _channel = null;
+    try {
+      await _socket?.close();
+    } catch (_) {}
+    _socket = null;
   }
 
   @override
   Future<void> broadcast(String payload) async {
-    if (_channel == null) return;
+    if (_socket == null) return;
     try {
-      _channel!.sink.add(payload);
+      _socket!.add(payload);
     } catch (e) {
       if (kDebugMode) debugPrint('[Relay] send error: $e');
     }
@@ -343,16 +310,12 @@ class RelayMeshTransport implements MeshTransport {
     _heartbeatTimer = null;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
-    _sub?.cancel();
+    unawaited(_sub?.cancel());
     _sub = null;
     try {
-      _channel?.sink.close();
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('[Relay] Erreur close channel (dispose): $e');
-      }
-    }
-    _channel = null;
+      _socket?.close();
+    } catch (_) {}
+    _socket = null;
     _reconnectAttempts = 0;
     _incomingController.close();
   }

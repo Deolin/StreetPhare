@@ -139,26 +139,44 @@ class NetworkConfig {
   // Contexte : De nombreuses box internet bloquent le NAT Hairpinning,
   // empêchant l'application (exécutée sur le même PC que le serveur)
   // de résoudre `streetphare.ddns.net` → IP publique → rebouclage local.
-  // Sur Android (émulateur ou device en debug USB), 127.0.0.1 pointe
-  // vers l'appareil lui-même, pas vers le PC hôte. L'émulateur expose
-  // le PC hôte via 10.0.2.2.
   //
-  // NOTE DE SÉCURITÉ : Les adresses de loopback (127.0.0.1, 10.0.2.2)
+  // Stratégie de fallback local :
+  //   - Priorité 1 : Variable d'environnement STREETPHARE_LOCAL_HOST
+  //     (permet de pointer vers l'IP LAN du PC hôte, ex: 192.168.1.42)
+  //   - Priorité 2 : 127.0.0.1 (compatible avec `adb reverse` sur
+  //     device physique ET émulateur)
+  //
+  // Utilisation avec adb reverse (recommandé pour le débogage) :
+  //   adb reverse tcp:3000 tcp:3000
+  //   adb reverse tcp:3001 tcp:3001
+  //   adb reverse tcp:4000 tcp:4000
+  //
+  // NOTE DE SÉCURITÉ : Les adresses de loopback (127.0.0.1)
   // utilisent HTTP/WS car le trafic ne quitte JAMAIS la machine locale.
   // Aucun risque d'interception réseau sur ces adresses. Le certificat
   // TLS n'est pas nécessaire pour les communications intra-machine.
 
-  /// Adresse locale de fallback (dépend de la plateforme).
+  /// Adresse locale de fallback (dépend de la plateforme et de la config).
   ///
-  /// - Android émulateur → 10.0.2.2 (le port 10.0.2.2 du PC hôte)
-  /// - Toutes autres plateformes → 127.0.0.1
+  /// Priorités :
+  ///   1. Flag compile-time `--dart-define=STREETPHARE_LOCAL_HOST=192.168.x.x`
+  ///   2. `127.0.0.1` — fonctionne avec `adb reverse` sur tout Android
+  ///
+  /// Usage recommandé pour debug device physique :
+  ///   flutter run --dart-define=STREETPHARE_LOCAL_HOST=192.168.1.42
   static String get _localFallbackHost {
-    if (kIsWeb) return '127.0.0.1';
-    try {
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        return '10.0.2.2';
+    // Priorité 1 : flag compile-time (override via --dart-define).
+    // Utilise String.fromEnvironment (compile-time) compatible web + natif.
+    const envOverride = String.fromEnvironment('STREETPHARE_LOCAL_HOST');
+    if (envOverride.isNotEmpty) {
+      if (kDebugMode) {
+        debugPrint(
+            '[NetworkConfig] Fallback local overridé via --dart-define → $envOverride');
       }
-    } catch (_) {}
+      return envOverride;
+    }
+    // Priorité 2 : 127.0.0.1 fonctionne avec `adb reverse`
+    // (device physique ET émulateur, une fois les ports redirigés).
     return '127.0.0.1';
   }
 

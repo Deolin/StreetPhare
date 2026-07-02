@@ -1,9 +1,9 @@
-# StreetPhare v3.3.2 — Reverse-proxy Caddy (TLS automatique Let's Encrypt)
+# StreetPhare v3.3.3 — Reverse-proxy Caddy (TLS automatique Let's Encrypt)
 
 streetphare.ddns.net {
+	reverse_proxy 127.0.0.1:3000
 	tls {
 		protocols tls1.2 tls1.3
-		reverse_proxy localhost:3000
 	}
 
 	header {
@@ -15,29 +15,73 @@ streetphare.ddns.net {
 	# ── Chemin WebSocket /mesh ─────────────────────────────────────────
 	handle /mesh* {
 		reverse_proxy 127.0.0.1:3000 {
+			# FIX v3.3.3 : header_up Host {host} nécessaire pour que le
+			# handshake WebSocket RFC 6455 aboutisse. Les clients mobiles
+			# Dart n'envoient pas toujours l'en-tête Host, Caddy le
+			# normalise via {host} avant de le transmettre à Node.js.
 			header_up Host {host}
+			header_up X-Forwarded-For {remote_host}
 			header_up X-Real-IP {remote_host}
-			header_up Origin {host}
-
-			# Flush immédiat pour le streaming WebSocket WAN (évite le code 1006)
-			flush_interval -1
+			# FIX v3.3.4 : Transmettre l'Origin du client mobile pour que
+			# Node.js (CORS + WebSocket) voie l'origine réelle. Sans cela,
+			# Node.js reçoit Origin: N/A → code 1006 Abnormal Closure.
+			header_up Origin {header.origin}
+			# Forcer la transmission explicite des en-têtes de handshake
+			# WebSocket (Upgrade + Connection) pour garantir la compatibilité
+			# RFC 6455 avec les clients Dart/dart:io.
+			header_up Upgrade {header.upgrade}
+			header_up Connection {header.connection}
 
 			transport http {
 				dial_timeout 10s
 			}
 		}
 	}
+	log {
+		output file /var/log/caddy/streetphare-mesh-access.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+		format json
+	}
 
 	# ── Toutes les autres routes (API REST, admin, etc.) ───────────────
 	handle {
 		reverse_proxy 127.0.0.1:3000 {
 			header_up Host {host}
+			header_up X-Forwarded-For {remote_host}
 			header_up X-Real-IP {remote_host}
 		}
 	}
 
 	log {
 		output file /var/log/caddy/streetphare-access.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+		format json
+	}
+}
+
+# ── Port 3001 — Serveur Backup (HTTP local, exposé en HTTPS par Caddy) ──
+# Le serveur Backup écoute sur 127.0.0.1:3001. Caddy l'expose en HTTPS
+# sur le port 443 du même domaine pour que les clients mobiles externes
+# puissent basculer sur le backup sans devoir spécifier un port explicite.
+# Le FailoverManager du client utilise la même URL de base HTTPS et
+# route vers le backup via ce bloc Caddy.
+streetphare.ddns.net:3001 {
+	tls {
+		protocols tls1.2 tls1.3
+	}
+
+	reverse_proxy 127.0.0.1:3001 {
+		header_up Host {host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Real-IP {remote_host}
+	}
+
+	log {
+		output file /var/log/caddy/streetphare-backup-access.log {
 			roll_size 10mb
 			roll_keep 5
 		}

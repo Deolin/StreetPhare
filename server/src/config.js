@@ -10,8 +10,13 @@ const config = {
   host: process.env.SERVER_HOST || '0.0.0.0',
   port: parseInt(process.env.SERVER_PORT || '3000', 10),
 
+  // ── Backup (écoute sur un port dédié) ──────────────────────────────
+  // Utilisé uniquement quand SERVER_TYPE=BACKUP.
+  backupHost: process.env.BACKUP_HOST || '127.0.0.1',
+  backupPort: parseInt(process.env.BACKUP_PORT || '3001', 10),
+
   // ── Serveur partenaire ──────────────────────────────────────────────
-  partnerUrl: process.env.PARTNER_URL || 'http://192.168.31.63:3001',
+  partnerUrl: process.env.PARTNER_URL || 'http://127.0.0.1:3001',
 
 
   // ── Chiffrement ─────────────────────────────────────────────────────

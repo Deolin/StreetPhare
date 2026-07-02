@@ -55,7 +55,12 @@ app.use(helmet({
   // HSTS désactivé : Caddy gère le TLS et les en-têtes HSTS.
   // Le serveur Node.js ne doit PAS rediriger HTTP→HTTPS lui-même.
 }));
-app.use(cors());
+// FIX v3.3.4 : CORS permissif pour le reverse-proxy Caddy.
+// Caddy transmet l'Origin du client mobile via header_up Origin {header.origin}.
+// Le middleware cors() avec origin: true accepte tout Origin (la sécurité
+// est assurée par Caddy en amont : TLS, rate limiting, HSTS).
+// Sans cela, les connexions WebSocket sans Origin étaient rejetées → code 1006.
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -108,8 +113,9 @@ const limiter = rateLimit({
   // Routes exclues du rate limiting : WebSocket (géré par leur propre
   // mécanisme de rate limiting) et sync interne Primary↔Backup.
   skip: (req) => {
-    // Ne pas limiter les requêtes de synchronisation entre serveurs.
-    if (req.path.startsWith('/api/sync/')) return true;
+    // Ne pas limiter les requêtes de synchronisation entre serveurs
+    // ni les requêtes de sync client (sync-push, sync-check).
+    if (req.path.startsWith('/api/sync')) return true;
     // Ne pas limiter le ping (healthcheck).
     if (req.path === '/api/ping') return true;
     return false;
@@ -178,6 +184,14 @@ const wss = new WebSocketServer({
   path: '/mesh',
   maxPayload: 512 * 1024, // 512 Ko max par message (évite crash OOM sur welcome massif)
   clientTracking: true,
+  // FIX v3.3.4 — Désactiver la compression permessage-deflate.
+  // Le client Dart/dart:io ne supporte PAS l'extension permessage-deflate
+  // (RFC 7692). Sans cette désactivation, le serveur ws compresse les
+  // frames, dart:io voit un bit RSV1 inattendu et ferme la connexion
+  // avec le code 1002 (Protocol Error). Le serveur voit un code 1006
+  // (Abnormal Closure) car le client ne fait pas de handshake de close
+  // propre. Résultat : déconnexion 1ms après le welcome → boucle infinie.
+  perMessageDeflate: false,
 });
 
 // ── Heartbeat serveur : détection des clients fantômes ──────────────────

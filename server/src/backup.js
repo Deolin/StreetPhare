@@ -90,7 +90,9 @@ const limiter = rateLimit({
     });
   },
   skip: (req) => {
-    if (req.path.startsWith('/api/sync/')) return true;
+    // Ne pas limiter les requêtes de synchronisation entre serveurs
+    // ni les requêtes de sync client (sync-push, sync-check).
+    if (req.path.startsWith('/api/sync')) return true;
     if (req.path === '/api/ping') return true;
     return false;
   },

@@ -453,7 +453,7 @@ class FailoverManager {
   /// (127.0.0.1) avant de déclarer la défaillance.
   Future<bool> _ping(String address) async {
     try {
-      final uri = Uri.parse('$address/healthz');
+      final uri = Uri.parse('$address/api/ping');
       final resp = await _httpClient.get(uri, headers: {
         'X-StreetPhare-Heartbeat': '1',
       }).timeout(_config!.pingTimeout);
@@ -476,7 +476,7 @@ class FailoverManager {
             );
           }
           try {
-            final uri = Uri.parse('$fallback/healthz');
+            final uri = Uri.parse('$fallback/api/ping');
             final resp = await _httpClient.get(uri, headers: {
               'X-StreetPhare-Heartbeat': '1',
             }).timeout(_config!.pingTimeout);
@@ -512,6 +512,24 @@ class FailoverManager {
   /// Résout l'adresse locale correspondant à une URL No-IP distante.
   /// Retourne `null` si l'adresse fournie n'est pas reconnue.
   String? _resolveLocalFallback(String remoteAddress) {
+    // Si l'adresse contient le host de production (streetphare.ddns.net)
+    // sans port explicite (port 443 implicite), c'est le serveur PRIMARY.
+    // On le détecte via le host de production plutôt que via le port.
+    final host = NetworkConfig.productionHost;
+    if (host.isNotEmpty && remoteAddress.contains(host)) {
+      // Si un port explicite est présent, on distingue primary vs secondary.
+      if (remoteAddress.contains(':${NetworkConfig.primaryPort}') ||
+          remoteAddress.contains(':${NetworkConfig.primaryPort}/')) {
+        return NetworkConfig.localhostPrimaryServer;
+      }
+      if (remoteAddress.contains(':${NetworkConfig.secondaryPort}') ||
+          remoteAddress.contains(':${NetworkConfig.secondaryPort}/')) {
+        return NetworkConfig.localhostSecondaryServer;
+      }
+      // Pas de port explicite → c'est le PRIMARY sur le port 443 (HTTPS par défaut).
+      return NetworkConfig.localhostPrimaryServer;
+    }
+    // Fallback générique : si l'adresse contient le numéro de port.
     if (remoteAddress.contains(NetworkConfig.primaryPort.toString())) {
       return NetworkConfig.localhostPrimaryServer;
     }

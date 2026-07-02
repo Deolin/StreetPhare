@@ -7,7 +7,7 @@
 //   2. Lorsque le transport passe sur `cellular` (Internet dispo),
 //      lancer un timer périodique de synchronisation (3 min).
 //   3. PUSH : Envoyer les alertes locales modifiées depuis la dernière
-//      synchronisation vers le serveur (POST /api/v2/sync-push).
+//      synchronisation vers le serveur (POST /api/sync-push).
 //   4. PULL : Recevoir les deltas (alertes plus récentes côté serveur),
 //      les fusionner dans la base Hive locale.
 //   5. Re-propager les alertes reçues vers le mesh P2P.
@@ -24,6 +24,9 @@ import '../core/network/peer_counter_service.dart';
 import '../database/hive_alert_database.dart';
 import 'failover_manager.dart';
 import 'network_manager.dart';
+
+/// Résultat d'une opération de synchronisation.
+enum _SyncResult { success, failed, rateLimited }
 
 /// Service de synchronisation bidirectionnelle (push + pull).
 class SyncService {
@@ -53,6 +56,11 @@ class SyncService {
 
   /// Nombre maximal d'alertes locales à pousser par cycle.
   static const int maxPushBatchSize = 200;
+
+  /// Backoff rate-limit : timestamp jusqu'auquel toute sync est suspendue.
+  /// Sert à éviter les boucles de retry quand le serveur répond 429.
+  DateTime? _rateLimitedUntil;
+  static const Duration _maxRateLimitBackoff = Duration(minutes: 5);
 
   /// Démarre la surveillance. Idempotent.
   void start() {
@@ -140,30 +148,74 @@ class SyncService {
     _syncTimer = null;
   }
 
+  // ── Backoff rate-limit ─────────────────────────────────────────────────────
+
+  /// Vérifie si la sync est actuellement en backoff rate-limit (429).
+  bool _isRateLimited() {
+    final until = _rateLimitedUntil;
+    if (until == null) return false;
+    if (DateTime.now().isAfter(until)) {
+      _rateLimitedUntil = null; // Backoff expiré.
+      return false;
+    }
+    return true;
+  }
+
+  /// Active un backoff rate-limit pour la durée indiquée (plafonnée).
+  void _setRateLimitBackoff(int retryAfterMs) {
+    final delay = Duration(
+      milliseconds: retryAfterMs.clamp(0, _maxRateLimitBackoff.inMilliseconds),
+    );
+    _rateLimitedUntil = DateTime.now().add(delay);
+  }
+
+  /// Tente d'extraire retryAfterMs du corps de la réponse 429,
+  /// ou estime un délai par défaut via les headers RateLimit.
+  int _parseRateLimitRetry(http.Response response) {
+    // Priorité : retryAfterMs dans le corps JSON.
+    try {
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (body['retryAfterMs'] is int) {
+        return body['retryAfterMs'] as int;
+      }
+    } catch (_) {}
+
+    // Fallback : délai par défaut (1 minute).
+    return 60000;
+  }
+
   // ── Logique de synchronisation bidirectionnelle ───────────────────────────
 
   /// Synchronisation bidirectionnelle complète (push + pull) avec le serveur.
   ///
   /// Phase PUSH :
   ///   1. Récupère les alertes locales modifiées depuis [_lastPushTs].
-  ///   2. POST /api/v2/sync-push avec le batch + peerId + since=_lastPullTs.
+  ///   2. POST /api/sync-push avec le batch + peerId + since=_lastPullTs.
   ///
   /// Phase PULL (intégrée dans la réponse du push) :
   ///   3. Le serveur répond avec { upserted, deltas, serverTs }.
   ///   4. Fusionne les `deltas` dans Hive (upsert si plus récent).
   ///
-  /// Fallback PULL-only (si le push échoue) :
-  ///   5. GET /api/v2/sync-check?since=_lastPullTs
+  /// Fallback PULL-only (si le push échoue SANS 429) :
+  ///   5. GET /api/sync-check?since=_lastPullTs
   ///   6. Fusionne les items reçus.
   Future<void> _pushAndPull() async {
     try {
       final serverBase = _failover.currentAddress;
       if (serverBase.isEmpty) return;
 
-      // Phase 1 : PUSH — envoyer les alertes locales modifiées.
-      final pushed = await _pushLocalAlerts(serverBase);
+      // Vérifie si on est en backoff rate-limit.
+      if (_isRateLimited()) {
+        if (kDebugMode) {
+          debugPrint('[SyncService] ⏸ Sync suspendue (backoff rate-limit)');
+        }
+        return;
+      }
 
-      if (pushed) {
+      // Phase 1 : PUSH — envoyer les alertes locales modifiées.
+      final pushResult = await _pushLocalAlerts(serverBase);
+
+      if (pushResult == _SyncResult.success) {
         // Le push a réussi et a déjà fusionné les deltas (push-pull).
         if (kDebugMode) {
           debugPrint('[SyncService] Push-pull bidirectionnel réussi');
@@ -171,9 +223,17 @@ class SyncService {
         return;
       }
 
+      if (pushResult == _SyncResult.rateLimited) {
+        // 429 reçu : ne PAS faire de pull (il serait aussi 429).
+        // Le backoff est déjà configuré dans _pushBatch.
+        return;
+      }
+
       // Phase 2 (fallback) : PULL-only si le push a échoué
       // ou s'il n'y avait rien à pousser.
-      await _pullFromServer(serverBase);
+      if (!_isRateLimited()) {
+        await _pullFromServer(serverBase);
+      }
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[SyncService] Erreur sync (non fatale): $e');
@@ -182,8 +242,8 @@ class SyncService {
   }
 
   /// PUSH : Envoie les alertes locales au serveur.
-  /// Retourne `true` si le push a réussi (et a fusionné les deltas reçus).
-  Future<bool> _pushLocalAlerts(String serverBase) async {
+  /// Retourne [_SyncResult] pour indiquer le résultat.
+  Future<_SyncResult> _pushLocalAlerts(String serverBase) async {
     try {
       // Récupérer les alertes locales modifiées depuis le dernier push.
       final allLocal = _db.getAll();
@@ -206,12 +266,12 @@ class SyncService {
       if (kDebugMode) {
         debugPrint('[SyncService] Erreur push local: $e');
       }
-      return false;
+      return _SyncResult.failed;
     }
   }
 
   /// Envoie un batch d'alertes au serveur et fusionne la réponse.
-  Future<bool> _pushBatch(
+  Future<_SyncResult> _pushBatch(
     String serverBase,
     List<Alert> alerts,
     List<Alert> allLocal,
@@ -234,11 +294,22 @@ class SyncService {
         )
         .timeout(syncTimeout);
 
+    // Gestion du 429 (Rate Limit) avec backoff.
+    if (response.statusCode == 429) {
+      final retryAfterMs = _parseRateLimitRetry(response);
+      _setRateLimitBackoff(retryAfterMs);
+      if (kDebugMode) {
+        debugPrint(
+            '[SyncService] ⛔ Rate-limité — backoff ${retryAfterMs ~/ 1000}s');
+      }
+      return _SyncResult.rateLimited;
+    }
+
     if (response.statusCode != 200 && response.statusCode != 201) {
       if (kDebugMode) {
         debugPrint('[SyncService] Push rejeté (HTTP ${response.statusCode})');
       }
-      return false;
+      return _SyncResult.failed;
     }
 
     final respBody = jsonDecode(response.body) as Map<String, dynamic>;
@@ -263,7 +334,7 @@ class SyncService {
           '${deltas?.length ?? 0} deltas reçus');
     }
 
-    return true;
+    return _SyncResult.success;
   }
 
   /// PULL-only : fallback si le push a échoué.
@@ -275,6 +346,16 @@ class SyncService {
           .replace(queryParameters: {'since': since});
 
       final response = await http.get(uri).timeout(syncTimeout);
+
+      // Gestion du 429 côté pull aussi.
+      if (response.statusCode == 429) {
+        final retryAfterMs = _parseRateLimitRetry(response);
+        _setRateLimitBackoff(retryAfterMs);
+        if (kDebugMode) {
+          debugPrint('[SyncService] ⛔ Pull rate-limité — backoff ${retryAfterMs ~/ 1000}s');
+        }
+        return;
+      }
 
       if (response.statusCode != 200) return;
 
