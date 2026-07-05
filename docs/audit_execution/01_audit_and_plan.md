@@ -10,7 +10,7 @@
 
 ### 1.1 Architecture réseau actuelle
 
-```
+```text
 [Client Flutter Android]
     │
     ├──▶ wss://streetphare.ddns.net/mesh        (WebSocket mesh, port 443 → Caddy → Node.js :3000)

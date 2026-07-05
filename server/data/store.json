@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "savedAt": "2026-07-02T11:42:11.616Z",
+  "savedAt": "2026-07-03T06:55:46.612Z",
   "alerts": [],
   "events": [],
   "panicPings": [],
   "bugReports": [],
   "meshMessages": [],
   "syncState": {
-    "lastSyncAt": null,
-    "lastSyncSuccess": false,
+    "lastSyncAt": "2026-07-02T20:01:55.560Z",
+    "lastSyncSuccess": true,
     "partnerUrl": "http://192.168.31.63:3001"
   }
 }

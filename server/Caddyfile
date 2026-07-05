@@ -51,6 +51,7 @@ streetphare.ddns.net {
 			header_up Host {host}
 			header_up X-Forwarded-For {remote_host}
 			header_up X-Real-IP {remote_host}
+			header_up Origin {header.origin}
 		}
 	}
 
@@ -78,6 +79,7 @@ streetphare.ddns.net:3001 {
 		header_up Host {host}
 		header_up X-Forwarded-For {remote_host}
 		header_up X-Real-IP {remote_host}
+		header_up Origin {header.origin}
 	}
 
 	log {
@@ -97,6 +99,7 @@ streetphare.ddns.net:4000 {
 	reverse_proxy 127.0.0.1:4000 {
 		header_up Host {host}
 		header_up X-Real-IP {remote_host}
+		header_up Origin {header.origin}
 	}
 
 	log {

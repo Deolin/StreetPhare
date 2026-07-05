@@ -130,7 +130,6 @@ class BugReportService {
   DateTime? _rateLimitedUntil;
 
   static const Duration _kFlushInterval = Duration(minutes: 5);
-  static const Duration _kMinFlushInterval = Duration(seconds: 30);
   static const Duration _kRequestTimeout = Duration(seconds: 10);
   static const int _kMaxAttemptsBeforeAbandon = 8;
   static const Duration _kMaxRateLimitBackoff = Duration(minutes: 5);
@@ -365,15 +364,6 @@ class BugReportService {
     if (_consecutiveFlushFailures > 6) {
       _consecutiveFlushFailures = 6; // Plafonne à 6 (backoff max ~64s).
     }
-  }
-
-  /// Calcule l'intervalle de backoff exponentiel basé sur le nombre
-  /// d'échecs consécutifs : 5s → 10s → 20s → 40s → 60s max.
-  Duration _currentBackoff() {
-    const base = _kMinFlushInterval;
-    final factor = 1 << _consecutiveFlushFailures; // 2^failures
-    final computed = base * factor;
-    return computed > _kMaxRateLimitBackoff ? _kMaxRateLimitBackoff : computed;
   }
 
   /// Vérifie si le flush est en backoff rate-limit.

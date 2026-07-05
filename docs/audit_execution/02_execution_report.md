@@ -53,20 +53,20 @@
 
 ### 2B — Correction FailoverManager / SyncService
 
-#### Problème
+#### Problème2b
 
 - `FailoverManager._ping()` utilisait l'endpoint `/healthz`
 - Le serveur expose `/api/ping` (route définie dans `api.js`)
 - Résultat : heartbeat toujours KO → failover déclenché → timeout 15s
 - Fallback local utilisait `10.0.2.2` (émulateur uniquement), inopérant sur device physique
 
-#### Solution
+#### Solution2b
 
 1. **failover_manager.dart** : `/healthz` → `/api/ping` (2 occurrences)
 2. **network_config.dart** : `_localFallbackHost` utilise `127.0.0.1` (compatible `adb reverse`) + flag compile-time `--dart-define=STREETPHARE_LOCAL_HOST=<ip>`
 3. **adb reverse** : exécuté pour rediriger ports 3000, 3001, 4000 du device vers l'hôte
 
-#### Impact attendu
+#### Impact attendu2b
 
 - Heartbeat OK immédiatement (pas de tentative de failover systématique)
 - SyncService push-pull bidirectionnel fonctionnel

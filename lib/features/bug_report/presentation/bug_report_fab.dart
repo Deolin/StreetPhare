@@ -23,9 +23,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../main.dart' show navigatorKey;
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../debug/client_debug_logger.dart';
+import '../../../main.dart' show navigatorKey;
 import '../../../network/failover_manager.dart';
 
 // ============================================================================

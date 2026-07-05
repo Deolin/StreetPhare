@@ -1,10 +1,12 @@
-// MainActivity.kt — StreetPhare v1.4  (2026-06-17)
+// MainActivity.kt — StreetPhare v2.3  (2026-07-03)
 //
 // Enregistre les canaux Flutter :
 //   - "com.streetphare/routing"            : moteur de routage piéton GraphHopper embarqué.
 //   - "streetphare/apk_info"               : expose le chemin source de l'APK installé.
 //   - "streetphare/ble_advertiser"         : publicité BLE (peripheral GATT).
 //   - "streetphare/ble_gatt_server"        : serveur GATT natif pour échange P2P.
+//   - "streetphare/map_tiles"              : DownloadManager tuiles cartographiques.
+//   - "streetphare/map_tiles_status"       : EventChannel statut des téléchargements.
 package com.example.flutter_streetphare
 
 import android.bluetooth.BluetoothAdapter
@@ -41,6 +43,9 @@ class MainActivity : FlutterActivity() {
     private var bleAdvertiser: BluetoothLeAdvertiser? = null
     private var bleGattServer: BluetoothGattServer? = null
 
+    /// Plugin de téléchargement de tuiles via DownloadManager.
+    private val mapTilesPlugin by lazy { MapTileDownloadPlugin(applicationContext) }
+
     /// Event channel for incoming BLE data from remote peers.
     private var incomingEventSink: EventChannel.EventSink? = null
 
@@ -59,6 +64,8 @@ class MainActivity : FlutterActivity() {
         private const val BLE_ADVERTISER_CHANNEL = "streetphare/ble_advertiser"
         private const val BLE_GATT_CHANNEL = "streetphare/ble_gatt"
         private const val BLE_GATT_EVENT = "streetphare/ble_gatt_events"
+        private const val MAP_TILES_CHANNEL = "streetphare/map_tiles"
+        private const val MAP_TILES_EVENT = "streetphare/map_tiles_status"
 
         private val STREETPHARE_SERVICE_UUID: UUID =
             UUID.fromString("6e400001-b5a3-f393-e0a9-e50e24dcca9e")
@@ -92,6 +99,19 @@ class MainActivity : FlutterActivity() {
 
         // ── Canal GATT Server (échange de données P2P) ───────────────
         setupBleGattServerChannel(flutterEngine)
+
+        // ── Canal Map Tiles DownloadManager ──────────────────────────
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            MAP_TILES_CHANNEL
+        ).setMethodCallHandler(mapTilesPlugin)
+
+        EventChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            MAP_TILES_EVENT
+        ).setStreamHandler(mapTilesPlugin.streamHandler)
+
+        mapTilesPlugin.registerReceiver()
 
         // ── Canal APK Info ───────────────────────────────────────────
         MethodChannel(
@@ -462,6 +482,8 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         bridge?.dispose()
         bridge = null
+
+        mapTilesPlugin.dispose()
 
         try { bleAdvertiser?.stopAdvertising(null) } catch (_: Exception) {}
         bleAdvertiser = null

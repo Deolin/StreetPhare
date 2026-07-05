@@ -11,6 +11,11 @@
 //     comme expirées.
 //   - Un avertissement proactif est levé si un événement est planifié
 //     à plus de 30 jours (cf. events_screen.dart).
+//
+// v2.3 — Intégration avec MapTileDownloadService :
+//   `preloadZone()` déclenche désormais de vrais téléchargements natifs
+//   via le DownloadManager Android (fallback automatique OSM si le
+//   serveur privé est inaccessible).
 
 import 'dart:io';
 
@@ -18,6 +23,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/map_tile_download_service.dart';
 import '../settings/data/app_preferences_store.dart';
 
 /// Gestionnaire singleton du cache de tuiles cartographiques.
@@ -177,12 +183,15 @@ class MapCacheManager {
   /// Déclenche un téléchargement d'arrière-plan des tuiles pour la
   /// zone couverte par une commune donnée.
   ///
+  /// Utilise le [MapTileDownloadService] qui délègue au
+  /// DownloadManager Android natif avec fallback automatique OSM.
+  ///
   /// [zoneLabel] : nom de la commune (ex: "Bruxelles").
   /// [centerLat] / [centerLng] : coordonnées du centre approximatif.
   /// [radiusKm] : rayon de couverture en km (défaut 5 km).
   ///
-  /// Cette méthode est appelée quand un événement est chargé et que
-  /// le cache local n'a pas encore de tuiles pour cette commune.
+  /// Les tuiles sont téléchargées pour les niveaux de zoom 12 à 15
+  /// (échelle région → rue).
   Future<void> preloadZone({
     required String zoneLabel,
     required double centerLat,
@@ -191,30 +200,71 @@ class MapCacheManager {
   }) async {
     if (kDebugMode) {
       debugPrint(
-        '[MapCacheManager] Préchargement de la zone "$zoneLabel" '
+        '[MapCacheManager] Préchargement zone "$zoneLabel" '
         '($radiusKm km autour de $centerLat, $centerLng)…',
       );
     }
 
-    // Marque cette zone comme "à précharger" dans les préférences.
-    // Le préchargement effectif se fera lorsque l'utilisateur
-    // naviguera vers cette zone sur la carte — les tuiles seront
-    // alors mises en cache automatiquement par flutter_map.
+    // ── Persistance de la zone dans les préférences ───────────────────
     final prefs = await SharedPreferences.getInstance();
     const zonesKey = 'map_cache_preloaded_zones';
     final existing = prefs.getStringList(zonesKey) ?? [];
     if (!existing.contains(zoneLabel)) {
       existing.add(zoneLabel);
-      // Limite à 20 zones pour éviter une croissance infinie.
-      if (existing.length > 20) {
-        existing.removeAt(0);
-      }
+      if (existing.length > 20) existing.removeAt(0);
       await prefs.setStringList(zonesKey, existing);
+    }
+
+    // ── Déclenchement des téléchargements via DownloadManager ─────────
+    // Calcule le rectangle géographique approximatif.
+    const kmPerDeg = 1.0 / 111.32; // 1° ≈ 111.32 km
+    final delta = radiusKm * kmPerDeg;
+    final swLat = centerLat - delta;
+    final swLng = centerLng - delta;
+    final neLat = centerLat + delta;
+    final neLng = centerLng + delta;
+
+    // Niveaux de zoom : 12 (ville) à 15 (rue).
+    const minZoom = 12;
+    const maxZoom = 15;
+
+    final service = MapTileDownloadService.instance;
+    service.startTracking();
+
+    for (var z = minZoom; z <= maxZoom; z++) {
+      final bounds = MapTileDownloadService.tileBoundsForArea(
+        swLat: swLat,
+        swLng: swLng,
+        neLat: neLat,
+        neLng: neLng,
+        z: z,
+      );
+
+      final tileCount =
+          (bounds.maxX - bounds.minX + 1) * (bounds.maxY - bounds.minY + 1);
+
+      if (kDebugMode) {
+        debugPrint(
+          '[MapCacheManager] Zoom $z → $tileCount tuiles '
+          '(x:${bounds.minX}–${bounds.maxX}, y:${bounds.minY}–${bounds.maxY})',
+        );
+      }
+
+      await service.downloadTileBatch(
+        minZ: z,
+        maxZ: z,
+        minX: bounds.minX,
+        maxX: bounds.maxX,
+        minY: bounds.minY,
+        maxY: bounds.maxY,
+      );
     }
 
     if (kDebugMode) {
       debugPrint(
-          '[MapCacheManager] Zone "$zoneLabel" marquée pour préchargement.');
+        '[MapCacheManager] ✅ Zone "$zoneLabel" : '
+        'téléchargements planifiés (zoom $minZoom–$maxZoom).',
+      );
     }
   }
 

@@ -366,17 +366,13 @@ class HiveMessagingService extends ValueNotifier<List<HiveMessage>> {
       _trimToLimit();
       _emitFiltered(userPosition: localPosition);
 
-      // ── Notification native non filtrée ──────────────────────────
-      // Affiche une notification système immédiatement à la réception
-      // du message, AVANT tout filtre applicatif (blocage, proximité,
-      // type de message). Le message est affiché tel quel, sans filtre,
-      // pour que l'utilisateur voie TOUS les messages entrants dans la
-      // zone de notification Android (style conversationnel).
-      //
-      // Cette notification est décorrélée de la liste filtrée affichée
-      // dans l'UI : même si l'utilisateur filtre "adminOnly", la
-      // notification native affichera quand même le message brut.
-      NotificationService.instance.showMessageNotification(msg);
+      // ── Notification native groupée ──────────────────────────────
+      // Enqueue le message dans le buffer de NotificationService.
+      // Les messages sont regroupés (debounce 1.5s) dans une seule
+      // notification Inbox avec défilement/historique des derniers
+      // messages reçus. Remplace l'ancien showMessageNotification()
+      // qui créait une notification distincte par message.
+      NotificationService.instance.enqueueHiveMessage(msg);
     } catch (e) {
       debugPrint('[HiveMessaging] erreur réception: $e');
     }

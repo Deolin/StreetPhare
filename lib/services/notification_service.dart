@@ -9,6 +9,7 @@
 //   4. Dialogue pédagogique d'autorisation arrière-plan.
 //   5. Multiplateforme : Android, iOS, Windows (graceful fallback).
 
+import 'dart:async';
 import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
@@ -46,6 +47,198 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+
+  // --------------------------------------------------------------------------
+  // Buffer de regroupement des messages Hive P2P
+  // --------------------------------------------------------------------------
+
+  /// Buffer de messages reçus en attente d'affichage groupé.
+  /// Chaque entrée contient le texte formaté pour l'affichage
+  /// et l'horodatage d'origine.
+  final List<_BufferedMessage> _hiveBuffer = [];
+
+  /// Timer de debounce pour regrouper les bursts de messages.
+  Timer? _hiveBufferTimer;
+
+  /// Nombre maximum de lignes affichées dans la notification groupée.
+  static const int _kMaxInboxLines = 8;
+
+  /// Délai de debounce : on attend ce délai après le dernier message
+  /// avant d'afficher/mettre à jour la notification groupée.
+  static const Duration _kHiveDebounce = Duration(milliseconds: 1500);
+
+  /// ID fixe de la notification groupée (toujours le même, mis à jour).
+  static const int _kHiveGroupNotifId = 3999;
+
+  // --------------------------------------------------------------------------
+  // Enqueue Hive message → affichage groupé différé
+  // --------------------------------------------------------------------------
+
+  /// Ajoute un message Hive au buffer et planifie l'affichage groupé.
+  ///
+  /// Remplace [showMessageNotification] qui créait une notification
+  /// distincte par message. Avec cette méthode, tous les messages
+  /// reçus pendant une fenêtre de [_kHiveDebounce] sont regroupés
+  /// dans UNE SEULE notification avec un style Inbox (défilement).
+  ///
+  /// Sur Android, on utilise [InboxStyleInformation] pour afficher
+  /// jusqu'à [_kMaxInboxLines] lignes dans la notification.
+  /// Chaque ligne a le format : « Expéditeur : contenu ».
+  void enqueueHiveMessage(HiveMessage message) {
+    if (kIsWeb || !io.Platform.isAndroid) return;
+
+    // Formatage : « Expéditeur : contenu » tronqué si nécessaire.
+    final sender = message.isFromAdmin ? '📟 Admin' : _senderDisplayName(message);
+    final content = message.content.length > 120
+        ? '${message.content.substring(0, 120)}…'
+        : message.content;
+    final line = '$sender: $content';
+
+    _hiveBuffer.add(_BufferedMessage(
+      line: line,
+      receivedAt: message.sentAt,
+      messageId: message.id,
+    ));
+
+    // Limiter le buffer pour éviter l'accumulation infinie.
+    while (_hiveBuffer.length > _kMaxInboxLines * 3) {
+      _hiveBuffer.removeAt(0);
+    }
+
+    // Reset du timer de debounce : on repousse l'affichage
+    // pour accumuler les messages arrivant en burst.
+    _hiveBufferTimer?.cancel();
+    _hiveBufferTimer = Timer(_kHiveDebounce, _flushHiveBuffer);
+
+    if (kDebugMode) {
+      debugPrint(
+        '[NotificationService] buffer Hive: ${_hiveBuffer.length} msg(s)',
+      );
+    }
+  }
+
+  /// Vide le buffer Hive et affiche/met à jour la notification groupée.
+  ///
+  /// La notification utilise [InboxStyleInformation] sur Android pour
+  /// produire un rendu avec lignes empilées (similaire à Gmail/WhatsApp
+  /// quand plusieurs messages arrivent). Chaque ligne affiche
+  /// « Expéditeur : contenu ».
+  ///
+  /// Si le buffer est vide, on annule la notification existante
+  /// (tous les messages ont expiré ou ont été consommés).
+  Future<void> _flushHiveBuffer() async {
+    if (_hiveBuffer.isEmpty) {
+      // Plus rien à afficher : annuler la notification groupée.
+      await _plugin.cancel(id: _kHiveGroupNotifId);
+      return;
+    }
+
+    if (!_initialized) await init();
+
+    // Extraire les N dernières lignes (les plus récentes en bas).
+    final lines = _hiveBuffer
+        .skip(_hiveBuffer.length > _kMaxInboxLines
+            ? _hiveBuffer.length - _kMaxInboxLines
+            : 0)
+        .map((b) => b.line)
+        .toList();
+
+    final count = _hiveBuffer.length;
+    final title = '📡 Messages Hive ($count)';
+
+    // Corps : dernière ligne reçue (affiché sous le titre dans la preview).
+    final summaryLine = lines.last;
+
+    // Style Inbox Android.
+    final inboxStyle = InboxStyleInformation(
+      lines,
+      contentTitle: title,
+      summaryText: '$count message${count > 1 ? 's' : ''} reçu${count > 1 ? 's' : ''}',
+    );
+
+    final androidDetails = AndroidNotificationDetails(
+      _kMessagesChannelId,
+      'Messages',
+      channelDescription: 'Messages P2P reçus via le réseau Hive StreetPhare.',
+      importance: Importance.max,
+      priority: Priority.high,
+      color: const Color(0xFFFFB300),
+      autoCancel: false,
+      category: AndroidNotificationCategory.message,
+      styleInformation: inboxStyle,
+      groupKey: 'hive_messages',
+      setAsGroupSummary: true,
+      showWhen: true,
+      when: _hiveBuffer.last.receivedAt.millisecondsSinceEpoch,
+    );
+
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      categoryIdentifier: 'hive_message',
+    );
+
+    final details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    try {
+      await _plugin.show(
+        id: _kHiveGroupNotifId,
+        title: title,
+        body: summaryLine,
+        notificationDetails: details,
+        payload: 'hive_inbox_tap',
+      );
+      if (kDebugMode) {
+        debugPrint(
+          '[NotificationService] notification groupée affichée: '
+          '$count message(s)',
+        );
+      }
+    } catch (e) {
+      // Fallback simple sans InboxStyle.
+      if (kDebugMode) {
+        debugPrint(
+          '[NotificationService] échec InboxStyle, fallback simple: $e',
+        );
+      }
+      await _plugin.show(
+        id: _kHiveGroupNotifId,
+        title: title,
+        body: lines.join('\n'),
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _kMessagesChannelId,
+            'Messages',
+            channelDescription:
+                'Messages P2P reçus via le réseau Hive StreetPhare.',
+            importance: Importance.max,
+            priority: Priority.high,
+            color: Color(0xFFFFB300),
+            autoCancel: false,
+            category: AndroidNotificationCategory.message,
+          ),
+          iOS: iosDetails,
+        ),
+        payload: 'hive_inbox_tap',
+      );
+    }
+
+    // Une fois affiché, on vide le buffer.
+    _hiveBuffer.clear();
+  }
+
+  /// Vide le buffer Hive et annule la notification groupée.
+  /// Appelé par exemple quand l'utilisateur ouvre l'application.
+  void dismissHiveGroup() {
+    _hiveBufferTimer?.cancel();
+    _hiveBufferTimer = null;
+    _hiveBuffer.clear();
+    unawaited(_plugin.cancel(id: _kHiveGroupNotifId));
+  }
 
   // --------------------------------------------------------------------------
   // Initialisation
@@ -430,6 +623,28 @@ class NotificationService {
 
     return true;
   }
+}
+
+// ============================================================================
+// Types internes
+// ============================================================================
+
+/// Message bufferisé pour l'affichage groupé Hive.
+class _BufferedMessage {
+  const _BufferedMessage({
+    required this.line,
+    required this.receivedAt,
+    required this.messageId,
+  });
+
+  /// Texte formaté pour l'affichage : « Expéditeur : contenu ».
+  final String line;
+
+  /// Horodatage de réception (UTC).
+  final DateTime receivedAt;
+
+  /// ID du message Hive d'origine (pour le payload de tap).
+  final String messageId;
 }
 
 // ============================================================================
