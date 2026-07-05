@@ -142,7 +142,8 @@ class MapTileDownloadService {
 
   Future<void> cancelTile(int downloadId) async {
     try {
-      await _methodChannel.invokeMethod('cancelTile', {'downloadId': downloadId});
+      await _methodChannel
+          .invokeMethod('cancelTile', {'downloadId': downloadId});
     } catch (e) {
       if (kDebugMode) debugPrint('[MapTileDownload] Erreur cancelTile: $e');
     }
@@ -162,7 +163,8 @@ class MapTileDownloadService {
     } on MissingPluginException {
       return null;
     } catch (e) {
-      if (kDebugMode) debugPrint('[MapTileDownload] Erreur getLocalTilePath: $e');
+      if (kDebugMode)
+        debugPrint('[MapTileDownload] Erreur getLocalTilePath: $e');
       return null;
     }
   }
@@ -234,8 +236,8 @@ class MapTileDownloadService {
 
     final latRad = lat * pi / 180.0;
     // y = floor( (1 - ln(tan(φ) + 1/cos(φ)) / π) / 2 * 2^z )
-    final y = ((1.0 - log(tan(latRad) + 1.0 / cos(latRad)) / pi) / 2.0 * n)
-        .floor();
+    final y =
+        ((1.0 - log(tan(latRad) + 1.0 / cos(latRad)) / pi) / 2.0 * n).floor();
 
     return (x: x.clamp(0, n - 1), y: y.clamp(0, n - 1));
   }

@@ -4,19 +4,21 @@
 // Le destinataire installe ce mini-APK qui télécharge la dernière version
 // complète depuis GitHub Releases et l'installe automatiquement.
 
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
 
 android {
-    namespace = "com.streetphare.downloader"
-
+    namespace = "com.streetphare.mini_downloader"
     compileSdk = 35
 
     defaultConfig {
         applicationId = "com.streetphare.downloader"
-        minSdk = 21
+        minSdk = 24
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
@@ -37,13 +39,15 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-
-    kotlinOptions {
-        jvmTarget = "11"
-    }
 }
 
 dependencies {
     // FileProvider pour ACTION_VIEW (Android 7+).
     implementation("androidx.core:core:1.15.0")
+}
+
+tasks.withType<KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_11) // Attention à la minuscule sur 'jvmTarget' !
+    }
 }

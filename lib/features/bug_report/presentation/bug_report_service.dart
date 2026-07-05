@@ -288,7 +288,8 @@ class BugReportService {
       // Double-check après chaque envoi : le 429 peut arriver en cours de flush.
       if (_isRateLimited()) {
         if (kDebugMode) {
-          debugPrint('[BugReport] ⏸ Flush interrompu (rate-limit reçu en cours)');
+          debugPrint(
+              '[BugReport] ⏸ Flush interrompu (rate-limit reçu en cours)');
         }
         break;
       }

@@ -204,9 +204,7 @@ class RelayMeshTransport implements MeshTransport {
           if (data is String) {
             if (kDebugMode) {
               final preview =
-                  data.length > 200
-                      ? '${data.substring(0, 200)}...'
-                      : data;
+                  data.length > 200 ? '${data.substring(0, 200)}...' : data;
               debugPrint('[Relay] ← $preview');
             }
             _incomingController.add(data);
@@ -214,9 +212,7 @@ class RelayMeshTransport implements MeshTransport {
             final str = utf8.decode(data);
             if (kDebugMode) {
               final preview =
-                  str.length > 200
-                      ? '${str.substring(0, 200)}...'
-                      : str;
+                  str.length > 200 ? '${str.substring(0, 200)}...' : str;
               debugPrint('[Relay] ← (binary) $preview');
             }
             _incomingController.add(str);

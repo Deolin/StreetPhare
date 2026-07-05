@@ -352,7 +352,8 @@ class SyncService {
         final retryAfterMs = _parseRateLimitRetry(response);
         _setRateLimitBackoff(retryAfterMs);
         if (kDebugMode) {
-          debugPrint('[SyncService] ⛔ Pull rate-limité — backoff ${retryAfterMs ~/ 1000}s');
+          debugPrint(
+              '[SyncService] ⛔ Pull rate-limité — backoff ${retryAfterMs ~/ 1000}s');
         }
         return;
       }

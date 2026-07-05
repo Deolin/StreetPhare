@@ -88,7 +88,8 @@ class NotificationService {
     if (kIsWeb || !io.Platform.isAndroid) return;
 
     // Formatage : « Expéditeur : contenu » tronqué si nécessaire.
-    final sender = message.isFromAdmin ? '📟 Admin' : _senderDisplayName(message);
+    final sender =
+        message.isFromAdmin ? '📟 Admin' : _senderDisplayName(message);
     final content = message.content.length > 120
         ? '${message.content.substring(0, 120)}…'
         : message.content;
@@ -153,7 +154,8 @@ class NotificationService {
     final inboxStyle = InboxStyleInformation(
       lines,
       contentTitle: title,
-      summaryText: '$count message${count > 1 ? 's' : ''} reçu${count > 1 ? 's' : ''}',
+      summaryText:
+          '$count message${count > 1 ? 's' : ''} reçu${count > 1 ? 's' : ''}',
     );
 
     final androidDetails = AndroidNotificationDetails(

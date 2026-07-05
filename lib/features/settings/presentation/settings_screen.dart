@@ -15,10 +15,10 @@
 //  10. Guide de l'application (tutoriel)
 //  11. À propos
 
+import 'package:app_settings/app_settings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:open_settings/open_settings.dart';
 
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
@@ -1641,7 +1641,7 @@ class _AndroidNotificationSection extends StatelessWidget {
   }
 
   static Future<void> _openAndroidNotificationSettings() async {
-    await OpenSettings.openNotificationSetting();
+    await AppSettings.openAppSettings();
   }
 }
 
