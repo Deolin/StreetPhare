@@ -1596,7 +1596,7 @@ class _MapScreenState extends State<MapScreen> {
                                       ),
                                     ),
                                   ),
-                                RichAttributionWidget(
+                                const RichAttributionWidget(
                                   alignment: AttributionAlignment.bottomLeft,
                                   attributions: [
                                     TextSourceAttribution(

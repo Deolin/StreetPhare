@@ -7,7 +7,7 @@
 // avec les données analytiques.
 //
 // Fonctionnalités :
-//   - flutter_map avec tuiles sombres (CartoDB dark_all) par défaut
+//   - flutter_map avec tuiles sombres (OSM + filtre invert) par défaut
 //   - Écoute du flux d'alertes global (NetworkCoordinator.instance.alertsStream)
 //   - Affichage temps réel des marqueurs d'alertes sur la carte
 //   - Support du mode sombre (forcé à true dans le dashboard)
@@ -228,7 +228,7 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
               ),
               if (markers.isNotEmpty) MarkerLayer(markers: markers),
               if (widget.showAttribution)
-                RichAttributionWidget(
+                const RichAttributionWidget(
                   alignment: AttributionAlignment.bottomLeft,
                   attributions: [
                     TextSourceAttribution(

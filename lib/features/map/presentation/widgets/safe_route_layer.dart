@@ -39,7 +39,7 @@ import '../../../../core/theme/streetphare_theme.dart';
 final Color _kRouteColorLight = StreetPhareTheme.primary;
 
 /// Couleur de la Route Safe en mode sombre : jaune néon haute visibilité,
-/// lisible même en plein soleil sur fond de carte sombre CartoDB.
+/// lisible même en plein soleil sur fond de carte sombre.
 const Color _kRouteColorDark = Color(0xFFFFEB3B); // Jaune Material 500
 
 /// Largeur renforcée du trait en mode sombre pour la lisibilité.

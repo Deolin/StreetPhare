@@ -9,6 +9,9 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; display: flex; height: 100vh; }
     #map { flex: 1; height: 100vh; }
+    /* Mode sombre sans clé API : filtre CSS appliqué uniquement aux tuiles OSM
+       (pas aux marqueurs, gérés par .leaflet-marker-pane). */
+    .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(1.1); }
     #panel { width: 460px; background: #161b22; border-left: 1px solid #30363d; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
     h2 { color: #ff7b72; font-size: 17px; }
     h3 { color: #79c0ff; font-size: 13px; margin-bottom: 6px; }
