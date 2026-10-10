@@ -1,0 +1,15 @@
+# ── Secrets & environnement ──────────────────────────────────────────────
+# Contient MASTER_KEY, JWT_SECRET, ADMIN_HASH. Ne jamais versionner.
+# Seul .env.example (modèle) est versionné.
+.env
+
+# ── Données d'exécution ─────────────────────────────────────────────────
+# État du serveur (alerts, événements, sync) — régénéré au démarrage.
+data/
+
+# ── Logs ────────────────────────────────────────────────────────────────
+logs/
+
+# ── Builds & exécutables (Node SEA) ─────────────────────────────────────
+dist/
+

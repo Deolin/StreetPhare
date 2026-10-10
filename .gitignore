@@ -25,6 +25,18 @@ crash_report.*
 node_modules/
 package-lock.json
 
+# ==========================================
+# SECRETS & DONNÉES D'EXÉCUTION — NE PAS VERSIONNER
+# ==========================================
+
+# Fichiers d'environnement : contiennent MASTER_KEY, JWT_SECRET, ADMIN_HASH.
+# Seul le modèle .env.example doit rester versionné.
+.env
+
+# Données d'exécution du serveur (alerts, événements, état de synchronisation)
+server/data/
+server/logs/
+
 # Fichiers générés Flutter/IDE
 .metadata
 *.iml
