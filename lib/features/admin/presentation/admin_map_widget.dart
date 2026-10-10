@@ -22,9 +22,9 @@ import '../../../core/models/alert_model.dart';
 import '../../../core/network/osm_tile_headers.dart';
 import '../../../network/network_coordinator.dart';
 
-/// URL des tuiles sombres CartoDB (dashboard admin).
-const String _kTileUrlDark =
-    'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
+/// URL des tuiles OpenStreetMap Standard (gratuit, sans clé API).
+/// Le mode sombre est obtenu via `darkModeTileBuilder` (filtre invert+hue-rotate).
+const String _kTileUrlDark = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const String _kTileUrlLight = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 /// Widget de carte autonome pour le Dashboard Admin.
@@ -220,6 +220,8 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
                   headers: kStreetPhareTileHeaders,
                 ),
                 maxNativeZoom: 19,
+                tileBuilder:
+                    widget.darkMode ? darkModeTileBuilder : null,
                 tileDisplay: const TileDisplay.fadeIn(
                   duration: Duration(milliseconds: 200),
                 ),
@@ -230,9 +232,7 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
                   alignment: AttributionAlignment.bottomLeft,
                   attributions: [
                     TextSourceAttribution(
-                      widget.darkMode
-                          ? 'CartoDB / OpenStreetMap contributors'
-                          : 'OpenStreetMap contributors',
+                      'OpenStreetMap contributors',
                     ),
                   ],
                 ),
