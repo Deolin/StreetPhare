@@ -260,7 +260,7 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
               valueListenable: AppPreferencesStore.instance,
               builder: (_, prefs, o) {
                 return PopupMenuButton<MessageFilter>(
-                  icon: const Icon(Icons.filter_list,
+                  icon: Icon(Icons.filter_list,
                       color: StreetPhareTheme.primary),
                   tooltip: 'Filtrer les messages',
                   onSelected: (filter) async {
@@ -316,12 +316,12 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
                   color: StreetPhareTheme.primary.withValues(alpha: 0.1),
                   child: Row(
                     children: [
-                      const Icon(Icons.filter_alt,
+                      Icon(Icons.filter_alt,
                           size: 14, color: StreetPhareTheme.primary),
                       const SizedBox(width: 6),
                       Text(
                         prefs.messageFilter.label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: StreetPhareTheme.primary,
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -730,7 +730,7 @@ class _MessageContextMenu extends StatelessWidget {
                     radius: 18,
                     child: Text(
                       message.senderAlias.substring(0, 2).toUpperCase(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: StreetPhareTheme.primary,
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
@@ -773,7 +773,7 @@ class _MessageContextMenu extends StatelessWidget {
                 isBlocked
                     ? 'Débloquer cet utilisateur'
                     : 'Bloquer cet utilisateur',
-                style: const TextStyle(
+                style: TextStyle(
                   color: StreetPhareTheme.danger,
                   fontWeight: FontWeight.w500,
                 ),
@@ -936,8 +936,8 @@ class _MessageTile extends StatelessWidget {
                         size: 12, color: Color(0xFF1565C0)),
                   ),
                 if (message.type == HiveMessageType.alert)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 4),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
                     child: Icon(Icons.warning_amber,
                         size: 12, color: StreetPhareTheme.danger),
                   ),

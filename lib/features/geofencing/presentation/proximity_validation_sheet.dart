@@ -121,9 +121,9 @@ class ProximityValidationSheet extends StatelessWidget {
     final remaining = expiry.difference(DateTime.now().toUtc());
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: StreetPhareTheme.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: SafeArea(
@@ -154,8 +154,8 @@ class ProximityValidationSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             // Question principale — formulation exacte requise
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
                 'La zone est-elle toujours sans danger ou le danger est-il toujours là ?',
                 textAlign: TextAlign.center,
@@ -172,7 +172,7 @@ class ProximityValidationSheet extends StatelessWidget {
               child: Text(
                 '${_labelForType(alert.type)[0].toUpperCase()}${_labelForType(alert.type).substring(1)} signalé${alert.type == AlertType.barrage || alert.type == AlertType.policiers ? '' : 'e'} à ${event.distanceMeters.toStringAsFixed(0)} m.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   color: StreetPhareTheme.primary,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -186,7 +186,7 @@ class ProximityValidationSheet extends StatelessWidget {
                 'Détecté à ${event.distanceMeters.toStringAsFixed(0)} m. '
                 'Disparaît dans ${remaining.inMinutes + 1} min.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   color: StreetPhareTheme.textSecondary,
                   fontSize: 12,
                 ),
@@ -201,9 +201,9 @@ class ProximityValidationSheet extends StatelessWidget {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () => Navigator.of(context).pop(false),
-                      icon: const Icon(Icons.close,
+                      icon: Icon(Icons.close,
                           color: StreetPhareTheme.danger),
-                      label: const Text(
+                      label: Text(
                         'NON',
                         style: TextStyle(
                           color: StreetPhareTheme.danger,
@@ -211,7 +211,7 @@ class ProximityValidationSheet extends StatelessWidget {
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
+                        side: BorderSide(
                           color: StreetPhareTheme.danger,
                           width: 2,
                         ),
@@ -243,7 +243,7 @@ class ProximityValidationSheet extends StatelessWidget {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
+              child: Text(
                 'Plus tard',
                 style: TextStyle(color: StreetPhareTheme.textSecondary),
               ),

@@ -22,15 +22,29 @@ const os = require("os");
 
 // ── Détection OS ──────────────────────────────────────────────────────────
 const isWindows = os.platform() === "win32";
+let VERBOSE = false;
 
 function shell(cmd, args, opts) {
   const fullCmd = isWindows ? `${cmd}.bat` : cmd;
+  if (VERBOSE) {
+    console.error(`\n▶ ${fullCmd} ${args.join(" ")}\n`);
+  }
   const result = spawnSync(fullCmd, args, {
     stdio: "inherit",
     shell: isWindows,
     ...opts,
   });
-  return result.status;
+  // spawnSync renvoie `result.error` si le binaire est introuvable
+  // (ex: dart/flutter absents du PATH) : on le fait remonter explicitement.
+  if (result.error) {
+    console.error(`❌ Impossible de lancer « ${fullCmd} » : ${result.error.message}`);
+    return 1;
+  }
+  if (result.status !== 0) {
+    console.error(`❌ « ${fullCmd} » a échoué avec le code ${result.status}.`);
+    return result.status;
+  }
+  return 0;
 }
 
 // ── Commandes ─────────────────────────────────────────────────────────────
@@ -63,7 +77,10 @@ function runTest() {
 
 // ── Dispatch ──────────────────────────────────────────────────────────────
 
-const command = (process.argv[2] || "ci").toLowerCase();
+// Le premier argument non-flag est la commande ; --verbose active le mode verbeux.
+VERBOSE = process.argv.includes("--verbose");
+const commandArgs = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+const command = (commandArgs[0] || "ci").toLowerCase();
 let exitCode = 0;
 
 switch (command) {
@@ -85,9 +102,10 @@ switch (command) {
   default:
     console.error(`Commande inconnue : ${command}`);
     console.error(
-      "Commandes disponibles : analyze, format, test, lint, ci",
+      "Commandes disponibles : analyze, format, test, lint, ci (options : --verbose)",
     );
     exitCode = 1;
 }
 
-process.exit(exitCode || 0);
+// Ne jamais sortir avec un code indéfini/null (masquerait l'échec).
+process.exit(exitCode == null ? 1 : exitCode);

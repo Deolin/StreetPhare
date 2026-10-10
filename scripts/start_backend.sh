@@ -74,7 +74,7 @@ echo -e "  ${VERT}✅ Node.js $NODE_VERSION détecté${NC}"
 # ── Vérification et installation des dépendances ─────────────────────────
 echo ""
 echo -e "${VERT}▶ Vérification des dépendances npm...${NC}"
-cd test_servers
+cd server
 
 if [ ! -d "node_modules" ] || [ ! -d "node_modules/express" ] || [ ! -d "node_modules/ws" ]; then
   echo -e "  ${JAUNE}⚠ Dépendances manquantes. Installation...${NC}"
@@ -93,15 +93,17 @@ echo -e "${VERT}▶ Démarrage du serveur backend...${NC}"
 if [ "$START_ALL" = true ]; then
   echo -e "  ${CYAN}🚀 Lancement de TOUS les services StreetPhare :${NC}"
   echo ""
-  cd test_servers
+  cd server
   
   # Définition des variables d'environnement pour launch_all.js
   export STREETPHARE_MASTER_KEY="${STREETPHARE_MASTER_KEY:-streetphare-dev-key-CHANGE_ME_IN_PROD}"
   export STREETPHARE_LOG="1"
   export NODE_ENV="development"
   
-  node launch_all.js &
-  LAUNCH_PID=$!
+  node src/primary.js &
+  PRIMARY_PID=$!
+  node src/backup.js &
+  BACKUP_PID=$!
   
   cd ..
   
@@ -115,16 +117,16 @@ if [ "$START_ALL" = true ]; then
   echo "  • LiveMon.  → ws://localhost:4001"
   echo "--------------------------------------------"
   echo ""
-  echo -e "  ${VERT}✅ PID du launchpad : $LAUNCH_PID${NC}"
+  echo -e "  ${VERT}✅ PIDs des serveurs : primary=$PRIMARY_PID, backup=$BACKUP_PID${NC}"
   echo "  Appuyez sur Ctrl+C pour arrêter tous les services."
-  
-  # Attente du processus principal
-  wait $LAUNCH_PID 2>/dev/null || true
+
+  # Attente des processus principaux
+  wait $PRIMARY_PID $BACKUP_PID 2>/dev/null || true
   
 else
   echo -e "  ${CYAN}🚀 Lancement du serveur primaire (port $PRIMARY_PORT)...${NC}"
   echo ""
-  cd test_servers
+  cd server
   
   export PORT="$PRIMARY_PORT"
   export ROLE="primary"
@@ -132,7 +134,7 @@ else
   export STREETPHARE_LOG="1"
   export NODE_ENV="development"
   
-  node server_primary_v2.js &
+  node src/primary.js &
   SERVER_PID=$!
   
   cd ..

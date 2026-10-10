@@ -32,6 +32,13 @@ class AppStrings {
         themeLightSubtitle: 'Fond clair, lecture diurne',
         themeDark: 'Sombre',
         themeDarkSubtitle: 'Vrai noir OLED, économie de batterie',
+        skinSectionTitle: 'Skin / Apparence',
+        skinDescription: 'Choisissez le profil visuel de l\'application.',
+        skinDefaultLabel: 'Par défaut',
+        skinDefaultSubtitle: 'Thème StreetPhare classique (ambre / nuit)',
+        skinMarsAttacksLabel: 'Mars Attacks',
+        skinMarsAttacksSubtitle:
+            'Rétro-futuriste pulp : vert sombre, rouge vif, noir d\'encre',
         batterySaverTitle: 'Mode Économe',
         batterySaverDescription:
             'Réduit la fréquence des scans GPS/BLE et prolonge l\'autonomie.',
@@ -361,6 +368,13 @@ class AppStrings {
         themeLightSubtitle: 'Light background, daytime reading',
         themeDark: 'Dark',
         themeDarkSubtitle: 'True OLED black, battery saving',
+        skinSectionTitle: 'Skin / Appearance',
+        skinDescription: 'Choose the visual profile of the app.',
+        skinDefaultLabel: 'Default',
+        skinDefaultSubtitle: 'Classic StreetPhare theme (amber / night)',
+        skinMarsAttacksLabel: 'Mars Attacks',
+        skinMarsAttacksSubtitle:
+            'Retro-futuristic pulp: dark green, vivid red, ink black',
         batterySaverTitle: 'Battery Saver',
         batterySaverDescription:
             'Reduces GPS/BLE scan frequency and extends battery life.',
@@ -682,6 +696,13 @@ class AppStrings {
         themeLightSubtitle: 'Lichte achtergrond, daglichtlezen',
         themeDark: 'Donker',
         themeDarkSubtitle: 'Echt OLED-zwart, batterijbesparing',
+        skinSectionTitle: 'Skin / Uiterlijk',
+        skinDescription: 'Kies het visuele profiel van de app.',
+        skinDefaultLabel: 'Standaard',
+        skinDefaultSubtitle: 'Klassiek StreetPhare-thema (amber / nacht)',
+        skinMarsAttacksLabel: 'Mars Attacks',
+        skinMarsAttacksSubtitle:
+            'Retro-futuristische pulp: donkergroen, fel rood, inktzwart',
         batterySaverTitle: 'Energiebesparing',
         batterySaverDescription:
             'Vermindert de frequentie van GPS/BLE-scans en verlengt de levensduur van de batterij.',
@@ -1013,6 +1034,14 @@ class AppStrings {
         themeLightSubtitle: 'Heller Hintergrund, Taglesen',
         themeDark: 'Dunkel',
         themeDarkSubtitle: 'Echtes OLED-Schwarz, Batteriesparmodus',
+        skinSectionTitle: 'Skin / Erscheinungsbild',
+        skinDescription: 'Wählen Sie das visuelle Profil der App.',
+        skinDefaultLabel: 'Standard',
+        skinDefaultSubtitle:
+            'Klassisches StreetPhare-Design (Bernstein / Nacht)',
+        skinMarsAttacksLabel: 'Mars Attacks',
+        skinMarsAttacksSubtitle:
+            'Retro-futuristischer Pulp: Dunkelgrün, kräftiges Rot, Tintenschwarz',
         batterySaverTitle: 'Energiesparmodus',
         batterySaverDescription:
             'Reduziert die GPS/BLE-Scanfrequenz und verlängert die Akkulaufzeit.',
@@ -1343,6 +1372,12 @@ class AppStrings {
     required this.themeLightSubtitle,
     required this.themeDark,
     required this.themeDarkSubtitle,
+    required this.skinSectionTitle,
+    required this.skinDescription,
+    required this.skinDefaultLabel,
+    required this.skinDefaultSubtitle,
+    required this.skinMarsAttacksLabel,
+    required this.skinMarsAttacksSubtitle,
     required this.batterySaverTitle,
     required this.batterySaverDescription,
     required this.batterySaverSubtitle,
@@ -1622,6 +1657,12 @@ class AppStrings {
   final String themeLightSubtitle;
   final String themeDark;
   final String themeDarkSubtitle;
+  final String skinSectionTitle;
+  final String skinDescription;
+  final String skinDefaultLabel;
+  final String skinDefaultSubtitle;
+  final String skinMarsAttacksLabel;
+  final String skinMarsAttacksSubtitle;
 
   // Batterie / Notifications
   final String batterySaverTitle;

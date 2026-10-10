@@ -21,6 +21,20 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ⚠️  SCRIPT OBSOLÈTE
+# Ce script ciblait l'ancien serveur Dart (server_dart/), qui a été supprimé.
+# Le serveur StreetPhare est désormais Node.js (dossier server/).
+# Build équivalent :  cd server && npm run build:all
+#                    (voir server/scripts/build-sea.js)
+# ═══════════════════════════════════════════════════════════════════════════
+Write-Host "" -ForegroundColor Red
+Write-Host "❌ Ce script est obsolète (serveur Dart supprimé)." -ForegroundColor Red
+Write-Host "   Build Node.js : cd server && npm run build:all" -ForegroundColor Yellow
+Write-Host ""
+exit 1
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Resolve-Path "$scriptDir\.."
 $serverSrc = "$projectRoot\server_dart"

@@ -11,6 +11,9 @@
 
 import 'package:flutter/material.dart';
 
+import 'skin_controller.dart';
+import 'theme_palette.dart';
+
 /// Couleurs et thèmes StreetPhare.
 class StreetPhareTheme {
   StreetPhareTheme._();
@@ -21,9 +24,9 @@ class StreetPhareTheme {
   static const Color darkBackground = Color(0xFF000000); // vrai noir OLED
   static const Color darkSurface = Color(0xFF0E1116);
   static const Color darkSurfaceVariant = Color(0xFF1A1F29);
-  static const Color primary = Color(0xFFFFB300); // Ambre lampadaire
-  static const Color accent = Color(0xFFFF6F00);
-  static const Color danger = Color(0xFFE53935);
+  static const Color _defaultPrimary = Color(0xFFFFB300); // Ambre lampadaire
+  static const Color _defaultAccent = Color(0xFFFF6F00);
+  static const Color _defaultDanger = Color(0xFFE53935);
   static const Color darkTextPrimary = Color(0xFFFFFFFF);
   static const Color darkTextSecondary = Color(0xFFB0BEC5);
 
@@ -42,14 +45,34 @@ class StreetPhareTheme {
   // pour préserver la rétrocompatibilité des écrans non encore
   // thémés dynamiquement.
   // ---------------------------------------------------------------------------
-  static const Color background = darkBackground;
-  static const Color surface = darkSurface;
+  static const ThemePalette defaultPalette = ThemePalette(
+    primary: _defaultPrimary,
+    accent: _defaultAccent,
+    danger: _defaultDanger,
+    background: darkBackground,
+    surface: darkSurface,
+    surfaceVariant: darkSurfaceVariant,
+    textPrimary: darkTextPrimary,
+    textSecondary: darkTextSecondary,
+  );
 
-  /// Couleur d'accent ambre, exposée publiquement pour les widgets
-  /// qui construisent leurs propres `Container` en dehors du
-  /// `ColorScheme`.
-  static const Color textPrimary = darkTextPrimary;
-  static const Color textSecondary = darkTextSecondary;
+  // ---------------------------------------------------------------------------
+  // Couleurs DYNAMIQUES — reflètent le skin courant (SkinController).
+  // Ces getters remplacent les anciennes constantes statiques ; évalués à
+  // l'accès, ils sont compatibles avec un basculement de skin à chaud.
+  // ---------------------------------------------------------------------------
+  static Color get primary => SkinController.instance.value.palette.primary;
+  static Color get accent => SkinController.instance.value.palette.accent;
+  static Color get danger => SkinController.instance.value.palette.danger;
+  static Color get background =>
+      SkinController.instance.value.palette.background;
+  static Color get surface => SkinController.instance.value.palette.surface;
+  static Color get surfaceVariant =>
+      SkinController.instance.value.palette.surfaceVariant;
+  static Color get textPrimary =>
+      SkinController.instance.value.palette.textPrimary;
+  static Color get textSecondary =>
+      SkinController.instance.value.palette.textSecondary;
 
   // ---------------------------------------------------------------------------
   // Construction des ThemeData
@@ -66,13 +89,13 @@ class StreetPhareTheme {
       brightness: Brightness.dark,
       scaffoldBackgroundColor: darkBackground,
       colorScheme: const ColorScheme.dark(
-        primary: primary,
+        primary: _defaultPrimary,
         onPrimary: Colors.black,
-        secondary: accent,
+        secondary: _defaultAccent,
         onSecondary: Colors.white,
         surface: darkSurface,
         onSurface: darkTextPrimary,
-        error: danger,
+        error: _defaultDanger,
         onError: Colors.white,
       ),
       fontFamily: 'Roboto',
@@ -137,13 +160,13 @@ class StreetPhareTheme {
       brightness: Brightness.light,
       scaffoldBackgroundColor: lightBackground,
       colorScheme: const ColorScheme.light(
-        primary: accent,
+        primary: _defaultAccent,
         onPrimary: Colors.white,
-        secondary: primary,
+        secondary: _defaultPrimary,
         onSecondary: Colors.black,
         surface: lightSurface,
         onSurface: lightTextPrimary,
-        error: danger,
+        error: _defaultDanger,
         onError: Colors.white,
       ),
       fontFamily: 'Roboto',

@@ -56,12 +56,12 @@ class BugReportFab extends StatelessWidget {
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.bug_report_outlined,
                         color: StreetPhareTheme.primary, size: 20),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Text(
                       'Bug',
                       style: TextStyle(
@@ -350,7 +350,7 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
         children: [
-          const Icon(Icons.bug_report_outlined,
+          Icon(Icons.bug_report_outlined,
               color: StreetPhareTheme.primary, size: 28),
           const SizedBox(width: 12),
           Expanded(
@@ -453,7 +453,7 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: StreetPhareTheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(
+                    side: BorderSide(
                         color: StreetPhareTheme.primary, width: 1.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

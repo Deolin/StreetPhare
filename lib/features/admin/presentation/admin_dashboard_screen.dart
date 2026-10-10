@@ -14,7 +14,7 @@ import '../../sandbox/sandbox_controller.dart';
 
 /// Écran de débogage sandbox — contrôles d'injection uniquement.
 class AdminDashboardScreen extends StatefulWidget {
-  const AdminDashboardScreen({super.key});
+  AdminDashboardScreen({super.key});
 
   @override
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();

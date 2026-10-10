@@ -86,9 +86,9 @@ class ReportBottomSheet extends StatelessWidget {
     final childAspectRatio = isLowVision ? 1.1 : 0.85;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: StreetPhareTheme.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: SafeArea(
@@ -117,7 +117,7 @@ class ReportBottomSheet extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Row(
                   children: [
-                    const Icon(Icons.add_alert,
+                    Icon(Icons.add_alert,
                         color: StreetPhareTheme.primary),
                     SizedBox(width: isLowVision ? 0 : 12),
                     Text(

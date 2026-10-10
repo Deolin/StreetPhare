@@ -14,7 +14,7 @@
 #  Usage : bash scripts/cleanup.sh
 # ============================================================================
 
-set -e  # Arrêt immédiat en cas d'erreur
+set -eo pipefail  # Arrêt immédiat en cas d'erreur + propagation via pipe
 
 # Couleurs pour les logs
 VERT="\033[0;32m"
@@ -28,17 +28,19 @@ log() {
   echo -e "[$(date +%H:%M:%S)] $1" | tee -a "$LOGFILE"
 }
 
-# Fonction pour exécuter une commande avec gestion d'erreur
+# Fonction pour exécuter une commande avec gestion d'erreur.
+# La sortie est affichée EN DIRECT (tee) ET journalisée : en cas d'échec,
+# l'erreur réelle reste visible dans la console (plus de redirection muette).
 run_step() {
   local description="$1"
   local cmd="$2"
-  
+
   log "${VERT}▶ $description${NC}"
-  if eval "$cmd" >> "$LOGFILE" 2>&1; then
+  if eval "$cmd" 2>&1 | tee -a "$LOGFILE"; then
     log "  ${VERT}✅ OK${NC} — $description"
     return 0
   else
-    log "  ${ROUGE}❌ ÉCHEC${NC} — $description"
+    log "  ${ROUGE}❌ ÉCHEC${NC} — $description (voir log ci-dessus)"
     return 1
   fi
 }

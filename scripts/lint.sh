@@ -14,7 +14,7 @@
 #    --watch    Surveille les modifications et ré-analyse automatiquement
 # ============================================================================
 
-set -e
+set -euo pipefail
 
 VERT="\033[0;32m"
 JAUNE="\033[1;33m"
@@ -23,14 +23,19 @@ NC="\033[0m"
 
 STRICT=false
 WATCH=false
+VERBOSE=false
 
 # ── Parsing des arguments ────────────────────────────────────────────────
 for arg in "$@"; do
   case "$arg" in
-    --strict) STRICT=true ;;
-    --watch)  WATCH=true ;;
+    --strict)  STRICT=true ;;
+    --watch)   WATCH=true ;;
+    --verbose) VERBOSE=true ;;
     --help|-h)
-      echo "Usage : bash scripts/lint.sh [--strict] [--watch]"
+      echo "Usage : bash scripts/lint.sh [--strict] [--watch] [--verbose]"
+      echo "  --strict   Traite aussi les infos comme des erreurs (tout est fatal)"
+      echo "  --watch    Surveille les modifications et ré-analyse automatiquement"
+      echo "  --verbose  Active la sortie verbeuse de flutter analyze"
       exit 0
       ;;
     *) echo -e "${JAUNE}⚠ Argument inconnu : $arg${NC}" ;;
@@ -40,8 +45,9 @@ done
 echo ""
 echo "============================================"
 echo "  StreetPhare — Analyse Statique (Lint)"
-[ "$STRICT" = true ] && echo "  (mode strict activé)"
+[ "$STRICT" = true ] && echo "  (mode strict activé : les infos sont fatales)"
 [ "$WATCH" = true ] && echo "  (mode surveillance activé)"
+[ "$VERBOSE" = true ] && echo "  (mode verbeux activé)"
 echo "============================================"
 echo ""
 
@@ -58,25 +64,32 @@ echo ""
 echo -e "${VERT}▶ Analyse du code Dart...${NC}"
 echo ""
 
+# Met en évidence les lignes "error" (rouge) et "warning" (jaune).
+highlight_issues() {
+  local line
+  while IFS= read -r line; do
+    case "$line" in
+      *error*)   echo -e "${ROUGE}${line}${NC}" ;;
+      *warning*) echo -e "${JAUNE}${line}${NC}" ;;
+      *)         echo "$line" ;;
+    esac
+  done
+}
+
+ANALYZE_ARGS=()
+[ "$VERBOSE" = true ] && ANALYZE_ARGS+=(--verbose)
+# En mode strict, les infos deviennent aussi fatales (analyse plus sévère).
+# NB : on n'utilise PAS --no-fatal-* qui masquerait les erreurs réelles.
+[ "$STRICT" = true ] && ANALYZE_ARGS+=(--fatal-infos)
+
 if [ "$WATCH" = true ]; then
-  # Mode surveillance continue
   echo "   Surveillance en cours (Ctrl+C pour arrêter)..."
-  if [ "$STRICT" = true ]; then
-    flutter analyze --watch --no-fatal-infos --no-fatal-warnings 2>&1
-  else
-    flutter analyze --watch 2>&1
-  fi
+  flutter analyze --watch "${ANALYZE_ARGS[@]}" 2>&1 | highlight_issues
 else
-  # Mode analyse unique
-  if [ "$STRICT" = true ]; then
-    # En mode strict, les warnings deviennent des erreurs
-    flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1
-  else
-    flutter analyze 2>&1
-  fi
+  flutter analyze "${ANALYZE_ARGS[@]}" 2>&1 | highlight_issues
 fi
 
-EXIT_CODE=$?
+EXIT_CODE=${PIPESTATUS[0]}
 
 echo ""
 echo "--------------------------------------------"

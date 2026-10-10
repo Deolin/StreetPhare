@@ -148,4 +148,3 @@ npm run build:all             # produit streetphare-primary.exe / -backup.exe
 Application open source — voir le fichier `LICENSE` (GPLv3).
 
 > GraphHopper Core et les composants tiers sont distribués sous leurs licences respectives (Apache 2.0, ODbL pour les données OSM).
-

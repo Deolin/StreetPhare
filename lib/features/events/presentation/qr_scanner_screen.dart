@@ -149,7 +149,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             child: Column(
               children: [
                 if (_processing)
-                  const SizedBox(
+                  SizedBox(
                     width: 32,
                     height: 32,
                     child: CircularProgressIndicator(

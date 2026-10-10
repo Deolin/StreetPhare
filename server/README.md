@@ -4,6 +4,7 @@
 > **Rôle** : infrastructure serveur **optionnelle** (le mesh P2P BLE/Wi-Fi Direct est prioritaire).
 
 Le serveur joue trois rôles :
+
 1. **Relais WebSocket** `/mesh` — propagation des alertes entre clients hors portée BLE.
 2. **API REST** `/api/*` — signalements, événements, PANIC, sync.
 3. **Failover** Primary ↔ Backup — haute disponibilité derrière Caddy.
@@ -49,6 +50,7 @@ npm run dev:backup        # Backup   sur :3001
 
 > ⚠️ **Production** : `config.js` refuse de démarrer avec les clés par défaut.
 > Générez des secrets forts :
+
 > ```bash
 > openssl rand -hex 32                       # MASTER_KEY / JWT_SECRET
 > node -e "require('bcryptjs').hash('motdepasse', 12).then(console.log)"   # ADMIN_HASH

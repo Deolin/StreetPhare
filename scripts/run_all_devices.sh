@@ -45,8 +45,8 @@ SKIP_IOS=true
 SKIP_WINDOWS=true
 DEBUG_MODE=false
 
-# Token et clé Appetize (variables d'environnement)
-APPETIZE_TOKEN="${APPETIZE_TOKEN:-tok_koo2pg5fquzsaw6d7cgyhtr6ge}"
+# Token et clé Appetize (variables d'environnement — jamais codés en dur).
+APPETIZE_TOKEN="${APPETIZE_TOKEN:-}"
 APPETIZE_APP_KEY="${APPETIZE_APP_KEY:-}"  # Si vide, crée une nouvelle app
 
 # ── Parsing des arguments ────────────────────────────────────────────────
@@ -298,7 +298,13 @@ else
         # Envoi à Appetize.io
         echo ""
         echo -e "${VERT}▶ Envoi à Appetize.io...${NC}"
-        
+
+        if [ -z "$APPETIZE_TOKEN" ]; then
+          echo -e "${ROUGE}❌ APPETIZE_TOKEN non défini. Impossible d'envoyer sur Appetize.io.${NC}"
+          echo "   Définissez-le : export APPETIZE_TOKEN=\"tok_xxx\""
+          exit 1
+        fi
+
         APPETIZE_URL="https://${APPETIZE_TOKEN}@api.appetize.io/v1/apps"
         if [ -n "$APPETIZE_APP_KEY" ]; then
           APPETIZE_URL="${APPETIZE_URL}/${APPETIZE_APP_KEY}"
@@ -473,11 +479,21 @@ echo ""
 echo -e "  ${CYAN}Appuyez sur Ctrl+C pour arrêter tous les déploiements.${NC}"
 
 # ── Attente des processus ────────────────────────────────────────────────
+FAILED=0
 for pid in "${PIDS[@]}"; do
-  wait "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null
+  code=$?
+  if [ "$code" -ne 0 ]; then
+    echo -e "  ${ROUGE}❌ Le processus $pid s'est terminé avec le code $code.${NC}"
+    FAILED=1
+  fi
 done
 
 echo ""
-echo -e "${VERT}✅ Tous les processus sont terminés.${NC}"
+if [ "$FAILED" -eq 0 ]; then
+  echo -e "${VERT}✅ Tous les processus sont terminés.${NC}"
+else
+  echo -e "${ROUGE}❌ Au moins un déploiement a échoué.${NC}"
+fi
 
-exit 0
+exit $FAILED

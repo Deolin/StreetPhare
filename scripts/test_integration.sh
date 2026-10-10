@@ -26,6 +26,7 @@ NC="\033[0m"
 
 DEVICE=""
 TARGET="integration_test"
+VERBOSE=false
 
 # ── Parsing des arguments ────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -37,6 +38,10 @@ while [[ $# -gt 0 ]]; do
     --target)
       TARGET="$2"
       shift 2
+      ;;
+    --verbose)
+      VERBOSE=true
+      shift
       ;;
     --help|-h)
       echo "Usage : bash scripts/test_integration.sh [--device <id>] [--target <fichier_test>]"
@@ -87,9 +92,9 @@ try:
         if d.get('targetPlatform','').startswith('android') and not d.get('emulator', True):
             print(d['id'])
             break
-except:
-    pass
-" 2>/dev/null || echo "")
+except Exception as e:
+    print(f'⚠ Erreur parsing JSON devices: {e}', file=sys.stderr)
+" || echo "")
   
   if [ -z "$DEVICE" ]; then
     # Fallback : Windows desktop
@@ -108,12 +113,16 @@ echo -e "${VERT}▶ Lancement des tests d'intégration...${NC}"
 echo ""
 
 if [ -d "$TARGET" ] || [ -f "$TARGET" ]; then
-  flutter test "$TARGET" -d "$DEVICE" 2>&1
+  TEST_ARGS=()
+  [ "$VERBOSE" = true ] && TEST_ARGS+=(-r expanded)
+  flutter test "$TARGET" -d "$DEVICE" "${TEST_ARGS[@]}" 2>&1
 else
   # Tente via 'flutter test integration_test' directement
   echo -e "${JAUNE}⚠ '$TARGET' introuvable, tentative via flutter test...${NC}"
   if [ -d "integration_test" ]; then
-    flutter test integration_test -d "$DEVICE" 2>&1
+    TEST_ARGS=()
+    [ "$VERBOSE" = true ] && TEST_ARGS+=(-r expanded)
+    flutter test integration_test -d "$DEVICE" "${TEST_ARGS[@]}" 2>&1
   else
     echo -e "${ROUGE}❌ Aucun dossier integration_test trouvé.${NC}"
     echo "   Créez un dossier integration_test/ avec vos tests d'intégration."

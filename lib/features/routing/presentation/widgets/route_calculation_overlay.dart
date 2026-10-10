@@ -126,7 +126,7 @@ class RouteCalculationOverlay extends StatelessWidget {
                 color: StreetPhareTheme.primary.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.map_outlined,
                 color: StreetPhareTheme.primary,
                 size: 36,
@@ -140,7 +140,7 @@ class RouteCalculationOverlay extends StatelessWidget {
               height: 36,
               child: CircularProgressIndicator(
                 strokeWidth: 3,
-                valueColor: const AlwaysStoppedAnimation<Color>(
+                valueColor: AlwaysStoppedAnimation<Color>(
                   StreetPhareTheme.primary,
                 ),
                 backgroundColor:
@@ -153,7 +153,7 @@ class RouteCalculationOverlay extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: StreetPhareTheme.textPrimary,
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -167,7 +167,7 @@ class RouteCalculationOverlay extends StatelessWidget {
               Text(
                 subMessage!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   color: StreetPhareTheme.textSecondary,
                   fontSize: 12,
                   height: 1.4,
@@ -181,7 +181,7 @@ class RouteCalculationOverlay extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
+                Icon(
                   Icons.directions_walk,
                   color: StreetPhareTheme.textSecondary,
                   size: 14,
@@ -246,10 +246,10 @@ class OsmAndNotInstalledDialog extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
-      title: const Row(
+      title: Row(
         children: [
           Icon(Icons.map, color: StreetPhareTheme.primary, size: 24),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(
             'OsmAnd non installé',
             style: TextStyle(
@@ -260,7 +260,7 @@ class OsmAndNotInstalledDialog extends StatelessWidget {
           ),
         ],
       ),
-      content: const Text(
+      content: Text(
         'Pour la navigation piétonne guidée vocalement (idéal malvoyants), '
         'OsmAnd doit être installé.\n\n'
         'Sinon, StreetPhare peut calculer l\'itinéraire via OpenStreetMap '
@@ -278,7 +278,7 @@ class OsmAndNotInstalledDialog extends StatelessWidget {
             Navigator.of(context).pop();
             onUseFallback();
           },
-          child: const Text(
+          child: Text(
             'Utiliser OSM en ligne',
             style: TextStyle(color: StreetPhareTheme.textSecondary),
           ),

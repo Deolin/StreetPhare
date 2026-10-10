@@ -363,13 +363,13 @@ class _MapScreenState extends State<MapScreen> {
           behavior: SnackBarBehavior.floating,
           content: Row(
             children: [
-              const Icon(Icons.location_on,
+              Icon(Icons.location_on,
                   color: StreetPhareTheme.primary, size: 18),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   s.mapUserPointDefined,
-                  style: const TextStyle(color: StreetPhareTheme.textPrimary),
+                  style: TextStyle(color: StreetPhareTheme.textPrimary),
                 ),
               ),
             ],
@@ -557,13 +557,13 @@ class _MapScreenState extends State<MapScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.event_busy,
+            Icon(Icons.event_busy,
                 color: StreetPhareTheme.primary, size: 26),
             const SizedBox(width: 10),
             Flexible(
               child: Text(
                 s.mapAddEventWarning,
-                style: const TextStyle(
+                style: TextStyle(
                   color: StreetPhareTheme.textPrimary,
                   fontSize: 16,
                 ),
@@ -573,7 +573,7 @@ class _MapScreenState extends State<MapScreen> {
         ),
         content: Text(
           s.mapAddEventWarning,
-          style: const TextStyle(
+          style: TextStyle(
             color: StreetPhareTheme.textSecondary,
             fontSize: 14,
           ),
@@ -597,7 +597,7 @@ class _MapScreenState extends State<MapScreen> {
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text(s.cancel,
-                style: const TextStyle(color: StreetPhareTheme.textSecondary)),
+                style: TextStyle(color: StreetPhareTheme.textSecondary)),
           ),
         ],
       ),
@@ -782,13 +782,13 @@ class _MapScreenState extends State<MapScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.alt_route,
+            Icon(Icons.alt_route,
                 color: StreetPhareTheme.primary, size: 24),
             const SizedBox(width: 10),
             Flexible(
               child: Text(
                 s.routeTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   color: StreetPhareTheme.textPrimary,
                   fontSize: 16,
                 ),
@@ -801,7 +801,7 @@ class _MapScreenState extends State<MapScreen> {
           children: [
             Text(
               s.mapDestinationLongPressHint,
-              style: const TextStyle(
+              style: TextStyle(
                 color: StreetPhareTheme.textSecondary,
                 fontSize: 13,
               ),
@@ -968,7 +968,7 @@ class _MapScreenState extends State<MapScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.lightbulb,
+            Icon(Icons.lightbulb,
                 color: StreetPhareTheme.primary, size: 28),
             const SizedBox(width: 10),
             Text(
@@ -1000,7 +1000,7 @@ class _MapScreenState extends State<MapScreen> {
               const SizedBox(height: 12),
               Text(
                 s.aboutOpenSource,
-                style: const TextStyle(
+                style: TextStyle(
                   color: StreetPhareTheme.primary,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -1040,17 +1040,17 @@ class _MapScreenState extends State<MapScreen> {
         backgroundColor: StreetPhareTheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: StreetPhareTheme.danger, width: 2),
+          side: BorderSide(color: StreetPhareTheme.danger, width: 2),
         ),
         title: Row(
           children: [
-            const Icon(Icons.emergency,
+            Icon(Icons.emergency,
                 color: StreetPhareTheme.danger, size: 28),
             const SizedBox(width: 10),
             Flexible(
               child: Text(
                 s.mapCollectivePanicTitle,
-                style: const TextStyle(
+                style: TextStyle(
                   color: StreetPhareTheme.textPrimary,
                   fontSize: 17,
                 ),
@@ -1061,7 +1061,7 @@ class _MapScreenState extends State<MapScreen> {
         content: Text(
           s.mapCollectivePanicMessage
               .replaceFirst('{count}', '${event.peerCount}'),
-          style: const TextStyle(
+          style: TextStyle(
             color: StreetPhareTheme.textSecondary,
             fontSize: 14,
           ),
@@ -1084,7 +1084,7 @@ class _MapScreenState extends State<MapScreen> {
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text(s.mapIgnore,
-                style: const TextStyle(color: StreetPhareTheme.textSecondary)),
+                style: TextStyle(color: StreetPhareTheme.textSecondary)),
           ),
         ],
       ),
@@ -1113,15 +1113,15 @@ class _MapScreenState extends State<MapScreen> {
           backgroundColor: StreetPhareTheme.surface,
           title: Row(
             children: [
-              const Icon(Icons.warning_amber, color: StreetPhareTheme.danger),
+              Icon(Icons.warning_amber, color: StreetPhareTheme.danger),
               const SizedBox(width: 12),
               Text(s.mapNoPanicContactTitle,
-                  style: const TextStyle(color: StreetPhareTheme.textPrimary)),
+                  style: TextStyle(color: StreetPhareTheme.textPrimary)),
             ],
           ),
           content: Text(
             s.mapNoPanicContactMessage,
-            style: const TextStyle(color: StreetPhareTheme.textSecondary),
+            style: TextStyle(color: StreetPhareTheme.textSecondary),
           ),
           actions: [
             TextButton(
@@ -1150,14 +1150,14 @@ class _MapScreenState extends State<MapScreen> {
         backgroundColor: StreetPhareTheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: StreetPhareTheme.danger, width: 2),
+          side: BorderSide(color: StreetPhareTheme.danger, width: 2),
         ),
         title: Row(
           children: [
-            const Icon(Icons.emergency, color: StreetPhareTheme.danger),
+            Icon(Icons.emergency, color: StreetPhareTheme.danger),
             const SizedBox(width: 12),
             Text(s.mapPanicModeTitle,
-                style: const TextStyle(color: StreetPhareTheme.textPrimary)),
+                style: TextStyle(color: StreetPhareTheme.textPrimary)),
           ],
         ),
         content: Text(
@@ -1168,7 +1168,7 @@ class _MapScreenState extends State<MapScreen> {
                   contacts
                       .map((c) => '• ${c.name} (${c.phoneNumber})')
                       .join('\n')),
-          style: const TextStyle(color: StreetPhareTheme.textSecondary),
+          style: TextStyle(color: StreetPhareTheme.textSecondary),
         ),
         actions: [
           TextButton(
@@ -1219,15 +1219,15 @@ class _MapScreenState extends State<MapScreen> {
           backgroundColor: StreetPhareTheme.surface,
           title: Row(
             children: [
-              const Icon(Icons.info_outline, color: StreetPhareTheme.primary),
+              Icon(Icons.info_outline, color: StreetPhareTheme.primary),
               const SizedBox(width: 12),
               Text(s.mapPanicSmsPreparedTitle,
-                  style: const TextStyle(color: StreetPhareTheme.textPrimary)),
+                  style: TextStyle(color: StreetPhareTheme.textPrimary)),
             ],
           ),
           content: Text(
             s.mapPanicSmsPreparedMessage.replaceFirst('{message}', message),
-            style: const TextStyle(color: StreetPhareTheme.textSecondary),
+            style: TextStyle(color: StreetPhareTheme.textSecondary),
           ),
           actions: [
             TextButton(
@@ -1248,16 +1248,16 @@ class _MapScreenState extends State<MapScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.check_circle, color: StreetPhareTheme.primary),
+            Icon(Icons.check_circle, color: StreetPhareTheme.primary),
             const SizedBox(width: 12),
             Text(s.mapPanicAlertReadyTitle,
-                style: const TextStyle(color: StreetPhareTheme.textPrimary)),
+                style: TextStyle(color: StreetPhareTheme.textPrimary)),
           ],
         ),
         content: Text(
           s.mapPanicAlertReadyMessage
               .replaceFirst('{count}', '${contacts.length}'),
-          style: const TextStyle(color: StreetPhareTheme.textSecondary),
+          style: TextStyle(color: StreetPhareTheme.textSecondary),
         ),
         actions: [
           TextButton(
@@ -1538,11 +1538,11 @@ class _MapScreenState extends State<MapScreen> {
                                     ],
                                   ),
                                 if (_locating)
-                                  const Align(
+                                  Align(
                                     alignment: Alignment.bottomLeft,
                                     child: Padding(
                                       padding:
-                                          EdgeInsets.only(left: 12, bottom: 24),
+                                          const EdgeInsets.only(left: 12, bottom: 24),
                                       child: SizedBox(
                                         width: 14,
                                         height: 14,
@@ -1573,14 +1573,14 @@ class _MapScreenState extends State<MapScreen> {
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            const Icon(Icons.gps_off,
+                                            Icon(Icons.gps_off,
                                                 size: 12,
                                                 color: StreetPhareTheme
                                                     .textSecondary),
                                             const SizedBox(width: 4),
                                             Text(
                                               _positionError!,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                   color: StreetPhareTheme
                                                       .textSecondary,
                                                   fontSize: 10),
@@ -1611,7 +1611,7 @@ class _MapScreenState extends State<MapScreen> {
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const CircularProgressIndicator(
+                                      CircularProgressIndicator(
                                         valueColor:
                                             AlwaysStoppedAnimation<Color>(
                                                 StreetPhareTheme.primary),
@@ -1663,14 +1663,14 @@ class _MapScreenState extends State<MapScreen> {
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  const Icon(Icons.lightbulb,
+                                                  Icon(Icons.lightbulb,
                                                       color: StreetPhareTheme
                                                           .primary,
                                                       size: 18),
                                                   const SizedBox(width: 8),
                                                   Text(
                                                     s.appTitle,
-                                                    style: const TextStyle(
+                                                    style: TextStyle(
                                                       color: StreetPhareTheme
                                                           .textPrimary,
                                                       fontSize: 14,
@@ -1831,8 +1831,8 @@ class _MapScreenState extends State<MapScreen> {
                                         customBorder: const CircleBorder(),
                                         onTap: () => setState(
                                             () => _safeRoutePoints = null),
-                                        child: const Padding(
-                                          padding: EdgeInsets.all(12),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(12),
                                           child: Icon(
                                             Icons.clear,
                                             color: StreetPhareTheme.danger,
@@ -1871,13 +1871,13 @@ class _MapScreenState extends State<MapScreen> {
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(Icons.my_location,
+                                          Icon(Icons.my_location,
                                               size: 13,
                                               color: StreetPhareTheme.primary),
                                           const SizedBox(width: 5),
                                           Text(
                                             prefs.routeDestinationType.label,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               color:
                                                   StreetPhareTheme.textPrimary,
                                               fontSize: 11,
@@ -1886,7 +1886,7 @@ class _MapScreenState extends State<MapScreen> {
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                           const SizedBox(width: 4),
-                                          const Icon(Icons.expand_less,
+                                          Icon(Icons.expand_less,
                                               size: 14,
                                               color: StreetPhareTheme
                                                   .textSecondary),
@@ -1992,9 +1992,9 @@ class _DestinationSelectorSheet extends StatelessWidget {
       valueListenable: AppPreferencesStore.instance,
       builder: (context, prefs, _) {
         return Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: StreetPhareTheme.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
           child: SafeArea(
@@ -2017,12 +2017,12 @@ class _DestinationSelectorSheet extends StatelessWidget {
                 ),
                 Row(
                   children: [
-                    const Icon(Icons.my_location,
+                    Icon(Icons.my_location,
                         color: StreetPhareTheme.primary, size: 22),
                     const SizedBox(width: 10),
                     Text(
                       strings.mapDestinationObjective,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: StreetPhareTheme.textPrimary,
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
@@ -2033,7 +2033,7 @@ class _DestinationSelectorSheet extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   strings.mapDestinationLongPressHint,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: StreetPhareTheme.textSecondary,
                     fontSize: 12,
                   ),
@@ -2052,14 +2052,14 @@ class _DestinationSelectorSheet extends StatelessWidget {
                           value: type,
                           title: Text(
                             type.label,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: StreetPhareTheme.textPrimary,
                               fontSize: 14,
                             ),
                           ),
                           subtitle: Text(
                             type.description,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: StreetPhareTheme.textSecondary,
                               fontSize: 11,
                             ),
@@ -2075,7 +2075,7 @@ class _DestinationSelectorSheet extends StatelessWidget {
                   const Divider(height: 20),
                   Text(
                     strings.mapActiveEvent,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: StreetPhareTheme.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w600,

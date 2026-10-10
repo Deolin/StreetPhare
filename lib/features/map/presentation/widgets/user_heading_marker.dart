@@ -75,7 +75,7 @@ class UserHeadingMarker extends StatelessWidget {
         // ── Flèche directionnelle orientée (sans ombre parasite) ──
         Transform.rotate(
           angle: angleRad,
-          child: const Icon(
+          child: Icon(
             Icons.navigation,
             color: StreetPhareTheme.primary,
             size: 26,
@@ -138,7 +138,7 @@ class UserHeadingMarker extends StatelessWidget {
         Container(
           width: 13,
           height: 13,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: StreetPhareTheme.primary,
           ),

@@ -58,7 +58,7 @@ const esbuild = resolveEsbuild();
       minify: false, // SEA nécessite un bundle lisible
     });
   } catch (e) {
-    console.error('[SEA] esbuild failed:', e.message || e);
+    console.error('[SEA] esbuild failed:', e.stack || e.message || e);
     process.exit(1);
   }
 
@@ -71,7 +71,7 @@ const esbuild = resolveEsbuild();
       stdio: 'inherit',
     });
   } catch (e) {
-    console.error('[SEA] Blob generation failed.');
+    console.error('[SEA] Blob generation failed:', e.stderr || e.message || e);
     process.exit(1);
   }
 
@@ -96,7 +96,9 @@ const esbuild = resolveEsbuild();
       const signtool = process.env.SIGNTOOL || 'signtool';
       execSync(`"${signtool}" remove /s "${exePath}"`);
   } catch (err) {
-      console.log("Signtool non trouvé ou inutile, tentative alternative...");
+      console.log(
+        "Signtool non trouvé ou inutile (" + (err.message || err) + "), tentative alternative...",
+      );
   }
   // Injection du blob via postject.
   console.log(`[SEA] Injecting blob into ${exeName} ...`);
@@ -107,12 +109,12 @@ const esbuild = resolveEsbuild();
       { cwd: root, stdio: 'inherit' }
     );
   } catch (e) {
-    console.error('[SEA] postject injection failed.');
+    console.error('[SEA] postject injection failed:', e.stderr || e.message || e);
     process.exit(1);
   }
 
   console.log(`[SEA] Build complete: ${exePath}`);
 })().catch((e) => {
-  console.error('[SEA] Unexpected error:', e);
+  console.error('[SEA] Unexpected error:', e.stack || e.message || e);
   process.exit(1);
 });

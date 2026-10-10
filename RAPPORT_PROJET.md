@@ -11,6 +11,7 @@
 **StreetPhare** est une application **citoyenne de cartographie collaborative en temps réel**, pensée pour **sécuriser les déplacements piétons lors d'événements et de rassemblements publics** (manifestations, festivals, etc.).
 
 ### Objectif principal
+
 - Permettre aux utilisateurs de **signaler des dangers** (barrages, policiers, nasses, autopompes, dangers, groupes de casseurs…) et de **recevoir les signalements validés par consensus**.
 - Calculer des **itinéraires piétons « safe »** en évitant ou pondérant les zones dangereuses.
 - Déclencher des **alertes PANIC** (individuelles et collectives) en cas d'urgence.
@@ -18,6 +19,7 @@
 - Garantir l'**anonymat et le respect du RGPD** (aucune donnée personnelle, UUID éphémères rotatifs, chiffrement de bout en bout, TTL stricts, droit à l'oubli, kill switch).
 
 ### Positionnement
+
 Application open source sous **licence GPLv3**, multi-plateforme (Android, iOS, Windows, Linux, macOS, Web), accompagnée d'une **infrastructure serveur** légère, d'un **site vitrine** statique et d'un **serveur MCP** (Model Context Protocol).
 
 ---
@@ -204,30 +206,31 @@ StreetPhare/
 ## 5. Recommandations & Prochaines Étapes (Roadmap priorisée)
 
 ### 🔴 Priorité 1 — Sécurité (immédiat)
+
 1. **Sortir `server/.env` du versionnement** (`git rm --cached server/.env`, ajouter `.env` au `.gitignore`).
 2. Ignorer `server/data/store.json` et autres données runtime.
 3. En production, **régénérer** `MASTER_KEY`, `JWT_SECRET`, `ADMIN_HASH` (openssl + bcrypt 12 rounds) et vérifier que `NODE_ENV=production` est bien défini (le serveur refuse de démarrer sinon — comportement correct).
 
 ### 🟠 Priorité 2 — Documentation & cohérence
-4. **Réécrire le `README.md` racine** pour refléter l'architecture réelle (features, P2P, serveur, CI).
-5. **Corriger `server/README.md`** : remplacer la description « Serveur Dart » par la réalité Node.js/Express (ou documenter clairement les deux cibles).
-6. **Unifier le versionnement** : adopter une source unique de version (ex. `pubspec.yaml` + tag Git cohérent entre client, serveur et docs).
+
+1. **Réécrire le `README.md` racine** pour refléter l'architecture réelle (features, P2P, serveur, CI).
+2. **Corriger `server/README.md`** : remplacer la description « Serveur Dart » par la réalité Node.js/Express (ou documenter clairement les deux cibles).
+3. **Unifier le versionnement** : adopter une source unique de version (ex. `pubspec.yaml` + tag Git cohérent entre client, serveur et docs).
 
 ### 🟡 Priorité 3 — Qualité & refactoring
-7. **Dédupliquer** `osmand_routing_service.dart` (routing/ vs routing/infrastructure/).
-8. **Nettoyer** les artefacts Dart résiduels dans `server/` (`.dart_tool`, `build`, `web_src`…) une fois la décision Node vs Dart tranchée.
-9. **Augmenter la couverture de tests** sur les couches critiques : `network/` (failover, sync, transports), `routing/` (A*, Dijkstra, map matching), `database/` (crypto, TTL).
-10. **Traiter les TODO** : finaliser `event_model.dart` et `osmand_routing_service.dart`.
+
+1. **Dédupliquer** `osmand_routing_service.dart` (routing/ vs routing/infrastructure/).
+2. **Nettoyer** les artefacts Dart résiduels dans `server/` (`.dart_tool`, `build`, `web_src`…) une fois la décision Node vs Dart tranchée.
+3. **Augmenter la couverture de tests** sur les couches critiques : `network/` (failover, sync, transports), `routing/` (A*, Dijkstra, map matching), `database/` (crypto, TTL).
+4. **Traiter les TODO** : finaliser `event_model.dart` et `osmand_routing_service.dart`.
 
 ### 🟢 Priorité 4 — Évolution
-11. **Suivre la migration Kotlin built-in** (débloquer `android.builtInKotlin=true` quand les plugins tiers seront compatibles).
-12. **Valider GraphHopper + protobuf-java + JTS** sur appareil physique (lecture `.pbf`, zones d'évitement).
-13. **MCP server** : documenter son usage et l'intégrer à la CI si pertinent.
-14. **Centraliser la logique de fallback routage** (GraphHopper → OsmAnd → OSRM/Dijkstra) dans un seul service.
+
+ 1. **Suivre la migration Kotlin built-in** (débloquer `android.builtInKotlin=true` quand les plugins tiers seront compatibles).
+ 2. **Valider GraphHopper + protobuf-java + JTS** sur appareil physique (lecture `.pbf`, zones d'évitement).
+ 3. **MCP server** : documenter son usage et l'intégrer à la CI si pertinent.
+ 4. **Centraliser la logique de fallback routage** (GraphHopper → OsmAnd → OSRM/Dijkstra) dans un seul service.
 
 ---
 
 *Rapport généré automatiquement après analyse complète du workspace (10/10/2026).*
-
-
-

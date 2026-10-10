@@ -165,7 +165,7 @@ class _StartScreenState extends State<StartScreen>
                   child: Text(
                     strings.startScreenWelcome,
                     key: ValueKey('welcome_${_displayLanguage.code}'),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: StreetPhareTheme.textPrimary,
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -188,7 +188,7 @@ class _StartScreenState extends State<StartScreen>
                   child: Text(
                     strings.startScreenSubtitle,
                     key: ValueKey('subtitle_${_displayLanguage.code}'),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: StreetPhareTheme.textSecondary,
                       fontSize: 14,
                     ),
@@ -224,7 +224,7 @@ class _StartScreenState extends State<StartScreen>
                 // --- Sélecteur de langue (Dropdown) ---
                 Text(
                   strings.startScreenSelectLanguage,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: StreetPhareTheme.textSecondary,
                     fontSize: 14,
                   ),
@@ -246,13 +246,13 @@ class _StartScreenState extends State<StartScreen>
                       value: _selectedLanguage,
                       hint: Text(
                         _displayStrings.languageLabel,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: StreetPhareTheme.textPrimary,
                         ),
                       ),
                       isExpanded: true,
                       dropdownColor: StreetPhareTheme.surface,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: StreetPhareTheme.textPrimary,
                         fontSize: 16,
                       ),
@@ -335,7 +335,7 @@ class _LogoPlaceholder extends StatelessWidget {
       height: 120,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const RadialGradient(
+        gradient: RadialGradient(
           colors: [StreetPhareTheme.primary, StreetPhareTheme.accent],
         ),
         boxShadow: [

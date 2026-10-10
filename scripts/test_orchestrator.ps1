@@ -12,7 +12,21 @@
 # Usage :
 #   powershell -ExecutionPolicy Bypass -File scripts/test_orchestrator.ps1
 
-$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Stop"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ⚠️  SCRIPT OBSOLÈTE (phases serveur)
+# Les phases 2/3/4 ciblaient l'ancien serveur Dart (bin/server.dart), supprimé.
+# Le serveur est désormais Node.js (server/src/primary.js + backup.js).
+# Lancement :  cd server && npm run dev:primary   (ou : dev:backup)
+# ═══════════════════════════════════════════════════════════════════════════
+Write-Host "" -ForegroundColor Red
+Write-Host "❌ Ce script est obsolète (serveur Dart supprimé)." -ForegroundColor Red
+Write-Host "   L'analyse Flutter : node scripts/orchestrate.js analyze" -ForegroundColor Yellow
+Write-Host "   Le serveur Node   : cd server && npm run dev:primary" -ForegroundColor Yellow
+Write-Host ""
+exit 1
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Resolve-Path "$scriptDir\.."
 $serverDir = "$projectRoot\server"

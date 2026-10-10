@@ -342,7 +342,7 @@ class _SplashScreenState extends State<SplashScreen>
                 const SizedBox(height: 32),
 
                 // --- Nom de l'application ---
-                const Text(
+                Text(
                   'StreetPhare',
                   style: TextStyle(
                     color: StreetPhareTheme.textPrimary,
@@ -352,7 +352,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Cartographie citoyenne en temps réel',
                   style: TextStyle(
                     color: StreetPhareTheme.textSecondary,
@@ -376,7 +376,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     child: Text(
                       _tooltips[_tooltipIndex],
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: StreetPhareTheme.textSecondary,
                         fontSize: 12,
                         fontStyle: FontStyle.italic,
@@ -399,7 +399,7 @@ class _SplashScreenState extends State<SplashScreen>
                           value: _progress,
                           minHeight: 6,
                           backgroundColor: StreetPhareTheme.surface,
-                          valueColor: const AlwaysStoppedAnimation<Color>(
+                          valueColor: AlwaysStoppedAnimation<Color>(
                             StreetPhareTheme.primary,
                           ),
                         ),
@@ -407,7 +407,7 @@ class _SplashScreenState extends State<SplashScreen>
                       const SizedBox(height: 12),
                       Text(
                         _statusMessage,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: StreetPhareTheme.textSecondary,
                           fontSize: 13,
                         ),
@@ -468,7 +468,7 @@ class _TutorialThenMapBridgeState extends State<_TutorialThenMapBridge> {
   /// Fond neutre pendant la transition (pas de flash blanc/noir).
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: StreetPhareTheme.background,
       body: Center(
         child: CircularProgressIndicator(
@@ -521,7 +521,7 @@ class _StartScreenBridgeState extends State<_StartScreenBridge> {
   /// Fond neutre pendant la transition (pas de flash blanc/noir).
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: StreetPhareTheme.background,
       body: Center(
         child: CircularProgressIndicator(
@@ -549,7 +549,7 @@ class _LogoPlaceholder extends StatelessWidget {
       height: 120,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const RadialGradient(
+        gradient: RadialGradient(
           colors: [StreetPhareTheme.primary, StreetPhareTheme.accent],
         ),
         boxShadow: [

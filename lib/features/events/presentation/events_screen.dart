@@ -150,10 +150,10 @@ class _EventsScreenState extends State<EventsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.warning_amber, color: StreetPhareTheme.danger, size: 24),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Flexible(
               child: Text(
                 'Retirer l\'événement ?',
@@ -165,7 +165,7 @@ class _EventsScreenState extends State<EventsScreen> {
             ),
           ],
         ),
-        content: const Text(
+        content: Text(
           'Êtes-vous sûr de vouloir retirer cet événement ?\n'
           'Cette action est définitive et supprimera le tracé de la carte.',
           style: TextStyle(
@@ -280,7 +280,7 @@ class _EventsScreenState extends State<EventsScreen> {
                     _InfoCard(
                       child: Text(
                         s.eventsSecurityDescription,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: StreetPhareTheme.textSecondary,
                           fontSize: 13,
                         ),
@@ -358,12 +358,12 @@ class _EmptyEventsCard extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const Icon(Icons.event_busy,
+            Icon(Icons.event_busy,
                 size: 48, color: StreetPhareTheme.textSecondary),
             const SizedBox(height: 12),
             Text(
               strings.eventsEmptyTitle,
-              style: const TextStyle(
+              style: TextStyle(
                 color: StreetPhareTheme.textPrimary,
                 fontWeight: FontWeight.w600,
               ),
@@ -372,7 +372,7 @@ class _EmptyEventsCard extends StatelessWidget {
             Text(
               strings.eventsEmptySubtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                   color: StreetPhareTheme.textSecondary, fontSize: 13),
             ),
           ],
@@ -431,7 +431,7 @@ class _EventCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     event.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: StreetPhareTheme.textPrimary,
                       fontWeight: FontWeight.w700,
                       fontSize: 15,
@@ -440,7 +440,7 @@ class _EventCard extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.qr_code_2,
+                  icon: Icon(Icons.qr_code_2,
                       size: 18, color: StreetPhareTheme.primary),
                   tooltip: 'Partager via QR Code',
                   onPressed: () => _showQrDialog(context),
@@ -448,7 +448,7 @@ class _EventCard extends StatelessWidget {
                   constraints: const BoxConstraints(),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close,
+                  icon: Icon(Icons.close,
                       size: 18, color: StreetPhareTheme.textSecondary),
                   tooltip: strings.eventsRemoveTooltip,
                   onPressed: onRemove,
@@ -462,19 +462,19 @@ class _EventCard extends StatelessWidget {
             // ── Infos basiques ───────────────────────────────────────────
             Text(
               '${strings.eventsCodeLabel} : ${event.code}',
-              style: const TextStyle(
+              style: TextStyle(
                   color: StreetPhareTheme.textSecondary, fontSize: 11),
             ),
             Text(
               '${strings.eventsStartLabel} : ${_fmt(event.startAt)}',
-              style: const TextStyle(
+              style: TextStyle(
                   color: StreetPhareTheme.textSecondary, fontSize: 11),
             ),
             if (event.generalZone != null) ...[
               const SizedBox(height: 2),
               Text(
                 'Commune : ${event.generalZone}',
-                style: const TextStyle(
+                style: TextStyle(
                     color: StreetPhareTheme.textSecondary, fontSize: 11),
               ),
             ],
@@ -486,7 +486,7 @@ class _EventCard extends StatelessWidget {
                 icon: Icons.warning_amber,
                 iconColor: const Color(0xFFFF6F00),
                 bgColor: const Color(0xFFFF6F00).withValues(alpha: 0.12),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -497,7 +497,7 @@ class _EventCard extends StatelessWidget {
                         fontSize: 13,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       'La carte risque de ne pas être disponible hors-ligne. '
                       'Veuillez ne pas télécharger la carte plus de 30 jours '
@@ -523,7 +523,7 @@ class _EventCard extends StatelessWidget {
                   children: [
                     Text(
                       strings.eventsRouteHidden,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: StreetPhareTheme.textPrimary,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
@@ -554,7 +554,7 @@ class _EventCard extends StatelessWidget {
                       strings.eventsStepActive
                           .replaceFirst('{index}', '${activeStep + 1}')
                           .replaceFirst('{total}', '${event.waypoints.length}'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: StreetPhareTheme.textSecondary,
                         fontSize: 12,
                       ),
@@ -562,7 +562,7 @@ class _EventCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       event.waypoints[activeStep].label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: StreetPhareTheme.textPrimary,
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
@@ -584,7 +584,7 @@ class _EventCard extends StatelessWidget {
                 bgColor: StreetPhareTheme.primary.withValues(alpha: 0.12),
                 child: Text(
                   strings.eventsRouteVisible,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: StreetPhareTheme.textPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
@@ -615,7 +615,7 @@ class _EventCard extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.qr_code_2,
+            Icon(Icons.qr_code_2,
                 color: StreetPhareTheme.primary, size: 24),
             const SizedBox(width: 8),
             Expanded(
@@ -742,7 +742,7 @@ class _JoinCard extends StatelessWidget {
           children: [
             Text(
               strings.eventsJoinSubtitle,
-              style: const TextStyle(
+              style: TextStyle(
                 color: StreetPhareTheme.textSecondary,
                 fontSize: 13,
               ),
@@ -805,7 +805,7 @@ class _JoinCard extends StatelessWidget {
               label: Text(strings.eventsQrScan),
               style: OutlinedButton.styleFrom(
                 foregroundColor: StreetPhareTheme.primary,
-                side: const BorderSide(color: StreetPhareTheme.primary),
+                side: BorderSide(color: StreetPhareTheme.primary),
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
@@ -813,7 +813,7 @@ class _JoinCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               strings.eventsFleurusCodes,
-              style: const TextStyle(
+              style: TextStyle(
                   color: StreetPhareTheme.textSecondary, fontSize: 11),
             ),
           ],

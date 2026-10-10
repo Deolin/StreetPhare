@@ -13,13 +13,24 @@
 #  Usage : bash scripts/build_runner.sh
 # ============================================================================
 
-set -e
+set -eo pipefail
 
 # ── Couleurs ────────────────────────────────────────────────────────────
 VERT="\033[0;32m"
 JAUNE="\033[1;33m"
 ROUGE="\033[0;31m"
 NC="\033[0m"
+
+VERBOSE=false
+for arg in "$@"; do
+  case "$arg" in
+    --verbose) VERBOSE=true ;;
+    --help|-h)
+      echo "Usage : bash scripts/build_runner.sh [--verbose]"
+      exit 0
+      ;;
+  esac
+done
 
 echo ""
 echo "============================================"
@@ -50,9 +61,13 @@ fi
 echo ""
 echo -e "${VERT}▶ Étape 3/3 : Génération du code (build_runner)...${NC}"
 echo "   Commande : flutter pub run build_runner build --delete-conflicting-outputs"
+[ "$VERBOSE" = true ] && echo "   (mode verbeux activé)"
 echo ""
 
-if flutter pub run build_runner build --delete-conflicting-outputs; then
+BR_ARGS=(build --delete-conflicting-outputs)
+[ "$VERBOSE" = true ] && BR_ARGS=(--verbose "${BR_ARGS[@]}")
+
+if flutter pub run build_runner "${BR_ARGS[@]}"; then
   echo ""
   echo -e "  ${VERT}✅ Génération de code terminée avec succès.${NC}"
 else

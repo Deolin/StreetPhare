@@ -15,7 +15,8 @@ import 'core/i18n/app_locale.dart';
 import 'core/network/url_strategy_noop.dart'
     if (dart.library.js_util) 'package:flutter_streetphare/core/network/url_strategy_web.dart';
 import 'core/security/keystore_service.dart';
-import 'core/theme/streetphare_theme.dart';
+import 'core/theme/app_skin.dart';
+import 'core/theme/skin_controller.dart';
 import 'core/theme/theme_controller.dart';
 import 'database/crypto_utils.dart';
 import 'debug/client_debug_logger.dart';
@@ -113,6 +114,7 @@ void main() async {
       VersionCheckService.instance.init(),
       AppLocale.instance.load(),
       ThemeController.instance.load(),
+      SkinController.instance.load(),
       PanicContactStore.instance.load(),
       AvoidanceFilterStore.instance.load(),
       AppPreferencesStore.instance.load(),
@@ -278,66 +280,71 @@ class StreetPhareApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<AppThemeMode>(
-      valueListenable: ThemeController.instance,
-      builder: (context, mode, _) {
-        return ValueListenableBuilder<AppLanguage>(
-          valueListenable: AppLocale.instance,
-          builder: (context, language, _) {
-            return ValueListenableBuilder<AppPreferences>(
-              valueListenable: AppPreferencesStore.instance,
-              builder: (context, prefs, _) {
-                return ValueListenableBuilder<bool>(
-                  valueListenable: VisualImpairedStore.instance,
-                  builder: (context, isVisualImpaired, _) {
-                    return MaterialApp(
-                      title: 'StreetPhare',
-                      debugShowCheckedModeBanner: false,
-                      navigatorKey: navigatorKey,
+    return ValueListenableBuilder<AppSkin>(
+      valueListenable: SkinController.instance,
+      builder: (context, skin, _) {
+        return ValueListenableBuilder<AppThemeMode>(
+          valueListenable: ThemeController.instance,
+          builder: (context, mode, _) {
+            return ValueListenableBuilder<AppLanguage>(
+              valueListenable: AppLocale.instance,
+              builder: (context, language, _) {
+                return ValueListenableBuilder<AppPreferences>(
+                  valueListenable: AppPreferencesStore.instance,
+                  builder: (context, prefs, _) {
+                    return ValueListenableBuilder<bool>(
+                      valueListenable: VisualImpairedStore.instance,
+                      builder: (context, isVisualImpaired, _) {
+                        return MaterialApp(
+                          title: 'StreetPhare',
+                          debugShowCheckedModeBanner: false,
+                          navigatorKey: navigatorKey,
 
-                      // Thèmes clair & sombre.
-                      theme: StreetPhareTheme.lightTheme(),
-                      darkTheme: StreetPhareTheme.darkTheme(),
+                          // Thèmes clair & sombre (fournis par le skin courant).
+                          theme: skin.lightTheme(),
+                          darkTheme: skin.darkTheme(),
 
-                      // ThemeMode est piloté par le ThemeController
-                      // (système / clair / sombre, persistant).
-                      themeMode: mode.toThemeMode(),
+                          // ThemeMode est piloté par le ThemeController
+                          // (système / clair / sombre, persistant).
+                          themeMode: mode.toThemeMode(),
 
-                      // Support multilingue
-                      locale: language.locale,
-                      // Ajout des délégués requis pour les composants Material (comme DropdownButton)
-                      localizationsDelegates: const [
-                        GlobalMaterialLocalizations.delegate,
-                        GlobalWidgetsLocalizations.delegate,
-                        GlobalCupertinoLocalizations.delegate,
-                      ],
-                      // Déclaration des locales supportées par la Ruche et la vitrine
-                      supportedLocales: const [
-                        Locale('fr', ''),
-                        Locale('en', ''),
-                        Locale('nl', ''),
-                        Locale('de', ''),
-                      ],
+                          // Support multilingue
+                          locale: language.locale,
+                          // Ajout des délégués requis pour les composants Material (comme DropdownButton)
+                          localizationsDelegates: const [
+                            GlobalMaterialLocalizations.delegate,
+                            GlobalWidgetsLocalizations.delegate,
+                            GlobalCupertinoLocalizations.delegate,
+                          ],
+                          // Déclaration des locales supportées par la Ruche et la vitrine
+                          supportedLocales: const [
+                            Locale('fr', ''),
+                            Locale('en', ''),
+                            Locale('nl', ''),
+                            Locale('de', ''),
+                          ],
 
-                      // Facteur d'échelle du texte global (accessibilité / malvoyant)
-                      // + bouton de débogage global permanent.
-                      builder: (context, child) {
-                        final factor =
-                            isVisualImpaired ? 1.5 : prefs.textScaleFactor;
-                        return MediaQuery(
-                          data: MediaQuery.of(context).copyWith(
-                            textScaler: TextScaler.linear(factor),
-                          ),
-                          child: Stack(
-                            children: [
-                              if (child != null) child,
-                              const BugReportFab(),
-                            ],
-                          ),
+                          // Facteur d'échelle du texte global (accessibilité / malvoyant)
+                          // + bouton de débogage global permanent.
+                          builder: (context, child) {
+                            final factor =
+                                isVisualImpaired ? 1.5 : prefs.textScaleFactor;
+                            return MediaQuery(
+                              data: MediaQuery.of(context).copyWith(
+                                textScaler: TextScaler.linear(factor),
+                              ),
+                              child: Stack(
+                                children: [
+                                  if (child != null) child,
+                                  const BugReportFab(),
+                                ],
+                              ),
+                            );
+                          },
+
+                          home: const SplashScreen(),
                         );
                       },
-
-                      home: const SplashScreen(),
                     );
                   },
                 );

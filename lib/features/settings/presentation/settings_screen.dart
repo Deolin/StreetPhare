@@ -22,6 +22,8 @@ import 'package:flutter/services.dart';
 
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
+import '../../../core/theme/app_skin.dart';
+import '../../../core/theme/skin_controller.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../services/apk_downloader_service.dart';
@@ -91,6 +93,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _MessageFilterSection(strings: s),
                   _BlockedUsersSection(strings: s),
                   _ThemeSection(strings: s),
+                  _SkinSection(strings: s),
                   _BatterySaverSection(strings: s),
                   _AndroidNotificationSection(strings: s),
                   _AvoidanceFiltersSection(strings: s),
@@ -124,8 +127,7 @@ class _EventsSection extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return _Card(
       child: ListTile(
-        leading:
-            const Icon(Icons.event, color: StreetPhareTheme.primary, size: 26),
+        leading: Icon(Icons.event, color: StreetPhareTheme.primary, size: 26),
         title: Text(
           strings.eventsTitle,
           style: TextStyle(
@@ -474,6 +476,76 @@ class _ThemeSection extends StatelessWidget {
 }
 
 // ============================================================================
+// [4bis] Section SKIN (profil visuel)
+// ============================================================================
+
+class _SkinSection extends StatelessWidget {
+  const _SkinSection({required this.strings});
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    return _Card(
+      child: ValueListenableBuilder<AppSkin>(
+        valueListenable: SkinController.instance,
+        builder: (context, current, _) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionHeader(
+                icon: Icons.palette,
+                title: strings.skinSectionTitle,
+              ),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(left: 30),
+                child: Text(
+                  strings.skinDescription,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: onSurface.withValues(alpha: 0.65)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              RadioGroup<AppSkin>(
+                groupValue: current,
+                onChanged: (v) {
+                  if (v == null) return;
+                  SkinController.instance.setSkin(v);
+                },
+                child: Column(
+                  children: [
+                    for (final skin in AppSkin.values)
+                      RadioListTile<AppSkin>(
+                        value: skin,
+                        title: Text(
+                          skin.label,
+                          style: TextStyle(color: onSurface, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          skin.subtitle,
+                          style: TextStyle(
+                            color: onSurface.withValues(alpha: 0.6),
+                            fontSize: 12,
+                          ),
+                        ),
+                        activeColor: StreetPhareTheme.primary,
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ============================================================================
 // [5] Section MODE ÉCONOME + NOTIFICATIONS
 // ============================================================================
 
@@ -650,7 +722,7 @@ class _AvoidanceFiltersSection extends StatelessWidget {
                   );
                 },
               ),
-              const Divider(height: 1, color: StreetPhareTheme.textSecondary),
+              Divider(height: 1, color: StreetPhareTheme.textSecondary),
               _AvoidanceTile(
                 title: strings.avoidBarragesTitle,
                 subtitle: strings.avoidBarragesSubtitle,
@@ -899,11 +971,11 @@ class _BackgroundServiceSectionState extends State<_BackgroundServiceSection> {
         setState(() => _serviceActive = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Service arrêté'),
+            SnackBar(
+              content: const Text('Service arrêté'),
               backgroundColor: StreetPhareTheme.primary,
               behavior: SnackBarBehavior.floating,
-              duration: Duration(seconds: 2),
+              duration: const Duration(seconds: 2),
             ),
           );
         }
@@ -915,12 +987,12 @@ class _BackgroundServiceSectionState extends State<_BackgroundServiceSection> {
         setState(() => _serviceActive = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
+            SnackBar(
+              content: const Text(
                   'Impossible d\'arrêter le service. Vérifiez les paramètres Android.'),
               backgroundColor: StreetPhareTheme.danger,
               behavior: SnackBarBehavior.floating,
-              duration: Duration(seconds: 4),
+              duration: const Duration(seconds: 4),
             ),
           );
         }
@@ -975,12 +1047,12 @@ class _BackgroundServiceSectionState extends State<_BackgroundServiceSection> {
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Échec de l\'activation du service.\n'
+          SnackBar(
+            content: const Text('Échec de l\'activation du service.\n'
                 'Vérifiez les permissions Android et réessayez.'),
             backgroundColor: StreetPhareTheme.danger,
             behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 5),
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -1197,7 +1269,7 @@ class _ContactTile extends StatelessWidget {
         backgroundColor: StreetPhareTheme.primary.withValues(alpha: 0.2),
         child: Text(
           contact.name.isEmpty ? '?' : contact.name[0].toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             color: StreetPhareTheme.primary,
             fontWeight: FontWeight.bold,
           ),
@@ -1351,8 +1423,8 @@ class _TutorialSection extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return _Card(
       child: ListTile(
-        leading: const Icon(Icons.help_outline,
-            color: StreetPhareTheme.primary, size: 26),
+        leading:
+            Icon(Icons.help_outline, color: StreetPhareTheme.primary, size: 26),
         title: Text(
           strings.tutorialTitle,
           style: TextStyle(color: onSurface, fontWeight: FontWeight.w500),
@@ -1389,8 +1461,8 @@ class _AboutSection extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return _Card(
       child: ListTile(
-        leading: const Icon(Icons.info_outline,
-            color: StreetPhareTheme.primary, size: 26),
+        leading:
+            Icon(Icons.info_outline, color: StreetPhareTheme.primary, size: 26),
         title: Text(
           strings.aboutApp,
           style: TextStyle(color: onSurface, fontWeight: FontWeight.w500),
@@ -1427,8 +1499,7 @@ class _AboutSection extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.lightbulb,
-                color: StreetPhareTheme.primary, size: 28),
+            Icon(Icons.lightbulb, color: StreetPhareTheme.primary, size: 28),
             const SizedBox(width: 10),
             Text(
               strings.appTitle,
@@ -1459,7 +1530,7 @@ class _AboutSection extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 strings.aboutOpenSource,
-                style: const TextStyle(
+                style: TextStyle(
                   color: StreetPhareTheme.primary,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -1762,7 +1833,7 @@ class _BlockedUsersSection extends StatelessWidget {
                       radius: 16,
                       child: Text(
                         id.length >= 2 ? id.substring(0, 2).toUpperCase() : id,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: StreetPhareTheme.danger,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
@@ -1794,11 +1865,11 @@ class _BlockedUsersSection extends StatelessWidget {
                           );
                         }
                       },
-                      icon: const Icon(Icons.lock_open,
+                      icon: Icon(Icons.lock_open,
                           size: 16, color: StreetPhareTheme.primary),
                       label: Text(
                         strings.blockedUsersUnblock,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: StreetPhareTheme.primary,
                           fontSize: 12,
                         ),
@@ -1904,8 +1975,7 @@ class _ShareApkSection extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return _Card(
       child: ListTile(
-        leading:
-            const Icon(Icons.share, color: StreetPhareTheme.primary, size: 26),
+        leading: Icon(Icons.share, color: StreetPhareTheme.primary, size: 26),
         title: Text(
           'Partager StreetPhare',
           style: TextStyle(
@@ -1936,7 +2006,7 @@ class _ShareApkSection extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            const Icon(Icons.share, color: StreetPhareTheme.primary, size: 28),
+            Icon(Icons.share, color: StreetPhareTheme.primary, size: 28),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -2168,19 +2238,19 @@ class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
     required this.icon,
     required this.title,
-    this.color = StreetPhareTheme.primary,
+    this.color,
   });
 
   final IconData icon;
   final String title;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return Row(
       children: [
-        Icon(icon, color: color, size: 22),
+        Icon(icon, color: color ?? StreetPhareTheme.primary, size: 22),
         const SizedBox(width: 8),
         Expanded(
           child: Text(

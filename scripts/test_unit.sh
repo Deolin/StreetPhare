@@ -23,14 +23,16 @@ NC="\033[0m"
 
 COVERAGE=false
 CRYPTO_ONLY=false
+VERBOSE=false
 
 # ── Parsing des arguments ────────────────────────────────────────────────
 for arg in "$@"; do
   case "$arg" in
     --coverage)   COVERAGE=true ;;
     --crypto-only) CRYPTO_ONLY=true ;;
+    --verbose)    VERBOSE=true ;;
     --help|-h)
-      echo "Usage : bash scripts/test_unit.sh [--coverage] [--crypto-only]"
+      echo "Usage : bash scripts/test_unit.sh [--coverage] [--crypto-only] [--verbose]"
       exit 0
       ;;
     *) echo -e "${JAUNE}⚠ Argument inconnu : $arg${NC}" ;;
@@ -63,11 +65,15 @@ if [ "$CRYPTO_ONLY" = true ]; then
   if [ -z "$CRYPTO_TESTS" ]; then
     echo -e "${JAUNE}⚠ Aucun fichier de test crypto trouvé dans test/.${NC}"
     echo "   Exécution de tous les tests unitaires par défaut..."
-    flutter test
+    TEST_ARGS=()
+    [ "$VERBOSE" = true ] && TEST_ARGS+=(-r expanded)
+    flutter test "${TEST_ARGS[@]}"
   else
     echo "   Fichiers trouvés :"
     echo "$CRYPTO_TESTS" | while read f; do echo "    - $f"; done
-    flutter test $CRYPTO_TESTS
+    TEST_ARGS=()
+    [ "$VERBOSE" = true ] && TEST_ARGS+=(-r expanded)
+    flutter test "${TEST_ARGS[@]}" $CRYPTO_TESTS
   fi
 elif [ "$COVERAGE" = true ]; then
   echo "   Génération de la couverture de code (lcov)..."
@@ -82,7 +88,9 @@ elif [ "$COVERAGE" = true ]; then
     fi
   fi
 else
-  flutter test 2>&1
+  TEST_ARGS=()
+  [ "$VERBOSE" = true ] && TEST_ARGS+=(-r expanded)
+  flutter test "${TEST_ARGS[@]}" 2>&1
 fi
 
 EXIT_CODE=$?

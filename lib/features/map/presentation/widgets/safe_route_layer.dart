@@ -36,7 +36,7 @@ import '../../../../core/theme/streetphare_theme.dart';
 ///   - un marqueur de départ et un marqueur d'arrivée
 // [1] Couleurs contrastées pour la carte sombre (lisibilité forte luminosité)
 /// Couleur de la Route Safe en mode clair (vert vif StreetPhare).
-const Color _kRouteColorLight = StreetPhareTheme.primary;
+final Color _kRouteColorLight = StreetPhareTheme.primary;
 
 /// Couleur de la Route Safe en mode sombre : jaune néon haute visibilité,
 /// lisible même en plein soleil sur fond de carte sombre CartoDB.
@@ -154,7 +154,7 @@ class SafeRouteLayer extends StatelessWidget {
           point: routePoints.last,
           width: 38,
           height: 38,
-          child: const _EndpointDot(
+          child: _EndpointDot(
             color: StreetPhareTheme.accent,
             icon: Icons.location_on,
             size: 24,

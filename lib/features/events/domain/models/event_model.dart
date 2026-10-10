@@ -479,19 +479,19 @@ class EventModel {
   // --------------------------------------------------------------------------
 
   /// Décode la polyline GeoJSON `[[lng,lat],...]` en `List<LatLng>`.
+  ///
+  /// Le format attendu est `[[lng,lat],[lng,lat],...]`. La regex matche
+  /// chaque paire `[lng, lat]` (nombres uniquement) afin de ne pas être
+  /// perturbée par les crochets externes de l'enveloppe GeoJSON.
   List<LatLng> decodeRoute() {
     final coords = <LatLng>[];
-    final regex = RegExp(r'\[([^\]]+)\]');
+    final regex = RegExp(r'\[\s*([0-9.\-]+)\s*,\s*([0-9.\-]+)\s*\]');
     for (final match in regex.allMatches(routeGeoJson)) {
-      final parts = match
-          .group(1)!
-          .split(',')
-          .map((s) => double.tryParse(s.trim()))
-          .whereType<double>()
-          .toList();
-      if (parts.length >= 2) {
+      final lng = double.tryParse(match.group(1)!);
+      final lat = double.tryParse(match.group(2)!);
+      if (lng != null && lat != null) {
         // GeoJSON : [lng, lat]
-        coords.add(LatLng(parts[1], parts[0]));
+        coords.add(LatLng(lat, lng));
       }
     }
     return coords;

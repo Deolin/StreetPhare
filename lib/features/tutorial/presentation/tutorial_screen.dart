@@ -89,7 +89,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
           if (widget.isFirstLaunch)
             TextButton(
               onPressed: _dismiss,
-              child: const Text(
+              child: Text(
                 'Passer',
                 style: TextStyle(
                   color: StreetPhareTheme.primary,
@@ -166,7 +166,7 @@ class _WelcomeBanner extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.lightbulb_outline,
                 color: StreetPhareTheme.primary,
                 size: 28,

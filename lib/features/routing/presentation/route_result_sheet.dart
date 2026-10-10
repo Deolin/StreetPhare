@@ -159,7 +159,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
           child: Text(
             s.routeNotFound,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: StreetPhareTheme.textSecondary),
+            style: TextStyle(color: StreetPhareTheme.textSecondary),
           ),
         ),
       );
@@ -177,12 +177,12 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
             // ── En-tête ─────────────────────────────────────────────────
             Row(
               children: [
-                const Icon(Icons.shield,
+                Icon(Icons.shield,
                     color: StreetPhareTheme.primary, size: 22),
                 const SizedBox(width: 8),
                 Text(
                   s.routeTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: StreetPhareTheme.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -190,7 +190,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.close,
+                  icon: Icon(Icons.close,
                       color: StreetPhareTheme.textSecondary),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
@@ -219,11 +219,11 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                   widget.routes.length > 1)
                 TextButton.icon(
                   onPressed: _loadAlternatives,
-                  icon: const Icon(Icons.alt_route,
+                  icon: Icon(Icons.alt_route,
                       color: StreetPhareTheme.primary),
                   label: Text(
                     s.routeShowAlternatives,
-                    style: const TextStyle(color: StreetPhareTheme.primary),
+                    style: TextStyle(color: StreetPhareTheme.primary),
                   ),
                 ),
             ],
@@ -235,7 +235,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(
+                    SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
@@ -247,7 +247,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                     const SizedBox(width: 10),
                     Text(
                       s.routeCalculatingAlternatives,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: StreetPhareTheme.textSecondary,
                         fontSize: 13,
                       ),
@@ -306,9 +306,9 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
 
   Widget _wrap(Widget child) {
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: StreetPhareTheme.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(top: false, child: child),
     );
@@ -377,7 +377,7 @@ class _RouteTile extends StatelessWidget {
                             route.label.isEmpty
                                 ? strings.routeItinerary
                                 : route.label,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: StreetPhareTheme.textPrimary,
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
@@ -409,7 +409,7 @@ class _RouteTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${route.distanceLabel} \u2022 ${strings.routeRisk} ${route.totalRiskScore.toStringAsFixed(0)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: StreetPhareTheme.textSecondary,
                         fontSize: 12,
                       ),
@@ -555,7 +555,7 @@ class _MiniRouteMap extends StatelessWidget {
                     point: pts.first,
                     width: 16,
                     height: 16,
-                    child: const Icon(Icons.trip_origin,
+                    child: Icon(Icons.trip_origin,
                         color: StreetPhareTheme.primary, size: 16),
                   ),
                 if (pts.length >= 2)
@@ -563,7 +563,7 @@ class _MiniRouteMap extends StatelessWidget {
                     point: pts.last,
                     width: 16,
                     height: 16,
-                    child: const Icon(Icons.location_on,
+                    child: Icon(Icons.location_on,
                         color: StreetPhareTheme.accent, size: 16),
                   ),
               ],
