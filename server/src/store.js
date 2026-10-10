@@ -42,6 +42,10 @@ class Store {
     this.meshMessages = [];      // Backlog de messages mesh (store-and-forward)
     this.meshClients = new Set();
     this.adminClients = new Set();
+    this.bannedUsers = new Set();     // UUIDs d'émetteurs bannis (modération tchat)
+    this.geofencingZones = [];        // Zones de géorepérage administrées
+    this._listeners = {};             // Événements internes (alert_added, …)
+    this._msgTimestamps = [];         // Timestamps des messages (taux msg/s)
     this.syncState = {
       lastSyncAt: null,
       lastSyncSuccess: false,
@@ -54,6 +58,22 @@ class Store {
 
     // Chargement initial depuis le disque.
     this._loadFromDisk();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ÉVÉNEMENTS INTERNES (flux temps réel)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  on(event, fn) {
+    (this._listeners[event] = this._listeners[event] || []).push(fn);
+    return this;
+  }
+
+  emit(event, payload) {
+    const fns = this._listeners[event] || [];
+    for (const fn of fns) {
+      try { fn(payload); } catch (_) {}
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -87,6 +107,14 @@ class Store {
 
       if (Array.isArray(data.meshMessages)) {
         this.meshMessages = data.meshMessages.slice(-5000);
+      }
+
+      if (Array.isArray(data.bannedUsers)) {
+        this.bannedUsers = new Set(data.bannedUsers);
+      }
+
+      if (Array.isArray(data.geofencingZones)) {
+        this.geofencingZones = data.geofencingZones;
       }
 
       if (data.syncState && typeof data.syncState === 'object') {
@@ -146,6 +174,8 @@ class Store {
       panicPings: this.panicPings,
       bugReports: this.bugReports.slice(-200),
       meshMessages: this.meshMessages.slice(-1000),
+      bannedUsers: [...this.bannedUsers],
+      geofencingZones: this.geofencingZones,
       syncState: { ...this.syncState },
     };
   }
@@ -166,6 +196,7 @@ class Store {
     }
     this.alerts.push({ ...alert, createdAt: alert.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
     this._scheduleSave();
+    this.emit('alert_added', this.alerts[this.alerts.length - 1]);
     return this.alerts[this.alerts.length - 1];
   }
 
@@ -239,8 +270,11 @@ class Store {
       receivedAt: new Date().toISOString(),
       senderId: payload.sender_id || 'unknown',
     };
+    if (payload.simulated) msg.simulated = true;
     this.meshMessages.push(msg);
     if (this.meshMessages.length > 5000) this.meshMessages = this.meshMessages.slice(-5000);
+    this._msgTimestamps.push(Date.now());
+    if (this._msgTimestamps.length > 1000) this._msgTimestamps = this._msgTimestamps.slice(-1000);
     this._scheduleSave();
     log('MESH', `Message backlog #${msg.id} enregistré (total: ${this.meshMessages.length})`);
     return msg;
@@ -316,6 +350,187 @@ class Store {
     for (const alert of data.alerts) { this.addAlert({ ...alert, votes: alert.votes || [] }); }
     if (data.events) { for (const event of data.events) { this.addEvent(event); } }
     this._scheduleSave();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // MODÉRATION — Bannissement d'UUID (tchat P2P / relais)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  banUser(uuid) {
+    if (!uuid) return false;
+    this.bannedUsers.add(uuid);
+    this._scheduleSave();
+    return true;
+  }
+
+  unbanUser(uuid) {
+    const removed = this.bannedUsers.delete(uuid);
+    if (removed) this._scheduleSave();
+    return removed;
+  }
+
+  isBanned(uuid) { return this.bannedUsers.has(uuid); }
+
+  getBannedUsers() { return [...this.bannedUsers]; }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // GÉOREPÉRAGE — Zones administrées
+  // ═══════════════════════════════════════════════════════════════════════
+
+  addGeofencingZone(zone) {
+    const entry = {
+      id: zone.id || require('uuid').v4(),
+      name: zone.name || 'Zone sans nom',
+      type: zone.type || 'safe', // safe | danger | custom
+      lat: zone.lat,
+      lng: zone.lng,
+      radiusMeters: zone.radiusMeters || 100,
+      createdAt: new Date().toISOString(),
+    };
+    if (zone.simulated) entry.simulated = true;
+    this.geofencingZones.push(entry);
+    this._scheduleSave();
+    return entry;
+  }
+
+  removeGeofencingZone(id) {
+    const idx = this.geofencingZones.findIndex(z => z.id === id);
+    if (idx !== -1) { this.geofencingZones.splice(idx, 1); this._scheduleSave(); return true; }
+    return false;
+  }
+
+  getGeofencingZones() { return this.geofencingZones; }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // CONSOLE — Purge des vieux signalements
+  // ═══════════════════════════════════════════════════════════════════════
+
+  purgeOldAlerts(maxAgeHours = 24) {
+    const cutoff = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
+    const before = this.alerts.length;
+    this.alerts = this.alerts.filter(a => new Date(a.createdAt) > cutoff);
+    const removed = before - this.alerts.length;
+    if (removed > 0) this._scheduleSave();
+    return removed;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // CONSOLE — Informations sur les connexions actives
+  // ═══════════════════════════════════════════════════════════════════════
+
+  getConnectionsInfo() {
+    return {
+      meshClients: this.meshClients.size,
+      adminClients: this.adminClients.size,
+      alertsTotal: this.alerts.length,
+      alertsActive: this.getActiveAlerts().length,
+      events: this.events.length,
+      bannedUsers: this.bannedUsers.size,
+      geofencingZones: this.geofencingZones.length,
+      meshMessages: this.meshMessages.length,
+      stateHash: this.getStateHash(),
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // MODÉRATION — Validation / rejet / suppression de signalements
+  // ═══════════════════════════════════════════════════════════════════════
+
+  validateAlert(id) {
+    const alert = this.alerts.find(a => a.id === id);
+    if (!alert) return false;
+    alert.status = 'active';
+    alert.updatedAt = new Date().toISOString();
+    this._scheduleSave();
+    return true;
+  }
+
+  rejectAlert(id) {
+    const alert = this.alerts.find(a => a.id === id);
+    if (!alert) return false;
+    alert.status = 'rejected';
+    alert.updatedAt = new Date().toISOString();
+    this._scheduleSave();
+    return true;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // MODÉRATION — Suppression d'un message mesh
+  // ═══════════════════════════════════════════════════════════════════════
+
+  deleteMeshMessage(id) {
+    const idx = this.meshMessages.findIndex(m => m.id === id);
+    if (idx === -1) return false;
+    this.meshMessages.splice(idx, 1);
+    this._scheduleSave();
+    return true;
+  }
+  // ═══════════════════════════════════════════════════════════════════════
+  // SIMULATION & MÉTRIQUES
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /// Ajoute des votes (upvotes) à une alerte. Retourne le nombre ajouté.
+  addVotes(id, userIds) {
+    const a = this.alerts.find(x => x.id === id);
+    if (!a) return 0;
+    if (!a.votes) a.votes = [];
+    let added = 0;
+    for (const u of userIds) {
+      if (!a.votes.includes(u)) { a.votes.push(u); added++; }
+    }
+    if (added) { a.updatedAt = new Date().toISOString(); this._scheduleSave(); }
+    return added;
+  }
+
+  /// Retire jusqu'à `count` votes (downvotes). Retourne le nombre retiré.
+  removeVotes(id, count) {
+    const a = this.alerts.find(x => x.id === id);
+    if (!a || !a.votes || a.votes.length === 0) return 0;
+    const before = a.votes.length;
+    a.votes = a.votes.slice(0, Math.max(0, before - count));
+    const removed = before - a.votes.length;
+    if (removed) { a.updatedAt = new Date().toISOString(); this._scheduleSave(); }
+    return removed;
+  }
+
+  /// Supprime toutes les entités fictives (marquées `simulated: true`).
+  /// N'affecte pas les données de production réelles.
+  removeSimulatedEntities() {
+    const removed = {
+      alerts: this.alerts.filter(a => a.simulated).length,
+      events: this.events.filter(e => e.simulated).length,
+      zones: this.geofencingZones.filter(z => z.simulated).length,
+      messages: this.meshMessages.filter(m => m.simulated).length,
+      panics: this.panicPings.filter(p => p.simulated).length,
+    };
+    this.alerts = this.alerts.filter(a => !a.simulated);
+    this.events = this.events.filter(e => !e.simulated);
+    this.geofencingZones = this.geofencingZones.filter(z => !z.simulated);
+    this.meshMessages = this.meshMessages.filter(m => !m.simulated);
+    this.panicPings = this.panicPings.filter(p => !p.simulated);
+    this._scheduleSave();
+    return removed;
+  }
+
+  /// Taux de messages (moyenne sur la dernière minute, msg/s).
+  getMessageRate() {
+    const cutoff = Date.now() - 60000;
+    this._msgTimestamps = this._msgTimestamps.filter(t => t > cutoff);
+    return this._msgTimestamps.length / 60;
+  }
+
+  /// Métriques temps réel (pour le widget de charge admin).
+  getMetrics() {
+    return {
+      meshClients: this.meshClients.size,
+      adminClients: this.adminClients.size,
+      alertsActive: this.getActiveAlerts().length,
+      alertsTotal: this.alerts.length,
+      events: this.events.length,
+      messagesPerSec: Math.round(this.getMessageRate() * 100) / 100,
+      memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      uptimeSeconds: Math.round(process.uptime()),
+    };
   }
 }
 

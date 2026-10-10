@@ -17,6 +17,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
+import '../../../core/network/osm_tile_headers.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../domain/models/route_result.dart';
 import '../infrastructure/osmand_routing_service.dart';
@@ -537,6 +538,9 @@ class _MiniRouteMap extends StatelessWidget {
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.streetphare.app',
+              tileProvider: NetworkTileProvider(
+                headers: kStreetPhareTileHeaders,
+              ),
             ),
             if (pts.length >= 2)
               PolylineLayer(

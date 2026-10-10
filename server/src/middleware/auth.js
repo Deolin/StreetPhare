@@ -77,6 +77,8 @@ function authenticateToken(req, res, next) {
 
     req.user = {
       role: decoded.role,
+      username: decoded.username,
+      permissions: decoded.permissions || [],
       iat: decoded.iat,
       exp: decoded.exp,
     };
@@ -127,6 +129,23 @@ function requireRole(allowedRoles) {
   };
 }
 
+/// Crée un middleware qui vérifie que l'utilisateur possède une permission
+/// granulaire donnée. L'administrateur principal (rôle `admin`) a toutes
+/// les permissions ; les modérateurs (rôle `moderator`) doivent avoir la
+/// permission dans leur payload JWT.
+function requirePermission(permission) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(500).json({ error: 'Erreur de configuration du serveur' });
+    }
+    if (req.user.role === 'admin') return next();
+    if (Array.isArray(req.user.permissions) && req.user.permissions.includes(permission)) {
+      return next();
+    }
+    return res.status(403).json({ error: `Permission requise : ${permission}` });
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // UTILITAIRE : Vérification de token pour WebSocket (handshake)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -167,8 +186,12 @@ function verifyWsToken(url) {
     maxAge: config.jwtExpiresIn || '8h',
   });
 
-  if (!decoded || !decoded.role || decoded.role !== 'admin') {
-    throw new Error('Token WebSocket invalide : rôle admin requis');
+  if (!decoded || !decoded.role) {
+    throw new Error('Token WebSocket invalide : rôle manquant');
+  }
+
+  if (decoded.role !== 'admin' && decoded.role !== 'moderator') {
+    throw new Error('Token WebSocket invalide : rôle non autorisé');
   }
 
   log('AUTH', `WebSocket admin autorisé — rôle=${decoded.role}`);
@@ -178,5 +201,6 @@ function verifyWsToken(url) {
 module.exports = {
   authenticateToken,
   requireRole,
+  requirePermission,
   verifyWsToken,
 };

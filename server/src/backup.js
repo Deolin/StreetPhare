@@ -21,7 +21,11 @@ const config = require('./config');
 const store = require('./store');
 const sync = require('./sync');
 const apiRoutes = require('./routes/api');
+const adminRoutes = require('./routes/admin');
+const simulationRoutes = require('./routes/simulation');
 const { verifyWsToken } = require('./middleware/auth');
+const { setAdminBroadcaster, broadcast } = require('./services/broadcast');
+const { executeCommand } = require('./console');
 
 const app = express();
 
@@ -105,6 +109,8 @@ app.get('/admin', (req, res) => {
 app.use('/admin', express.static(path.join(__dirname, '..', 'public', 'admin')));
 app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 app.use('/api', apiRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/admin/simulation', simulationRoutes);
 
 app.get('/', (req, res) => {
   res.json({
@@ -197,7 +203,9 @@ adminWss.on('connection', (ws, req) => {
   try {
     ws.send(JSON.stringify({
       type: 'admin_snapshot',
-      alerts: store.getActiveAlerts(),
+      role: adminUser.role,
+      permissions: adminUser.permissions || [],
+      alerts: store.getAllAlerts().map(a => ({ ...a, votes: a.votes || [] })),
       events: store.getAllEvents(),
       syncState: store.syncState,
     }));
@@ -206,7 +214,15 @@ adminWss.on('connection', (ws, req) => {
   }
 
   ws.on('message', (data) => {
-    log('ADMIN', `Message (${adminUser.role}): ${data.toString().substring(0, 200)}`);
+    const msg = data.toString();
+    log('ADMIN', `Message (${adminUser.role}): ${msg.substring(0, 200)}`);
+    try {
+      const parsed = JSON.parse(msg);
+      if (parsed.type === 'console_cmd') {
+        const output = executeCommand(parsed.cmd || '', { broadcastFn: broadcast });
+        try { ws.send(JSON.stringify({ type: 'console_output', output })); } catch (_) {}
+      }
+    } catch (_) {}
   });
 
   ws.on('close', () => {
@@ -216,6 +232,26 @@ adminWss.on('connection', (ws, req) => {
 
   ws.on('error', (err) => log('ADMIN', `Erreur socket: ${err.message}`));
 });
+
+// ── Diffusion temps réel vers les clients admin ──────────────────────────
+setAdminBroadcaster((type, payload = {}) => {
+  const message = JSON.stringify({ type, ...payload });
+  for (const client of adminWss.clients) {
+    if (client.readyState === 1) {
+      try { client.send(message); } catch (_) {}
+    }
+  }
+});
+
+// ── Flux temps réel : nouvelle alerte → broadcast aux admins ─────────────
+store.on('alert_added', (alert) => {
+  broadcast('new_alert', { alert: { ...alert, votes: alert.votes || [] } });
+});
+
+// ── Métriques temps réel (widget de charge) ─────────────────────────────
+setInterval(() => {
+  broadcast('metrics', store.getMetrics());
+}, 3000);
 
 // ── Démarrage ───────────────────────────────────────────────────────────
 server.listen(config.backupPort, config.backupHost, () => {

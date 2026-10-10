@@ -32,6 +32,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
 import '../../../core/models/alert_model.dart';
+import '../../../core/network/osm_tile_headers.dart';
 import '../../../core/network/peer_counter_service.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
@@ -65,13 +66,13 @@ const _kEventColors = [
   Color(0xFF4CAF50), // Vert
 ];
 
-// CartoDB Positron (light) — gratuit, pas d'avertissement OSM
-// CartoDB Dark Matter (dark) — gratuit, thème sombre cohérent
-// Voir conditions : https://carto.com/help/working-with-data/attribution
-const _kTileUrlLight =
-    'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
-const _kTileUrlDark =
-    'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
+// OpenStreetMap Standard — tuiles gratuites, sans clé API.
+// Conforme à la politique d'utilisation des tuiles OSM :
+//   https://operations.osmfoundation.org/policies/tiles/
+// Le mode sombre est obtenu via `darkModeTileBuilder` (filtre invert+hue-rotate)
+// fourni par flutter_map, appliqué aux tuiles uniquement (pas aux marqueurs).
+const _kTileUrlLight = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const _kTileUrlDark = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 // ============================================================================
 // MapScreen
@@ -1518,6 +1519,9 @@ class _MapScreenState extends State<MapScreen> {
                                   key: ValueKey('tiles_$isDark'),
                                   urlTemplate: tileUrl,
                                   userAgentPackageName: 'com.streetphare.app',
+                                  tileProvider: NetworkTileProvider(
+                                    headers: kStreetPhareTileHeaders,
+                                  ),
                                   maxNativeZoom: 19,
                                   tileDisplay: const TileDisplay.fadeIn(
                                     duration: Duration(milliseconds: 350),

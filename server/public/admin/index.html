@@ -9,34 +9,39 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; display: flex; height: 100vh; }
     #map { flex: 1; height: 100vh; }
-    #panel { width: 420px; background: #161b22; border-left: 1px solid #30363d; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
-    h2 { color: #ff7b72; font-size: 18px; margin-bottom: 8px; }
-    h3 { color: #79c0ff; font-size: 14px; margin-bottom: 6px; }
-    .card { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; }
-    .card label { display: block; font-size: 12px; color: #8b949e; margin-bottom: 4px; }
-    .card input, .card textarea, .card select { width: 100%; background: #21262d; border: 1px solid #30363d; border-radius: 4px; padding: 8px; color: #c9d1d9; font-size: 13px; margin-bottom: 8px; }
-    .card button { background: #238636; color: white; border: none; border-radius: 4px; padding: 10px 16px; cursor: pointer; font-size: 13px; width: 100%; }
+    #panel { width: 460px; background: #161b22; border-left: 1px solid #30363d; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+    h2 { color: #ff7b72; font-size: 17px; }
+    h3 { color: #79c0ff; font-size: 13px; margin-bottom: 6px; }
+    .card { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; }
+    .card label { display: block; font-size: 11px; color: #8b949e; margin: 4px 0 2px; }
+    .card input, .card textarea, .card select { width: 100%; background: #21262d; border: 1px solid #30363d; border-radius: 4px; padding: 6px 8px; color: #c9d1d9; font-size: 12px; margin-bottom: 4px; }
+    .card button { background: #238636; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12px; }
     .card button:hover { background: #2ea043; }
     .card button.danger { background: #da3633; }
-    .card button.danger:hover { background: #f85149; }
-    #qr-container { text-align: center; margin-top: 12px; }
-    #qr-container img { max-width: 200px; border: 2px solid #30363d; border-radius: 6px; }
-    #status { font-size: 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 8px; }
-    #status .ok { color: #3fb950; }
-    #status .ko { color: #f85149; }
-    #alerts-list { max-height: 200px; overflow-y: auto; font-size: 12px; }
-    #alerts-list .alert-item { padding: 6px 0; border-bottom: 1px solid #21262d; }
-    .alert-item button { background: #da3633; color: white; border: none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 11px; }
-    .waypoint-row { display: flex; gap: 8px; margin-bottom: 4px; align-items: center; }
-    .waypoint-row input { flex: 1; margin-bottom: 0; }
-    .waypoint-row button { width: auto; padding: 4px 8px; background: #da3633; }
-    /* Login overlay */
+    .card button.small { padding: 2px 6px; font-size: 11px; }
+    #status { font-size: 11px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 8px; }
+    #status .ok { color: #3fb950; } #status .ko { color: #f85149; }
+    .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+    .tab { flex: 1; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; padding: 8px 4px; cursor: pointer; font-size: 12px; border-radius: 4px; }
+    .tab.active { background: #1f6feb; color: white; border-color: #1f6feb; }
+    .tab-content { display: flex; flex-direction: column; gap: 12px; }
+    .list { max-height: 220px; overflow-y: auto; font-size: 11px; }
+    .item { padding: 6px 0; border-bottom: 1px solid #21262d; }
+    .item .meta { color: #8b949e; font-size: 10px; }
+    .item button { background: #da3633; color: white; border: none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 10px; margin-right: 3px; }
+    .item button.ok { background: #238636; }
+    .item.selected { background: #1f2733; border-left: 3px solid #1f6feb; padding-left: 6px; cursor: pointer; }
+    .item { cursor: pointer; }
+    .filters label { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; font-size: 11px; cursor: pointer; }
+    #console-output { background: #000; color: #3fb950; font-family: 'Courier New', monospace; font-size: 11px; min-height: 200px; max-height: 280px; overflow-y: auto; padding: 8px; white-space: pre-wrap; border-radius: 4px; }
+    #console-input { font-family: 'Courier New', monospace; }
     #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 9999; }
     #login-box { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 32px; width: 360px; text-align: center; }
-    #login-box h2 { margin-bottom: 20px; }
     #login-box input { width: 100%; background: #21262d; border: 1px solid #30363d; border-radius: 4px; padding: 10px; color: #c9d1d9; font-size: 14px; margin-bottom: 12px; }
     #login-box button { background: #238636; color: white; border: none; border-radius: 4px; padding: 10px 16px; cursor: pointer; font-size: 14px; width: 100%; }
     #login-error { color: #f85149; font-size: 12px; margin-top: 8px; }
+    .perm-row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
+    .perm-row input { width: auto; margin: 0; }
   </style>
 </head>
 <body>
@@ -45,53 +50,150 @@
     <h2>🛡 StreetPhare Admin</h2>
     <div id="status">
       <span id="sync-status">⏳ Connexion...</span> |
-      Alertes actives: <span id="active-count">0</span> |
-      Utilisateurs mesh: <span id="mesh-count">0</span>
+      Alertes: <span id="active-count">0</span> |
+      Mesh: <span id="mesh-count">0</span>
     </div>
 
-    <div class="card">
-      <h3>📋 Signalements actifs</h3>
-      <div id="alerts-list">Aucun signalement</div>
+    <div class="tabs">
+      <button class="tab active" id="tab-btn-surveillance" onclick="switchTab('surveillance')">📡 Surveillance</button>
+      <button class="tab" id="tab-btn-edition" onclick="switchTab('edition')">✏️ Édition</button>
+      <button class="tab" id="tab-btn-controle" onclick="switchTab('controle')">👥 Contrôle</button>
+      <button class="tab" id="tab-btn-console" onclick="switchTab('console')">⌨️ Console</button>
+      <button class="tab" id="tab-btn-simulation" onclick="switchTab('simulation')">🧪 Simulation</button>
     </div>
 
-    <div class="card">
-      <h3>🎪 Créer une manifestation</h3>
-      <label>Code (ex: FLEURUS-TOUR)</label>
-      <input id="event-code" placeholder="MANIF-123">
-      <label>Titre</label>
-      <input id="event-title" placeholder="Le Tour de Fleurus">
-      <label>Début (ISO)</label>
-      <input id="event-start" type="datetime-local" title="Start time" placeholder="0.0000">
-      <label>Fin (ISO)</label>
-      <input id="event-end" type="datetime-local" title="End time" placeholder="60.00000">
-      <label>Destination Lat</label>
-      <input id="event-dest-lat" type="number" step="0.0001" placeholder="50.4762">
-      <label>Destination Lng</label>
-      <input id="event-dest-lng" type="number" step="0.0001" placeholder="4.5422">
-      <label>Route GeoJSON</label>
-      <textarea id="event-route" rows="2" placeholder='[[4.5422,50.4762],[4.5440,50.4780]]'></textarea>
-      <label>Waypoints (lat, lng, label, h+min)</label>
-      <div id="waypoints-container">
-        <div class="waypoint-row">
-          <input class="wp-label" placeholder="Label">
-          <input class="wp-lat" type="number" step="0.0001" placeholder="Lat">
-          <input class="wp-lng" type="number" step="0.0001" placeholder="Lng">
-          <input class="wp-min" type="number" placeholder="Min">
+    <!-- ── SURVEILLANCE ── -->
+    <div id="tab-surveillance" class="tab-content">
+      <div class="card">
+        <h3>🗂 Filtres de couches (Point & Click)</h3>
+        <div class="filters">
+          <label><input type="checkbox" data-layer="police" checked onchange="toggleLayer('police', this)">Police</label>
+          <label><input type="checkbox" data-layer="barrages" checked onchange="toggleLayer('barrages', this)">Barrages</label>
+          <label><input type="checkbox" data-layer="dangers" checked onchange="toggleLayer('dangers', this)">Dangers</label>
+          <label><input type="checkbox" data-layer="panic" checked onchange="toggleLayer('panic', this)">PANIC</label>
+          <label><input type="checkbox" data-layer="safe" checked onchange="toggleLayer('safe', this)">Safe zones</label>
+          <label><input type="checkbox" data-layer="events" checked onchange="toggleLayer('events', this)">Événements</label>
         </div>
       </div>
-      <button onclick="addWaypoint()">+ Ajouter waypoint</button>
-      <button onclick="createEvent()" style="margin-top:8px;">Créer + Générer QR Code</button>
-      <div id="qr-container"></div>
+      <div class="card">
+        <h3>📋 Flux de signalements</h3>
+        <div class="list" id="alerts-list">Aucun signalement</div>
+      </div>
+    </div>
+
+    <!-- ── ÉDITION ── -->
+    <div id="tab-edition" class="tab-content" style="display:none">
+      <div class="card">
+        <h3>💬 Tchat P2P / Relais</h3>
+        <div class="list" id="chat-list">Chargement…</div>
+        <button class="small" onclick="loadChat()">Rafraîchir</button>
+        <button class="small danger" onclick="banChatUser()">Ban UUID</button>
+      </div>
+      <div class="card">
+        <h3>🎪 Événement & Géorepérage</h3>
+        <label>Nom de zone</label><input id="zone-name" placeholder="ex: Zone de repli">
+        <label>Type</label>
+        <select id="zone-type"><option value="safe">Safe</option><option value="danger">Danger</option><option value="custom">Custom</option></select>
+        <label>Lat / Lng</label>
+        <input id="zone-lat" placeholder="Lat" type="number" step="0.0001">
+        <input id="zone-lng" placeholder="Lng" type="number" step="0.0001">
+        <button onclick="addZone()">➕ Ajouter zone</button>
+        <div class="list" id="zones-list">Aucune zone</div>
+      </div>
+    </div>
+
+    <!-- ── CONTRÔLE ── -->
+    <div id="tab-controle" class="tab-content" style="display:none">
+      <div class="card">
+        <h3>👥 Comptes modérateurs</h3>
+        <label>Nom d'utilisateur</label><input id="mod-username">
+        <label>Mot de passe</label><input id="mod-password" type="password">
+        <label>Permissions</label>
+        <div id="perm-list"></div>
+        <button onclick="createModerator()">➕ Créer modérateur</button>
+        <div class="list" id="mods-list">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- ── CONSOLE ── -->
+    <div id="tab-console" class="tab-content" style="display:none">
+      <div class="card">
+        <h3>⌨️ Console interactive</h3>
+        <div id="console-output">Bienvenue. Tapez "help" pour la liste des commandes.\n</div>
+        <input id="console-input" placeholder="commande…" onkeydown="if(event.key==='Enter')runConsole()">
+        <button onclick="runConsole()">Exécuter</button>
+      </div>
+    </div>
+
+    <!-- ── SIMULATION ── -->
+    <div id="tab-simulation" class="tab-content" style="display:none">
+      <div class="card">
+        <h3>🖱 Générateur "Point &amp; Click"</h3>
+        <label>Type d'entité (puis cliquez sur la carte)</label>
+        <select id="sim-entity-type" onchange="onSimTypeChange(this.value)"></select>
+        <div id="sim-mode-indicator" style="font-size:11px;color:#8b949e;margin-top:4px">Mode : inactif — choisissez un type puis cliquez sur la carte.</div>
+      </div>
+
+      <div class="card">
+        <h3>⚡ Injecteur de scénarios (Batch)</h3>
+        <div id="scenario-buttons"></div>
+      </div>
+
+      <div class="card">
+        <h3>🤖 Bots &amp; Déplacements</h3>
+        <label>Nombre de bots</label>
+        <input id="sim-bot-count" type="number" value="5" min="1" max="100">
+        <button onclick="simBots('start')">▶ Démarrer</button>
+        <button class="danger" onclick="simBots('stop')">■ Arrêter</button>
+      </div>
+
+      <div class="card">
+        <h3>🗳 Simulation du consensus</h3>
+        <button onclick="autoVoteAll()">Vote auto (consensus +3)</button>
+        <label>Ou ciblé :</label>
+        <input id="sim-vote-id" placeholder="alertId (cliquez une alerte pour remplir)">
+        <input id="sim-vote-up" type="number" value="3" title="upvotes">
+        <input id="sim-vote-down" type="number" value="0" title="downvotes">
+        <button onclick="simVotes()">Simuler votes</button>
+      </div>
+
+      <div class="card">
+        <h3>💬 Injecteur tchat P2P</h3>
+        <input id="sim-chat-count" type="number" value="10" min="1" max="200">
+        <button onclick="simChat()">Injecter messages</button>
+      </div>
+
+      <div class="card">
+        <h3>🧹 Nettoyage &amp; sécurité</h3>
+        <button class="danger" onclick="simPurge()">🧹 Purger la simulation</button>
+        <div style="font-size:10px;color:#8b949e;margin-top:4px">Supprime toutes les entités fictives sans toucher aux données réelles.</div>
+      </div>
+
+      <div class="card">
+        <h3>⌨ Raccourcis clavier</h3>
+        <div style="font-size:10px;color:#8b949e;line-height:1.6">
+          <b>Suppr</b> supprimer l'alerte sélectionnée ·
+          <b>V</b> valider ·
+          <b>Échap</b> désélectionner ·
+          <b>C</b> copier UUID/GPS ·
+          <b>1..6</b> couches carte
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>📈 Charge en direct</h3>
+        <canvas id="load-chart" width="420" height="110" style="width:100%;background:#0d1117;border:1px solid #30363d;border-radius:4px"></canvas>
+        <div id="load-stats" style="font-size:10px;color:#8b949e;margin-top:4px">—</div>
+      </div>
     </div>
   </div>
 
-  <!-- Login overlay -->
+  <!-- ── LOGIN ── -->
   <div id="login-overlay">
     <div id="login-box">
       <h2>🔐 Connexion Admin</h2>
-      <input id="login-user" type="text" placeholder="Nom d'utilisateur" value="admin" autocomplete="username">
-      <div style="display:none"><input type="password" autocomplete="current-password" value="block-browser-autofill"></div>
-      <input id="login-pass" type="password" placeholder="Mot de passe" autocomplete="off">
+      <input id="login-user" placeholder="Utilisateur" value="admin" autocomplete="username">
+      <input id="login-pass" type="password" placeholder="Mot de passe" autocomplete="current-password">
       <button onclick="doLogin()">Se connecter</button>
       <div id="login-error"></div>
     </div>
@@ -99,191 +201,454 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const map = L.map('map').setView([50.4762, 4.5422], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-    const markers = {};
+    /* ── État global ─────────────────────────────────────────────────── */
+    let ws, adminToken = '';
+    const map = L.map('map').setView([50.4762, 4.5422], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    const layerGroups = {};
+    const markersById = {};
+    let currentRole = '';
+    let currentPermissions = [];
+    const filters = { police: true, barrages: true, dangers: true, panic: true, safe: true, events: true };
 
-    let ws;
-    let currentHash = '';
-    let adminToken = '';
+    ['police', 'barrages', 'dangers', 'panic', 'safe', 'events'].forEach(k => {
+      layerGroups[k] = L.layerGroup().addTo(map);
+    });
+    const botsLayer = L.layerGroup().addTo(map);
+    const LAYER_KEYS = ['police', 'barrages', 'dangers', 'panic', 'safe', 'events'];
+    let simMode = null;
+    let selectedAlertId = null;
+    const loadHistory = [];
 
-    // Charger le token depuis sessionStorage si disponible.
     adminToken = sessionStorage.getItem('sp_admin_token') || '';
 
+    /* ── LOGIN ───────────────────────────────────────────────────────── */
     async function doLogin() {
       const user = document.getElementById('login-user').value;
       const pass = document.getElementById('login-pass').value;
-      const errorDiv = document.getElementById('login-error');
+      const err = document.getElementById('login-error');
       const btn = document.querySelector('#login-box button');
-      const overlay = document.getElementById('login-overlay');
-
-      btn.disabled = true;
-      btn.textContent = 'Connexion...';
-
+      btn.disabled = true; btn.textContent = 'Connexion...';
       try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: user, password: pass })
-        });
-        const data = await res.json();
-
+        const creds = { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: user, password: pass }) };
+        // 1) Connexion administrateur principal.
+        let data = await (await fetch('/api/auth/login', { method: 'POST', ...creds })).json();
+        // 2) Fallback : connexion compte modérateur.
+        if (!data.success) {
+          data = await (await fetch('/api/admin/moderators/login', { method: 'POST', ...creds })).json();
+        }
         if (data.success && data.token) {
           adminToken = data.token;
+          currentRole = data.role || 'admin';
+          currentPermissions = data.permissions || [];
           sessionStorage.setItem('sp_admin_token', data.token);
-
-          // Recharger la page pour que le nouveau token soit utilisé
-          // par le code d'initialisation (ligne ~156). Cela vide aussi
-          // tout vieux token expiré qui pourrait être en mémoire.
           window.location.reload();
         } else {
-          errorDiv.textContent = data.error || 'Identifiants invalides';
-          btn.disabled = false;
-          btn.textContent = 'Se connecter';
+          err.textContent = data.error || 'Identifiants invalides';
+          btn.disabled = false; btn.textContent = 'Se connecter';
         }
       } catch (e) {
-        errorDiv.textContent = 'Erreur réseau.';
-        btn.disabled = false;
-        btn.textContent = 'Se connecter';
+        err.textContent = 'Erreur réseau.';
+        btn.disabled = false; btn.textContent = 'Se connecter';
       }
     }
 
-    // Si un token existe, on cache l'overlay et on tente la connexion WebSocket.
-    // Le `ws.onerror` réaffichera l'overlay si le token est véritablement invalide.
+    /* ── INIT ────────────────────────────────────────────────────────── */
     if (adminToken) {
       document.getElementById('login-overlay').style.display = 'none';
-      document.getElementById('sync-status').innerHTML = '<span class="ok">● Connexion...</span>';
-      try { connect(); } catch (_) { /* ignore */ }
+      try { connect(); } catch (_) {}
+    }
+    document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+    /* ── WEBSOCKET ───────────────────────────────────────────────────── */
+    function connect() {
+      if (!adminToken) return;
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${location.host}/admin-ws?token=${encodeURIComponent(adminToken)}`);
+      ws.onmessage = (e) => {
+        let d; try { d = JSON.parse(e.data); } catch (_) { return; }
+        if (d.type === 'admin_snapshot') {
+          currentRole = d.role || 'admin';
+          currentPermissions = d.permissions || [];
+          renderAlerts(d.alerts || []);
+          renderEvents(d.events || []);
+          updateStatus(d.syncState);
+          loadZones();
+        } else if (d.type === 'new_alert') {
+          addAlertMarker(d.alert);
+          refreshSnapshot();
+        } else if (d.type === 'report_updated') {
+          refreshSnapshot();
+        } else if (d.type === 'geofencing_changed') {
+          loadZones();
+        } else if (d.type === 'global_alert') {
+          notify(d.message || 'Alerte globale');
+        } else if (d.type === 'console_output') {
+          appendConsole(d.output);
+        } else if (d.type === 'bot_update') {
+          renderBots(d.bots || []);
+        } else if (d.type === 'chat_message') {
+          if (d.text) notify('💬 ' + d.text);
+        } else if (d.type === 'simulation_changed') {
+          refreshSnapshot(); loadZones();
+        } else if (d.type === 'panic') {
+          notify('🚨 PANIC ' + (d.collective ? 'collectif' : 'individuel') + ' (' + d.count + ' ping)');
+        } else if (d.type === 'metrics') {
+          updateLoadChart(d);
+        }
+      };
+      ws.onopen = () => {
+        document.getElementById('sync-status').innerHTML = '<span class="ok">● Connecté (Live)</span>';
+        loadZones(); loadModerators(); loadSimTypes();
+      };
+      ws.onclose = async () => {
+        document.getElementById('sync-status').innerHTML = '<span class="ko">● Déconnecté — reconnexion…</span>';
+        const valid = await verifyToken();
+        if (valid) setTimeout(connect, 3000);
+        else { sessionStorage.removeItem('sp_admin_token'); adminToken = ''; document.getElementById('login-overlay').style.display = 'flex'; }
+      };
+      ws.onerror = () => {};
+    }
+    async function verifyToken() {
+      try {
+        const r = await fetch('/api/auth/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: adminToken }) });
+        const d = await r.json(); return d.valid === true;
+      } catch (_) { return true; }
+    }
+    function refreshSnapshot() {
+      fetch('/api/admin/reports', { headers: { 'Authorization': `Bearer ${adminToken}` } })
+        .then(r => r.json()).then(d => renderAlerts(d.alerts || [])).catch(() => {});
+    }
+    function notify(msg) {
+      const el = document.getElementById('alerts-list');
+      el.insertAdjacentHTML('afterbegin', `<div class="item" style="color:#ff7b72">🚨 ${escapeHtml(msg)}</div>`);
     }
 
-    // Permettre la connexion via Entrée
-    document.getElementById('login-pass').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') doLogin();
+    /* ── ONGLETS ─────────────────────────────────────────────────────── */
+    function switchTab(name) {
+      ['surveillance', 'edition', 'controle', 'console', 'simulation'].forEach(t => {
+        document.getElementById('tab-' + t).style.display = (t === name) ? 'flex' : 'none';
+        document.getElementById('tab-btn-' + t).classList.toggle('active', t === name);
+      });
+      if (name === 'simulation') loadSimTypes();
+    }
+
+    /* ── CARTE ───────────────────────────────────────────────────────── */
+    function layerKeyFor(type) {
+      if (type === 'policiers' || type === 'police') return 'police';
+      if (type === 'barrage') return 'barrages';
+      if (type === 'panic') return 'panic';
+      return 'dangers';
+    }
+    function addAlertMarker(a) {
+      const key = layerKeyFor(a.type);
+      const color = key === 'police' ? '#79c0ff' : key === 'barrages' ? '#ffa657' : key === 'panic' ? '#f85149' : '#d29922';
+      const marker = L.circleMarker([a.lat, a.lng], { radius: 8, color, fillOpacity: 0.7 })
+        .bindPopup(`<b>${escapeHtml(a.type)}</b><br>${escapeHtml(a.description || '')}<br><small>${a.id}</small><br><small>votes=${(a.votes || []).length} statut=${a.status}</small><br><button onclick="copyText('${a.id}')">📋 UUID</button> <button onclick="copyText('${a.lat}, ${a.lng}')">📍 GPS</button>`);
+      marker.addTo(layerGroups[key]);
+      markersById[a.id] = marker;
+    }
+    function renderAlerts(alerts) {
+      Object.keys(markersById).forEach(id => { try { map.removeLayer(markersById[id]); } catch (_) {} delete markersById[id]; });
+      document.getElementById('active-count').textContent = alerts.length;
+      const list = document.getElementById('alerts-list');
+      if (!alerts.length) { list.innerHTML = 'Aucun signalement'; return; }
+      list.innerHTML = alerts.map(a => `
+        <div class="item ${selectedAlertId === a.id ? 'selected' : ''}" data-alert="${a.id}" onclick="selectAlert('${a.id}')">
+          <b>${escapeHtml(a.type)}</b> <span class="meta">(${a.status}) votes=${(a.votes||[]).length}</span>
+          ${a.simulated ? '<span class="meta" style="color:#bc8cff"> [SIM]</span>' : ''}<br>
+          <button class="ok" onclick="event.stopPropagation();validateReport('${a.id}')">Valider</button>
+          <button onclick="event.stopPropagation();rejectReport('${a.id}')">Rejeter</button>
+          <button onclick="event.stopPropagation();deleteReport('${a.id}')">Suppr.</button>
+          <button onclick="event.stopPropagation();copyText('${a.id}')">📋</button>
+        </div>`).join('');
+      alerts.forEach(a => addAlertMarker(a));
+      toggleLayers();
+    }
+    function renderEvents(events) {
+      layerGroups.events.clearLayers();
+      (events || []).forEach(ev => {
+        if (ev.destinationLatitude != null && ev.destinationLongitude != null) {
+          L.marker([ev.destinationLatitude, ev.destinationLongitude]).addTo(layerGroups.events).bindPopup(`<b>${ev.title || ev.code}</b>`);
+        }
+      });
+    }
+    function toggleLayer(key, cb) { filters[key] = cb.checked; toggleLayers(); }
+    function toggleLayers() {
+      Object.keys(layerGroups).forEach(k => {
+        if (filters[k]) { if (!map.hasLayer(layerGroups[k])) layerGroups[k].addTo(map); }
+        else { if (map.hasLayer(layerGroups[k])) map.removeLayer(layerGroups[k]); }
+      });
+    }
+    function updateStatus(syncState) {
+      document.getElementById('sync-status').innerHTML = '<span class="ok">● Connecté (Live)</span>';
+      if (syncState) document.getElementById('mesh-count').textContent = syncState.meshClients || 0;
+    }
+
+    /* ── MODÉRATION SIGNALEMENTS ─────────────────────────────────────── */
+    async function validateReport(id) { await modReport(id, 'validate'); }
+    async function rejectReport(id) { await modReport(id, 'reject'); }
+    async function deleteReport(id) { await modReport(id, null, 'DELETE'); }
+    async function modReport(id, action, method = 'POST') {
+      const path = method === 'DELETE' ? `/api/admin/reports/${id}` : `/api/admin/reports/${id}/${action}`;
+      await fetch(path, { method, headers: { 'Authorization': `Bearer ${adminToken}` } });
+      refreshSnapshot();
+    }
+
+    /* ── TCHAT ───────────────────────────────────────────────────────── */
+    async function loadChat() {
+      const r = await fetch('/api/admin/chat', { headers: { 'Authorization': `Bearer ${adminToken}` } });
+      if (!r.ok) { document.getElementById('chat-list').innerHTML = 'Accès refusé (permission chatModerate)'; return; }
+      const d = await r.json();
+      const list = document.getElementById('chat-list');
+      if (!d.messages.length) { list.innerHTML = 'Aucun message'; return; }
+      list.innerHTML = d.messages.map(m => {
+        const body = (m.data && m.data.text) || (m.data && m.data.kind) || JSON.stringify(m.data || {}).slice(0, 80);
+        return `<div class="item">
+          <span class="meta">${escapeHtml(m.senderId || '?')}</span><br>${escapeHtml(body)}<br>
+          <button onclick="deleteChat('${m.id}')">Supprimer</button>
+          <button onclick="banUuid('${m.senderId || ''}')">Ban</button>
+        </div>`;
+      }).join('');
+    }
+    async function deleteChat(id) {
+      await fetch(`/api/admin/chat/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } });
+      loadChat();
+    }
+    async function banUuid(uuid) {
+      if (!uuid) return;
+      await fetch('/api/admin/chat/ban', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` }, body: JSON.stringify({ uuid }) });
+    }
+    async function banChatUser() {
+      const uuid = prompt('UUID de l\'émetteur à bannir :');
+      if (uuid) await banUuid(uuid);
+    }
+
+    /* ── GÉOREPÉRAGE ─────────────────────────────────────────────────── */
+    async function addZone() {
+      const name = document.getElementById('zone-name').value;
+      const type = document.getElementById('zone-type').value;
+      const lat = parseFloat(document.getElementById('zone-lat').value);
+      const lng = parseFloat(document.getElementById('zone-lng').value);
+      await fetch('/api/admin/geofencing', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` }, body: JSON.stringify({ name, type, lat, lng, radiusMeters: 100 }) });
+      loadZones();
+    }
+    async function loadZones() {
+      const r = await fetch('/api/admin/geofencing', { headers: { 'Authorization': `Bearer ${adminToken}` } });
+      if (!r.ok) return;
+      const d = await r.json();
+      renderZones(d.zones || []);
+    }
+    function renderZones(zones) {
+      layerGroups.safe.clearLayers();
+      const list = document.getElementById('zones-list');
+      if (!zones.length) { list.innerHTML = 'Aucune zone'; return; }
+      list.innerHTML = zones.map(z => `<div class="item"><b>${escapeHtml(z.name)}</b> (${z.type}) r=${z.radiusMeters}m <button onclick="deleteZone('${z.id}')">✕</button></div>`).join('');
+      zones.forEach(z => {
+        const color = z.type === 'danger' ? '#f85149' : '#3fb950';
+        L.circle([z.lat, z.lng], { radius: z.radiusMeters, color, fillOpacity: 0.15 }).addTo(layerGroups.safe).bindPopup(`<b>${z.name}</b> (${z.type})`);
+      });
+    }
+    async function deleteZone(id) {
+      await fetch(`/api/admin/geofencing/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } });
+      loadZones();
+    }
+
+    /* ── MODÉRATEURS ─────────────────────────────────────────────────── */
+    async function loadModerators() {
+      if (currentRole !== 'admin') return;
+      const r = await fetch('/api/admin/moderators', { headers: { 'Authorization': `Bearer ${adminToken}` } });
+      if (!r.ok) return;
+      const d = await r.json();
+      renderPerms(d.permissions || []);
+      const list = document.getElementById('mods-list');
+      if (!d.moderators.length) { list.innerHTML = 'Aucun modérateur'; return; }
+      list.innerHTML = d.moderators.map(m => `<div class="item"><b>${escapeHtml(m.username)}</b><br><span class="meta">${(m.permissions||[]).join(', ') || 'aucune'}</span><br><button onclick="deleteModerator('${m.id}')">Supprimer</button></div>`).join('');
+    }
+    function renderPerms(perms) {
+      document.getElementById('perm-list').innerHTML = perms.map(p => `<div class="perm-row"><input type="checkbox" id="perm-${p}" value="${p}"><label for="perm-${p}">${p}</label></div>`).join('');
+    }
+    async function createModerator() {
+      const username = document.getElementById('mod-username').value;
+      const password = document.getElementById('mod-password').value;
+      const permissions = Array.from(document.querySelectorAll('#perm-list input:checked')).map(i => i.value);
+      await fetch('/api/admin/moderators', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` }, body: JSON.stringify({ username, password, permissions }) });
+      loadModerators();
+    }
+    async function deleteModerator(id) {
+      await fetch(`/api/admin/moderators/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } });
+      loadModerators();
+    }
+
+    /* ── CONSOLE ─────────────────────────────────────────────────────── */
+    function runConsole() {
+      const inp = document.getElementById('console-input');
+      const cmd = inp.value.trim();
+      if (!cmd) return;
+      appendConsole('> ' + cmd);
+      inp.value = '';
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'console_cmd', cmd }));
+    }
+    function appendConsole(text) {
+      const out = document.getElementById('console-output');
+      out.textContent += text + '\n';
+      out.scrollTop = out.scrollHeight;
+    }
+
+    /* ── SIMULATION ─────────────────────────────────────────────────── */
+    function authHeaders() {
+      return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` };
+    }
+    async function copyText(text) {
+      try { await navigator.clipboard.writeText(String(text)); notify('📋 Copié : ' + text); }
+      catch (_) { prompt('Copier manuellement (Ctrl+C) :', String(text)); }
+    }
+    function selectAlert(id) {
+      selectedAlertId = (selectedAlertId === id) ? null : id;
+      document.getElementById('sim-vote-id').value = selectedAlertId || '';
+      document.querySelectorAll('#alerts-list .item').forEach(el => {
+        el.classList.toggle('selected', el.getAttribute('data-alert') === selectedAlertId);
+      });
+    }
+    function clearSelection() {
+      selectedAlertId = null;
+      document.getElementById('sim-vote-id').value = '';
+      document.querySelectorAll('#alerts-list .item.selected').forEach(el => el.classList.remove('selected'));
+    }
+    async function loadSimTypes() {
+      try {
+        const r = await fetch('/api/admin/simulation/entity-types', { headers: { 'Authorization': `Bearer ${adminToken}` } });
+        if (!r.ok) return;
+        const d = await r.json();
+        const sel = document.getElementById('sim-entity-type');
+        if (sel.options.length <= 1) {
+          sel.innerHTML = '<option value="">— Choisir un type —</option>' +
+            d.types.map(t => `<option value="${t.id}">${t.label}</option>`).join('');
+        }
+        document.getElementById('scenario-buttons').innerHTML =
+          Object.entries(d.scenarios).map(([k, v]) => `<button onclick="injectScenario('${k}')" title="${escapeHtml(v.description)}">${escapeHtml(v.label)}</button>`).join('');
+      } catch (_) {}
+    }
+    function onSimTypeChange(value) {
+      simMode = value || null;
+      const ind = document.getElementById('sim-mode-indicator');
+      if (simMode) {
+        map.getContainer().style.cursor = 'crosshair';
+        ind.textContent = '🎯 Mode actif : ' + value + ' — cliquez sur la carte (Échap pour désactiver).';
+      } else {
+        map.getContainer().style.cursor = '';
+        ind.textContent = 'Mode : inactif — choisissez un type puis cliquez sur la carte.';
+      }
+    }
+    async function generateAt(typeId, lat, lng) {
+      let endpoint = '/api/admin/simulation/alert', body = { type: typeId, lat, lng };
+      if (typeId === 'panic' || typeId === 'panic_collective') { endpoint = '/api/admin/simulation/panic'; body = { lat, lng, collective: typeId === 'panic_collective' }; }
+      else if (typeId === 'safe_zone' || typeId === 'zone') { endpoint = '/api/admin/simulation/zone'; body = { lat, lng, type: typeId === 'safe_zone' ? 'safe' : 'custom', name: typeId === 'safe_zone' ? 'Safe Zone SIM' : 'Zone SIM', radiusMeters: 120 }; }
+      else if (typeId === 'waypoint') { endpoint = '/api/admin/simulation/waypoint'; body = { lat, lng, name: 'Point SIM' }; }
+      try { await fetch(endpoint, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) }); } catch (_) {}
+    }
+    async function injectScenario(name) {
+      await fetch('/api/admin/simulation/scenario', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ name }) });
+    }
+    async function simBots(action) {
+      const count = parseInt(document.getElementById('sim-bot-count').value, 10) || 5;
+      await fetch('/api/admin/simulation/bots', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ action, count }) });
+    }
+    async function simVotes() {
+      const alertId = document.getElementById('sim-vote-id').value.trim();
+      if (!alertId) { notify('⚠ Sélectionnez une alerte ou saisissez un alertId'); return; }
+      const upvotes = parseInt(document.getElementById('sim-vote-up').value, 10) || 0;
+      const downvotes = parseInt(document.getElementById('sim-vote-down').value, 10) || 0;
+      await fetch('/api/admin/simulation/votes', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ alertId, upvotes, downvotes }) });
+    }
+    async function autoVoteAll() {
+      await fetch('/api/admin/simulation/auto-vote', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ upvotesPerAlert: 3 }) });
+    }
+    async function simChat() {
+      const count = parseInt(document.getElementById('sim-chat-count').value, 10) || 10;
+      await fetch('/api/admin/simulation/chat', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ count }) });
+    }
+    async function simPurge() {
+      const r = await fetch('/api/admin/simulation/purge', { method: 'POST', headers: authHeaders() });
+      const d = await r.json().catch(() => ({}));
+      notify('🧹 Simulation purgée : ' + JSON.stringify(d.removed || {}));
+      refreshSnapshot(); loadZones();
+    }
+    function renderBots(bots) {
+      botsLayer.clearLayers();
+      (bots || []).forEach(b => {
+        L.circleMarker([b.lat, b.lng], { radius: 5, color: '#bc8cff', fillOpacity: 0.8 })
+          .addTo(botsLayer)
+          .bindPopup(`<b>${escapeHtml(b.name)}</b><br><small>${b.id}</small><br><button onclick="copyText('${b.id}')">📋 UUID</button> <button onclick="copyText('${b.lat}, ${b.lng}')">📍 GPS</button>`);
+      });
+    }
+
+    /* ── CARTE : clic → génération ───────────────────────────────────── */
+    map.on('click', (e) => {
+      if (!simMode) return;
+      generateAt(simMode, e.latlng.lat, e.latlng.lng);
     });
 
-    function connect() {
-      if (!adminToken) {
-        document.getElementById('sync-status').innerHTML = '<span class="ko">● Token manquant</span>';
-        return;
+    /* ── RACCOURCIS CLAVIER ──────────────────────────────────────────── */
+    document.addEventListener('keydown', (e) => {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return;
+      if (e.key === 'Delete') {
+        if (selectedAlertId) { deleteReport(selectedAlertId); clearSelection(); }
+      } else if (e.key === 'v' || e.key === 'V') {
+        if (selectedAlertId) validateReport(selectedAlertId);
+      } else if (e.key === 'Escape') {
+        if (simMode) { simMode = null; onSimTypeChange(''); document.getElementById('sim-entity-type').value = ''; }
+        else clearSelection();
+      } else if (e.key === 'c' || e.key === 'C') {
+        if (selectedAlertId) copyText(selectedAlertId);
+      } else if (e.key >= '1' && e.key <= '6') {
+        const key = LAYER_KEYS[parseInt(e.key, 10) - 1];
+        if (key) { filters[key] = !filters[key]; toggleLayers(); }
       }
+    });
 
-      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${location.host}/admin-ws?token=${encodeURIComponent(adminToken)}`;
-      ws = new WebSocket(wsUrl);
-
-      ws.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        if (data.type === 'admin_snapshot') {
-          updateAlerts(data.alerts || []);
-          updateStatus(data.syncState);
-        }
-        if (data.type === 'new_alert') updateAlerts([data.alert]);
-      };
-      ws.onopen = () => document.getElementById('sync-status').innerHTML = '<span class="ok">● Connecté</span>';
-      ws.onclose = () => {
-        document.getElementById('sync-status').innerHTML = '<span class="ko">● Déconnecté — reconnexion dans 3s</span>';
-        setTimeout(connect, 3000);
-      };
-      ws.onerror = () => {
-        // Si le WebSocket échoue avec un code 400/401, le token est invalide.
-        // On efface le token et on ré-affiche l'overlay.
-        sessionStorage.removeItem('sp_admin_token');
-        adminToken = '';
-        document.getElementById('login-overlay').style.display = 'flex';
-        document.getElementById('sync-status').innerHTML = '<span class="ko">● Session expirée — reconnectez-vous</span>';
-      };
+    /* ── GRAPHIQUE DE CHARGE ─────────────────────────────────────────── */
+    function updateLoadChart(metrics) {
+      loadHistory.push({ t: Date.now(), alerts: metrics.alertsActive, msgs: metrics.messagesPerSec, mem: metrics.memoryMB, mesh: metrics.meshClients });
+      if (loadHistory.length > 60) loadHistory.shift();
+      drawLoadChart();
+      document.getElementById('load-stats').textContent =
+        `Mesh: ${metrics.meshClients} | Admin: ${metrics.adminClients} | Alertes actives: ${metrics.alertsActive} | msg/s: ${metrics.messagesPerSec} | Mémoire: ${metrics.memoryMB} MB | Uptime: ${metrics.uptimeSeconds}s`;
     }
-
-    function updateAlerts(alerts) {
-      const list = document.getElementById('alerts-list');
-      document.getElementById('active-count').textContent = alerts.length;
-      if (!alerts.length) { list.innerHTML = 'Aucun signalement'; return; }
-      list.innerHTML = alerts.map(a => `<div class="alert-item">
-        <strong>${a.type}</strong> (${(a.votes||[]).length} votes) — ${a.description || 'Sans description'}<br>
-        <small>${a.lat.toFixed(4)}, ${a.lng.toFixed(4)}</small>
-        <button onclick="rejectAlert('${a.id}')">❌ Révoquer</button>
-      </div>`).join('');
-
-      alerts.forEach(a => {
-        const key = a.id;
-        if (markers[key]) { markers[key].setLatLng([a.lat, a.lng]); return; }
-        markers[key] = L.marker([a.lat, a.lng]).addTo(map)
-          .bindPopup(`<b>${a.type}</b><br>${a.description || ''}<br><small>${a.id}</small>`);
-      });
-    }
-
-    function updateStatus(syncState) {
-      document.getElementById('sync-status').innerHTML = '<span class="ok">● Connecté</span>';
-      if (syncState) {
-        document.getElementById('mesh-count').textContent = syncState.meshClients || 0;
+    function drawLoadChart() {
+      const canvas = document.getElementById('load-chart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) { const y = (h / 4) * i; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+      if (loadHistory.length < 2) return;
+      const maxAlerts = Math.max(5, ...loadHistory.map(p => p.alerts));
+      const maxMsgs = Math.max(1, ...loadHistory.map(p => p.msgs));
+      const maxMem = Math.max(100, ...loadHistory.map(p => p.mem));
+      function drawLine(key, max, color) {
+        ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+        loadHistory.forEach((p, i) => {
+          const x = (i / (loadHistory.length - 1)) * w;
+          const y = h - (p[key] / max) * (h - 10) - 6;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
       }
+      drawLine('alerts', maxAlerts, '#ff7b72');
+      drawLine('msgs', maxMsgs, '#79c0ff');
+      drawLine('mem', maxMem, '#3fb950');
+      ctx.fillStyle = '#8b949e'; ctx.font = '10px sans-serif';
+      ctx.fillText('■ alertes  ■ msg/s  ■ mémoire(MB)', 6, 11);
     }
 
-    async function rejectAlert(id) {
-      if (!adminToken) { alert('Token admin manquant'); return; }
-      const res = await fetch(`/api/alerts/${id}/reject`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminToken}`
-        }
-      });
-      if (res.ok) {
-        delete markers[id];
-        if (ws && ws.readyState === WebSocket.OPEN) connect(); // refresh via snapshot
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Erreur lors de la révocation');
-      }
-    }
-
-    function addWaypoint() {
-      const div = document.createElement('div');
-      div.className = 'waypoint-row';
-      div.innerHTML = '<input class="wp-label" placeholder="Label"><input class="wp-lat" type="number" step="0.0001" placeholder="Lat"><input class="wp-lng" type="number" step="0.0001" placeholder="Lng"><input class="wp-min" type="number" placeholder="Min"><button onclick="this.parentElement.remove()">✕</button>';
-      document.getElementById('waypoints-container').appendChild(div);
-    }
-
-    async function createEvent() {
-      if (!adminToken) { alert('Token admin manquant'); return; }
-
-      const code = document.getElementById('event-code').value;
-      const title = document.getElementById('event-title').value;
-      const startAt = document.getElementById('event-start').value;
-      const endAt = document.getElementById('event-end').value;
-      const destLat = parseFloat(document.getElementById('event-dest-lat').value);
-      const destLng = parseFloat(document.getElementById('event-dest-lng').value);
-      const route = document.getElementById('event-route').value;
-
-      const wpRows = document.querySelectorAll('#waypoints-container .waypoint-row');
-      const waypoints = Array.from(wpRows).map(r => ({
-        label: r.querySelector('.wp-label').value,
-        latitude: parseFloat(r.querySelector('.wp-lat').value),
-        longitude: parseFloat(r.querySelector('.wp-lng').value),
-        scheduledAt: new Date(new Date(startAt).getTime() + parseInt(r.querySelector('.wp-min').value || '0') * 60000).toISOString(),
-      }));
-
-      const body = {
-        code, title, startAt, endAt: endAt || null, visibleAt: startAt,
-        routeGeoJson: route, waypoints, pois: [], careCenters: [], exitPoints: [], safeZones: [],
-        destinationLatitude: destLat, destinationLongitude: destLng
-      };
-
-      const res = await fetch('/api/events/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminToken}`
-        },
-        body: JSON.stringify(body)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        document.getElementById('qr-container').innerHTML = `<p><b>Code:</b> ${data.code}</p><p>QR Code (scannez avec StreetPhare) :</p><img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(JSON.stringify(data))}" alt="QR Code">`;
-      } else {
-        alert(data.error || 'Erreur création événement');
-      }
-    }
+    function escapeHtml(s) { return String(s || '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
   </script>
 </body>
 </html>
+

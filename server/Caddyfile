@@ -45,6 +45,26 @@ streetphare.ddns.net {
 		format json
 	}
 
+	# ── Chemin WebSocket /admin-ws (dashboard administrateur) ───────────
+	handle /admin-ws* {
+		reverse_proxy 127.0.0.1:3000 {
+			header_up Host {host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Real-IP {remote_host}
+			header_up Origin {header.origin}
+			# FIX admin : transférer explicitement le handshake WebSocket
+			# (Upgrade + Connection) pour le dashboard admin, comme pour /mesh.
+			# Sans cela, la connexion WebSocket du panneau admin peut échouer
+			# (code 1006) et forcer une boucle de reconnexion de l'invite.
+			header_up Upgrade {header.upgrade}
+			header_up Connection {header.connection}
+
+			transport http {
+				dial_timeout 10s
+			}
+		}
+	}
+
 	# ── Toutes les autres routes (API REST, admin, etc.) ───────────────
 	handle {
 		reverse_proxy 127.0.0.1:3000 {

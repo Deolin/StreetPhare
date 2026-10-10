@@ -28,7 +28,11 @@ const config = require('./config');
 const store = require('./store');
 const sync = require('./sync');
 const apiRoutes = require('./routes/api');
+const adminRoutes = require('./routes/admin');
+const simulationRoutes = require('./routes/simulation');
 const { verifyWsToken } = require('./middleware/auth');
+const { setAdminBroadcaster, broadcast } = require('./services/broadcast');
+const { executeCommand } = require('./console');
 
 const app = express();
 
@@ -139,6 +143,8 @@ app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 
 // ── Routes API ──────────────────────────────────────────────────────────
 app.use('/api', apiRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/admin/simulation', simulationRoutes);
 
 // ── Page d'accueil ──────────────────────────────────────────────────────
 app.get('/', (req, res) => {
@@ -180,8 +186,7 @@ server.on('upgrade', (request, socket, head) => {
 // - maxPayload: limite la taille des messages pour éviter les crashs OOM
 // - skipUTF8Validation: true pour les clients compatibles (perf)
 const wss = new WebSocketServer({
-  server,
-  path: '/mesh',
+  noServer: true,
   maxPayload: 512 * 1024, // 512 Ko max par message (évite crash OOM sur welcome massif)
   clientTracking: true,
   // FIX v3.3.4 — Désactiver la compression permessage-deflate.
@@ -430,8 +435,7 @@ wss.on('connection', (ws, req) => {
 //   wss://host:3000/admin-ws?token=eyJ...
 // La vérification est effectuée par verifyClient avant l'upgrade.
 const adminWss = new WebSocketServer({
-  server,
-  path: '/admin-ws',
+  noServer: true,
   maxPayload: 512 * 1024,
   verifyClient: (info, cb) => {
     const reqUrl = info.req.url || '';
@@ -458,18 +462,15 @@ adminWss.on('connection', (ws, req) => {
   try {
     ws.send(JSON.stringify({
       type: 'admin_snapshot',
-      alerts: store.getActiveAlerts(),
+      role: adminUser.role,
+      permissions: adminUser.permissions || [],
+      alerts: store.getAllAlerts().map(a => ({ ...a, votes: a.votes || [] })),
       events: store.getAllEvents(),
       syncState: store.syncState,
     }));
   } catch (e) {
     log('ADMIN', `Erreur envoi snapshot: ${e.message}`);
   }
-
-  ws.on('message', (data) => {
-    const msg = data.toString();
-    log('ADMIN', `Message admin (${adminUser.role}): ${msg.substring(0, 200)}`);
-  });
 
   ws.on('close', () => {
     store.adminClients.delete(ws);
@@ -479,6 +480,63 @@ adminWss.on('connection', (ws, req) => {
   ws.on('error', (err) => {
     log('ADMIN', `Erreur socket: ${err.message}`);
   });
+
+  // ── Console d'administration interactive ────────────────────────────────
+  ws.on('message', (data) => {
+    const msg = data.toString();
+    log('ADMIN', `Message admin (${adminUser.role}): ${msg.substring(0, 200)}`);
+    try {
+      const parsed = JSON.parse(msg);
+      if (parsed.type === 'console_cmd') {
+        const output = executeCommand(parsed.cmd || '', { broadcastFn: broadcast });
+        try { ws.send(JSON.stringify({ type: 'console_output', output })); } catch (_) {}
+      }
+    } catch (_) {
+      // message non-JSON : ignoré
+    }
+  });
+});
+
+// ── Diffusion temps réel vers les clients admin ──────────────────────────
+setAdminBroadcaster((type, payload = {}) => {
+  const message = JSON.stringify({ type, ...payload });
+  for (const client of adminWss.clients) {
+    if (client.readyState === 1) {
+      try { client.send(message); } catch (_) {}
+    }
+  }
+});
+
+// ── Flux temps réel : nouvelle alerte → broadcast aux admins ─────────────
+store.on('alert_added', (alert) => {
+  broadcast('new_alert', { alert: { ...alert, votes: alert.votes || [] } });
+});
+
+// ── Métriques temps réel (widget de charge) ─────────────────────────────
+setInterval(() => {
+  broadcast('metrics', store.getMetrics());
+}, 3000);
+
+// ── Routage des connexions WebSocket (mesh + admin) ──────────────────────
+// Un SEUL listener `upgrade` route vers le bon WebSocketServer.
+// Avoir plusieurs WebSocketServer attachés au même `server` via { server, path }
+// provoque des rejets 400 croisés : chaque serveur abortait le chemin de
+// l'autre (abortHandshake 400 quand shouldHandle retourne false).
+server.on('upgrade', (req, socket, head) => {
+  let pathname;
+  try {
+    pathname = new URL(req.url, 'http://localhost').pathname;
+  } catch (_) {
+    pathname = (req.url || '').split('?')[0];
+  }
+
+  if (pathname === '/mesh') {
+    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+  } else if (pathname === '/admin-ws') {
+    adminWss.handleUpgrade(req, socket, head, (ws) => adminWss.emit('connection', ws, req));
+  } else {
+    socket.destroy();
+  }
 });
 
 // ── Synchronisation périodique avec exponential backoff ─────────────────

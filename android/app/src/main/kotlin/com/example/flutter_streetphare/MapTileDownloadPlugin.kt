@@ -62,6 +62,13 @@ class MapTileDownloadPlugin(private val context: Context) : MethodChannel.Method
 
         /// Base URL publique OpenStreetMap (fallback).
         const val OSM_TILE_BASE = "https://tile.openstreetmap.org"
+
+        /// User-Agent conforme à la politique OSM (identification de l'app).
+        const val USER_AGENT =
+            "StreetPhareApp/2.2 (com.streetphare.app; contact@streetphare.app)"
+
+        /// Referer transmis avec les requêtes de tuiles.
+        const val REFERER = "https://streetphare.app/"
     }
 
     // ── Gestion des téléchargements en cours ────────────────────────────────
@@ -268,6 +275,11 @@ class MapTileDownloadPlugin(private val context: Context) : MethodChannel.Method
                 setAllowedOverRoaming(true)
                 // Pas de réseau mobile restreint (le cache peut faire
                 // plusieurs Mo — on laisse le DownloadManager gérer).
+
+                // Conformité OSM : User-Agent identifiable + Referer.
+                // Sans ces en-têtes, tile.openstreetmap.org renvoie 403.
+                addRequestHeader("User-Agent", USER_AGENT)
+                addRequestHeader("Referer", REFERER)
             }
             downloadManager.enqueue(request)
         } catch (e: Exception) {

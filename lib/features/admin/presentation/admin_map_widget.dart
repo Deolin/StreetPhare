@@ -19,6 +19,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/models/alert_model.dart';
+import '../../../core/network/osm_tile_headers.dart';
 import '../../../network/network_coordinator.dart';
 
 /// URL des tuiles sombres CartoDB (dashboard admin).
@@ -215,6 +216,9 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
               TileLayer(
                 urlTemplate: tileUrl,
                 userAgentPackageName: 'com.streetphare.admin',
+                tileProvider: NetworkTileProvider(
+                  headers: kStreetPhareTileHeaders,
+                ),
                 maxNativeZoom: 19,
                 tileDisplay: const TileDisplay.fadeIn(
                   duration: Duration(milliseconds: 200),
