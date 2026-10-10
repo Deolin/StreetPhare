@@ -48,6 +48,9 @@ const log = (category, message) => {
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  // FIX 403 OSM : politique par défaut `no-referrer` → on transmet l'origine
+  // comme Referer (recommandé par la politique des tuiles OSM).
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   // HSTS désactivé : Caddy gère le TLS et les en-têtes HSTS.
 }));
 app.use(cors());

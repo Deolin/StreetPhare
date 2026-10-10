@@ -56,6 +56,12 @@ const log = (category, message) => {
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  // FIX 403 OSM : la politique par défaut de Helmet est `no-referrer`,
+  // ce qui empêche le navigateur d'envoyer un en-tête Referer vers les
+  // serveurs de tuiles. On utilise une politique standard qui transmet
+  // l'origine (ex: https://streetphare.ddns.net/) comme Referer, comme
+  // le recommande la politique d'utilisation des tuiles OSM.
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   // HSTS désactivé : Caddy gère le TLS et les en-têtes HSTS.
   // Le serveur Node.js ne doit PAS rediriger HTTP→HTTPS lui-même.
 }));

@@ -42,12 +42,24 @@ add_definitions(-DUNICODE -D_UNICODE)
 # and any other plugin still using C++17 experimental coroutines with VS 18 (2026).
 add_definitions(-D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 
-# Provide a stub <atlbase.h> when the ATL component is not installed in VS BuildTools.
-# flutter_local_notifications_windows includes atlbase.h but uses no ATL symbols
-# (it relies on WinRT instead). The stub satisfies the #include without defining anything.
-# To remove this workaround: install "C++ ATL for v143 build tools" via VS Installer.
-if(NOT EXISTS "$ENV{INCLUDE}/atlbase.h")
-  include_directories(BEFORE "${CMAKE_CURRENT_SOURCE_DIR}/atl_stub")
+# FIX build Windows — ATL manquant (atlbase.h / atlstr.h).
+#   - flutter_local_notifications_windows  → #include <atlbase.h>
+#   - flutter_secure_storage_windows       → #include <atlstr.h> (CString)
+# Le composant "C++ ATL" n'est installé que pour le toolset MSVC 14.44,
+# pas pour le toolset par défaut (14.51) utilisé par CMake, d'où l'erreur
+# C1083 "fichier include introuvable". On pointe explicitement vers les
+# répertoires include/lib ATL du toolset qui les contient.
+if(MSVC)
+  file(GLOB _streetphare_msvc_toolsets
+    "C:/Program Files (x86)/Microsoft Visual Studio/*/*/VC/Tools/MSVC/*"
+    "C:/Program Files/Microsoft Visual Studio/*/*/VC/Tools/MSVC/*")
+  foreach(_toolset ${_streetphare_msvc_toolsets})
+    if(EXISTS "${_toolset}/atlmfc/include/atlbase.h")
+      include_directories(BEFORE "${_toolset}/atlmfc/include")
+      link_directories("${_toolset}/atlmfc/lib/x64")
+      break()
+    endif()
+  endforeach()
 endif()
 
 # Compilation settings that should be applied to most targets.
