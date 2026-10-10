@@ -1523,6 +1523,8 @@ class _MapScreenState extends State<MapScreen> {
                                     headers: kStreetPhareTileHeaders,
                                   ),
                                   maxNativeZoom: 19,
+                                  tileBuilder:
+                                      isDark ? darkModeTileBuilder : null,
                                   tileDisplay: const TileDisplay.fadeIn(
                                     duration: Duration(milliseconds: 350),
                                   ),
@@ -1598,9 +1600,7 @@ class _MapScreenState extends State<MapScreen> {
                                   alignment: AttributionAlignment.bottomLeft,
                                   attributions: [
                                     TextSourceAttribution(
-                                      isDark
-                                          ? 'CartoDB / OpenStreetMap contributors'
-                                          : 'OpenStreetMap contributors',
+                                      'OpenStreetMap contributors',
                                     ),
                                   ],
                                 ),
