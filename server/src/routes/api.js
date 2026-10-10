@@ -294,6 +294,92 @@ router.post('/sync/full', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+// ROUTING (Calcul d'itinéraire)
+// ═══════════════════════════════════════════════════════════════════════
+
+/// POST /api/route — Calcul d'itinéraire avec profil de transport.
+/// Body: { from: { lat, lon }, to: { lat, lon }, profile?: "car"|"foot"|"pedestrian", avoid_filters?: {...} }
+/// Headers: X-StreetPhare-Route (piéton|voiture|vélo)
+///
+/// Le paramètre `profile` détermine le moteur de routage ciblé :
+///   - "car" / "voiture" → port OSRM car (ex: 5001)
+///   - "foot" / "piéton" / absent → port OSRM foot (ex: 5000)
+router.post('/route', (req, res) => {
+  const { from, to, profile: bodyProfile, avoid_filters } = req.body || {};
+  const headerProfile = req.headers['x-streetphare-route'] || '';
+  const queryProfile = req.query.profile || '';
+
+  // Résolution du profil — priorité: body > header > query > défaut 'foot'
+  const profileRaw = bodyProfile || headerProfile || queryProfile || 'foot';
+  const isVehicle = profileRaw === 'car' || profileRaw === 'voiture' || profileRaw === 'vehicle';
+  const profileLabel = isVehicle ? 'voiture' : 'piéton';
+
+  // ── Log diagnostic horodaté ──────────────────────────────────────────
+  const now = new Date();
+  const ts = [
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+    String(now.getSeconds()).padStart(2, '0'),
+  ].join(':');
+  console.log(
+    `[${ts}] [Routing] Calcul d'itinéraire requis — Profil détecté: ${profileLabel}`,
+  );
+  if (from && to) {
+    console.log(
+      `[${ts}] [Routing]   De: (${from.lat}, ${from.lon}) → Vers: (${to.lat}, ${to.lon})`,
+    );
+  }
+  // ──────────────────────────────────────────────────────────────────────
+
+  if (!from || !to || from.lat == null || from.lon == null || to.lat == null || to.lon == null) {
+    console.log(`[${ts}] [Routing] ❌ Coordonnées invalides ou absentes`);
+    return res.status(400).json({ error: 'from et to avec lat/lon requis' });
+  }
+
+  // TODO(Déploiement): Implémenter le proxy vers OSRM local selon le profil.
+  // Pour l'instant, on retourne un itinéraire minimal en ligne droite
+  // (fallback). Le client Flutter doit utiliser OsmAndBridge/GraphHopper
+  // en priorité absolue ; ce endpoint est le mode dégradé serveur.
+
+  // Construction d'une réponse de fallback cohérente.
+  const points = [
+    [from.lat, from.lon],
+    [to.lat, to.lon],
+  ];
+
+  // Distance approximative (haversine).
+  const R = 6371000;
+  const dLat = ((to.lat - from.lat) * Math.PI) / 180;
+  const dLon = ((to.lon - from.lon) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((from.lat * Math.PI) / 180) *
+      Math.cos((to.lat * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const distanceM = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+
+  console.log(
+    `[${ts}] [Routing] ✅ Itinéraire ${profileLabel} — ` +
+      `distance ≈ ${distanceM} m (fallback ligne droite)`,
+  );
+
+  res.json({
+    routes: [
+      {
+        id: 'fallback_route',
+        polyline: points,
+        distance_m: distanceM,
+        safe_score: 0,
+        profile: profileLabel,
+      },
+    ],
+    source: 'server_fallback',
+    profile: profileLabel,
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
 // EVENTS (Manifestations / Événements)
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -534,12 +620,30 @@ router.post('/auth/verify', (req, res) => {
 /// POST /api/bug-report — Réception d'un rapport de bug.
 /// Stocké en base et loggué console. Survit aux redémarrages.
 router.post('/bug-report', (req, res) => {
-  const { type, message, stackTrace, deviceInfo, appVersion } = req.body || {};
-  if (!message) {
-    return res.status(400).json({ error: 'message requis' });
+  const {
+    type, message, description, title,
+    stackTrace, deviceInfo, appVersion, app_version,
+    platform, category, extra_logs, client_timestamp, attempts,
+    // fallback: `message` ou `description` sont acceptés
+  } = req.body || {};
+
+  const msg = message || description || '';
+  if (!msg) {
+    return res.status(400).json({ error: 'message ou description requis' });
   }
 
-  const saved = store.addBugReport({ type, message, stackTrace, deviceInfo, appVersion });
+  const saved = store.addBugReport({
+    type: category || type || 'report',
+    message: msg,
+    title: title || null,
+    stackTrace: stackTrace || null,
+    deviceInfo: deviceInfo || null,
+    appVersion: appVersion || app_version || 'unknown',
+    platform: platform || null,
+    extraLogs: extra_logs || null,
+    clientTimestamp: client_timestamp || null,
+    attempts: attempts ?? 0,
+  });
 
   const now = new Date();
   const ts = [
@@ -552,10 +656,12 @@ router.post('/bug-report', (req, res) => {
     String(now.getMonth() + 1).padStart(2, '0'),
   ].join('');
 
-  console.log(`[${ts}] - [BUG] #${saved.id} ${type || 'report'} — ${message}`);
+  console.log(`[${ts}] - [BUG] #${saved.id} ${saved.type || 'report'}${saved.title ? ' — ' + saved.title : ''}`);
+  console.log(`[${ts}] - [BUG] Msg: ${msg.substring(0, 200)}`);
   if (stackTrace) console.log(`[${ts}] - [BUG] Stack:\n${stackTrace}`);
-  if (deviceInfo) console.log(`[${ts}] - [BUG] Device: ${JSON.stringify(deviceInfo)}`);
-  if (appVersion) console.log(`[${ts}] - [BUG] App version: ${appVersion}`);
+  if (saved.platform) console.log(`[${ts}] - [BUG] Platform: ${saved.platform}`);
+  if (saved.appVersion !== 'unknown') console.log(`[${ts}] - [BUG] App version: ${saved.appVersion}`);
+  if (saved.extraLogs) console.log(`[${ts}] - [BUG] Extra logs: ${saved.extraLogs.substring(0, 500)}`);
 
   res.status(201).json({ success: true, id: saved.id, receivedAt: saved.receivedAt });
 });

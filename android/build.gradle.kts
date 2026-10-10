@@ -40,20 +40,42 @@ gradle.beforeProject {
     project.extra["targetSdk"] = targetCompileSdk
 }
 
-gradle.projectsEvaluated {
-    rootProject.subprojects {
-        if (project.name == "app") return@subprojects
-        if (project.extensions.findByName("android") != null) {
-            try {
-                // Utilisation de l'API standard AGP (via réflexion pour la souplesse)
-                val androidExt = project.extensions.getByName("android")
-                androidExt.javaClass.methods.firstOrNull {
-                    it.name == "setCompileSdkVersion" &&
-                        it.parameterCount == 1 &&
-                        it.parameterTypes[0] == Int::class.javaPrimitiveType
-                }?.invoke(androidExt, targetCompileSdk)
-            } catch (_: Throwable) { }
+// ============================================================================
+//  Forçage du compileSdk sur TOUS les projets (plugins Flutter inclus)
+//  ---------------------------------------------------------------------------
+//  Les plugins Flutter (objectbox_flutter_libs, etc.) sont chargés comme
+//  projets composites par le Flutter Plugin Loader. On intercepte
+//  l'application du plugin Android avec pluginManager.withPlugin()
+//  pour garantir que le compileSdk est override AVANT évaluation.
+// ============================================================================
+gradle.rootProject.allprojects {
+    // Intercepte tout projet (y compris composites) dès que le plugin
+    // Android Library est appliqué.
+    pluginManager.withPlugin("com.android.library") {
+        try {
+            extensions.configure<com.android.build.api.dsl.LibraryExtension> {
+                compileSdk = targetCompileSdk
+            }
+            logger.lifecycle(
+                "StreetPhare: forced compileSdk=${targetCompileSdk} on :${project.name} (Library)"
+            )
+        } catch (_: Exception) {
+            // projet sans LibraryExtension
         }
+    }
+
+    // Même interception pour le plugin Android Application (au cas où un
+    // plugin l'utiliserait — normalement seul :app le fait)
+    pluginManager.withPlugin("com.android.application") {
+        if (project.name == "app") return@withPlugin
+        try {
+            extensions.configure<com.android.build.api.dsl.ApplicationExtension> {
+                compileSdk = targetCompileSdk
+            }
+            logger.lifecycle(
+                "StreetPhare: forced compileSdk=${targetCompileSdk} on :${project.name} (App)"
+            )
+        } catch (_: Exception) { }
     }
 }
 

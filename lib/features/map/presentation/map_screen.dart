@@ -49,6 +49,7 @@ import '../../reports/presentation/report_bottom_sheet.dart';
 import '../../routing/core/models/routing_profile.dart';
 import '../../routing/core/routing_engine.dart';
 import '../../routing/data/avoidance_filter_store.dart';
+import '../../routing/domain/pedestrian_route_service.dart';
 import '../../routing/presentation/route_result_sheet.dart';
 import '../../routing/presentation/safe_path_engine.dart';
 import '../../settings/data/app_preferences_store.dart';
@@ -661,6 +662,21 @@ class _MapScreenState extends State<MapScreen> {
 
     // Détermine le profil de routage selon le mode choisi.
     final routingProfile = _transportModeToRoutingProfile(chosenMode);
+
+    // ── Log diagnostic horodaté ────────────────────────────────────────
+    final now = DateTime.now();
+    final ts = '[${now.hour.toString().padLeft(2, '0')}:'
+        '${now.minute.toString().padLeft(2, '0')}:'
+        '${now.second.toString().padLeft(2, '0')}]';
+    final profileLabel = chosenMode == 'car'
+        ? 'voiture'
+        : chosenMode == 'transit'
+            ? 'transports'
+            : 'piéton';
+    debugPrint('$ts [Navigation] Envoi de la demande d\'itinéraire —'
+        ' Profil: $profileLabel');
+    // ────────────────────────────────────────────────────────────────────
+
     _showRouteSafeProgress(
       isFailover
           ? s.mapRouteSafeFailover.replaceFirst('{label}', destinationLabel)
@@ -701,11 +717,14 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    // Fallback : SafePathEngine (grille Dijkstra).
+    // Fallback : SafePathEngine (grille Dijkstra) avec contraintes
+    // adaptées au profil de transport sélectionné.
+    final localConstraints = PedestrianConstraints.fromProfile(routingProfile);
     final localRoutes = SafePathEngine.computeRoutes(
       start: start,
       end: destination,
       filters: filters,
+      constraints: localConstraints,
     );
 
     if (localRoutes.isEmpty) {
@@ -741,10 +760,11 @@ class _MapScreenState extends State<MapScreen> {
       case 'car':
         return RoutingProfile.vehicle;
       case 'transit':
-        // Les transports en commun ne sont pas encore supportés par
-        // les moteurs de routage (GraphHopper/OSRM). Fallback piéton
-        // jusqu'à intégration d'un profil TC (ex: OpenTripPlanner).
-        return RoutingProfile.pedestrian;
+        // Les transports en commun ne sont pas encore supportés nativement par
+        // les moteurs de routage (GraphHopper/OSRM). Fallback véhicule (car/bus)
+        // car le réseau routier est plus proche du trajet TC que le réseau piéton.
+        // TODO: Intégrer OpenTripPlanner pour un vrai profil TC.
+        return RoutingProfile.vehicle;
       default:
         return RoutingProfile.pedestrian;
     }

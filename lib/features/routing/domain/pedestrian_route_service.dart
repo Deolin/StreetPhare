@@ -132,6 +132,7 @@ class PedestrianRouteService {
     required LatLng end,
     required AvoidanceFilters filters,
     PedestrianConstraints constraints = PedestrianConstraints.urban,
+    RoutingProfile profile = RoutingProfile.pedestrian,
     String? eventId,
     List<LatLng> avoidPoints = const [],
   }) async {
@@ -140,6 +141,7 @@ class PedestrianRouteService {
       final osmAndResult = await OsmAndRoutingService.instance.computeRoutes(
         start: start,
         end: end,
+        profile: profile,
         filters: filters,
         avoidPoints: avoidPoints,
         eventId: eventId,
@@ -165,6 +167,7 @@ class PedestrianRouteService {
           end: end,
           eventId: eventId,
           filters: filters,
+          profile: profile,
         );
         if (osmRoutes.isNotEmpty) {
           _activeMode = PedestrianRoutingMode.osmNetwork;
@@ -211,6 +214,7 @@ class PedestrianRouteService {
     required LatLng end,
     required AvoidanceFilters filters,
     PedestrianConstraints constraints = PedestrianConstraints.urban,
+    RoutingProfile profile = RoutingProfile.pedestrian,
     String? eventId,
     List<LatLng> avoidPoints = const [],
   }) async {
@@ -219,6 +223,7 @@ class PedestrianRouteService {
       final osmAndResult = await OsmAndRoutingService.instance.computeRoutes(
         start: start,
         end: end,
+        profile: profile,
         filters: filters,
         avoidPoints: avoidPoints,
         eventId: eventId,
@@ -243,6 +248,7 @@ class PedestrianRouteService {
           end: end,
           eventId: eventId,
           filters: filters,
+          profile: profile,
         );
         if (osmRoutes.isNotEmpty) {
           _activeMode = PedestrianRoutingMode.osmNetwork;
@@ -269,9 +275,23 @@ class PedestrianRouteService {
     required LatLng end,
     required String eventId,
     required AvoidanceFilters filters,
+    RoutingProfile profile = RoutingProfile.pedestrian,
   }) async {
     final serverUrl = NetworkConfig.primaryServer;
     final uri = Uri.parse('$serverUrl/v1/events/$eventId/route');
+
+    // ── Log diagnostic horodaté ──────────────────────────────────────
+    final now = DateTime.now();
+    final ts =
+        '[${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}]';
+    final profileLabel = profile == RoutingProfile.vehicle
+        ? 'voiture'
+        : profile == RoutingProfile.bicycle
+            ? 'vélo'
+            : 'piéton';
+    debugPrint('$ts [Navigation] Envoi de la demande d\'itinéraire —'
+        ' Profil: $profileLabel → $uri');
+    // ──────────────────────────────────────────────────────────────────
 
     try {
       final response = await http
@@ -279,11 +299,12 @@ class PedestrianRouteService {
             uri,
             headers: {
               'Content-Type': 'application/json',
-              'X-StreetPhare-Route': 'pedestrian',
+              'X-StreetPhare-Route': profileLabel,
             },
             body: jsonEncode({
               'from': {'lat': start.latitude, 'lon': start.longitude},
               'to': {'lat': end.latitude, 'lon': end.longitude},
+              'profile': profileLabel,
               'avoid_filters': {
                 'barrage': filters.avoidBarrages,
                 'nasse': filters.avoidNasses,

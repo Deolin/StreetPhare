@@ -3,19 +3,22 @@
 // Implémentation "Relay" (données mobiles 3G/4G/5G) du contrat
 // MeshTransport.
 //
-// v3.3.5 — BYPASS COMPLET de web_socket_channel
-//   Le wrapper IOWebSocketChannel (même sans GuaranteeChannel) causait
-//   des fermetures 1002 (Protocol Error) après chaque welcome.
-//   Solution : utiliser dart:io WebSocket directement, sans AUCUN
-//   wrapper. On gère nous-mêmes le sink via socket.add() et le
-//   stream via socket.listen().
+// v3.4.0 — WEBSOCKET CHANNEL STANDARD
+//   Abandon du hack de handshake manuel (HttpClient + detachSocket +
+//   WebSocket.fromUpgradedSocket) qui brisait le décodage TLS via
+//   le reverse-proxy Caddy (code 1006 sur le WAN).
+//   Utilisation de WebSocketChannel.connect() du package standard
+//   web_socket_channel v3.x, qui gère nativement et de manière robuste
+//   le handshake TLS/WebSocket sur toutes les plateformes.
+//   Le heartbeat applicatif envoie des pings JSON dans le flux normal
+//   du channel, sans toucher au socket TCP sous-jacent.
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show HttpClient, WebSocket;
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../network_config.dart';
 import '../p2p_mesh_service.dart';
@@ -39,10 +42,7 @@ class RelayMeshTransport implements MeshTransport {
   /// Intervalle du heartbeat applicatif. 0 = désactivé.
   final Duration heartbeat;
 
-  // v3.3.6 : HttpClient réutilisé pour éviter les fuites de ressources.
-  final HttpClient _httpClient = HttpClient();
-
-  WebSocket? _socket;
+  WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _sub;
   Timer? _heartbeatTimer;
   Timer? _reconnectTimer;
@@ -74,19 +74,11 @@ class RelayMeshTransport implements MeshTransport {
     unawaited(_connect());
   }
 
-  /// Établit la connexion WebSocket via HttpClient + WebSocketTransformer.
+  /// Établit la connexion WebSocket via [WebSocketChannel.connect].
   ///
-  /// FIX v3.3.6 — Upgrade manuel pour contrôle total du handshake :
-  ///   L'API haut-niveau WebSocket.connect() de Dart SDK 3.2+ active
-  ///   permessage-deflate par défaut. Même avec compression:
-  ///   CompressionOptions.compressionOff, le handshake envoyait encore
-  ///   l'en-tête Sec-WebSocket-Extensions. Le serveur (ws ^8.18.0) avec
-  ///   perMessageDeflate: false ne le gère pas → 1002 Protocol Error
-  ///   juste après le welcome.
-  ///
-  ///   Solution radicale : HttpClient + WebSocketTransformer.upgrade().
-  ///   On contrôle chaque en-tête du handshake manuellement, SANS
-  ///   Sec-WebSocket-Extensions. Aucune négociation de compression.
+  /// Le package web_socket_channel v3.x gère nativement le handshake
+  /// TLS et la négociation WebSocket, y compris à travers les
+  /// reverse-proxies comme Caddy. Aucun hack manuel de socket.
   Future<void> _connect() async {
     if (_disposed) return;
 
@@ -97,7 +89,7 @@ class RelayMeshTransport implements MeshTransport {
       urlsToTry.add(localFallback);
     }
 
-    WebSocket? socket;
+    WebSocketChannel? channel;
     String? connectedUrl;
 
     for (final url in urlsToTry) {
@@ -106,61 +98,10 @@ class RelayMeshTransport implements MeshTransport {
 
       try {
         final uri = Uri.parse(url);
-        final request = await _httpClient.getUrl(uri);
+        channel = WebSocketChannel.connect(uri);
 
-        // ── En-têtes strictement contrôlés ──────────────────────────
-        // PAS de Sec-WebSocket-Extensions → pas de permessage-deflate.
-        request.headers.set('Connection', 'Upgrade');
-        request.headers.set('Upgrade', 'websocket');
-        request.headers.set(
-          'Sec-WebSocket-Version',
-          '13',
-        );
-        request.headers.set(
-          'Sec-WebSocket-Key',
-          _generateWebSocketKey(),
-        );
-        request.headers.set(
-          'Origin',
-          'https://streetphare.ddns.net',
-        );
-        // User-Agent personnalisé pour debugging serveur.
-        request.headers.set(
-          'User-Agent',
-          'StreetPhare-Flutter/3.3.6',
-        );
-
-        // ignore: close_sinks — le sink est consommé par detachSocket()
-        // dans le cas 101, ou par drain() dans le cas non-101.
-        final response = await request.close();
-
-        if (response.statusCode != 101) {
-          if (kDebugMode) {
-            debugPrint(
-              '[Relay] → upgrade refusé: HTTP ${response.statusCode}',
-            );
-          }
-          // Drainer la réponse HTTP pour fermer le sink sous-jacent
-          // et éviter une fuite de ressource (close_sinks).
-          await response.drain();
-          continue;
-        }
-
-        // Upgrade manuel côté client :
-        //   1. Détacher le socket TCP sous-jacent de la réponse HTTP.
-        //   2. L'envelopper dans un WebSocket client sans compression.
-        // (close_sinks supprimé via le commentaire ignore sur la déclaration
-        //  de `response` plus haut ; detachSocket() consomme le sink.)
-        final rawSocket = await response.detachSocket();
-        socket = WebSocket.fromUpgradedSocket(
-          rawSocket,
-          serverSide: false,
-        );
-        // Désactiver les pings automatiques dart:io (on gère le
-        // heartbeat nous-mêmes).
-        try {
-          socket.pingInterval = null;
-        } catch (_) {}
+        // Attendre que le handshake soit terminé avant de continuer.
+        await channel.ready;
 
         connectedUrl = url;
         break;
@@ -168,10 +109,15 @@ class RelayMeshTransport implements MeshTransport {
         if (kDebugMode) {
           debugPrint('[Relay] → échec connexion à $url: $e');
         }
+        // Nettoyer le channel en échec.
+        try {
+          await channel?.sink.close();
+        } catch (_) {}
+        channel = null;
       }
     }
 
-    if (socket == null || connectedUrl == null) {
+    if (channel == null || connectedUrl == null) {
       if (kDebugMode) {
         debugPrint('[Relay] → tous les URLs ont échoué');
       }
@@ -181,24 +127,21 @@ class RelayMeshTransport implements MeshTransport {
 
     if (_disposed || !_started) {
       try {
-        await socket.close();
+        await channel.sink.close();
       } catch (_) {}
       return;
     }
 
-    _socket = socket;
+    _channel = channel;
     _reconnectAttempts = 0;
     _reconnecting = false;
 
     if (kDebugMode) {
-      debugPrint(
-        '[Relay] → ws connecté '
-        '(HttpClient+WebSocketTransformer, sans permessage-deflate)',
-      );
+      debugPrint('[Relay] → ws connecté (WebSocketChannel standard v3.x)');
     }
 
-    // ── Écoute DIRECTE du stream dart:io WebSocket ────────────────────
-    _sub = _socket!.listen(
+    // ── Écoute du stream WebSocketChannel ────────────────────────────
+    _sub = _channel!.stream.listen(
       (data) {
         try {
           if (data is String) {
@@ -219,10 +162,7 @@ class RelayMeshTransport implements MeshTransport {
           }
         } catch (e, st) {
           if (kDebugMode) {
-            debugPrint(
-              '[Relay] ⚠ exception interceptée '
-              '(protégée du code 1002): $e\n$st',
-            );
+            debugPrint('[Relay] ⚠ exception interceptée: $e\n$st');
           }
         }
       },
@@ -233,12 +173,8 @@ class RelayMeshTransport implements MeshTransport {
         _cleanupAndReconnect();
       },
       onDone: () {
-        final code = _socket?.closeCode;
-        final reason = _socket?.closeReason;
         if (kDebugMode) {
-          debugPrint('[Relay] ⚠ ws fermé (code=$code, reason=$reason)');
-        } else {
-          debugPrint('[Relay] ws fermé (code=$code)');
+          debugPrint('[Relay] ⚠ ws fermé');
         }
         _cleanupAndReconnect();
       },
@@ -256,9 +192,9 @@ class RelayMeshTransport implements MeshTransport {
     unawaited(_sub?.cancel());
     _sub = null;
     try {
-      _socket?.close();
+      _channel?.sink.close();
     } catch (_) {}
-    _socket = null;
+    _channel = null;
 
     if (!_started || _disposed) return;
     if (_reconnecting) return;
@@ -281,7 +217,7 @@ class RelayMeshTransport implements MeshTransport {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(heartbeat, (_) {
       try {
-        _socket?.add(jsonEncode({
+        _channel?.sink.add(jsonEncode({
           'kind': 'ping',
           'ts': DateTime.now().toUtc().toIso8601String(),
         }));
@@ -300,9 +236,9 @@ class RelayMeshTransport implements MeshTransport {
     unawaited(_sub?.cancel());
     _sub = null;
     try {
-      _socket?.close();
+      _channel?.sink.close();
     } catch (_) {}
-    _socket = null;
+    _channel = null;
 
     if (!_started || _disposed) return;
     if (_reconnecting) return;
@@ -332,16 +268,16 @@ class RelayMeshTransport implements MeshTransport {
     await _sub?.cancel();
     _sub = null;
     try {
-      await _socket?.close();
+      await _channel?.sink.close();
     } catch (_) {}
-    _socket = null;
+    _channel = null;
   }
 
   @override
   Future<void> broadcast(String payload) async {
-    if (_socket == null) return;
+    if (_channel == null) return;
     try {
-      _socket!.add(payload);
+      _channel!.sink.add(payload);
     } catch (e) {
       if (kDebugMode) debugPrint('[Relay] send error: $e');
     }
@@ -364,22 +300,11 @@ class RelayMeshTransport implements MeshTransport {
     unawaited(_sub?.cancel());
     _sub = null;
     try {
-      _socket?.close();
+      _channel?.sink.close();
     } catch (_) {}
-    _socket = null;
+    _channel = null;
     _reconnectAttempts = 0;
     _incomingController.close();
-    try {
-      _httpClient.close();
-    } catch (_) {}
-  }
-
-  /// Génère une clé Sec-WebSocket-Key aléatoire (RFC 6455 §4.1).
-  /// 16 octets aléatoires, encodés en base64.
-  static String _generateWebSocketKey() {
-    final rng = math.Random.secure();
-    final bytes = List<int>.generate(16, (_) => rng.nextInt(256));
-    return base64.encode(bytes);
   }
 
   static String _generateRandomPeerId() {

@@ -280,7 +280,20 @@ class Store {
   // ═══════════════════════════════════════════════════════════════════════
 
   addBugReport(report) {
-    const entry = { id: report.id || require('uuid').v4(), type: report.type || 'report', message: report.message || '', stackTrace: report.stackTrace || null, deviceInfo: report.deviceInfo || null, appVersion: report.appVersion || 'unknown', receivedAt: new Date().toISOString() };
+    const entry = {
+      id: report.id || require('uuid').v4(),
+      type: report.type || 'report',
+      title: report.title || null,
+      message: report.message || '',
+      stackTrace: report.stackTrace || null,
+      deviceInfo: report.deviceInfo || null,
+      appVersion: report.appVersion || 'unknown',
+      platform: report.platform || null,
+      extraLogs: report.extraLogs || null,
+      clientTimestamp: report.clientTimestamp || null,
+      attempts: report.attempts ?? 0,
+      receivedAt: new Date().toISOString(),
+    };
     this.bugReports.push(entry);
     if (this.bugReports.length > 1000) this.bugReports = this.bugReports.slice(-1000);
     this._scheduleSave();

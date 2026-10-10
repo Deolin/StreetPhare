@@ -78,7 +78,7 @@ dependencies:
   # geofence_manager: ^0.0.4
   flutter_map_tile_caching: ^10.1.1
   permission_handler: ^12.0.3
-  app_settings: ^6.0.0 # Ou la version la plus récente
+  app_settings: ^8.0.3 # Ou la version la plus récente
   shared_preferences: ^2.2.3
   flutter_background_service: ^5.0.1
   http: ^1.2.1
@@ -98,7 +98,7 @@ dependencies:
   logging: ^1.3.0
   intl: ^0.20.2 # Ajouté pour l'internationalisation
   flutter_secure_storage: ^10.3.1
-  flutter_foreground_task: 9.2.2
+  flutter_foreground_task: ^10.0.0
   qr_flutter: ^4.1.0
 
 dev_dependencies:
@@ -107,7 +107,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   hive_ce_generator: ^1.11.2
   build_runner: ^2.15.0
-  build_test: 3.5.15
+  build_test: ^3.5.16
   build_web_compilers: ^4.0.0
   test: ^1.31.0
   mocktail: ^1.0.5

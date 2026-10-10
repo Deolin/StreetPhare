@@ -499,9 +499,13 @@ class BugReportService {
     return {
       'id': entry.id,
       'title': entry.title,
+      // Le serveur attend un champ obligatoire `message`.
+      // On duplique `description` pour compatibilité serveur actuel.
+      'message': entry.description,
       'description': entry.description,
       'platform': entry.platform,
       'app_version': entry.appVersion,
+      'appVersion': entry.appVersion,
       'category': entry.category,
       'extra_logs': entry.extraLogs,
       'submitted_at': entry.submittedAt,

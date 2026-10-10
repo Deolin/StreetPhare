@@ -400,7 +400,7 @@ class OsmAndRoutingService {
         return [];
       }
 
-      return _parseGraphHopperResponse(resp.body);
+      return _parseGraphHopperResponse(resp.body, profile);
     } catch (e) {
       debugPrint('[OsmAnd] ❌ GraphHopper exception: $e');
       return [];
@@ -414,11 +414,12 @@ class OsmAndRoutingService {
   /// {"paths":[{"points":{"coordinates":[[lon,lat],...]},
   ///            "distance":1234,"time":890000}]}
   /// ```
-  List<RouteResult> _parseGraphHopperResponse(String body) {
+  List<RouteResult> _parseGraphHopperResponse(String body, RoutingProfile profile) {
     final json = jsonDecode(body) as Map<String, dynamic>;
     final paths = json['paths'] as List<dynamic>? ?? [];
     if (paths.isEmpty) return [];
 
+    final isVehicle = profile == RoutingProfile.vehicle;
     final results = <RouteResult>[];
     for (int i = 0; i < paths.length; i++) {
       final path = paths[i] as Map<String, dynamic>;
@@ -438,7 +439,7 @@ class OsmAndRoutingService {
         totalRiskScore: 0,
         pois: const [],
         label: i == 0
-            ? '🧭 Itinéraire piéton OsmAnd (GraphHopper)'
+            ? '🧭 Itinéraire ${isVehicle ? 'voiture' : 'piéton'} OsmAnd (GraphHopper)'
             : '🛤 Alternative OsmAnd $i',
       ));
     }
@@ -447,30 +448,40 @@ class OsmAndRoutingService {
 
   // ── OSRM public ──────────────────────────────────────────────────────────
 
-  /// Appel HTTP vers OSRM public en mode foot.
+  /// Appel HTTP vers OSRM public.
   ///
   /// IMPORTANT : router.project-osrm.org ne supporte QUE le profil
-  /// 'driving'. L'instance routing.openstreetmap.de (OSRD) supporte
-  /// le profil 'foot' (piéton).
+  /// 'driving'. L'instance routing.openstreetmap.de/routed-foot/ supporte
+  /// le profil 'foot' (piéton). On choisit le serveur selon le profil.
   ///
-  /// Endpoint : GET /routed-foot/route/v1/foot/{lon1},{lat1};{lon2},{lat2}
-  ///            ?overview=full&geometries=geojson
+  /// Endpoint voiture : GET https://router.project-osrm.org/route/v1/driving/...
+  /// Endpoint piéton  : GET https://routing.openstreetmap.de/routed-foot/route/v1/foot/...
   Future<List<RouteResult>> _computeViaOsrmPublic({
     required LatLng start,
     required LatLng end,
     RoutingProfile profile = RoutingProfile.pedestrian,
   }) async {
-    final osrmProfile = profile == RoutingProfile.vehicle ? 'driving' : 'foot';
+    final isVehicle = profile == RoutingProfile.vehicle;
+    final osrmProfile = isVehicle ? 'driving' : 'foot';
+
+    // Base URL différente selon le profil :
+    // - router.project-osrm.org → driving uniquement
+    // - routing.openstreetmap.de/routed-foot → foot uniquement
+    final baseUrl = isVehicle
+        ? 'https://router.project-osrm.org/route/v1'
+        : 'https://routing.openstreetmap.de/routed-foot/route/v1';
+
     final uri = Uri.parse(
-      'https://routing.openstreetmap.de/routed-foot/route/v1/$osrmProfile/'
+      '$baseUrl/$osrmProfile/'
       '${start.longitude.toStringAsFixed(6)},${start.latitude.toStringAsFixed(6)};'
       '${end.longitude.toStringAsFixed(6)},${end.latitude.toStringAsFixed(6)}'
       '?overview=full&geometries=geojson&alternatives=true',
     );
 
-    // Log l'URL exacte dans CLIENT_DEBUG.md pour le débogage.
+    final profileLabel = isVehicle ? 'car' : 'foot';
+
     if (kDebugMode) {
-      debugPrint('[OsmAnd] 🔗 OSRM foot URL: $uri');
+      debugPrint('[OsmAnd] 🔗 OSRM $profileLabel URL: $uri');
     }
 
     try {
@@ -485,9 +496,9 @@ class OsmAndRoutingService {
         return [];
       }
 
-      final routes = _parseOsrmResponse(resp.body);
+      final routes = _parseOsrmResponse(resp.body, profile);
       if (kDebugMode) {
-        debugPrint('[OsmAnd] ✅ OSRM foot → ${routes.length} route(s)');
+        debugPrint('[OsmAnd] ✅ OSRM $profileLabel → ${routes.length} route(s)');
       }
       return routes;
     } catch (e) {
@@ -502,7 +513,7 @@ class OsmAndRoutingService {
   ///
   /// En cas de format JSON inattendu, retourne une liste vide
   /// plutôt que de crasher l'application.
-  List<RouteResult> _parseOsrmResponse(String body) {
+  List<RouteResult> _parseOsrmResponse(String body, RoutingProfile profile) {
     try {
       final json = jsonDecode(body) as Map<String, dynamic>;
       final status = json['code'] as String? ?? '';
@@ -535,7 +546,7 @@ class OsmAndRoutingService {
             totalRiskScore: 0,
             pois: const [],
             label: i == 0
-                ? '🌍 Itinéraire piéton OSM (OSRM)'
+                ? '🌍 Itinéraire ${profile == RoutingProfile.vehicle ? 'voiture' : 'piéton'} OSM (OSRM)'
                 : '🛤 Alternative OSRM $i',
           ));
         } catch (e) {

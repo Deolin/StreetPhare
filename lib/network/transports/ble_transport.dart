@@ -1,6 +1,6 @@
 // lib/network/transports/ble_transport.dart
 //
-// Transport BLE (Bluetooth Low Energy) — v3.0 FULL-DUPLEX
+// Transport BLE (Bluetooth Low Energy) — v3.1 FULL-DUPLEX
 //
 // === ÉCHANGE DE DONNÉES BIDIRECTIONNEL ===
 //
@@ -47,6 +47,14 @@
 //   - Throttling 2s des découvertes pour éviter les rafales.
 //   - `scheduleMicrotask` pour céder la main à l'event loop.
 //   - `Future.microtask` entre les opérations GATT lourdes.
+//
+// === Correction crash v3.1 ===
+//
+//   - Plafonnement des tentatives de reconnexion (max 10) pour éviter
+//     l'overflow de pow(2, 125) qui produit delayMs=0 → boucle infinie.
+//   - Détection de BleAdapterDisabledException : cooldown de 5 secondes
+//     quand l'adaptateur Bluetooth est désactivé, au lieu de re-tenter
+//     immédiatement en boucle.
 
 import 'dart:async';
 import 'dart:convert';
@@ -136,6 +144,18 @@ class BleMeshTransport implements MeshTransport {
   final Map<String, Timer> _reconnectTimers = {};
   static const Duration _reconnectBaseDelay = Duration(seconds: 2);
   static const Duration _reconnectMaxDelay = Duration(seconds: 60);
+
+  /// Plafond absolu des tentatives de reconnexion pour éviter l'overflow
+  /// du backoff exponentiel : pow(2, 125) overflow en int → delayMs = 0
+  /// → boucle infinie de reconnexion immédiate → FATAL EXCEPTION.
+  static const int _reconnectMaxAttempts = 10;
+
+  /// Cooldown quand l'adaptateur Bluetooth est désactivé. Évite les
+  /// rafales de tentatives quand l'utilisateur a coupé le BT manuellement.
+  static const Duration _adapterDisabledCooldown = Duration(seconds: 5);
+
+  /// Timestamp de la dernière détection d'adaptateur désactivé.
+  DateTime? _lastAdapterDisabledTime;
 
   // ── Nettoyage ─────────────────────────────────────────────────────
   Timer? _deadConnectionCleanupTimer;
@@ -266,6 +286,10 @@ class BleMeshTransport implements MeshTransport {
       _onDeviceDiscovered,
       onError: (Object e) {
         if (kDebugMode) debugPrint('[BLE] scan error: $e');
+        // Si le scan échoue parce que l'adaptateur est désactivé,
+        // on évite de planter et on laisse le scan échouer
+        // silencieusement. L'utilisateur sera notifié via le
+        // ConnectivityService.
       },
     );
 
@@ -286,7 +310,7 @@ class BleMeshTransport implements MeshTransport {
     );
 
     if (kDebugMode) {
-      debugPrint('[BLE] v3.0 full-duplex démarré — peerId=$_peerId');
+      debugPrint('[BLE] v3.1 full-duplex démarré — peerId=$_peerId');
     }
   }
 
@@ -320,6 +344,7 @@ class BleMeshTransport implements MeshTransport {
     }
     _reconnectTimers.clear();
     _pendingConnections.clear();
+    _lastAdapterDisabledTime = null;
     _started = false;
   }
 
@@ -493,7 +518,7 @@ class BleMeshTransport implements MeshTransport {
           debugPrint(
               '[$ehh:$emm:$ess] [BLE] échec connexion GATT $deviceId: $e');
         }
-        _onConnectionFailed(deviceId);
+        _onConnectionFailed(deviceId, error: e);
       },
       cancelOnError: true,
     );
@@ -509,6 +534,7 @@ class BleMeshTransport implements MeshTransport {
         }
         _pendingConnections.remove(deviceId);
         _reconnectAttempts.remove(deviceId);
+        _lastAdapterDisabledTime = null; // Reset au succès
         _discoverServices(deviceId);
         break;
 
@@ -529,11 +555,33 @@ class BleMeshTransport implements MeshTransport {
     }
   }
 
-  void _onConnectionFailed(String deviceId) {
+  void _onConnectionFailed(String deviceId, {Object? error}) {
     _pendingConnections.remove(deviceId);
     unawaited(_connectSubs[deviceId]?.cancel());
     _connectSubs.remove(deviceId);
     _connections.remove(deviceId);
+
+    // Détection d'adaptateur Bluetooth désactivé.
+    // L'exception BleAdapterDisabledException arrive en cascade via
+    // RxJava (flutter_reactive_ble wrap l'erreur native Android).
+    if (error != null) {
+      final errStr = error.toString();
+      if (errStr.contains('BleAdapterDisabled') ||
+          errStr.contains('BLUETOOTH_DISABLED') ||
+          errStr.contains('adapter')) {
+        _lastAdapterDisabledTime = DateTime.now();
+        if (kDebugMode) {
+          debugPrint('[BLE] Adaptateur BT désactivé — pause reconnexion '
+              '(${_adapterDisabledCooldown.inSeconds}s)');
+        }
+        // Nettoyage : pas de reconnexion tant que l'adaptateur est off.
+        _reconnectAttempts.remove(deviceId);
+        _reconnectTimers[deviceId]?.cancel();
+        _reconnectTimers.remove(deviceId);
+        return;
+      }
+    }
+
     _scheduleReconnect(deviceId);
   }
 
@@ -707,10 +755,54 @@ class BleMeshTransport implements MeshTransport {
   void _scheduleReconnect(String deviceId) {
     if (!_started) return;
 
+    // Si l'adaptateur Bluetooth a été détecté comme désactivé,
+    // on stoppe toute reconnexion pendant le cooldown.
+    final lastDisabled = _lastAdapterDisabledTime;
+    if (lastDisabled != null &&
+        DateTime.now().difference(lastDisabled) < _adapterDisabledCooldown) {
+      if (kDebugMode) {
+        debugPrint('[BLE] reconnexion $deviceId suspendue '
+            '(adaptateur BT désactivé, cooldown actif)');
+      }
+      _reconnectAttempts.remove(deviceId);
+      _reconnectTimers[deviceId]?.cancel();
+      _reconnectTimers.remove(deviceId);
+      return;
+    }
+
     final attempt = (_reconnectAttempts[deviceId] ?? 0) + 1;
+
+    // Plafonnement ABSOLU : au-delà de _reconnectMaxAttempts, on
+    // abandonne la reconnexion pour ce device. Le scan redécouvrira
+    // le device plus tard si nécessaire. Cela évite :
+    //   - L'overflow de pow(2, 125) → delayMs = 0 → boucle infinie
+    //   - La saturation du thread pool RxJava → FATAL EXCEPTION
+    if (attempt > _reconnectMaxAttempts) {
+      if (kDebugMode) {
+        debugPrint('[BLE] reconnexion $deviceId abandonnée '
+            '(max $_reconnectMaxAttempts tentatives atteintes)');
+      }
+      _reconnectAttempts.remove(deviceId);
+      _reconnectTimers[deviceId]?.cancel();
+      _reconnectTimers.remove(deviceId);
+      return;
+    }
+
     _reconnectAttempts[deviceId] = attempt;
 
-    final delayMs = (_reconnectBaseDelay * pow(2, attempt - 1).toInt())
+    // Backoff exponentiel : 2s, 4s, 8s, 16s, 32s, 60s, 60s, 60s, 60s, 60s.
+    // Plafonné à _reconnectMaxDelay (60s) et protégé par
+    // _reconnectMaxAttempts (10) contre l'overflow.
+    final int exponent = (attempt - 1).clamp(0, 31); // clamp pour sécurité
+    int factor;
+    try {
+      factor = pow(2, exponent).toInt();
+    } catch (_) {
+      // Défense en profondeur : si pow overflow malgré le clamp,
+      // on utilise le délai max directement.
+      factor = _reconnectMaxDelay.inMilliseconds;
+    }
+    final delayMs = (_reconnectBaseDelay * factor)
         .inMilliseconds
         .clamp(0, _reconnectMaxDelay.inMilliseconds);
 
@@ -722,6 +814,7 @@ class BleMeshTransport implements MeshTransport {
 
     _reconnectTimers[deviceId]?.cancel();
     _reconnectTimers[deviceId] = Timer(Duration(milliseconds: delayMs), () {
+      _reconnectTimers.remove(deviceId);
       if (_started) {
         _maybeConnectToDevice(deviceId);
       }

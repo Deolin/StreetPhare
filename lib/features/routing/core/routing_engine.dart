@@ -175,44 +175,31 @@ class RoutingEngine {
       }
     }
 
-    // ── TENTATIVE 2 : GraphHopper HTTP local ───────────────────────────
+    // ── TENTATIVE 2 : OsmAnd Bridge (GraphHopper local → OSRM public) ──
+    // OsmAndRoutingService gère sa propre cascade interne :
+    //   MethodChannel Android → GraphHopper HTTP → OSRM public
+    // Un seul appel suffit, pas de raison d'appeler deux fois.
     try {
-      final legacyResult = await OsmAndRoutingService.instance.computeRoutes(
+      final osmAndResult = await OsmAndRoutingService.instance.computeRoutes(
         start: start,
         end: end,
         profile: profile,
         filters: avoidFilters,
         avoidPoints: avoidPoints,
       );
-      if (!legacyResult.isEmpty) {
-        onCascadeStep?.call(CascadeStep.graphHopper);
+      if (!osmAndResult.isEmpty) {
+        // Détermine l'étape cascade selon la source retournée
+        final step = osmAndResult.source == 'graphhopper_local'
+            ? CascadeStep.graphHopper
+            : CascadeStep.osrmPublic;
+        onCascadeStep?.call(step);
         return RouteComputeResult(
-          routes: legacyResult.routes,
-          source: legacyResult.source,
+          routes: osmAndResult.routes,
+          source: osmAndResult.source,
         );
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('[RoutingEngine] GraphHopper failed: $e');
-    }
-
-    // ── TENTATIVE 3 : OSRM public ──────────────────────────────────────
-    try {
-      final legacyResult = await OsmAndRoutingService.instance.computeRoutes(
-        start: start,
-        end: end,
-        profile: profile,
-        filters: avoidFilters,
-        avoidPoints: avoidPoints,
-      );
-      if (!legacyResult.isEmpty && legacyResult.source == 'osrm_public') {
-        onCascadeStep?.call(CascadeStep.osrmPublic);
-        return RouteComputeResult(
-          routes: legacyResult.routes,
-          source: legacyResult.source,
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('[RoutingEngine] OSRM failed: $e');
+      if (kDebugMode) debugPrint('[RoutingEngine] OsmAnd Bridge failed: $e');
     }
 
     // ── TENTATIVE 4 : SafePathEngine (grille Dijkstra) ─────────────────

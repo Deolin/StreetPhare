@@ -26,6 +26,7 @@ import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.DeadObjectException
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
@@ -488,10 +489,22 @@ class MainActivity : FlutterActivity() {
         try { bleAdvertiser?.stopAdvertising(null) } catch (_: Exception) {}
         bleAdvertiser = null
 
+        // Chaque opération GATT est isolée dans son propre try/catch
+        // pour éviter que l'échec de removeService n'empêche close().
+        // DeadObjectException → le process Bluetooth est déjà mort,
+        // c'est attendu lors du cleanup → ignoré silencieusement.
         try {
-            val service = bleGattServer?.getService(STREETPHARE_SERVICE_UUID)
-            if (service != null) bleGattServer?.removeService(service)
+            bleGattServer?.getService(STREETPHARE_SERVICE_UUID)?.let { service ->
+                bleGattServer?.removeService(service)
+            }
+        } catch (_: DeadObjectException) {
+            // Process BT déjà tué par le système — normal.
+        } catch (_: Exception) {}
+
+        try {
             bleGattServer?.close()
+        } catch (_: DeadObjectException) {
+            // Process BT déjà tué — normal.
         } catch (_: Exception) {}
         bleGattServer = null
 
