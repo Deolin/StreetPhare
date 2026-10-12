@@ -1,4 +1,39 @@
 # StreetPhare v3.3.3 — Reverse-proxy Caddy (TLS automatique Let's Encrypt)
+#
+# ── PRÉREQUIS RÉSEAU (Let's Encrypt / ACME) ──────────────────────────
+# Caddy a IMPÉRATIVEMENT besoin des ports 80 (challenge HTTP-01) et 443
+# (HTTPS) ouverts et redirigés vers ce serveur (routeur : redirection de
+# port 80→80 et 443→443). Sans le port 80 accessible publiquement, le
+# challenge HTTP-01 échoue et Caddy sert un certificat auto-signé →
+# erreur `net::ERR_CERT_AUTHORITY_INVALID` dans le navigateur.
+{
+	# Adresse de contact ACME (Let's Encrypt).
+	# ⚠️ OBLIGATOIRE en production : remplacez `admin@streetphare.local`
+	#    par une VRAIE adresse e-mail valide. Sans cela, Let's Encrypt ne
+	#    peut pas vous notifier (expiration / renouvellement imminent) et
+	#    applique des rate-limits plus stricts.
+	email admin@streetphare.local
+}
+
+# ── MODE DÉVELOPPEMENT (sans ports 80/443 publics) ───────────────────
+# Si vous testez en local sans port 80/443 exposé, Caddy ne peut pas
+# obtenir de certificat Let's Encrypt. Deux options :
+#   1. Remplacer `tls { protocols tls1.2 tls1.3 }` par `tls internal`
+#      (certificat auto-signé géré par Caddy, sans dépendance ACME).
+#   2. RETIRER l'en-tête `Strict-Transport-Security` (HSTS) ci-dessous
+#      pour ne pas enfermer le navigateur en HTTPS forcé.
+# Pour purger le HSTS déjà enregistré par le navigateur sur un domaine
+# de test :
+#   Chrome/Edge : chrome://net-internals/#hsts → « Delete domain security policies »
+#   Firefox     : effacez l'historique complet (cookies + site)
+
+# ── NETTOYAGE DU STOCKAGE Caddy (certificat corrompu) ────────────────
+# Les données ACME sont stockées par défaut dans :
+#   /var/lib/caddy/.local/share/caddy   (ou $XDG_DATA_HOME/caddy)
+# Pour forcer un renouvellement propre après corruption :
+#   sudo systemctl stop caddy
+#   sudo rm -rf /var/lib/caddy/.local/share/caddy/certificates
+#   sudo systemctl start caddy
 
 streetphare.ddns.net {
 	reverse_proxy 127.0.0.1:3000
@@ -7,6 +42,9 @@ streetphare.ddns.net {
 	}
 
 	header {
+		# HSTS : force HTTPS pour 1 an (31536000 s) + preload.
+		# ⚠️ En mode développement/local (certificat auto-signé `tls internal`),
+		#    commentez cette ligne pour éviter de bloquer le navigateur.
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"

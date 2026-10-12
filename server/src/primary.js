@@ -22,6 +22,7 @@ const path = require('path');
 const { WebSocketServer } = require('ws');
 const http = require('http');
 const { spawn } = require('child_process');
+const fs = require('fs');
 const cron = require('node-cron');
 
 const config = require('./config');
@@ -31,7 +32,7 @@ const apiRoutes = require('./routes/api');
 const adminRoutes = require('./routes/admin');
 const simulationRoutes = require('./routes/simulation');
 const { verifyWsToken } = require('./middleware/auth');
-const { setAdminBroadcaster, broadcast } = require('./services/broadcast');
+const { setAdminBroadcaster, setMeshBroadcaster, broadcast, broadcastToAll } = require('./services/broadcast');
 const { executeCommand } = require('./console');
 
 const app = express();
@@ -513,9 +514,24 @@ setAdminBroadcaster((type, payload = {}) => {
   }
 });
 
+// ── Diffusion temps réel vers les clients mesh (mobiles) ─────────────
+// Le format mesh utilise le champ `kind` (cohérent avec le protocole
+// /mesh : welcome, ping, chat…).
+setMeshBroadcaster((type, payload = {}) => {
+  const message = JSON.stringify({ kind: type, ...payload });
+  for (const client of wss.clients) {
+    if (client.readyState === 1) {
+      try { client.send(message); } catch (_) {}
+    }
+  }
+});
+
 // ── Flux temps réel : nouvelle alerte → broadcast aux admins ─────────────
 store.on('alert_added', (alert) => {
-  broadcast('new_alert', { alert: { ...alert, votes: alert.votes || [] } });
+  // Diffusion à TOUS (admin + mesh) : un nouveau signalement doit être
+  // visible en temps réel sur la carte des clients mobiles, pas seulement
+  // dans le dashboard d'administration.
+  broadcastToAll('new_alert', { alert: { ...alert, votes: alert.votes || [] } });
 });
 
 // ── Métriques temps réel (widget de charge) ─────────────────────────────
@@ -573,12 +589,18 @@ cron.schedule('0 * * * *', () => {
 // ── Garde-fous anti-crash : erreurs globales non gérées ──────────────
 // Sans ces handlers, toute exception non interceptée ou promesse rejetée
 // ferait planter le processus Node.js (comportement par défaut Node 15+).
-// Une modification erronée dans le panneau admin (modérateurs, géorepérage,
-// simulation…) ne doit JAMAIS arrêter le service : on journalise l'erreur
-// et on maintient le serveur en vie.
+//
+// Stratégie de résilience :
+//   - `uncaughtException`  : état potentiellement corrompu → on sauvegarde
+//                            l'état en urgence puis on sort (code 1) pour
+//                            laisser PM2 / systemd redémarrer proprement.
+//   - `unhandledRejection` : rejet souvent isolé et récupérable → on
+//                            journalise sans tuer le serveur.
 process.on('uncaughtException', (err) => {
   log('FATAL', `Exception non gérée : ${err && err.message ? err.message : err}`);
   if (err && err.stack) console.error(err.stack);
+  try { store.saveSync(); } catch (_) {}
+  setTimeout(() => process.exit(1), 250);
 });
 process.on('unhandledRejection', (reason) => {
   const msg = reason && reason.message ? reason.message : String(reason);
@@ -656,11 +678,31 @@ process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // nodemon restart
 /// Si Caddy n'est pas installé, un avertissement est loggué sans
 /// faire crasher le serveur Node.js. Le chemin du Caddyfile est
 /// relatif au répertoire `server/`.
+function isProcessAlive(pid) {
+  if (!pid || pid <= 0) return false;
+  try { process.kill(pid, 0); return true; } catch (_) { return false; }
+}
+
 function launchCaddyIndependent() {
   // Résolution du chemin du Caddyfile.
   // `__dirname` pointe vers `server/src/`, donc `../Caddyfile` remonte
   // dans `server/`.
   const caddyfilePath = path.join(__dirname, '..', 'Caddyfile');
+  const pidFile = path.join(__dirname, '..', 'caddy.pid');
+
+  // FIX anti-duplication : si un Caddy lancé par une exécution précédente
+  // est toujours vivant (ex: redémarrage nodemon/PM2), on ne relance PAS
+  // un second démon, sinon il échouerait avec « address already in use »
+  // (code 1).
+  try {
+    if (fs.existsSync(pidFile)) {
+      const oldPid = parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10);
+      if (isProcessAlive(oldPid)) {
+        log('CADDY', `⚠ Caddy déjà en cours d'exécution (PID ${oldPid}) — lancement ignoré`);
+        return;
+      }
+    }
+  } catch (_) {}
 
   try {
     const caddyProcess = spawn('caddy', [
@@ -673,6 +715,9 @@ function launchCaddyIndependent() {
       // `windowsHide: true` évite un flash de console sur Windows.
       windowsHide: true,
     });
+
+    // Mémorise le PID pour éviter un doublon au prochain redémarrage.
+    try { fs.writeFileSync(pidFile, String(caddyProcess.pid)); } catch (_) {}
 
     caddyProcess.unref();
 

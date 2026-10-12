@@ -24,7 +24,7 @@ const apiRoutes = require('./routes/api');
 const adminRoutes = require('./routes/admin');
 const simulationRoutes = require('./routes/simulation');
 const { verifyWsToken } = require('./middleware/auth');
-const { setAdminBroadcaster, broadcast } = require('./services/broadcast');
+const { setAdminBroadcaster, setMeshBroadcaster, broadcast, broadcastToAll } = require('./services/broadcast');
 const { executeCommand } = require('./console');
 
 const app = express();
@@ -246,9 +246,19 @@ setAdminBroadcaster((type, payload = {}) => {
   }
 });
 
+// ── Diffusion temps réel vers les clients mesh (mobiles) ─────────────
+setMeshBroadcaster((type, payload = {}) => {
+  const message = JSON.stringify({ kind: type, ...payload });
+  for (const client of wss.clients) {
+    if (client.readyState === 1) {
+      try { client.send(message); } catch (_) {}
+    }
+  }
+});
+
 // ── Flux temps réel : nouvelle alerte → broadcast aux admins ─────────────
 store.on('alert_added', (alert) => {
-  broadcast('new_alert', { alert: { ...alert, votes: alert.votes || [] } });
+  broadcastToAll('new_alert', { alert: { ...alert, votes: alert.votes || [] } });
 });
 
 // ── Métriques temps réel (widget de charge) ─────────────────────────────
@@ -258,11 +268,15 @@ setInterval(() => {
 
 // ── Démarrage ───────────────────────────────────────────────────────────
 // ── Garde-fous anti-crash : erreurs globales non gérées ──────────────
-// (même mécanisme de résilience que primary.js) — une erreur non gérée
-// dans une requête ne doit jamais arrêter le serveur miroir.
+// (même mécanisme de résilience que primary.js)
+//   - `uncaughtException`  : sauvegarde d'urgence + exit 1 → redémarrage
+//                            automatique par PM2 / systemd.
+//   - `unhandledRejection` : journalisation sans tuer le serveur.
 process.on('uncaughtException', (err) => {
   log('FATAL', `Exception non gérée : ${err && err.message ? err.message : err}`);
   if (err && err.stack) console.error(err.stack);
+  try { store.saveSync(); } catch (_) {}
+  setTimeout(() => process.exit(1), 250);
 });
 process.on('unhandledRejection', (reason) => {
   const msg = reason && reason.message ? reason.message : String(reason);

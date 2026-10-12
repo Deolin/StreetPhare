@@ -464,6 +464,20 @@ class P2PMeshService {
         );
         return;
       }
+
+      // Cas 5 : signalement reçu du serveur central (diffusion temps réel).
+      // `new_alert` (création), `report_validated` (validation) ou
+      // `report_rejected` (rejet) — payload `{ alert }` au format REST.
+      if (json['kind'] == 'report_validated' ||
+          json['kind'] == 'report_rejected' ||
+          json['kind'] == 'new_alert') {
+        final alertJson = json['alert'];
+        if (alertJson is Map<String, dynamic>) {
+          final alert = Alert.fromJson(alertJson);
+          _onServerAlertReceived(alert);
+        }
+        return;
+      }
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[P2PMeshService] message ignoré (parse error): $e');
@@ -504,6 +518,33 @@ class P2PMeshService {
           broadcastAlert(alert);
         }
       });
+    }));
+  }
+
+  /// Alerte validée/rejetée reçue du serveur central (diffusion temps réel).
+  ///
+  /// Contrairement à [_onAlertReceived] (gossip P2P), on ne RE-PROPAGE PAS
+  /// l'alerte : le serveur la diffuse déjà à tous les clients mesh connectés.
+  /// On la stocke localement et on notifie l'UI (carte + liste) immédiatement.
+  void _onServerAlertReceived(Alert alert) {
+    if (alert.isExpired()) return;
+    if (_recentlyReceivedAlertIds.contains(alert.id)) return;
+    _recentlyReceivedAlertIds.add(alert.id);
+    if (_recentlyReceivedAlertIds.length > _maxRecentAlertCache) {
+      final toRemove = _recentlyReceivedAlertIds.take(
+        _recentlyReceivedAlertIds.length ~/ 4,
+      );
+      _recentlyReceivedAlertIds.removeAll(toRemove);
+    }
+
+    unawaited(database.upsertFromServer(alert).then((_) {
+      _alertsReceivedController.add(alert);
+      if (kDebugMode) {
+        debugPrint(
+          '[P2PMeshService] signalement reçu du serveur : ${alert.id} '
+          '(${alert.type.name}, status=${alert.status.name})',
+        );
+      }
     }));
   }
 

@@ -191,6 +191,14 @@ class Store {
         if (!existing.votes) existing.votes = [];
         existing.votes.push(...alert.votes.filter(v => !existing.votes.includes(v)));
       }
+      // Propagation des champs mutables lors de la réplication
+      // Primary ↔ Backup : le statut (validé/rejeté) doit être
+      // synchronisé, pas seulement les votes.
+      if (alert.status !== undefined) existing.status = alert.status;
+      if (alert.type !== undefined) existing.type = alert.type;
+      if (alert.lat !== undefined) existing.lat = alert.lat;
+      if (alert.lng !== undefined) existing.lng = alert.lng;
+      if (alert.description !== undefined) existing.description = alert.description;
       existing.updatedAt = new Date().toISOString();
       this._scheduleSave();
       return existing;

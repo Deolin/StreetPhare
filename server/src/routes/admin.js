@@ -11,7 +11,7 @@ const config = require('../config');
 const store = require('../store');
 const sync = require('../sync');
 const moderators = require('../services/moderators');
-const { broadcast } = require('../services/broadcast');
+const { broadcast, broadcastToAll } = require('../services/broadcast');
 const { authenticateToken, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
@@ -120,7 +120,11 @@ router.get('/reports', authenticateToken, requirePermission('reportValidate'), (
 router.post('/reports/:id/validate', authenticateToken, requirePermission('reportValidate'), (req, res) => {
   try {
     if (!store.validateAlert(req.params.id)) return res.status(404).json({ error: 'Signalement non trouvé' });
-    broadcast('report_updated', { id: req.params.id, status: 'active' });
+    const alert = store.alerts.find(a => a.id === req.params.id);
+    if (alert) {
+      sync.enqueueAlert(alert); // réplication vers le Backup
+      broadcastToAll('report_validated', { alert: { ...alert, votes: alert.votes || [] } });
+    }
     res.json({ success: true });
   } catch (err) {
     log('REPORTS', `Erreur validation signalement : ${err.message}`);
@@ -133,8 +137,10 @@ router.post('/reports/:id/reject', authenticateToken, requirePermission('reportV
   try {
     if (!store.rejectAlert(req.params.id)) return res.status(404).json({ error: 'Signalement non trouvé' });
     const alert = store.alerts.find(a => a.id === req.params.id);
-    if (alert) sync.enqueueAlert(alert);
-    broadcast('report_updated', { id: req.params.id, status: 'rejected' });
+    if (alert) {
+      sync.enqueueAlert(alert); // réplication vers le Backup
+      broadcastToAll('report_rejected', { alert: { ...alert, votes: alert.votes || [] } });
+    }
     res.json({ success: true });
   } catch (err) {
     log('REPORTS', `Erreur rejet signalement : ${err.message}`);

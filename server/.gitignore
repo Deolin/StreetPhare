@@ -13,3 +13,6 @@ logs/
 # ── Builds & exécutables (Node SEA) ─────────────────────────────────────
 dist/
 
+# ── PID du démon Caddy (anti-duplication au redémarrage) ──────────────
+caddy.pid
+

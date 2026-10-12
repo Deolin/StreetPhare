@@ -1,0 +1,28 @@
+[Unit]
+Description=StreetPhare Primary Server (Node.js)
+After=network.target
+
+[Service]
+Type=simple
+# ── Adaptez User / Group / WorkingDirectory à votre déploiement ─────────────
+User=streetphare
+Group=streetphare
+WorkingDirectory=/opt/streetphare/server
+# Les secrets (MASTER_KEY, JWT_SECRET, ADMIN_HASH) sont chargés par dotenv
+# depuis server/.env (src/config.js) — pas besoin d'EnvironmentFile, ce qui
+# évite le problème d'expansion des « $ » des hash bcrypt par systemd.
+Environment=NODE_ENV=production
+Environment=SERVER_TYPE=PRIMARY
+Environment=PARTNER_URL=http://127.0.0.1:3001
+ExecStart=/usr/bin/node src/primary.js
+# Redémarrage automatique en cas de crash (uncaughtException → exit 1).
+Restart=always
+RestartSec=3
+# Évite une boucle de redémarrage infinie en cas de panne persistante.
+StartLimitIntervalSec=300
+StartLimitBurst=10
+StandardOutput=append:/var/log/streetphare-primary.log
+StandardError=append:/var/log/streetphare-primary.log
+
+[Install]
+WantedBy=multi-user.target

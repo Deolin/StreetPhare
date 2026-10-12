@@ -9,6 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
 const store = require('../store');
 const sync = require('../sync');
+const { broadcastToAll } = require('../services/broadcast');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -95,6 +96,11 @@ router.post('/alerts', reportLimiter, (req, res) => {
   // Réplication vers le Backup via outbox (retry automatique).
   sync.enqueueAlert(saved);
 
+  // Diffusion temps réel si le signalement est déjà validé (≥ seuil).
+  if ((saved.votes || []).length >= config.consensusThreshold) {
+    broadcastToAll('report_validated', { alert: { ...saved, votes: saved.votes || [] } });
+  }
+
   res.status(201).json({
     alert: { ...saved, votes: saved.votes || [] },
     votesCount: (saved.votes || []).length,
@@ -152,6 +158,13 @@ router.post('/alerts/:id/vote', (req, res) => {
   }
 
   const validated = alert.votes.length >= config.consensusThreshold;
+
+  // Diffusion temps réel : le signalement devient visible pour tout le
+  // réseau (mobiles connectés + admin + Backup) dès le franchissement du seuil.
+  if (validated && alert.status !== 'rejected') {
+    broadcastToAll('report_validated', { alert: { ...alert, votes: alert.votes || [] } });
+  }
+
   res.json({
     votesCount: alert.votes.length,
     validated,

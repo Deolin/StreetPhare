@@ -114,6 +114,35 @@ class HiveAlertDatabase {
     return false;
   }
 
+  /// Insère ou remplace une alerte reçue du serveur central (autoritaire).
+  ///
+  /// Contrairement à [insertOrMerge] (gossip P2P), le STATUT est écrasé par
+  /// celui reçu du serveur : le serveur est la source de vérité pour la
+  /// validation / le rejet (diffusion temps réel `report_validated` /
+  /// `report_rejected`).
+  Future<bool> upsertFromServer(Alert incoming) async {
+    _ensureOpen();
+    final existing = _box!.get(incoming.id);
+    if (existing == null) {
+      await _box!.put(incoming.id, incoming);
+      _emit();
+      return true;
+    }
+
+    // Fusion des confirmations + écrasement du statut serveur.
+    for (final uid in incoming.confirmations) {
+      existing.addConfirmation(uid);
+    }
+    existing.status = incoming.status;
+    existing.lastModifiedAt = incoming.lastModifiedAt;
+    if (incoming.uploadedTo.isNotEmpty) {
+      existing.uploadedTo = incoming.uploadedTo;
+    }
+    await _box!.put(existing.id, existing);
+    _emit();
+    return false;
+  }
+
   /// Supprime une alerte par id.
   Future<void> delete(String id) async {
     _ensureOpen();

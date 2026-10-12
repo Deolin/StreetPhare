@@ -285,6 +285,11 @@
           refreshSnapshot();
         } else if (d.type === 'report_updated') {
           refreshSnapshot();
+        } else if (d.type === 'report_validated') {
+          if (d.alert) addAlertMarker(d.alert);
+          refreshSnapshot();
+        } else if (d.type === 'report_rejected') {
+          refreshSnapshot();
         } else if (d.type === 'geofencing_changed') {
           loadZones();
         } else if (d.type === 'global_alert') {
