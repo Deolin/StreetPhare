@@ -163,8 +163,9 @@ class MapTileDownloadService {
     } on MissingPluginException {
       return null;
     } catch (e) {
-      if (kDebugMode)
+      if (kDebugMode) {
         debugPrint('[MapTileDownload] Erreur getLocalTilePath: $e');
+      }
       return null;
     }
   }

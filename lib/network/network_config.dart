@@ -113,7 +113,7 @@ class NetworkConfig {
   /// URL de l'API panic collective.
   ///
   /// https://streetphare.ddns.net/api/panic/collective
-  static String get collectivePanicUrl => '${baseUrl}/api/panic/collective';
+  static String get collectivePanicUrl => '$baseUrl/api/panic/collective';
 
   /// URL du dashboard d'administration (port 4000, Caddy).
   ///
@@ -130,7 +130,7 @@ class NetworkConfig {
   /// URL de soumission des rapports de bug.
   ///
   /// https://streetphare.ddns.net/api/bug-report
-  static String get bugReportUrl => '${baseUrl}/api/bug-report';
+  static String get bugReportUrl => '$baseUrl/api/bug-report';
 
   // ---------------------------------------------------------------------------
   // Fallback local (NAT Hairpinning / Loopback)

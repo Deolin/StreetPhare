@@ -68,9 +68,9 @@ class NetworkCoordinator with WidgetsBindingObserver {
         _cryptoUtils = CryptoUtils.instance;
   static final NetworkCoordinator instance = NetworkCoordinator._();
 
-  HiveAlertDatabase _db;
-  FailoverManager _failover;
-  CryptoUtils _cryptoUtils;
+  final HiveAlertDatabase _db;
+  final FailoverManager _failover;
+  final CryptoUtils _cryptoUtils;
   P2PMeshService? _mesh;
 
   Timer? _purgeTimer;

@@ -265,7 +265,7 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
         buf.writeln('Navigateur   : (détecté automatiquement)');
       } else {
         // Utilise dart:io pour obtenir le nom de l'OS et sa version.
-        buf.writeln('Type         : ${_platformLabel}');
+        buf.writeln('Type         : $_platformLabel');
         buf.writeln('OS           : ${io.Platform.operatingSystem}');
         buf.writeln('Version OS   : ${io.Platform.operatingSystemVersion}');
         buf.writeln('Cœurs CPU    : ${io.Platform.numberOfProcessors}');

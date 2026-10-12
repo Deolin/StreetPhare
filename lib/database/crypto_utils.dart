@@ -122,7 +122,7 @@ class CryptoUtils {
           type: KeyPairType.ed25519,
         ),
       );
-      return _ed.verify(message, signature: signature);
+      return await _ed.verify(message, signature: signature);
     } catch (_) {
       return false;
     }

@@ -37,7 +37,7 @@ class MockCryptoUtils extends Mock implements CryptoUtils {
     required DateTime createdAt,
   }) async {
     return SignedAlert(
-      signature: 'mock_signature_${alertId}_${type}',
+      signature: 'mock_signature_${alertId}_$type',
       publicKey: 'mock_public_key',
     );
   }

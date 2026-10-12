@@ -329,7 +329,7 @@ class BugReportService {
           );
           if (kDebugMode) {
             debugPrint(
-                '[BugReport] ❌ Rapport "${entry.title}" — échec (${entry.attempts + 1}/${_kMaxAttemptsBeforeAbandon})');
+                '[BugReport] ❌ Rapport "${entry.title}" — échec (${entry.attempts + 1}/$_kMaxAttemptsBeforeAbandon)');
           }
         }
       } catch (e) {
