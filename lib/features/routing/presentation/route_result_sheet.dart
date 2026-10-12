@@ -178,8 +178,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
             // ── En-tête ─────────────────────────────────────────────────
             Row(
               children: [
-                Icon(Icons.shield,
-                    color: StreetPhareTheme.primary, size: 22),
+                Icon(Icons.shield, color: StreetPhareTheme.primary, size: 22),
                 const SizedBox(width: 8),
                 Text(
                   s.routeTitle,
@@ -191,8 +190,8 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                 ),
                 const Spacer(),
                 IconButton(
-                  icon: Icon(Icons.close,
-                      color: StreetPhareTheme.textSecondary),
+                  icon:
+                      Icon(Icons.close, color: StreetPhareTheme.textSecondary),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -220,8 +219,7 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                   widget.routes.length > 1)
                 TextButton.icon(
                   onPressed: _loadAlternatives,
-                  icon: Icon(Icons.alt_route,
-                      color: StreetPhareTheme.primary),
+                  icon: Icon(Icons.alt_route, color: StreetPhareTheme.primary),
                   label: Text(
                     s.routeShowAlternatives,
                     style: TextStyle(color: StreetPhareTheme.primary),

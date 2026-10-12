@@ -23,9 +23,11 @@ class MarsAttacksTheme {
 
   // ── Palette « Mars Attacks » (rétro-pulp / SF vintage) ──────────────────
   static const Color inkBlack = Color(0xFF222222); // noir profond (fond sombre)
-  static const Color deepGreenSurface = Color(0xFF244131); // vert sombre d'encre
+  static const Color deepGreenSurface =
+      Color(0xFF244131); // vert sombre d'encre
   static const Color deepGreenVariant = Color(0xFF1B3326); // vert très sombre
-  static const Color alienGreen = Color(0xFF4A7C5C); // vert clair dérivé (accent)
+  static const Color alienGreen =
+      Color(0xFF4A7C5C); // vert clair dérivé (accent)
   static const Color vividRed = Color(0xFFCB633A); // rouge/orange vif d'alerte
   static const Color cream = Color(0xFFEEEDDE); // crème / blanc cassé (texte)
   static const Color creamMuted = Color(0xFFC4C1AF); // crème atténué

@@ -117,8 +117,7 @@ class ReportBottomSheet extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 child: Row(
                   children: [
-                    Icon(Icons.add_alert,
-                        color: StreetPhareTheme.primary),
+                    Icon(Icons.add_alert, color: StreetPhareTheme.primary),
                     SizedBox(width: isLowVision ? 0 : 12),
                     Text(
                       'Nouveau signalement',

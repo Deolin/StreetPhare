@@ -453,8 +453,8 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: StreetPhareTheme.primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: BorderSide(
-                        color: StreetPhareTheme.primary, width: 1.5),
+                    side:
+                        BorderSide(color: StreetPhareTheme.primary, width: 1.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),

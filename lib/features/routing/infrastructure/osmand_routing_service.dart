@@ -414,7 +414,8 @@ class OsmAndRoutingService {
   /// {"paths":[{"points":{"coordinates":[[lon,lat],...]},
   ///            "distance":1234,"time":890000}]}
   /// ```
-  List<RouteResult> _parseGraphHopperResponse(String body, RoutingProfile profile) {
+  List<RouteResult> _parseGraphHopperResponse(
+      String body, RoutingProfile profile) {
     final json = jsonDecode(body) as Map<String, dynamic>;
     final paths = json['paths'] as List<dynamic>? ?? [];
     if (paths.isEmpty) return [];

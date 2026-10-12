@@ -15,8 +15,7 @@
 const String kStreetPhareAppVersion = '2.2';
 
 /// User-Agent identifiant clairement l'application StreetPhare.
-const String kStreetPhareUserAgent =
-    'StreetPhareApp/$kStreetPhareAppVersion '
+const String kStreetPhareUserAgent = 'StreetPhareApp/$kStreetPhareAppVersion '
     '(com.streetphare.app; contact@streetphare.app)';
 
 /// Referer (page/origine) transmis avec les requêtes de tuiles.

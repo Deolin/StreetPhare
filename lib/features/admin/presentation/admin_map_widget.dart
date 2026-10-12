@@ -220,8 +220,7 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
                   headers: kStreetPhareTileHeaders,
                 ),
                 maxNativeZoom: 19,
-                tileBuilder:
-                    widget.darkMode ? darkModeTileBuilder : null,
+                tileBuilder: widget.darkMode ? darkModeTileBuilder : null,
                 tileDisplay: const TileDisplay.fadeIn(
                   duration: Duration(milliseconds: 200),
                 ),

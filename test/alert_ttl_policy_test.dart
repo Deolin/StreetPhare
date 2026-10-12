@@ -22,20 +22,25 @@ Alert _alert(AlertType type, DateTime createdAt) => Alert(
 void main() {
   group('AlertTtlPolicy — TTL par identifiant ReportType', () {
     test('types mobiles → 10 min', () {
-      expect(AlertTtlPolicy.ttlForReport('barrages'), const Duration(minutes: 10));
+      expect(
+          AlertTtlPolicy.ttlForReport('barrages'), const Duration(minutes: 10));
       expect(AlertTtlPolicy.ttlForReport('groupes_casseurs'),
           const Duration(minutes: 10));
-      expect(AlertTtlPolicy.ttlForReport('dangers'), const Duration(minutes: 10));
+      expect(
+          AlertTtlPolicy.ttlForReport('dangers'), const Duration(minutes: 10));
     });
 
     test('types statiques → 1 min', () {
-      expect(AlertTtlPolicy.ttlForReport('policiers'), const Duration(minutes: 1));
-      expect(AlertTtlPolicy.ttlForReport('autopompes'), const Duration(minutes: 1));
+      expect(
+          AlertTtlPolicy.ttlForReport('policiers'), const Duration(minutes: 1));
+      expect(AlertTtlPolicy.ttlForReport('autopompes'),
+          const Duration(minutes: 1));
       expect(AlertTtlPolicy.ttlForReport('nasses'), const Duration(minutes: 1));
     });
 
     test('identifiant inconnu → fallback mobile (10 min)', () {
-      expect(AlertTtlPolicy.ttlForReport('inconnu'), const Duration(minutes: 10));
+      expect(
+          AlertTtlPolicy.ttlForReport('inconnu'), const Duration(minutes: 10));
     });
   });
 
@@ -74,11 +79,13 @@ void main() {
     test('alerte statique expire après 1 min', () {
       final alert = _alert(AlertType.policiers, createdAt);
       expect(
-        AlertTtlPolicy.isAlertAlive(alert, now: DateTime.utc(2026, 1, 1, 12, 0, 59)),
+        AlertTtlPolicy.isAlertAlive(alert,
+            now: DateTime.utc(2026, 1, 1, 12, 0, 59)),
         isTrue,
       );
       expect(
-        AlertTtlPolicy.isAlertAlive(alert, now: DateTime.utc(2026, 1, 1, 12, 1, 1)),
+        AlertTtlPolicy.isAlertAlive(alert,
+            now: DateTime.utc(2026, 1, 1, 12, 1, 1)),
         isFalse,
       );
     });

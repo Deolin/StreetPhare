@@ -260,8 +260,8 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
               valueListenable: AppPreferencesStore.instance,
               builder: (_, prefs, o) {
                 return PopupMenuButton<MessageFilter>(
-                  icon: Icon(Icons.filter_list,
-                      color: StreetPhareTheme.primary),
+                  icon:
+                      Icon(Icons.filter_list, color: StreetPhareTheme.primary),
                   tooltip: 'Filtrer les messages',
                   onSelected: (filter) async {
                     await AppPreferencesStore.instance.setMessageFilter(filter);

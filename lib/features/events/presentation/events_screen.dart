@@ -615,8 +615,7 @@ class _EventCard extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.qr_code_2,
-                color: StreetPhareTheme.primary, size: 24),
+            Icon(Icons.qr_code_2, color: StreetPhareTheme.primary, size: 24),
             const SizedBox(width: 8),
             Expanded(
               child: Text(

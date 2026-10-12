@@ -578,8 +578,7 @@ class _MapScreenState extends State<MapScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.event_busy,
-                color: StreetPhareTheme.primary, size: 26),
+            Icon(Icons.event_busy, color: StreetPhareTheme.primary, size: 26),
             const SizedBox(width: 10),
             Flexible(
               child: Text(
@@ -803,8 +802,7 @@ class _MapScreenState extends State<MapScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.alt_route,
-                color: StreetPhareTheme.primary, size: 24),
+            Icon(Icons.alt_route, color: StreetPhareTheme.primary, size: 24),
             const SizedBox(width: 10),
             Flexible(
               child: Text(
@@ -989,8 +987,7 @@ class _MapScreenState extends State<MapScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.lightbulb,
-                color: StreetPhareTheme.primary, size: 28),
+            Icon(Icons.lightbulb, color: StreetPhareTheme.primary, size: 28),
             const SizedBox(width: 10),
             Text(
               s.appTitle,
@@ -1065,8 +1062,7 @@ class _MapScreenState extends State<MapScreen> {
         ),
         title: Row(
           children: [
-            Icon(Icons.emergency,
-                color: StreetPhareTheme.danger, size: 28),
+            Icon(Icons.emergency, color: StreetPhareTheme.danger, size: 28),
             const SizedBox(width: 10),
             Flexible(
               child: Text(
@@ -1417,8 +1413,9 @@ class _MapScreenState extends State<MapScreen> {
       final color = _alertColor(alert.type);
       final icon = _alertIcon(alert.type);
       final label = _alertLabel(alert.type);
-      final tooltip =
-          alert.description.isNotEmpty ? '$label — ${alert.description}' : label;
+      final tooltip = alert.description.isNotEmpty
+          ? '$label — ${alert.description}'
+          : label;
       markers.add(Marker(
         point: alert.position,
         width: 40,
@@ -1692,8 +1689,8 @@ class _MapScreenState extends State<MapScreen> {
                                   Align(
                                     alignment: Alignment.bottomLeft,
                                     child: Padding(
-                                      padding:
-                                          const EdgeInsets.only(left: 12, bottom: 24),
+                                      padding: const EdgeInsets.only(
+                                          left: 12, bottom: 24),
                                       child: SizedBox(
                                         width: 14,
                                         height: 14,

@@ -68,9 +68,8 @@ class Alert {
     final statusStr = (json['status'] as String?) ?? 'pending';
     return Alert(
       id: (json['id'] as String?) ?? '',
-      ephemeralUserId: (json['reporter_id'] as String?) ??
-          (json['userId'] as String?) ??
-          '',
+      ephemeralUserId:
+          (json['reporter_id'] as String?) ?? (json['userId'] as String?) ?? '',
       signature: (json['signature'] as String?) ?? '',
       type: alertTypeFromName(json['type'] as String?),
       latitude: _asDouble(json['lat']),
@@ -83,16 +82,14 @@ class Alert {
         (s) => s.name == statusStr,
         orElse: () => AlertStatus.pending,
       ),
-      confirmations:
-          ((json['votes'] ?? json['confirmations']) as List?)
-                  ?.map((e) => e.toString())
-                  .toSet() ??
-              const <String>{},
+      confirmations: ((json['votes'] ?? json['confirmations']) as List?)
+              ?.map((e) => e.toString())
+              .toSet() ??
+          const <String>{},
       uploadedTo: (json['uploadedTo'] as String?) ??
           (json['uploaded_to'] as String?) ??
           '',
-      lastModifiedAt:
-          _parseDate(json['updatedAt'] ?? json['last_modified_at']),
+      lastModifiedAt: _parseDate(json['updatedAt'] ?? json['last_modified_at']),
     );
   }
 
