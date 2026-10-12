@@ -1,0 +1,68 @@
+# ─────────────────────────────────────────────────────────────
+# Dependabot — surveillance automatisée des dépendances
+# StreetPhare
+# ─────────────────────────────────────────────────────────────
+# Surveille :
+#   1. Les dépendances Flutter/Dart (pubspec.yaml, racine)
+#   2. Les dépendances Node.js du serveur (server/package.json)
+#   3. Les versions des GitHub Actions (.github/workflows/)
+#
+# Les PR ouvertes par Dependabot déclenchent automatiquement le
+# workflow `ci.yml` (analyse + tests) via l'événement pull_request.
+# Pour activer la fusion automatique : activer « Allow auto-merge »
+# dans Settings → General → Pull Requests, et/ou configurer une
+# protection de branche exigeant le passage du CI.
+# ─────────────────────────────────────────────────────────────
+
+version: 2
+updates:
+
+  # ─── Flutter / Dart (pub) ────────────────────────────────
+  - package-ecosystem: "pub"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "flutter"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps(dev)"
+      include: "scope"
+
+  # ─── Node.js (npm) — serveur backend ─────────────────────
+  - package-ecosystem: "npm"
+    directory: "/server"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "javascript"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps(dev)"
+      include: "scope"
+
+  # ─── GitHub Actions (workflows CI/CD) ────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
