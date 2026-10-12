@@ -570,6 +570,22 @@ cron.schedule('0 * * * *', () => {
 //   - `unref()`          → Node.js ne bloque PAS l'event loop sur ce
 //                          processus enfant. Le processus Caddy survit
 //                          à l'arrêt du processus Node.js parent.
+// ── Garde-fous anti-crash : erreurs globales non gérées ──────────────
+// Sans ces handlers, toute exception non interceptée ou promesse rejetée
+// ferait planter le processus Node.js (comportement par défaut Node 15+).
+// Une modification erronée dans le panneau admin (modérateurs, géorepérage,
+// simulation…) ne doit JAMAIS arrêter le service : on journalise l'erreur
+// et on maintient le serveur en vie.
+process.on('uncaughtException', (err) => {
+  log('FATAL', `Exception non gérée : ${err && err.message ? err.message : err}`);
+  if (err && err.stack) console.error(err.stack);
+});
+process.on('unhandledRejection', (reason) => {
+  const msg = reason && reason.message ? reason.message : String(reason);
+  log('FATAL', `Promesse rejetée non gérée : ${msg}`);
+  if (reason && reason.stack) console.error(reason.stack);
+});
+
 launchCaddyIndependent();
 
 // ── Démarrage ───────────────────────────────────────────────────────────

@@ -237,9 +237,16 @@ function stopBots() {
 }
 
 function _tickBots() {
-  for (const bot of state.bots.values()) bot.tick(state.center);
-  const bots = [...state.bots.values()].map(b => ({ id: b.id, name: b.name, lat: b.lat, lng: b.lng }));
-  broadcast('bot_update', { bots });
+  try {
+    for (const bot of state.bots.values()) bot.tick(state.center);
+    const bots = [...state.bots.values()].map(b => ({ id: b.id, name: b.name, lat: b.lat, lng: b.lng }));
+    broadcast('bot_update', { bots });
+  } catch (err) {
+    // Blindage : une erreur dans le tick des bots ne doit jamais faire
+    // planter le processus (callback d'un setInterval, donc hors du
+    // contexte Express).
+    log('BOTS', `Erreur tick bots : ${err.message}`);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════

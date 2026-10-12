@@ -93,13 +93,18 @@ router.put('/moderators/:id', authenticateToken, async (req, res) => {
 
 /// DELETE /api/admin/moderators/:id — Supprimer un modérateur.
 router.delete('/moderators/:id', authenticateToken, (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Réservé à l\'administrateur principal' });
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Réservé à l\'administrateur principal' });
+    }
+    const removed = moderators.remove(req.params.id);
+    if (!removed) return res.status(404).json({ error: 'Modérateur non trouvé' });
+    broadcast('moderators_changed', {});
+    res.json({ success: true });
+  } catch (err) {
+    log('MOD', `Erreur suppression modérateur : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors de la suppression du modérateur' });
   }
-  const removed = moderators.remove(req.params.id);
-  if (!removed) return res.status(404).json({ error: 'Modérateur non trouvé' });
-  broadcast('moderators_changed', {});
-  res.json({ success: true });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -113,25 +118,40 @@ router.get('/reports', authenticateToken, requirePermission('reportValidate'), (
 
 /// POST /api/admin/reports/:id/validate — Valider un signalement.
 router.post('/reports/:id/validate', authenticateToken, requirePermission('reportValidate'), (req, res) => {
-  if (!store.validateAlert(req.params.id)) return res.status(404).json({ error: 'Signalement non trouvé' });
-  broadcast('report_updated', { id: req.params.id, status: 'active' });
-  res.json({ success: true });
+  try {
+    if (!store.validateAlert(req.params.id)) return res.status(404).json({ error: 'Signalement non trouvé' });
+    broadcast('report_updated', { id: req.params.id, status: 'active' });
+    res.json({ success: true });
+  } catch (err) {
+    log('REPORTS', `Erreur validation signalement : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors de la validation du signalement' });
+  }
 });
 
 /// POST /api/admin/reports/:id/reject — Rejeter un signalement.
 router.post('/reports/:id/reject', authenticateToken, requirePermission('reportValidate'), (req, res) => {
-  if (!store.rejectAlert(req.params.id)) return res.status(404).json({ error: 'Signalement non trouvé' });
-  const alert = store.alerts.find(a => a.id === req.params.id);
-  if (alert) sync.enqueueAlert(alert);
-  broadcast('report_updated', { id: req.params.id, status: 'rejected' });
-  res.json({ success: true });
+  try {
+    if (!store.rejectAlert(req.params.id)) return res.status(404).json({ error: 'Signalement non trouvé' });
+    const alert = store.alerts.find(a => a.id === req.params.id);
+    if (alert) sync.enqueueAlert(alert);
+    broadcast('report_updated', { id: req.params.id, status: 'rejected' });
+    res.json({ success: true });
+  } catch (err) {
+    log('REPORTS', `Erreur rejet signalement : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors du rejet du signalement' });
+  }
 });
 
 /// DELETE /api/admin/reports/:id — Supprimer un signalement.
 router.delete('/reports/:id', authenticateToken, requirePermission('reportValidate'), (req, res) => {
-  if (!store.deleteAlert(req.params.id)) return res.status(404).json({ error: 'Signalement non trouvé' });
-  broadcast('report_updated', { id: req.params.id, status: 'deleted' });
-  res.json({ success: true });
+  try {
+    if (!store.deleteAlert(req.params.id)) return res.status(404).json({ error: 'Signalement non trouvé' });
+    broadcast('report_updated', { id: req.params.id, status: 'deleted' });
+    res.json({ success: true });
+  } catch (err) {
+    log('REPORTS', `Erreur suppression signalement : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors de la suppression du signalement' });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -145,27 +165,42 @@ router.get('/chat', authenticateToken, requirePermission('chatModerate'), (req, 
 
 /// DELETE /api/admin/chat/:id — Supprimer un message.
 router.delete('/chat/:id', authenticateToken, requirePermission('chatModerate'), (req, res) => {
-  if (!store.deleteMeshMessage(req.params.id)) return res.status(404).json({ error: 'Message non trouvé' });
-  broadcast('chat_message_deleted', { id: req.params.id });
-  res.json({ success: true });
+  try {
+    if (!store.deleteMeshMessage(req.params.id)) return res.status(404).json({ error: 'Message non trouvé' });
+    broadcast('chat_message_deleted', { id: req.params.id });
+    res.json({ success: true });
+  } catch (err) {
+    log('CHAT', `Erreur suppression message : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors de la suppression du message' });
+  }
 });
 
 /// POST /api/admin/chat/ban — Bannir un UUID d'émetteur.
 router.post('/chat/ban', authenticateToken, requirePermission('chatModerate'), (req, res) => {
-  const { uuid } = req.body || {};
-  if (!uuid) return res.status(400).json({ error: 'uuid requis' });
-  store.banUser(uuid);
-  broadcast('user_banned', { uuid });
-  res.json({ success: true });
+  try {
+    const { uuid } = req.body || {};
+    if (!uuid) return res.status(400).json({ error: 'uuid requis' });
+    store.banUser(uuid);
+    broadcast('user_banned', { uuid });
+    res.json({ success: true });
+  } catch (err) {
+    log('CHAT', `Erreur bannissement : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors du bannissement' });
+  }
 });
 
 /// POST /api/admin/chat/unban — Lever un bannissement.
 router.post('/chat/unban', authenticateToken, requirePermission('chatModerate'), (req, res) => {
-  const { uuid } = req.body || {};
-  if (!uuid) return res.status(400).json({ error: 'uuid requis' });
-  store.unbanUser(uuid);
-  broadcast('user_unbanned', { uuid });
-  res.json({ success: true });
+  try {
+    const { uuid } = req.body || {};
+    if (!uuid) return res.status(400).json({ error: 'uuid requis' });
+    store.unbanUser(uuid);
+    broadcast('user_unbanned', { uuid });
+    res.json({ success: true });
+  } catch (err) {
+    log('CHAT', `Erreur débannissement : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors du débannissement' });
+  }
 });
 
 /// GET /api/admin/bans — Liste des UUIDs bannis.
@@ -184,18 +219,28 @@ router.get('/geofencing', authenticateToken, requirePermission('manageGeofencing
 
 /// POST /api/admin/geofencing — Ajouter une zone.
 router.post('/geofencing', authenticateToken, requirePermission('manageGeofencing'), (req, res) => {
-  const { name, type, lat, lng, radiusMeters } = req.body || {};
-  if (lat == null || lng == null) return res.status(400).json({ error: 'lat et lng requis' });
-  const zone = store.addGeofencingZone({ name, type, lat, lng, radiusMeters });
-  broadcast('geofencing_changed', {});
-  res.status(201).json({ success: true, zone });
+  try {
+    const { name, type, lat, lng, radiusMeters } = req.body || {};
+    if (lat == null || lng == null) return res.status(400).json({ error: 'lat et lng requis' });
+    const zone = store.addGeofencingZone({ name, type, lat, lng, radiusMeters });
+    broadcast('geofencing_changed', {});
+    res.status(201).json({ success: true, zone });
+  } catch (err) {
+    log('GEOFENCING', `Erreur ajout zone : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors de l\'ajout de la zone' });
+  }
 });
 
 /// DELETE /api/admin/geofencing/:id — Supprimer une zone.
 router.delete('/geofencing/:id', authenticateToken, requirePermission('manageGeofencing'), (req, res) => {
-  if (!store.removeGeofencingZone(req.params.id)) return res.status(404).json({ error: 'Zone non trouvée' });
-  broadcast('geofencing_changed', {});
-  res.json({ success: true });
+  try {
+    if (!store.removeGeofencingZone(req.params.id)) return res.status(404).json({ error: 'Zone non trouvée' });
+    broadcast('geofencing_changed', {});
+    res.json({ success: true });
+  } catch (err) {
+    log('GEOFENCING', `Erreur suppression zone : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors de la suppression de la zone' });
+  }
 });
 
 module.exports = router;

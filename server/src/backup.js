@@ -257,6 +257,19 @@ setInterval(() => {
 }, 3000);
 
 // ── Démarrage ───────────────────────────────────────────────────────────
+// ── Garde-fous anti-crash : erreurs globales non gérées ──────────────
+// (même mécanisme de résilience que primary.js) — une erreur non gérée
+// dans une requête ne doit jamais arrêter le serveur miroir.
+process.on('uncaughtException', (err) => {
+  log('FATAL', `Exception non gérée : ${err && err.message ? err.message : err}`);
+  if (err && err.stack) console.error(err.stack);
+});
+process.on('unhandledRejection', (reason) => {
+  const msg = reason && reason.message ? reason.message : String(reason);
+  log('FATAL', `Promesse rejetée non gérée : ${msg}`);
+  if (reason && reason.stack) console.error(reason.stack);
+});
+
 server.listen(config.backupPort, config.backupHost, () => {
   console.log('═══════════════════════════════════════════════');
   console.log(`  StreetPhare Server v3.1 — BACKUP (HTTP)`);

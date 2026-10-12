@@ -37,13 +37,6 @@ streetphare.ddns.net {
 			}
 		}
 	}
-	log {
-		output file /var/log/caddy/streetphare-mesh-access.log {
-			roll_size 10mb
-			roll_keep 5
-		}
-		format json
-	}
 
 	# ── Chemin WebSocket /admin-ws (dashboard administrateur) ───────────
 	handle /admin-ws* {
