@@ -59,26 +59,36 @@ router.get('/moderators', authenticateToken, (req, res) => {
 
 /// POST /api/admin/moderators — Créer un modérateur.
 router.post('/moderators', authenticateToken, async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Réservé à l\'administrateur principal' });
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Réservé à l\'administrateur principal' });
+    }
+    const { username, password, permissions } = req.body || {};
+    const result = await moderators.create(username, password, permissions);
+    if (result.error) return res.status(400).json({ error: result.error });
+    broadcast('moderators_changed', {});
+    res.status(201).json({ success: true, moderator: result.mod });
+  } catch (err) {
+    log('MOD', `Erreur création modérateur : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors de la création du modérateur' });
   }
-  const { username, password, permissions } = req.body || {};
-  const result = await moderators.create(username, password, permissions);
-  if (result.error) return res.status(400).json({ error: result.error });
-  broadcast('moderators_changed', {});
-  res.status(201).json({ success: true, moderator: result.mod });
 });
 
 /// PUT /api/admin/moderators/:id — Modifier un modérateur.
 router.put('/moderators/:id', authenticateToken, async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Réservé à l\'administrateur principal' });
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Réservé à l\'administrateur principal' });
+    }
+    const { password, permissions } = req.body || {};
+    const result = await moderators.update(req.params.id, { password, permissions });
+    if (result.error) return res.status(404).json({ error: result.error });
+    broadcast('moderators_changed', {});
+    res.json({ success: true, moderator: result.mod });
+  } catch (err) {
+    log('MOD', `Erreur modification modérateur : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors de la modification du modérateur' });
   }
-  const { password, permissions } = req.body || {};
-  const result = await moderators.update(req.params.id, { password, permissions });
-  if (result.error) return res.status(404).json({ error: result.error });
-  broadcast('moderators_changed', {});
-  res.json({ success: true, moderator: result.mod });
 });
 
 /// DELETE /api/admin/moderators/:id — Supprimer un modérateur.

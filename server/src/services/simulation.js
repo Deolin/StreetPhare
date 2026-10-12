@@ -140,7 +140,6 @@ function generatePanic(lat, lng, collective = false) {
   const alert = generateAlert(collective ? 'collective' : 'panic', lat, lng,
     collective ? '[SIM] PANIC collectif (5 pings)' : '[SIM] PANIC individuel');
   broadcast('panic', { lat, lng, collective, count, alertId: alert.id });
-  state.totalInjected++;
   return { aggregation, alert, count };
 }
 

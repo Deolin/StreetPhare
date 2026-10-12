@@ -36,6 +36,7 @@ import '../../../core/network/osm_tile_headers.dart';
 import '../../../core/network/peer_counter_service.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../../database/alert_visibility_policy.dart';
 import '../../../database/hive_alert_database.dart';
 import '../../../debug/client_debug_logger.dart';
 import '../../../network/collective_panic_service.dart';
@@ -130,6 +131,13 @@ class _MapScreenState extends State<MapScreen> {
   LatLng? _localReportMarker;
   AlertType? _localReportType;
 
+  /// Alertes réseau (validées par consensus ou simulées côté admin)
+  /// à afficher sur la carte citoyenne.
+  List<Alert> _remoteAlerts = const [];
+
+  /// Abonnement au flux d'alertes réseau.
+  StreamSubscription<List<Alert>>? _alertsSub;
+
   // --------------------------------------------------------------------------
   // Cycle de vie
   // --------------------------------------------------------------------------
@@ -143,12 +151,24 @@ class _MapScreenState extends State<MapScreen> {
         CollectivePanicService.instance.collectivePanicEvents.listen(
       _onCollectivePanicAlert,
     );
+    _alertsSub = NetworkCoordinator.instance.alertsStream.listen(
+      (alerts) {
+        if (!mounted) return;
+        setState(() => _remoteAlerts = alerts);
+      },
+    );
+    // Le stream broadcast ne rejoue pas la dernière valeur : on charge
+    // immédiatement les alertes déjà présentes dans Hive.
+    if (HiveAlertDatabase.instance.isInitialized) {
+      _remoteAlerts = HiveAlertDatabase.instance.getAllValid();
+    }
   }
 
   @override
   void dispose() {
     _positionSub?.cancel();
     _collectivePanicSub?.cancel();
+    _alertsSub?.cancel();
     _mapController.dispose();
     super.dispose();
   }
@@ -1305,6 +1325,128 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   // --------------------------------------------------------------------------
+  // Marqueurs d'alertes réseau (signalements validés / simulés)
+  // --------------------------------------------------------------------------
+
+  /// Couleur du marqueur selon le type d'alerte.
+  Color _alertColor(AlertType type) {
+    switch (type) {
+      case AlertType.barrage:
+        return Colors.red;
+      case AlertType.casseurs:
+        return Colors.amber;
+      case AlertType.danger:
+        return Colors.purple;
+      case AlertType.policiers:
+        return Colors.blue;
+      case AlertType.autopompes:
+        return Colors.orange;
+      case AlertType.filtre:
+        return Colors.teal;
+      case AlertType.panic:
+        return Colors.deepOrange;
+      case AlertType.dangerCollectif:
+        return Colors.redAccent;
+      case AlertType.density:
+        return Colors.cyanAccent;
+      case AlertType.autre:
+        return Colors.grey;
+    }
+  }
+
+  /// Icône du marqueur selon le type d'alerte.
+  IconData _alertIcon(AlertType type) {
+    switch (type) {
+      case AlertType.barrage:
+        return Icons.block;
+      case AlertType.casseurs:
+        return Icons.groups;
+      case AlertType.danger:
+        return Icons.warning_amber;
+      case AlertType.policiers:
+        return Icons.local_police;
+      case AlertType.autopompes:
+        return Icons.local_fire_department;
+      case AlertType.filtre:
+        return Icons.filter_alt;
+      case AlertType.panic:
+        return Icons.add_alert;
+      case AlertType.dangerCollectif:
+        return Icons.campaign;
+      case AlertType.density:
+        return Icons.people;
+      case AlertType.autre:
+        return Icons.add_alert;
+    }
+  }
+
+  /// Libellé lisible du type d'alerte (tooltip).
+  String _alertLabel(AlertType type) {
+    switch (type) {
+      case AlertType.barrage:
+        return 'Barrage';
+      case AlertType.casseurs:
+        return 'Casseurs';
+      case AlertType.danger:
+        return 'Danger';
+      case AlertType.policiers:
+        return 'Police';
+      case AlertType.autopompes:
+        return 'Autopompes';
+      case AlertType.filtre:
+        return 'Filtre';
+      case AlertType.panic:
+        return 'Panic';
+      case AlertType.dangerCollectif:
+        return 'Panic collectif';
+      case AlertType.density:
+        return 'Densité';
+      case AlertType.autre:
+        return 'Autre danger';
+    }
+  }
+
+  /// Construit les marqueurs des alertes réseau visibles.
+  /// Un point n'apparaît que s'il est `active` (validé par consensus),
+  /// ce qui inclut les alertes simulées injectées côté admin.
+  List<Marker> _buildAlertMarkers() {
+    final markers = <Marker>[];
+    final now = DateTime.now().toUtc();
+    for (final alert in _remoteAlerts) {
+      if (!AlertVisibilityPolicy.isVisible(alert, now: now)) continue;
+      final color = _alertColor(alert.type);
+      final icon = _alertIcon(alert.type);
+      final label = _alertLabel(alert.type);
+      final tooltip =
+          alert.description.isNotEmpty ? '$label — ${alert.description}' : label;
+      markers.add(Marker(
+        point: alert.position,
+        width: 40,
+        height: 40,
+        child: Tooltip(
+          message: tooltip,
+          child: Container(
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.9),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.5),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+        ),
+      ));
+    }
+    return markers;
+  }
+
+  // --------------------------------------------------------------------------
   // Couches événements
   // --------------------------------------------------------------------------
 
@@ -1454,6 +1596,9 @@ class _MapScreenState extends State<MapScreen> {
     // Marqueur local de signalement immédiat.
     final localMarker = _buildLocalReportMarker();
     if (localMarker != null) markers.add(localMarker);
+
+    // Marqueurs des alertes réseau (signalements validés / simulés).
+    markers.addAll(_buildAlertMarkers());
 
     return _EventLayers(polylines: polylines, markers: markers);
   }

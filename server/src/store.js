@@ -188,6 +188,7 @@ class Store {
     const existing = this.alerts.find(a => a.id === alert.id);
     if (existing) {
       if (alert.votes && alert.votes.length > 0) {
+        if (!existing.votes) existing.votes = [];
         existing.votes.push(...alert.votes.filter(v => !existing.votes.includes(v)));
       }
       existing.updatedAt = new Date().toISOString();

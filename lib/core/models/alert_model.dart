@@ -66,39 +66,92 @@ class Alert {
   /// (GET /v1/reports + POST /alerts).
   factory Alert.fromJson(Map<String, dynamic> json) {
     final statusStr = (json['status'] as String?) ?? 'pending';
-    final typeStr = (json['type'] as String?) ?? 'autre';
     return Alert(
-      id: json['id'] as String,
-      ephemeralUserId: (json['reporter_id'] as String?) ?? '',
+      id: (json['id'] as String?) ?? '',
+      ephemeralUserId: (json['reporter_id'] as String?) ??
+          (json['userId'] as String?) ??
+          '',
       signature: (json['signature'] as String?) ?? '',
-      type: AlertType.values.firstWhere(
-        (t) => t.name == typeStr,
-        orElse: () => AlertType.autre,
-      ),
-      latitude: (json['lat'] as num).toDouble(),
-      longitude: (json['lon'] as num).toDouble(),
+      type: alertTypeFromName(json['type'] as String?),
+      latitude: _asDouble(json['lat']),
+      longitude: _asDouble(json['lng'] ?? json['lon']),
       description: (json['description'] as String?) ?? '',
       densityValue: json['density_value'] as int?,
-      createdAt: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'] as String).toUtc()
-          : DateTime.now().toUtc(),
+      createdAt: _parseDate(json['createdAt'] ?? json['timestamp']),
       ttlHours: (json['ttl_hours'] as int?) ?? 24,
       status: AlertStatus.values.firstWhere(
         (s) => s.name == statusStr,
         orElse: () => AlertStatus.pending,
       ),
-      confirmations: ((json['confirmations'] as List?) ?? const [])
-          .map((e) => e.toString())
-          .toSet(),
-      uploadedTo: (json['uploaded_to'] as String?) ?? '',
-      lastModifiedAt: json['last_modified_at'] != null
-          ? DateTime.parse(json['last_modified_at'] as String).toUtc()
-          : DateTime.now().toUtc(),
+      confirmations:
+          ((json['votes'] ?? json['confirmations']) as List?)
+                  ?.map((e) => e.toString())
+                  .toSet() ??
+              const <String>{},
+      uploadedTo: (json['uploadedTo'] as String?) ??
+          (json['uploaded_to'] as String?) ??
+          '',
+      lastModifiedAt:
+          _parseDate(json['updatedAt'] ?? json['last_modified_at']),
     );
   }
 
   factory Alert.fromCompact(String raw) =>
       Alert.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+
+  /// Lit une valeur numérique JSON de façon tolérante (num → double).
+  static double _asDouble(Object? value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? 0.0;
+  }
+
+  /// Parse une date ISO, ou retombe sur `now` en cas d'absence/invalidité.
+  static DateTime _parseDate(Object? value) {
+    if (value == null) return DateTime.now().toUtc();
+    final parsed = DateTime.tryParse(value.toString());
+    return (parsed ?? DateTime.now()).toUtc();
+  }
+
+  /// Résout un [AlertType] à partir d'un identifiant texte, qu'il provienne
+  /// du serveur Node.js (`filter`, `police`, `mobile_danger`, …) ou du
+  /// modèle Dart local (`filtre`, `policiers`, `danger`, …).
+  static AlertType alertTypeFromName(String? name) {
+    switch (name) {
+      // ── Contrat serveur Node.js ────────────────────────────────────
+      case 'police':
+        return AlertType.policiers;
+      case 'fire_truck':
+        return AlertType.autopompes;
+      case 'filter':
+        return AlertType.filtre;
+      case 'mobile_danger':
+        return AlertType.danger;
+      case 'collective_danger':
+        return AlertType.dangerCollectif;
+      case 'panic':
+        return AlertType.panic;
+      // ── Noms locaux (round-trip P2P / anciens payloads) ────────────
+      case 'barrage':
+        return AlertType.barrage;
+      case 'casseurs':
+        return AlertType.casseurs;
+      case 'danger':
+        return AlertType.danger;
+      case 'policiers':
+        return AlertType.policiers;
+      case 'autopompes':
+        return AlertType.autopompes;
+      case 'filtre':
+        return AlertType.filtre;
+      case 'dangerCollectif':
+        return AlertType.dangerCollectif;
+      case 'density':
+        return AlertType.density;
+      default:
+        return AlertType.autre;
+    }
+  }
 
   /// Identifiant unique anonyme (hash court). Généré côté client.
   final String id;
@@ -183,14 +236,19 @@ class Alert {
         'reporter_id': ephemeralUserId,
         'type': type.name,
         'lat': latitude,
+        'lng': longitude,
         'lon': longitude,
         if (description.isNotEmpty) 'description': description,
         if (densityValue != null) 'density_value': densityValue,
+        'createdAt': createdAt.toUtc().toIso8601String(),
         'timestamp': createdAt.toUtc().toIso8601String(),
         'ttl_hours': ttlHours,
         'status': status.name,
+        'votes': confirmations.toList(),
         'confirmations': confirmations.toList(),
         'signature': signature,
+        'uploadedTo': uploadedTo,
+        'updatedAt': lastModifiedAt.toUtc().toIso8601String(),
         'last_modified_at': lastModifiedAt.toUtc().toIso8601String(),
       };
 
