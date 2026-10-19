@@ -158,6 +158,7 @@ void main() {
 
         // Configuration par défaut des mocks.
         when(() => db.upsert(any())).thenAnswer((_) async => true);
+        when(() => failover.uploadAlerts(any())).thenAnswer((_) async => true);
       });
 
       test(
@@ -644,6 +645,7 @@ void main() {
         );
 
         when(() => db.upsert(any())).thenAnswer((_) async => true);
+        when(() => failover.uploadAlerts(any())).thenAnswer((_) async => true);
       });
 
       for (final type in [

@@ -706,6 +706,12 @@ class NetworkCoordinator with WidgetsBindingObserver {
       }
     }
 
+    // Upload immédiat vers le serveur central (Requirement #4) pour que le
+    // signalement soit visible en temps réel côté admin, sans attendre la
+    // sync périodique (3 min) ni le consensus local (3 confirmations).
+    // Non-fatal : en cas d'échec, la sync périodique (SyncService) retentera.
+    unawaited(_failover.uploadAlerts([alert.toJson()]));
+
     if (kDebugMode) {
       debugPrint('[NetworkCoordinator] alerte créée : $alert');
     }

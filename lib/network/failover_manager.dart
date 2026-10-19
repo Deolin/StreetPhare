@@ -560,7 +560,7 @@ class FailoverManager {
     }
 
     try {
-      final uri = Uri.parse('${_current!.address}/v1/alerts/sync');
+      final uri = Uri.parse('${_current!.address}/api/sync-push');
       final resp = await _httpClient
           .post(
             uri,
