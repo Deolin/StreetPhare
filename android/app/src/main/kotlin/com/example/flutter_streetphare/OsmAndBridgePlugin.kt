@@ -70,6 +70,9 @@ private val OSM_ASSET_CANDIDATES = listOf(
 /// Profil de routage piéton (foot).
 private const val FOOT_PROFILE = "foot"
 
+/// Profil de routage véhicule (car) — respecte le code de la route.
+private const val CAR_PROFILE = "car"
+
 // ════════════════════════════════════════════════════════════════════════════
 // OsmAndBridgePlugin
 // ════════════════════════════════════════════════════════════════════════════
@@ -199,12 +202,14 @@ class OsmAndBridgePlugin(
                     result.error("INVALID_COORDS", "Coordonnées invalides", null)
                     return
                 }
+                val profile = (args["profile"] as? String) ?: "pedestrian"
 
                 scope.launch {
                     val json = computeRoute(
                         startLat, startLon, endLat, endLon,
                         avoidPoints = avoidPoints,
-                        alternatives = false
+                        alternatives = false,
+                        profile = profile
                     )
                     withContext(Dispatchers.Main) { result.success(json) }
                 }
@@ -231,12 +236,14 @@ class OsmAndBridgePlugin(
                     result.error("INVALID_COORDS", "Coordonnées invalides", null)
                     return
                 }
+                val profile = (args["profile"] as? String) ?: "pedestrian"
 
                 scope.launch {
                     val json = computeRoute(
                         startLat, startLon, endLat, endLon,
                         avoidPoints = avoidPoints,
-                        alternatives = true
+                        alternatives = true,
+                        profile = profile
                     )
                     withContext(Dispatchers.Main) { result.success(json) }
                 }
@@ -298,14 +305,20 @@ class OsmAndBridgePlugin(
             gh.setOSMFile(osmFile.absolutePath)
             gh.graphHopperLocation = graphDir.absolutePath
 
-            // Profil piéton strict (foot) — sans voiture/vélo
-            // Note GH 7.0 : utilisation directe du string "foot"
-            // (FlagEncoderFactory supprimé dans GH 6+)
+            // Profils piéton (foot) et véhicule (car).
+            // Note GH 7.0 : utilisation directe des strings "foot"/"car"
+            // (FlagEncoderFactory supprimé dans GH 6+).
+            // Le profil "car" respecte le code de la route (sens uniques,
+            // restrictions) et n'emprunte que les routes carrossables.
             gh.profiles = listOf(
                 Profile(FOOT_PROFILE)
                     .setVehicle("foot")
                     .setWeighting("fastest")
-                    .setTurnCosts(false)
+                    .setTurnCosts(false),
+                Profile(CAR_PROFILE)
+                    .setVehicle("car")
+                    .setWeighting("fastest")
+                    .setTurnCosts(false),
             )
 
             // Contraction Hierarchies désactivée pour réduire la mémoire
@@ -394,7 +407,8 @@ class OsmAndBridgePlugin(
         startLat: Double, startLon: Double,
         endLat: Double,   endLon:   Double,
         avoidPoints: List<Map<String, Any>> = emptyList(),
-        alternatives: Boolean = false
+        alternatives: Boolean = false,
+        profile: String = "pedestrian"
     ): Map<String, Any> {
 
         val gh = hopper
@@ -408,8 +422,14 @@ class OsmAndBridgePlugin(
         }
 
         return try {
+            // Sélection du profil GraphHopper : "car" pour véhicule/urgence
+            // (respect du code de la route, routes carrossables), "foot" sinon.
+            val ghProfile = when (profile) {
+                "vehicle", "emergency" -> CAR_PROFILE
+                else -> FOOT_PROFILE
+            }
             val req = GHRequest(startLat, startLon, endLat, endLon)
-                .setProfile(FOOT_PROFILE)
+                .setProfile(ghProfile)
                 .setLocale(java.util.Locale.FRENCH)
 
             // ── Algorithme d'Évitement Dynamique (Pondération des Arcs) ───

@@ -185,6 +185,7 @@ class OsmAndNativeChannel {
   Future<NativeRouteResult> computeRouteWithAlternatives({
     required LatLng start,
     required LatLng end,
+    RoutingProfile profile = RoutingProfile.pedestrian,
     List<AvoidPoint> avoidPoints = const [],
   }) async {
     if (!isSupported) return NativeRouteResult.platformUnsupported;
@@ -197,6 +198,7 @@ class OsmAndNativeChannel {
           'startLon': start.longitude,
           'endLat': end.latitude,
           'endLon': end.longitude,
+          'profile': profile.name,
           'avoidPoints': avoidPoints
               .map((p) => {
                     'lat': p.lat,
