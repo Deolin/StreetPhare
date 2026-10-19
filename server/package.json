@@ -40,7 +40,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "cross-env": "^7.0.3",
+    "cross-env": "^10.1.0",
     "esbuild": "^0.25.0",
     "nodemon": "^3.1.0",
     "pm2": "^7.0.4"
