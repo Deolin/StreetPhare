@@ -137,7 +137,7 @@ class WifiDirectMeshTransport
     // de microtâches Dart (_startMicrotaskLoop).
     try {
       final bytes = utf8.encode(payload);
-      _socket!.send(bytes, _mcastGroup!, port);
+      await _socket!.send(bytes, _mcastGroup!, port);
     } on SocketException catch (e) {
       // Socket coupée par l'OS (errno=1 Operation not permitted).
       // On ferme silencieusement : la socket sera recréée au retour

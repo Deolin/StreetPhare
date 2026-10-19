@@ -193,6 +193,38 @@ class RoutingEngine {
       }
     }
 
+    // ── TENTATIVE 1.5 : SafePathEngine si des dangers sont à éviter ─────
+    // OSRM public (utilisé en secours par OsmAnd Bridge) ne supporte PAS
+    // l'évitement de points. Quand des dangers doivent être évités, on
+    // préfère le SafePathEngine (grille Dijkstra) qui les contourne,
+    // plutôt que de laisser OSRM tracer à travers.
+    if (dangerPoints.isNotEmpty) {
+      try {
+        onCascadeStep?.call(CascadeStep.safePath);
+        final safePaths = SafePathEngine.computePrimaryOnly(
+          start: start,
+          end: end,
+          filters: avoidFilters,
+          constraints: PedestrianConstraints.fromProfile(profile),
+        );
+        if (safePaths.isNotEmpty) {
+          if (kDebugMode) {
+            debugPrint(
+                '[RoutingEngine] ✅ SafePath (évitement dangers actif : '
+                '${dangerPoints.length} point(s))');
+          }
+          return RouteComputeResult(
+            routes: safePaths,
+            source: 'safe_path_engine',
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[RoutingEngine] SafePath (dangers) failed: $e');
+        }
+      }
+    }
+
     // ── TENTATIVE 2 : OsmAnd Bridge (GraphHopper local → OSRM public) ──
     // OsmAndRoutingService gère sa propre cascade interne :
     //   MethodChannel Android → GraphHopper HTTP → OSRM public
