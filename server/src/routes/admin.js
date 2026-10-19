@@ -152,7 +152,9 @@ router.post('/reports/:id/reject', authenticateToken, requirePermission('reportV
 router.delete('/reports/:id', authenticateToken, requirePermission('reportValidate'), (req, res) => {
   try {
     if (!store.deleteAlert(req.params.id)) return res.status(404).json({ error: 'Signalement non trouvé' });
-    broadcast('report_updated', { id: req.params.id, status: 'deleted' });
+    // Diffusion aux clients mobiles (mesh) ET admin : la suppression doit
+    // être propagée en temps réel pour retirer le danger des cartes client.
+    broadcastToAll('report_deleted', { id: req.params.id });
     res.json({ success: true });
   } catch (err) {
     log('REPORTS', `Erreur suppression signalement : ${err.message}`);

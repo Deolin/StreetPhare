@@ -577,6 +577,25 @@ class NetworkCoordinator with WidgetsBindingObserver {
       final json = jsonDecode(raw) as Map<String, dynamic>;
       final kind = json['kind'] as String?;
 
+      // ── Signalements temps réel diffusés par le serveur central ──────
+      // Le serveur (panneau admin) diffuse `report_validated`,
+      // `report_rejected` et `report_deleted` aux clients mesh. Ces
+      // événements mettent à jour la base locale (source de vérité des
+      // dangers évités par le routage).
+      if (kind == 'report_validated') {
+        _onServerAlertValidated(json);
+        return;
+      }
+      if (kind == 'report_rejected' || kind == 'report_deleted') {
+        _onServerAlertRemoved(json);
+        return;
+      }
+      // Compatibilité ancien format : report_updated {status:'deleted'}.
+      if (kind == 'report_updated' && json['status'] == 'deleted') {
+        _onServerAlertRemoved(json);
+        return;
+      }
+
       if (kind == 'hive_p2p_message') {
         // ANR fix : ignore les messages auto-émis pour casser la boucle.
         final senderId = json['sender_id'] as String?;
@@ -597,6 +616,37 @@ class NetworkCoordinator with WidgetsBindingObserver {
       }
     } catch (e) {
       // Silence les payloads non-JSON (pings, etc.)
+    }
+  }
+
+  /// Traite un signalement validé reçu du serveur (temps réel).
+  /// Le serveur est la source de vérité : on écrase le statut local.
+  void _onServerAlertValidated(Map<String, dynamic> json) {
+    final alertJson = json['alert'] as Map<String, dynamic>?;
+    if (alertJson == null) return;
+    try {
+      final alert = Alert.fromJson(alertJson);
+      unawaited(_db.upsertFromServer(alert));
+      if (kDebugMode) {
+        debugPrint(
+            '[NetworkCoordinator] ✅ signalement validé (serveur) : ${alert.id}');
+      }
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[NetworkCoordinator] erreur alert serveur: $e\n$st');
+      }
+    }
+  }
+
+  /// Traite un signalement rejeté/supprimé reçu du serveur → retrait local.
+  /// Le danger disparaît immédiatement de la base (et donc des itinéraires).
+  void _onServerAlertRemoved(Map<String, dynamic> json) {
+    final alertJson = json['alert'] as Map<String, dynamic>?;
+    final id = (alertJson?['id'] as String?) ?? (json['id'] as String?);
+    if (id == null) return;
+    unawaited(_db.delete(id));
+    if (kDebugMode) {
+      debugPrint('[NetworkCoordinator] 🗑 signalement retiré (serveur) : $id');
     }
   }
 

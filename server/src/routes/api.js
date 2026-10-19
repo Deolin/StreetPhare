@@ -183,6 +183,8 @@ router.post('/alerts/:id/reject', authenticateToken, requireRole(['admin']), (re
   alert.status = 'rejected';
   alert.updatedAt = new Date().toISOString();
   sync.enqueueAlert(alert);
+  // Diffusion temps réel du rejet aux clients mobiles.
+  broadcastToAll('report_rejected', { alert: { ...alert, votes: alert.votes || [] } });
   res.json({ success: true, message: 'Signalement révoqué' });
 });
 
