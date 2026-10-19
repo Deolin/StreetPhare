@@ -31,6 +31,7 @@ import 'graph/spg_graph.dart';
 import 'graph/spg_loader.dart';
 import 'graph/spg_types.dart';
 import 'models/routing_profile.dart';
+import 'risk_score.dart';
 
 /// État du moteur de routage.
 enum EngineState {
@@ -162,7 +163,7 @@ class RoutingEngine {
             debugPrint('[RoutingEngine] ✅ SPG (${result.nodesExplored} nœuds, '
                 '${result.totalDistanceMeters.round()} m)');
           }
-          return _toRouteComputeResult(result);
+          return _applyRiskScore(_toRouteComputeResult(result), dangerPoints);
         }
       } catch (e) {
         if (kDebugMode) debugPrint('[RoutingEngine] SPG failed: $e');
@@ -183,9 +184,12 @@ class RoutingEngine {
         );
         if (!nativeResult.isEmpty) {
           onCascadeStep?.call(CascadeStep.nativeAndroid);
-          return RouteComputeResult(
-            routes: nativeResult.routes,
-            source: nativeResult.source,
+          return _applyRiskScore(
+            RouteComputeResult(
+              routes: nativeResult.routes,
+              source: nativeResult.source,
+            ),
+            dangerPoints,
           );
         }
       } catch (e) {
@@ -213,9 +217,12 @@ class RoutingEngine {
             ? CascadeStep.graphHopper
             : CascadeStep.osrmPublic;
         onCascadeStep?.call(step);
-        return RouteComputeResult(
-          routes: osmAndResult.routes,
-          source: osmAndResult.source,
+        return _applyRiskScore(
+          RouteComputeResult(
+            routes: osmAndResult.routes,
+            source: osmAndResult.source,
+          ),
+          dangerPoints,
         );
       }
     } catch (e) {
@@ -232,9 +239,12 @@ class RoutingEngine {
         constraints: PedestrianConstraints.fromProfile(profile),
       );
       if (paths.isNotEmpty) {
-        return RouteComputeResult(
-          routes: paths,
-          source: 'safe_path_engine',
+        return _applyRiskScore(
+          RouteComputeResult(
+            routes: paths,
+            source: 'safe_path_engine',
+          ),
+          dangerPoints,
         );
       }
     } catch (e) {
@@ -254,7 +264,7 @@ class RoutingEngine {
   /// visibles et des préférences utilisateur ([AvoidanceFilters]).
   List<LatLng> _collectDangerPoints(AvoidanceFilters filters) {
     try {
-      final alerts = AlertVisibilityPolicy.filterVisible(
+      final alerts = AlertVisibilityPolicy.filterAvoidable(
         HiveAlertDatabase.instance.getAllValid(),
       );
       return alerts
@@ -267,6 +277,27 @@ class RoutingEngine {
       }
       return const [];
     }
+  }
+
+  /// Applique le score de risque calculé aux itinéraires retournés.
+  ///
+  /// Le score est la somme des contributions des dangers traversés
+  /// (1.0 au centre d'un danger, décroissant jusqu'à 0 au bord du rayon).
+  RouteComputeResult _applyRiskScore(
+    RouteComputeResult result,
+    List<LatLng> dangerPoints,
+  ) {
+    if (dangerPoints.isEmpty || result.routes.isEmpty) return result;
+    final scored = result.routes
+        .map((r) => r.copyWith(
+              totalRiskScore: computeRiskScore(r.points, dangerPoints),
+            ))
+        .toList();
+    return RouteComputeResult(
+      routes: scored,
+      source: result.source,
+      errorMessage: result.errorMessage,
+    );
   }
 
   /// Convertit un ComputeResult (Isolate) en RouteComputeResult.

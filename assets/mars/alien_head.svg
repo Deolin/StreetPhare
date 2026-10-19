@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Tête d'alien (skin Mars Attacks) -->
+  <path d="M12 1.2C6.9 1.2 3.4 4.4 3.4 9c0 3.3 1 5.5 1.2 7.6.3 3.1 2.6 5.2 4.9 5.2h5c2.3 0 4.6-2.1 4.9-5.2.2-2.1 1.2-4.3 1.2-7.6 0-4.6-3.5-7.8-8.6-7.8z" fill="#8BC34A"/>
+  <ellipse cx="8.5" cy="10" rx="2.7" ry="3.7" fill="#141414"/>
+  <ellipse cx="15.5" cy="10" rx="2.7" ry="3.7" fill="#141414"/>
+  <circle cx="9.3" cy="8.9" r="1" fill="#ffffff" opacity="0.75"/>
+  <circle cx="16.3" cy="8.9" r="1" fill="#ffffff" opacity="0.75"/>
+  <path d="M11 14.6h2" stroke="#141414" stroke-width="0.9" stroke-linecap="round"/>
+</svg>

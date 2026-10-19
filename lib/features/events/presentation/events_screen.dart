@@ -639,11 +639,20 @@ class _EventCard extends StatelessWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: QrImageView(
-                data: qrData,
-                version: QrVersions.auto,
-                size: 200,
-                backgroundColor: Colors.white,
+              // SizedBox à taille fixe : l'AlertDialog enveloppe son contenu
+              // dans un IntrinsicWidth, or QrImageView utilise un LayoutBuilder
+              // interne qui ne supporte pas le calcul des dimensions
+              // intrinsèques (crash au partage). La taille fixe court-circuite
+              // ce calcul.
+              child: SizedBox(
+                width: 200,
+                height: 200,
+                child: QrImageView(
+                  data: qrData,
+                  version: QrVersions.auto,
+                  size: 200,
+                  backgroundColor: Colors.white,
+                ),
               ),
             ),
             const SizedBox(height: 12),

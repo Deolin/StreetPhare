@@ -142,8 +142,8 @@ class RoutingEngine {
       out.push({
         x: (lon - this.refLon) * 111320 * this.cosRef,
         y: (lat - this.refLat) * 110540,
-        radius: Number.isFinite(p.radius) ? p.radius : 30,
-        weight: Number.isFinite(p.weight) ? p.weight : 10,
+        radius: Number.isFinite(p.radius) ? p.radius : 50,
+        weight: Number.isFinite(p.weight) ? p.weight : 1e6,
       });
     }
     return out;

@@ -231,7 +231,7 @@ class AvoidPoint {
   const AvoidPoint({
     required this.lat,
     required this.lon,
-    this.radiusMeters = 30.0,
+    this.radiusMeters = 50.0,
   });
 
   final double lat;

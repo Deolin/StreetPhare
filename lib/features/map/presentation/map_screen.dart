@@ -25,6 +25,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -34,6 +35,8 @@ import '../../../core/i18n/strings.dart';
 import '../../../core/models/alert_model.dart';
 import '../../../core/network/osm_tile_headers.dart';
 import '../../../core/network/peer_counter_service.dart';
+import '../../../core/theme/app_skin.dart';
+import '../../../core/theme/skin_controller.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../database/alert_visibility_policy.dart';
@@ -1411,11 +1414,14 @@ class _MapScreenState extends State<MapScreen> {
   List<Marker> _buildAlertMarkers() {
     final markers = <Marker>[];
     final now = DateTime.now().toUtc();
+    final isMars = SkinController.instance.value == AppSkin.marsAttacks;
     for (final alert in _remoteAlerts) {
       if (!AlertVisibilityPolicy.isVisible(alert, now: now)) continue;
       final color = _alertColor(alert.type);
       final icon = _alertIcon(alert.type);
       final label = _alertLabel(alert.type);
+      // Icône personnalisée « Mars Attacks » (SVG) si le skin est actif.
+      final marsAsset = isMars ? _marsMarkerAsset(alert.type) : null;
       final tooltip = alert.description.isNotEmpty
           ? '$label — ${alert.description}'
           : label;
@@ -1438,12 +1444,33 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ],
             ),
-            child: Icon(icon, color: Colors.white, size: 20),
+            child: marsAsset != null
+                ? SvgPicture.asset(marsAsset, width: 22, height: 22)
+                : Icon(icon, color: Colors.white, size: 20),
           ),
         ),
       ));
     }
     return markers;
+  }
+
+  /// Asset SVG « Mars Attacks » pour un type d'alerte donné.
+  ///
+  /// Retourne `null` si le type conserve son icône Material standard.
+  /// Les marqueurs restent en espace écran (taille fixe 40×40) : ils ne
+  /// sont pas redimensionnés par le zoom, ce qui garantit leur lisibilité
+  /// à tous les niveaux (comportement standard FlutterMap pour les points).
+  String? _marsMarkerAsset(AlertType type) {
+    switch (type) {
+      case AlertType.policiers:
+        return 'assets/mars/alien_head.svg'; // Police → tête d'alien
+      case AlertType.barrage:
+        return 'assets/mars/cow.svg'; // Barrage → vache
+      case AlertType.autopompes:
+        return 'assets/mars/spaceship.svg'; // Autopompes → vaisseau
+      default:
+        return null;
+    }
   }
 
   // --------------------------------------------------------------------------

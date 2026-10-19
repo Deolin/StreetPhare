@@ -69,4 +69,16 @@ class RouteResult {
     }
     return '${(totalDistanceMeters / 1000).toStringAsFixed(2)} km';
   }
+
+  /// Copie de l'itinéraire avec un score de risque mis à jour.
+  RouteResult copyWith({double? totalRiskScore}) {
+    return RouteResult(
+      id: id,
+      points: points,
+      totalDistanceMeters: totalDistanceMeters,
+      totalRiskScore: totalRiskScore ?? this.totalRiskScore,
+      pois: pois,
+      label: label,
+    );
+  }
 }

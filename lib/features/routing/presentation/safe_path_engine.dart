@@ -85,7 +85,7 @@ class SafePathEngine {
     required AvoidanceFilters filters,
     PedestrianConstraints constraints = PedestrianConstraints.urban,
   }) {
-    final alerts = AlertVisibilityPolicy.filterVisible(
+    final alerts = AlertVisibilityPolicy.filterAvoidable(
       HiveAlertDatabase.instance.getAllValid(),
     );
     final grid = _Grid.build(
@@ -120,7 +120,7 @@ class SafePathEngine {
     required AvoidanceFilters filters,
     PedestrianConstraints constraints = PedestrianConstraints.urban,
   }) {
-    final alerts = AlertVisibilityPolicy.filterVisible(
+    final alerts = AlertVisibilityPolicy.filterAvoidable(
       HiveAlertDatabase.instance.getAllValid(),
     );
     final grid = _Grid.build(
@@ -179,7 +179,7 @@ class SafePathEngine {
     PedestrianConstraints constraints = PedestrianConstraints.urban,
   }) {
     // 1) Récupère les signalements ACTIFS et VISIBLES (>3 votes).
-    final alerts = AlertVisibilityPolicy.filterVisible(
+    final alerts = AlertVisibilityPolicy.filterAvoidable(
       HiveAlertDatabase.instance.getAllValid(),
     );
 

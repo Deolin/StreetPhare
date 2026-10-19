@@ -208,6 +208,16 @@ router.post('/sync/event', (req, res) => {
   res.json({ success: true });
 });
 
+/// POST /api/sync/tombstone — Reçoit un tombstone (suppression/rejet) du Primary.
+/// Applique la suppression/rejet localement afin que les clients du Backup
+/// répercutent aussi la suppression.
+router.post('/sync/tombstone', (req, res) => {
+  const { id, reason } = req.body || {};
+  if (!id) return res.status(400).json({ error: 'id requis' });
+  store.applyTombstone(id, reason === 'rejected' ? 'rejected' : 'deleted');
+  res.json({ success: true });
+});
+
 /// POST /api/v2/sync-push — Reçoit un batch d'alertes du client Flutter.
 /// Body: { alerts: [{ id, type, lat, lng, description?, votes?: [], ... }], peerId, since }
 /// Le serveur fusionne (upsert), puis répond avec les deltas plus récents
@@ -225,6 +235,10 @@ router.post('/sync-push', messageLimiter, (req, res) => {
       if (!alert.id || !alert.type || alert.lat == null || alert.lng == null) {
         continue; // skip malformed
       }
+      // Éviter la « résurrection » : ne pas ré-ajouter une alerte supprimée/rejetée.
+      if (store.isTombstoned(alert.id)) {
+        continue;
+      }
       // Ajouter le peerId aux votes s'il n'y est pas déjà.
       if (peerId && (!alert.votes || !alert.votes.includes(peerId))) {
         if (!alert.votes) alert.votes = [];
@@ -236,6 +250,7 @@ router.post('/sync-push', messageLimiter, (req, res) => {
 
     // Récupérer les deltas plus récents pour le client (push-pull).
     let deltas = [];
+    let tombstones = [];
     if (since) {
       const sinceDate = new Date(since);
       deltas = store.getAllAlerts()
@@ -245,16 +260,19 @@ router.post('/sync-push', messageLimiter, (req, res) => {
           return updated > sinceDate;
         })
         .map(a => ({ ...a, votes: a.votes || [] }));
+      // Suppressions/rejets côté serveur → à répercuter localement.
+      tombstones = store.getTombstonesSince(since);
     }
 
     console.log(
-      `[SYNC-PUSH] peer=${peerId || 'anon'} upserted=${upserted} deltas=${deltas.length}`
+      `[SYNC-PUSH] peer=${peerId || 'anon'} upserted=${upserted} deltas=${deltas.length} tombstones=${tombstones.length}`
     );
 
     res.json({
       success: true,
       upserted,
       deltas,
+      tombstones,
       serverTs: new Date().toISOString(),
     });
   } catch (err) {
@@ -278,9 +296,13 @@ router.get('/sync-check', (req, res) => {
     .slice(0, 500) // limite à 500 par requête
     .map(a => ({ ...a, votes: a.votes || [] }));
 
+  // Suppressions/rejets côté serveur → à répercuter localement.
+  const tombstones = since ? store.getTombstonesSince(since) : [];
+
   res.json({
     items,
     count: items.length,
+    tombstones,
     serverTs: new Date().toISOString(),
   });
 });
@@ -739,8 +761,8 @@ function parseAvoidPoints(raw) {
       return {
         lat,
         lon,
-        radius: Number.isFinite(radius) ? radius : 30,
-        weight: Number.isFinite(weight) ? weight : 10,
+        radius: Number.isFinite(radius) ? radius : 50,
+        weight: Number.isFinite(weight) ? weight : 1e6,
       };
     })
     .filter(Boolean);

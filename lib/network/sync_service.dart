@@ -328,6 +328,13 @@ class SyncService {
       await _mergeDeltas(deltas);
     }
 
+    // Répercuter localement les suppressions/rejets côté serveur
+    // (même si le broadcast temps réel a été manqué).
+    final tombstones = respBody['tombstones'] as List<dynamic>?;
+    if (tombstones != null && tombstones.isNotEmpty) {
+      await _processTombstones(tombstones);
+    }
+
     if (kDebugMode) {
       final upserted = respBody['upserted'] ?? alerts.length;
       debugPrint('[SyncService] Push OK → $upserted alertes envoyées, '
@@ -361,10 +368,17 @@ class SyncService {
       if (response.statusCode != 200) return;
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
-      final items = body['items'] as List<dynamic>?;
-      if (items == null || items.isEmpty) return;
 
-      await _mergeDeltas(items);
+      final items = body['items'] as List<dynamic>?;
+      if (items != null && items.isNotEmpty) {
+        await _mergeDeltas(items);
+      }
+
+      // Répercuter les suppressions/rejets côté serveur (tombstones).
+      final tombstones = body['tombstones'] as List<dynamic>?;
+      if (tombstones != null && tombstones.isNotEmpty) {
+        await _processTombstones(tombstones);
+      }
 
       if (body['serverTs'] != null) {
         _lastPullTs =
@@ -405,6 +419,31 @@ class SyncService {
 
     if (kDebugMode && merged > 0) {
       debugPrint('[SyncService] $merged alerte(s) fusionnée(s)');
+    }
+  }
+
+  /// Supprime localement les alertes dont le serveur a enregistré la
+  /// suppression ou le rejet (tombstones). Compense les broadcasts temps
+  /// réel manqués lors d'une déconnexion.
+  Future<void> _processTombstones(List<dynamic> items) async {
+    int removed = 0;
+    for (final item in items) {
+      try {
+        final map = item as Map<String, dynamic>;
+        final id = map['id'] as String?;
+        if (id == null || id.isEmpty) continue;
+        if (_db.getById(id) == null) continue;
+        await _db.delete(id);
+        removed++;
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[SyncService] Erreur tombstone: $e');
+        }
+      }
+    }
+
+    if (kDebugMode && removed > 0) {
+      debugPrint('[SyncService] $removed alerte(s) supprimée(s) (tombstone)');
     }
   }
 }

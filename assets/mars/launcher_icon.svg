@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Icône d'application "Mars Attacks" (source SVG à convertir en PNG 1024x1024) -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="75%">
+      <stop offset="0%" stop-color="#2E5238"/>
+      <stop offset="100%" stop-color="#14181A"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- Soucoupe en arrière-plan -->
+  <ellipse cx="256" cy="398" rx="180" ry="60" fill="#607d8b" opacity="0.9"/>
+  <path d="M196 370C196 320 316 320 316 370Z" fill="#cfd8dc"/>
+  <g fill="#ffeb3b">
+    <circle cx="160" cy="390" r="8"/>
+    <circle cx="256" cy="410" r="8"/>
+    <circle cx="352" cy="390" r="8"/>
+  </g>
+  <!-- Tête d'alien -->
+  <path d="M256 96c-60 0-104 40-104 104 0 44 13 74 16 102 4 42 34 70 66 70h44c32 0 62-28 66-70 3-28 16-58 16-102 0-64-44-104-104-104z" fill="#8BC34A"/>
+  <ellipse cx="210" cy="230" rx="36" ry="50" fill="#101010"/>
+  <ellipse cx="302" cy="230" rx="36" ry="50" fill="#101010"/>
+  <circle cx="222" cy="214" r="13" fill="#ffffff" opacity="0.75"/>
+  <circle cx="314" cy="214" r="13" fill="#ffffff" opacity="0.75"/>
+  <path d="M236 296h40" stroke="#101010" stroke-width="12" stroke-linecap="round"/>
+</svg>

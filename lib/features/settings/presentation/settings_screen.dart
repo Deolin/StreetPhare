@@ -24,6 +24,7 @@ import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
 import '../../../core/theme/app_skin.dart';
 import '../../../core/theme/skin_controller.dart';
+import '../../../core/theme/skins/mars_background.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../services/apk_downloader_service.dart';
@@ -75,8 +76,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         iconTheme: IconThemeData(color: onSurface),
       ),
-      body: Scrollbar(
-        controller: _scrollController,
+      body: MarsBackground(
+        child: Scrollbar(
+          controller: _scrollController,
         thumbVisibility: true,
         child: SingleChildScrollView(
           controller: _scrollController,
@@ -109,6 +111,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
         ),
+      ),
       ),
     );
   }

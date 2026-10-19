@@ -109,5 +109,14 @@ dependencies {
 // un sur-ensemble de protobuf-javalite, on exclut le variant lite : le code
 // généré lite (MLKit) reste compatible avec le runtime complet.
 configurations.all {
+    // Exclut le runtime lite (conflit de classes ~360 classes avec protobuf-java full).
+    // flutter_reactive_ble & MLKit (générés en mode lite) s'exécutent donc sur
+    // protobuf-java (full). Il faut un protobuf-java RÉCENT (≥3.22) : le format
+    // RawMessageInfo a changé (enums = Class au lieu de String), et un runtime
+    // trop ancien (3.11.4 via osmosis-osm-binary) provoque un ClassCastException
+    // dans MessageSchema.newSchemaForRawMessageInfo (crash BLE flutter_reactive_ble).
     exclude(group = "com.google.protobuf", module = "protobuf-javalite")
+    resolutionStrategy {
+        force("com.google.protobuf:protobuf-java:3.25.3")
+    }
 }

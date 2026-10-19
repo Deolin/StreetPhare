@@ -62,11 +62,11 @@ class ReportBottomSheet extends StatelessWidget {
       case ReportType.barrages:
         return AlertType.barrage;
       case ReportType.zonesFiltrees:
-        return AlertType.policiers;
+        return AlertType.filtre;
       case ReportType.nasses:
-        return AlertType.barrage;
+        return AlertType.filtre;
       case ReportType.autopompes:
-        return AlertType.danger;
+        return AlertType.autopompes;
       case ReportType.policiers:
         return AlertType.policiers;
       case ReportType.dangers:

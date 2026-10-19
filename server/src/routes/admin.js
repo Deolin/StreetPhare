@@ -136,6 +136,7 @@ router.post('/reports/:id/validate', authenticateToken, requirePermission('repor
 router.post('/reports/:id/reject', authenticateToken, requirePermission('reportValidate'), (req, res) => {
   try {
     if (!store.rejectAlert(req.params.id)) return res.status(404).json({ error: 'Signalement non trouvé' });
+    sync.enqueueTombstone(req.params.id, 'rejected'); // tombstone → Backup
     const alert = store.alerts.find(a => a.id === req.params.id);
     if (alert) {
       sync.enqueueAlert(alert); // réplication vers le Backup
@@ -152,6 +153,7 @@ router.post('/reports/:id/reject', authenticateToken, requirePermission('reportV
 router.delete('/reports/:id', authenticateToken, requirePermission('reportValidate'), (req, res) => {
   try {
     if (!store.deleteAlert(req.params.id)) return res.status(404).json({ error: 'Signalement non trouvé' });
+    sync.enqueueTombstone(req.params.id, 'deleted'); // tombstone → Backup
     // Diffusion aux clients mobiles (mesh) ET admin : la suppression doit
     // être propagée en temps réel pour retirer le danger des cartes client.
     broadcastToAll('report_deleted', { id: req.params.id });

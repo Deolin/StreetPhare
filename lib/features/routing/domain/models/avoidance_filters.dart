@@ -6,9 +6,10 @@
 // types de dangers il ACCEPTE de traverser ou veut ABSOLUMENT ÉVITER.
 // L'algorithme adapte son calcul en fonction de ces booléens.
 //
-// Par défaut, on évite les nasses et autopompes (souvent synonymes
-// d'embuscade) mais on accepte les barrages filtrants (souvent
-// contrôlables, dialogables, etc.).
+// Par défaut, tous les dangers sont évités (barrages, nasses, contrôles,
+// accidents/autopompes, rassemblements). Seuls les dangers « autres »
+// (non catégorisés) sont acceptés par défaut, et peuvent être évités
+// via le filtre dédié.
 
 import 'package:flutter/foundation.dart';
 
@@ -22,7 +23,7 @@ class AvoidanceFilters {
       avoidBarrages: (json['avoidBarrages'] as bool?) ?? true,
       avoidNasses: (json['avoidNasses'] as bool?) ?? true,
       avoidControles: (json['avoidControles'] as bool?) ?? true,
-      avoidAccidents: (json['avoidAccidents'] as bool?) ?? false,
+      avoidAccidents: (json['avoidAccidents'] as bool?) ?? true,
       avoidRassemblements: (json['avoidRassemblements'] as bool?) ?? true,
       avoidAutres: (json['avoidAutres'] as bool?) ?? false,
       masterSwitch: json['masterSwitch'] as bool?,
@@ -32,7 +33,7 @@ class AvoidanceFilters {
     this.avoidBarrages = true,
     this.avoidNasses = true,
     this.avoidControles = true,
-    this.avoidAccidents = false,
+    this.avoidAccidents = true,
     this.avoidRassemblements = true,
     this.avoidAutres = false,
     this.masterSwitch = true,
@@ -111,8 +112,9 @@ class AvoidanceFilters {
       case AlertType.policiers:
         return avoidControles;
       case AlertType.autopompes:
+        return avoidAccidents;
       case AlertType.filtre:
-        return avoidBarrages;
+        return avoidNasses;
       case AlertType.panic:
       case AlertType.dangerCollectif:
       case AlertType.density:

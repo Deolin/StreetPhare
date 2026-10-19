@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Vaisseau extraterrestre simplifié (skin Mars Attacks) -->
+  <path d="M9 9.6C9 5.9 15 5.9 15 9.6Z" fill="#cfd8dc"/>
+  <ellipse cx="12" cy="12.6" rx="9.2" ry="3.5" fill="#90a4ae"/>
+  <rect x="8" y="12.6" width="8" height="2.1" rx="1" fill="#607d8b"/>
+  <circle cx="6.8" cy="12.9" r="0.75" fill="#ffeb3b"/>
+  <circle cx="12" cy="13.7" r="0.75" fill="#ffeb3b"/>
+  <circle cx="17.2" cy="12.9" r="0.75" fill="#ffeb3b"/>
+  <path d="M8.5 15.7 7 20.4h10l-1.5-4.7Z" fill="#fff59d" opacity="0.45"/>
+</svg>

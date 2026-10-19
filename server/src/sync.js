@@ -131,18 +131,45 @@ function enqueueEvent(event) {
   log('OUTBOX', `Événement ${event.code} ajouté à l'outbox (taille: ${outbox.length})`);
 }
 
+/// Ajoute un tombstone (suppression/rejet) dans l'outbox pour réplication
+/// vers le Backup, afin que les clients du Backup suppriment aussi l'alerte.
+function enqueueTombstone(id, reason) {
+  if (!config.isPrimary) return;
+  if (!id) return;
+
+  outbox.push({
+    type: 'tombstone',
+    id,
+    payload: { reason: reason || 'deleted' },
+    attempts: 0,
+    nextRetry: Date.now(),
+  });
+  log('OUTBOX', `Tombstone ${id} (${reason || 'deleted'}) ajouté à l'outbox (taille: ${outbox.length})`);
+}
+
 /// Tente d'envoyer un élément de l'outbox vers le Backup.
 /// Retourne true en cas de succès, false si à réessayer plus tard.
 async function _processOutboxItem(item) {
   try {
-    const endpoint = item.type === 'alert' ? 'alert' : 'event';
-    const url = `${config.partnerUrl}/api/sync/${endpoint}`;
-    const bodyKey = item.type === 'alert' ? 'alert' : 'event';
+    let url;
+    let body;
+    if (item.type === 'alert') {
+      url = `${config.partnerUrl}/api/sync/alert`;
+      body = { alert: item.payload, from: config.serverType };
+    } else if (item.type === 'event') {
+      url = `${config.partnerUrl}/api/sync/event`;
+      body = { event: item.payload, from: config.serverType };
+    } else if (item.type === 'tombstone') {
+      url = `${config.partnerUrl}/api/sync/tombstone`;
+      body = { id: item.id, reason: item.payload && item.payload.reason ? item.payload.reason : 'deleted', from: config.serverType };
+    } else {
+      return false;
+    }
 
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: { [bodyKey]: item.payload, from: config.serverType },
+      body,
     });
 
     if (res.status >= 200 && res.status < 300) {
@@ -388,6 +415,7 @@ module.exports = {
   // API outbox (recommandée)
   enqueueAlert,
   enqueueEvent,
+  enqueueTombstone,
   startOutbox,
   stopOutbox,
   flushOutbox,

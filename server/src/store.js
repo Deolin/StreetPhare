@@ -44,6 +44,7 @@ class Store {
     this.adminClients = new Set();
     this.bannedUsers = new Set();     // UUIDs d'émetteurs bannis (modération tchat)
     this.geofencingZones = [];        // Zones de géorepérage administrées
+    this.tombstones = [];             // Tombstones (suppressions/rejets) pour sync différentielle
     this._listeners = {};             // Événements internes (alert_added, …)
     this._msgTimestamps = [];         // Timestamps des messages (taux msg/s)
     this.syncState = {
@@ -97,6 +98,7 @@ class Store {
 
       if (Array.isArray(data.alerts)) this.alerts = data.alerts;
       if (Array.isArray(data.events)) this.events = data.events;
+      if (Array.isArray(data.tombstones)) this.tombstones = data.tombstones;
 
       if (Array.isArray(data.panicPings)) {
         const cutoff = new Date(Date.now() - 5 * 60 * 1000);
@@ -176,6 +178,7 @@ class Store {
       meshMessages: this.meshMessages.slice(-1000),
       bannedUsers: [...this.bannedUsers],
       geofencingZones: this.geofencingZones,
+      tombstones: this.tombstones.slice(-5000),
       syncState: { ...this.syncState },
     };
   }
@@ -226,8 +229,57 @@ class Store {
 
   deleteAlert(id) {
     const idx = this.alerts.findIndex(a => a.id === id);
-    if (idx !== -1) { this.alerts.splice(idx, 1); this._scheduleSave(); return true; }
+    if (idx !== -1) {
+      this.alerts.splice(idx, 1);
+      this._addTombstone(id, 'deleted');
+      this._scheduleSave();
+      return true;
+    }
     return false;
+  }
+
+  /// Enregistre un tombstone (suppression/rejet) pour la sync différentielle.
+  /// Permet aux clients déconnectés de supprimer localement les alertes
+  /// retirées côté serveur, même s'ils ont manqué le broadcast temps réel.
+  _addTombstone(id, reason) {
+    const now = Date.now();
+    this.tombstones.push({ id, reason, deletedAt: new Date(now).toISOString() });
+    // Nettoyage : tombstones > 60 jours, puis cap à 5000 entrées.
+    const cutoff = now - 60 * 24 * 60 * 60 * 1000;
+    this.tombstones = this.tombstones
+      .filter(t => new Date(t.deletedAt).getTime() > cutoff)
+      .slice(-5000);
+  }
+
+  /// Retourne les tombstones postérieurs à [since].
+  getTombstonesSince(since) {
+    if (!since) return [];
+    const sinceDate = new Date(since);
+    return this.tombstones.filter(t => new Date(t.deletedAt) > sinceDate);
+  }
+
+  /// Applique un tombstone reçu d'un serveur partenaire (Primary → Backup).
+  /// Le tombstone est TOUJOURS enregistré (même si l'alerte n'existe pas
+  /// localement) afin que les clients du Backup suppriment aussi l'alerte.
+  applyTombstone(id, reason) {
+    if (reason === 'rejected') {
+      const alert = this.alerts.find(a => a.id === id);
+      if (alert) {
+        alert.status = 'rejected';
+        alert.updatedAt = new Date().toISOString();
+      }
+    } else {
+      const idx = this.alerts.findIndex(a => a.id === id);
+      if (idx !== -1) this.alerts.splice(idx, 1);
+    }
+    this._addTombstone(id, reason || 'deleted');
+    this._scheduleSave();
+    return true;
+  }
+
+  /// Vérifie si un id a un tombstone (suppression/rejet enregistré).
+  isTombstoned(id) {
+    return this.tombstones.some(t => t.id === id);
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -352,12 +404,16 @@ class Store {
 
   getBugReportById(id) { return this.bugReports.find(r => r.id === id) || null; }
 
-  exportAll() { return { alerts: this.alerts.map(a => ({ ...a, votes: a.votes ? [...a.votes] : [] })), events: this.events, exportedAt: new Date().toISOString() }; }
+  exportAll() { return { alerts: this.alerts.map(a => ({ ...a, votes: a.votes ? [...a.votes] : [] })), events: this.events, tombstones: this.tombstones, exportedAt: new Date().toISOString() }; }
 
   importAll(data) {
     if (!data || !data.alerts) return;
     for (const alert of data.alerts) { this.addAlert({ ...alert, votes: alert.votes || [] }); }
     if (data.events) { for (const event of data.events) { this.addEvent(event); } }
+    // Réconcilier les suppressions/rejets (tombstones) du partenaire.
+    if (Array.isArray(data.tombstones)) {
+      for (const t of data.tombstones) { this.applyTombstone(t.id, t.reason); }
+    }
     this._scheduleSave();
   }
 
@@ -450,6 +506,8 @@ class Store {
     if (!alert) return false;
     alert.status = 'active';
     alert.updatedAt = new Date().toISOString();
+    // Retirer le tombstone éventuel (re-validation après un rejet).
+    this.tombstones = this.tombstones.filter(t => t.id !== id);
     this._scheduleSave();
     return true;
   }
@@ -459,6 +517,7 @@ class Store {
     if (!alert) return false;
     alert.status = 'rejected';
     alert.updatedAt = new Date().toISOString();
+    this._addTombstone(id, 'rejected');
     this._scheduleSave();
     return true;
   }

@@ -51,4 +51,19 @@ class AlertVisibilityPolicy {
         .where((a) => isVisible(a, now: now))
         .toList();
   }
+
+  /// Filtre les alertes à ÉVITER lors du routage.
+  ///
+  /// Contrairement à [filterVisible] (carte générale), on n'applique PAS
+  /// le TTL court « Phase 2 » ([AlertTtlPolicy.isAlertAlive]) : un danger
+  /// reste évité tant qu'il est visible sur la carte (statut actif ou
+  /// consensus atteint), dans la limite stricte du TTL RGPD 24h.
+  /// Cela garantit la cohérence entre les marqueurs affichés et les
+  /// zones évitées par le moteur de routage.
+  static List<Alert> filterAvoidable(Iterable<Alert> alerts, {DateTime? now}) {
+    return alerts
+        .where((a) => !a.isExpired(now))
+        .where((a) => isVisible(a, now: now))
+        .toList();
+  }
 }
