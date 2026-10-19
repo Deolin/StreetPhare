@@ -307,6 +307,7 @@ class OsmAndRoutingService {
         start: start,
         end: end,
         profile: profile,
+        avoidPoints: avoidPoints,
       );
       if (serverRoutes.isNotEmpty) {
         if (kDebugMode) {
@@ -356,14 +357,20 @@ class OsmAndRoutingService {
     required LatLng start,
     required LatLng end,
     RoutingProfile profile = RoutingProfile.pedestrian,
+    List<LatLng> avoidPoints = const [],
   }) async {
+    final params = <String, String>{
+      'fromLat': start.latitude.toString(),
+      'fromLon': start.longitude.toString(),
+      'toLat': end.latitude.toString(),
+      'toLon': end.longitude.toString(),
+    };
+    if (avoidPoints.isNotEmpty) {
+      params['avoid'] =
+          avoidPoints.map((p) => '${p.latitude},${p.longitude}').join('|');
+    }
     final uri = Uri.parse('${NetworkConfig.apiUrl}/route').replace(
-      queryParameters: {
-        'fromLat': start.latitude.toString(),
-        'fromLon': start.longitude.toString(),
-        'toLat': end.latitude.toString(),
-        'toLon': end.longitude.toString(),
-      },
+      queryParameters: params,
     );
 
     try {

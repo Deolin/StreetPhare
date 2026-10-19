@@ -726,8 +726,27 @@ router.get('/mesh/sync', (req, res) => {
 // ROUTAGE PIÉTON (moteur serveur StreetPhare — priorité sur OSRM externe)
 // ═══════════════════════════════════════════════════════════════════════
 
+/// Parse la query `avoid=lat,lon,radius,weight|...` en liste de zones à risque.
+function parseAvoidPoints(raw) {
+  if (!raw) return [];
+  return raw
+    .split('|')
+    .map((part) => {
+      const [lat, lon, radius, weight] = part.split(',').map(Number);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      return {
+        lat,
+        lon,
+        radius: Number.isFinite(radius) ? radius : 30,
+        weight: Number.isFinite(weight) ? weight : 10,
+      };
+    })
+    .filter(Boolean);
+}
+
 /// GET /api/route — Calcule un itinéraire piéton via le moteur local Dijkstra.
 /// Query: ?fromLat=..&fromLon=..&toLat=..&toLon=..
+///        &avoid=lat,lon[,radius[,weight]]|...   (zones de danger à pénaliser)
 router.get('/route', (req, res) => {
   const { fromLat, fromLon, toLat, toLon } = req.query;
   const lat1 = parseFloat(fromLat);
@@ -739,8 +758,10 @@ router.get('/route', (req, res) => {
     return res.status(400).json({ error: 'fromLat, fromLon, toLat, toLon requis (nombres)' });
   }
 
+  const avoidPoints = parseAvoidPoints(req.query.avoid);
+
   try {
-    const r = routingEngine.route(lat1, lon1, lat2, lon2);
+    const r = routingEngine.route(lat1, lon1, lat2, lon2, avoidPoints);
     if (!r) {
       return res.status(404).json({
         error: 'Aucun itinéraire trouvé dans la zone couverte',
