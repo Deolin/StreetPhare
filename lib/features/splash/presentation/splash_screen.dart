@@ -10,6 +10,7 @@ import '../../../core/theme/streetphare_theme.dart';
 import '../../../services/version_check_service.dart';
 import '../../map/map_cache_manager.dart';
 import '../../map/presentation/map_screen.dart';
+import '../../routing/infrastructure/osmand_native_channel.dart';
 import '../../start_screen/data/start_screen_store.dart';
 import '../../start_screen/presentation/start_screen.dart';
 import '../../tutorial/data/tutorial_store.dart';
@@ -143,9 +144,12 @@ class _SplashScreenState extends State<SplashScreen>
         await Future.delayed(const Duration(milliseconds: 1200));
       }
 
-      _updateProgress(0.90, 'Finalisation…');
+      // Étape 5b : Initialisation du moteur de routage embarqué (bloquante).
+      // On attend que GraphHopper soit prêt (ou échoue) avant de rediriger,
+      // avec remontée de progression depuis le natif.
+      _updateProgress(0.85, 'Initialisation du moteur de routage…');
       _tooltipIndex = (_tooltipIndex + 1) % _tooltips.length;
-      await Future.delayed(const Duration(milliseconds: 500));
+      await _waitForRoutingEngine();
 
       _updateProgress(1.0, 'Prêt !');
       await Future.delayed(const Duration(milliseconds: 400));
@@ -312,6 +316,56 @@ class _SplashScreenState extends State<SplashScreen>
     } catch (e) {
       debugPrint('[Splash] Erreur vérification tuiles : $e');
       return false;
+    }
+  }
+
+  /// Attend l'initialisation du moteur de routage embarqué.
+  ///
+  /// Sur Android, déclenche (ou récupère) l'initialisation GraphHopper et
+  /// attend sa fin. La progression native pilote la barre. Un timeout de
+  /// sécurité évite de bloquer indéfiniment (repli sur le mode en ligne).
+  Future<void> _waitForRoutingEngine() async {
+    final channel = OsmAndNativeChannel.instance;
+    if (!channel.isSupported) {
+      _updateProgress(0.95, 'Moteur de routage indisponible sur cette plateforme');
+      return;
+    }
+
+    void onProgress() {
+      if (!mounted) return;
+      final p = channel.initProgress.value;
+      final msg =
+          p.message.isNotEmpty ? p.message : 'Initialisation du moteur de routage…';
+      if (p.stage == 'extract') {
+        _updateProgress(0.86, msg);
+      } else if (p.stage == 'import') {
+        _updateProgress(0.90, msg);
+      } else if (p.stage == 'ready') {
+        _updateProgress(0.96, 'Moteur de routage prêt');
+      } else if (p.stage == 'error') {
+        _updateProgress(0.90, msg);
+      }
+    }
+
+    channel.initProgress.addListener(onProgress);
+    try {
+      final ready = await channel.initEngine().timeout(
+            const Duration(seconds: 90),
+            onTimeout: () => false,
+          );
+      if (!mounted) return;
+      if (ready) {
+        _updateProgress(0.96, 'Moteur de routage prêt');
+      } else {
+        _updateProgress(0.96, 'Moteur de routage indisponible — itinéraires en ligne');
+      }
+    } catch (e) {
+      debugPrint('[Splash] Init moteur routage : $e');
+      if (mounted) {
+        _updateProgress(0.96, 'Moteur de routage indisponible — itinéraires en ligne');
+      }
+    } finally {
+      channel.initProgress.removeListener(onProgress);
     }
   }
 

@@ -40,6 +40,7 @@ import '../../../database/alert_visibility_policy.dart';
 import '../../../database/hive_alert_database.dart';
 import '../../../debug/client_debug_logger.dart';
 import '../../../network/collective_panic_service.dart';
+import '../../../network/network_config.dart';
 import '../../../network/network_coordinator.dart';
 import '../../../network/server_heartbeat_service.dart';
 import '../../../services/connectivity_service.dart';
@@ -67,13 +68,15 @@ const _kEventColors = [
   Color(0xFF4CAF50), // Vert
 ];
 
-// OpenStreetMap Standard — tuiles gratuites, sans clé API.
+// Tuiles OpenStreetMap servies par le serveur StreetPhare (proxy /tiles).
 // Conforme à la politique d'utilisation des tuiles OSM :
 //   https://operations.osmfoundation.org/policies/tiles/
+// Le client ne sollicite jamais tile.openstreetmap.org directement : il passe
+// par le proxy du serveur (priorité local → serveur → OSM en dernier recours).
 // Le mode sombre est obtenu via `darkModeTileBuilder` (filtre invert+hue-rotate)
 // fourni par flutter_map, appliqué aux tuiles uniquement (pas aux marqueurs).
-const _kTileUrlLight = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-const _kTileUrlDark = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+String get _kTileUrlLight => '${NetworkConfig.baseUrl}/tiles/{z}/{x}/{y}.png';
+String get _kTileUrlDark => '${NetworkConfig.baseUrl}/tiles/{z}/{x}/{y}.png';
 
 // ============================================================================
 // MapScreen

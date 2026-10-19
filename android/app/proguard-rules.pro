@@ -78,7 +78,12 @@
 #  leurs classes ne sont plus « manquantes » → pas besoin de -dontwarn.)
 
 # --- API compilateur Java (GraphHopper IntEncodedValueImpl) ---
--dontwarn javax.lang.model.SourceVersion
+# javax.lang.model.SourceVersion n'existe pas sur Android ; elle est fournie par
+# un shim (android/app/src/main/java/javax/lang/model/SourceVersion.java).
+# On la conserve explicitement pour que R8 (build release) ne l'élimine pas.
+-keep class javax.lang.model.SourceVersion { *; }
+# Toute autre classe javax.lang.model référencée mais non fournie : avertissement ignoré.
+-dontwarn javax.lang.model.**
 
 # --- StAX (parseur XML stream, absent d'Android — lecture .pbf uniquement) ---
 -dontwarn javax.xml.stream.XMLInputFactory

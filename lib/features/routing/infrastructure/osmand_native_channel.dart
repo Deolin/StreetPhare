@@ -12,6 +12,7 @@
 //   2. HTTP GraphHopper local (adminServerUrl:8080) — si moteur non prêt
 //   3. OSRM public (internet) — fallback ultime
 
+import 'dart:async';
 import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
@@ -47,6 +48,8 @@ class OsmAndNativeChannel {
   static final OsmAndNativeChannel instance = OsmAndNativeChannel._();
 
   static const _channel = MethodChannel('com.streetphare/routing');
+  static const _progressChannel =
+      EventChannel('com.streetphare/routing_progress');
 
   // ── Platform guard ───────────────────────────────────────────────────────
 
@@ -68,17 +71,61 @@ class OsmAndNativeChannel {
     }
   }
 
-  /// Déclenche l'initialisation du moteur en arrière-plan.
+  /// Déclenche l'initialisation du moteur en arrière-plan et attend sa fin.
   ///
-  /// Appeler au démarrage de l'app (dans `main.dart`) pour préparer
-  /// le graphe avant la première demande de route.
-  Future<void> initEngine() async {
-    if (!isSupported) return;
+  /// Retourne `true` quand le moteur est prêt, `false` en cas d'échec
+  /// (fichier OSM manquant, mémoire insuffisante) ou hors Android.
+  /// Idempotent : plusieurs appels partagent le même [Future] en cours.
+  Future<bool> initEngine() async {
+    if (!isSupported) return false;
+    final existing = _initFuture;
+    if (existing != null) return existing;
+    _initFuture = _doInitEngine();
+    return _initFuture!;
+  }
+
+  Future<bool>? _initFuture;
+
+  /// Progression de l'initialisation du moteur (pour la barre de démarrage).
+  final ValueNotifier<EngineInitProgress> initProgress =
+      ValueNotifier<EngineInitProgress>(EngineInitProgress.idle);
+
+  StreamSubscription<dynamic>? _progressSub;
+
+  Future<bool> _doInitEngine() async {
     try {
-      await _channel.invokeMethod<bool>('initEngine');
-      if (kDebugMode) debugPrint('[NativeChannel] initEngine → OK');
+      _listenProgress();
+      final ready = await _channel.invokeMethod<bool>('initEngine');
+      if (kDebugMode) debugPrint('[NativeChannel] initEngine → ready=$ready');
+      return ready ?? false;
     } catch (e) {
       if (kDebugMode) debugPrint('[NativeChannel] initEngine error: $e');
+      return false;
+    }
+  }
+
+  void _listenProgress() {
+    if (_progressSub != null) return;
+    try {
+      _progressSub = _progressChannel.receiveBroadcastStream().listen(
+        (event) {
+          if (event is Map) {
+            final stage = (event['stage'] as String?) ?? 'unknown';
+            final message = (event['message'] as String?) ?? '';
+            final progress = (event['progress'] as num?)?.toDouble();
+            initProgress.value = EngineInitProgress(
+              stage: stage,
+              message: message,
+              progress: progress,
+            );
+          }
+        },
+        onError: (Object _) {
+          // La progression est best-effort : on ignore les erreurs de flux.
+        },
+      );
+    } catch (_) {
+      // Canal indisponible (plateforme non-Android) : on ignore.
     }
   }
 
@@ -304,4 +351,32 @@ class NativeRouteResult {
         source: 'error',
         errorMessage: msg,
       );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// EngineInitProgress
+// ════════════════════════════════════════════════════════════════════════════
+
+/// État d'avancement de l'initialisation du moteur GraphHopper embarqué.
+///
+/// Alimenté par l'EventChannel `com.streetphare/routing_progress` (natif)
+/// et consommé par l'écran de démarrage pour piloter la barre de progression.
+class EngineInitProgress {
+  const EngineInitProgress({
+    required this.stage,
+    required this.message,
+    this.progress,
+  });
+
+  /// Étape courante : 'idle' | 'extract' | 'import' | 'ready' | 'error'.
+  final String stage;
+
+  /// Message lisible à afficher.
+  final String message;
+
+  /// Progression déterministe (0..1), ou `null` si indéterminée.
+  final double? progress;
+
+  /// État initial avant toute initialisation.
+  static const idle = EngineInitProgress(stage: 'idle', message: '');
 }

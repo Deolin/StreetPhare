@@ -19,8 +19,8 @@
 //   MODE B — InternalPolyline (rendu dans flutter_map SafeRouteLayer)
 //   ──────────────────────────────────────────────────────────────────
 //   Appel HTTP au moteur de routage :
-//     1. GraphHopper local     → http://adminServerUrl:8080 (profil foot)
-//     2. OSRM public (fallback) → https://router.project-osrm.org   (foot)
+//     1. Serveur StreetPhare   → {apiUrl}/route (moteur Dijkstra serveur)
+//     2. OSRM public (fallback) → https://routing.openstreetmap.de/routed-foot
 //   Retourne une List<LatLng> strictement conforme au réseau routier
 //   OpenStreetMap (trottoirs, chemins piétons, passages). Ces points
 //   sont injectés dans `RouteResult.points` pour affichage dans la carte.
@@ -133,9 +133,6 @@ class OsmAndRoutingService {
 
   /// URL F-Droid pour OsmAnd (alternative libre).
   static const _kFDroidUrl = 'https://f-droid.org/packages/net.osmand.plus/';
-
-  /// Port du serveur GraphHopper local.
-  static const int _kGraphHopperPort = 8080;
 
   /// Timeout HTTP pour les requêtes de routage.
   static const Duration _kHttpTimeout = Duration(seconds: 12);
@@ -260,8 +257,8 @@ class OsmAndRoutingService {
   ///
   /// Ordre de priorité :
   ///   0. MethodChannel Android (GraphHopper embarqué + OSM offline) — PRIORITAIRE
-  ///   1. GraphHopper HTTP local (`adminServerUrl:8080`) — profil foot
-  ///   2. OSRM public demo  (`router.project-osrm.org`)  — foot
+  ///   1. Serveur StreetPhare (`/api/route`, moteur Dijkstra serveur) — piéton
+  ///   2. OSRM public (dernier recours) — foot
   ///   3. Retourne [OsmAndResult] vide (erreur remontée à l'appelant)
   ///
   /// [avoidPoints] : liste de LatLng à éviter (dangers validés ≥3 votes).
@@ -304,24 +301,22 @@ class OsmAndRoutingService {
       }
     }
 
-    // ── Tentative 1 : GraphHopper local (HTTP) ───────────────────────────────
+    // ── Tentative 1 : Serveur StreetPhare (priorité sur OSRM externe) ────────
     try {
-      final ghRoutes = await _computeViaGraphHopper(
+      final serverRoutes = await _computeViaServer(
         start: start,
         end: end,
         profile: profile,
-        avoidPoints: avoidPoints,
-        filters: filters,
       );
-      if (ghRoutes.isNotEmpty) {
+      if (serverRoutes.isNotEmpty) {
         if (kDebugMode) {
-          debugPrint('[OsmAnd] ✅ GraphHopper local → '
-              '${ghRoutes.first.points.length} points');
+          debugPrint('[OsmAnd] ✅ Serveur StreetPhare → '
+              '${serverRoutes.first.points.length} points');
         }
-        return OsmAndResult(routes: ghRoutes, source: 'graphhopper_local');
+        return OsmAndResult(routes: serverRoutes, source: 'streetphare_server');
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('[OsmAnd] GraphHopper failed: $e');
+      if (kDebugMode) debugPrint('[OsmAnd] Serveur StreetPhare failed: $e');
     }
 
     // ── Tentative 2 : OSRM public ─────────────────────────────────────────
@@ -351,43 +346,25 @@ class OsmAndRoutingService {
     );
   }
 
-  // ── GraphHopper local ─────────────────────────────────────────────────────
+  // ── Serveur StreetPhare ───────────────────────────────────────────────────
 
-  /// Appel HTTP vers GraphHopper local sur port [_kGraphHopperPort].
+  /// Appel HTTP vers le moteur de routage du serveur StreetPhare.
   ///
-  /// API : GET /route?point={lat,lon}&point={lat,lon}&profile=foot
-  Future<List<RouteResult>> _computeViaGraphHopper({
+  /// API : GET {apiUrl}/route?fromLat=..&fromLon=..&toLat=..&toLon=..
+  /// Prioritaire sur OSRM : le client ne sollicite OSM qu'en dernier recours.
+  Future<List<RouteResult>> _computeViaServer({
     required LatLng start,
     required LatLng end,
     RoutingProfile profile = RoutingProfile.pedestrian,
-    required AvoidanceFilters filters,
-    List<LatLng> avoidPoints = const [],
   }) async {
-    // GraphHopper local tourne en HTTP sur le port 8080.
-    // On extrait le nom d'hôte de primaryServer et on reconstruit
-    // l'URL en HTTP (et non HTTPS, qui est réservé au serveur Node.js).
-    final rawHost = Uri.parse(NetworkConfig.primaryServer).host;
-    final host = 'http://$rawHost:$_kGraphHopperPort';
-
-    final ghProfile = profile == RoutingProfile.vehicle ? 'car' : 'foot';
-
-    final uriBuffer = StringBuffer(
-      '$host/route'
-      '?point=${start.latitude},${start.longitude}'
-      '&point=${end.latitude},${end.longitude}'
-      '&profile=$ghProfile'
-      '&type=json'
-      '&calc_points=true'
-      '&instructions=false',
+    final uri = Uri.parse('${NetworkConfig.apiUrl}/route').replace(
+      queryParameters: {
+        'fromLat': start.latitude.toString(),
+        'fromLon': start.longitude.toString(),
+        'toLat': end.latitude.toString(),
+        'toLon': end.longitude.toString(),
+      },
     );
-
-    if (avoidPoints.isNotEmpty) {
-      final blockArea =
-          avoidPoints.map((p) => '${p.latitude},${p.longitude}').join('|');
-      uriBuffer.write('&block_area=${Uri.encodeComponent(blockArea)}');
-    }
-
-    final uri = Uri.parse(uriBuffer.toString());
 
     try {
       final resp = await http.get(uri, headers: {
@@ -395,53 +372,58 @@ class OsmAndRoutingService {
       }).timeout(_kHttpTimeout);
 
       if (resp.statusCode != 200) {
-        debugPrint(
-            '[OsmAnd] ⚠ GraphHopper HTTP ${resp.statusCode}: ${resp.body.length > 200 ? resp.body.substring(0, 200) : resp.body}');
+        debugPrint('[OsmAnd] ⚠ Serveur StreetPhare HTTP ${resp.statusCode}');
         return [];
       }
 
-      return _parseGraphHopperResponse(resp.body, profile);
+      return _parseServerResponse(resp.body, profile);
     } catch (e) {
-      debugPrint('[OsmAnd] ❌ GraphHopper exception: $e');
+      debugPrint('[OsmAnd] ❌ Serveur StreetPhare exception: $e');
       return [];
     }
   }
 
-  /// Parse la réponse JSON GraphHopper.
+  /// Parse la réponse JSON du serveur StreetPhare.
   ///
   /// Format attendu :
   /// ```json
-  /// {"paths":[{"points":{"coordinates":[[lon,lat],...]},
-  ///            "distance":1234,"time":890000}]}
+  /// {"source":"streetphare_server",
+  ///  "routes":[{"points":[[lat,lon],...],"distanceMeters":1234,
+  ///            "durationSeconds":890}]}
   /// ```
-  List<RouteResult> _parseGraphHopperResponse(
-      String body, RoutingProfile profile) {
+  List<RouteResult> _parseServerResponse(String body, RoutingProfile profile) {
     final json = jsonDecode(body) as Map<String, dynamic>;
-    final paths = json['paths'] as List<dynamic>? ?? [];
-    if (paths.isEmpty) return [];
+    final routes = json['routes'] as List<dynamic>? ?? [];
+    if (routes.isEmpty) return [];
 
     final isVehicle = profile == RoutingProfile.vehicle;
     final results = <RouteResult>[];
-    for (int i = 0; i < paths.length; i++) {
-      final path = paths[i] as Map<String, dynamic>;
-      final geometry = path['points'] as Map<String, dynamic>?;
-      if (geometry == null) continue;
-
-      final coords = geometry['coordinates'] as List<dynamic>? ?? [];
-      final points = _coordsToLatLng(coords);
+    for (int i = 0; i < routes.length; i++) {
+      final r = routes[i] as Map<String, dynamic>;
+      final rawPoints = r['points'] as List<dynamic>? ?? [];
+      final points = <LatLng>[];
+      for (final pt in rawPoints) {
+        if (pt is List && pt.length >= 2) {
+          final lat = (pt[0] as num).toDouble();
+          final lon = (pt[1] as num).toDouble();
+          if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+            points.add(LatLng(lat, lon));
+          }
+        }
+      }
       if (points.length < 2) continue;
 
-      final distM = (path['distance'] as num?)?.toDouble() ?? 0;
+      final distM = (r['distanceMeters'] as num?)?.toDouble() ?? 0;
 
       results.add(RouteResult(
-        id: i == 0 ? 'osmand_gh_primary' : 'osmand_gh_alt$i',
+        id: i == 0 ? 'sp_server_primary' : 'sp_server_alt$i',
         points: points,
         totalDistanceMeters: distM,
         totalRiskScore: 0,
         pois: const [],
         label: i == 0
-            ? '🧭 Itinéraire ${isVehicle ? 'voiture' : 'piéton'} OsmAnd (GraphHopper)'
-            : '🛤 Alternative OsmAnd $i',
+            ? '🏠 Itinéraire ${isVehicle ? 'voiture' : 'piéton'} (serveur StreetPhare)'
+            : '🛤 Alternative StreetPhare $i',
       ));
     }
     return results;

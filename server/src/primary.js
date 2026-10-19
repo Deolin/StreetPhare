@@ -33,7 +33,9 @@ const adminRoutes = require('./routes/admin');
 const simulationRoutes = require('./routes/simulation');
 const { verifyWsToken } = require('./middleware/auth');
 const { setAdminBroadcaster, setMeshBroadcaster, broadcast, broadcastToAll } = require('./services/broadcast');
+const { routingEngine } = require('./services/routing');
 const { executeCommand } = require('./console');
+const fetch = require('node-fetch');
 
 const app = express();
 
@@ -149,6 +151,26 @@ app.use('/admin', express.static(path.join(__dirname, '..', 'public', 'admin')))
 app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 
 // ── Routes API ──────────────────────────────────────────────────────────
+// ── Proxy de tuiles OSM (les clients téléchargent les cartes via StreetPhare) ─
+// Le client ne sollicite jamais tile.openstreetmap.org directement :
+// il passe par ce proxy qui relaie (et pourra mettre en cache) les tuiles.
+app.get('/tiles/:z/:x/:y.png', async (req, res) => {
+  const { z, x, y } = req.params;
+  const tileUrl = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+  try {
+    const r = await fetch(tileUrl, {
+      headers: { 'User-Agent': 'StreetPhare/3.0 (proxy tuiles OSM)' },
+    });
+    if (!r.ok) return res.status(r.status).end();
+    const buf = await r.buffer();
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(buf);
+  } catch (e) {
+    res.status(502).json({ error: 'Proxy tuiles indisponible' });
+  }
+});
+
 app.use('/api', apiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/simulation', simulationRoutes);
@@ -753,6 +775,13 @@ function launchCaddyIndependent() {
     log('CADDY', `⚠ Impossible de lancer Caddy : ${err.message}`);
     log('CADDY', '  Le serveur Node.js fonctionne sans TLS.');
   }
+}
+
+// ── Précharge le graphe de routage piéton (non fatal si absent) ──────────
+try {
+  routingEngine.load();
+} catch (e) {
+  log('ROUTING', `⚠ ${e.message}`);
 }
 
 module.exports = app;

@@ -265,26 +265,45 @@ class MapTileDownloadPlugin(private val context: Context) : MethodChannel.Method
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private fun enqueueDownload(url: String, destPath: String): Long {
+        // FIX v3.4.3 : VISIBILITY_HIDDEN exige la permission
+        // android.permission.DOWNLOAD_WITHOUT_NOTIFICATION (sinon
+        // SecurityException "Invalid value for visibility: 2"). On tente
+        // d'abord en masqué, puis on retombe sur VISIBLE_NOTIFY_COMPLETED.
         return try {
-            val request = DownloadManager.Request(Uri.parse(url)).apply {
-                setTitle("Tuile cartographique")
-                setDescription("Téléchargement tuile StreetPhare")
-                setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
-                setDestinationUri(Uri.fromFile(File(destPath)))
-                setAllowedOverMetered(true)
-                setAllowedOverRoaming(true)
-                // Pas de réseau mobile restreint (le cache peut faire
-                // plusieurs Mo — on laisse le DownloadManager gérer).
-
-                // Conformité OSM : User-Agent identifiable + Referer.
-                // Sans ces en-têtes, tile.openstreetmap.org renvoie 403.
-                addRequestHeader("User-Agent", USER_AGENT)
-                addRequestHeader("Referer", REFERER)
+            downloadManager.enqueue(
+                buildRequest(url, destPath, DownloadManager.Request.VISIBILITY_HIDDEN)
+            )
+        } catch (e: SecurityException) {
+            Log.w(TAG, "VISIBILITY_HIDDEN refusé → fallback VISIBLE_NOTIFY_COMPLETED")
+            try {
+                downloadManager.enqueue(
+                    buildRequest(url, destPath, DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                )
+            } catch (e2: Exception) {
+                Log.e(TAG, "Échec enqueue download (fallback): ${e2.message}", e2)
+                -1L
             }
-            downloadManager.enqueue(request)
         } catch (e: Exception) {
             Log.e(TAG, "Échec enqueue download: ${e.message}", e)
             -1L
+        }
+    }
+
+    private fun buildRequest(url: String, destPath: String, visibility: Int): DownloadManager.Request {
+        return DownloadManager.Request(Uri.parse(url)).apply {
+            setTitle("Tuile cartographique")
+            setDescription("Téléchargement tuile StreetPhare")
+            setNotificationVisibility(visibility)
+            setDestinationUri(Uri.fromFile(File(destPath)))
+            setAllowedOverMetered(true)
+            setAllowedOverRoaming(true)
+            // Pas de réseau mobile restreint (le cache peut faire
+            // plusieurs Mo — on laisse le DownloadManager gérer).
+
+            // Conformité OSM : User-Agent identifiable + Referer.
+            // Sans ces en-têtes, tile.openstreetmap.org renvoie 403.
+            addRequestHeader("User-Agent", USER_AGENT)
+            addRequestHeader("Referer", REFERER)
         }
     }
 

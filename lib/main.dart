@@ -27,6 +27,7 @@ import 'features/geofencing/presentation/geofencing_service.dart';
 import 'features/geofencing/presentation/proximity_validation_service.dart';
 import 'features/messaging/presentation/hive_messaging_service.dart';
 import 'features/routing/data/avoidance_filter_store.dart';
+import 'features/routing/infrastructure/osmand_native_channel.dart';
 import 'features/settings/data/app_preferences_store.dart';
 import 'features/settings/data/panic_contact_store.dart';
 import 'features/settings/data/settings_store.dart';
@@ -216,6 +217,11 @@ void main() async {
 
     // Démarre le service de bug report offline-first.
     unawaited(BugReportService.instance.start());
+
+    // Prépare le moteur de routage GraphHopper embarqué en arrière-plan.
+    // Nécessite le fichier assets/osm/fleurus.osm.pbf (sinon le moteur
+    // reste désactivé et la cascade bascule sur OSRM public).
+    unawaited(OsmAndNativeChannel.instance.initEngine());
   } catch (e, st) {
     if (kDebugMode) {
       debugPrint('[main] ERREUR initialisation réseau : $e\n$st');

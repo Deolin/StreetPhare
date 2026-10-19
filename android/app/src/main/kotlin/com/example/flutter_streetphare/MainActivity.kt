@@ -95,6 +95,11 @@ class MainActivity : FlutterActivity() {
             CHANNEL_NAME
         ).setMethodCallHandler(plugin)
 
+        EventChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            ROUTING_PROGRESS_EVENT
+        ).setStreamHandler(plugin.progressStreamHandler)
+
         // ── Canal BLE Advertising ────────────────────────────────────
         setupBleAdvertiserChannel(flutterEngine)
 

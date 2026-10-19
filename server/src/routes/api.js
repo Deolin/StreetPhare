@@ -10,6 +10,7 @@ const config = require('../config');
 const store = require('../store');
 const sync = require('../sync');
 const { broadcastToAll } = require('../services/broadcast');
+const { routingEngine } = require('../services/routing');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -719,6 +720,49 @@ router.get('/mesh/sync', (req, res) => {
     messages,
     serverTs: new Date().toISOString(),
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// ROUTAGE PIÉTON (moteur serveur StreetPhare — priorité sur OSRM externe)
+// ═══════════════════════════════════════════════════════════════════════
+
+/// GET /api/route — Calcule un itinéraire piéton via le moteur local Dijkstra.
+/// Query: ?fromLat=..&fromLon=..&toLat=..&toLon=..
+router.get('/route', (req, res) => {
+  const { fromLat, fromLon, toLat, toLon } = req.query;
+  const lat1 = parseFloat(fromLat);
+  const lon1 = parseFloat(fromLon);
+  const lat2 = parseFloat(toLat);
+  const lon2 = parseFloat(toLon);
+
+  if ([lat1, lon1, lat2, lon2].some((v) => !Number.isFinite(v))) {
+    return res.status(400).json({ error: 'fromLat, fromLon, toLat, toLon requis (nombres)' });
+  }
+
+  try {
+    const r = routingEngine.route(lat1, lon1, lat2, lon2);
+    if (!r) {
+      return res.status(404).json({
+        error: 'Aucun itinéraire trouvé dans la zone couverte',
+        routes: [],
+      });
+    }
+    res.json({
+      source: 'streetphare_server',
+      routes: [
+        {
+          id: 'sp_server_0',
+          label: 'Itinéraire piéton (serveur StreetPhare)',
+          distanceMeters: r.distanceMeters,
+          durationSeconds: r.durationSeconds,
+          points: r.points,
+        },
+      ],
+    });
+  } catch (e) {
+    console.error('[API] /route erreur :', e.message);
+    res.status(500).json({ error: e.message, routes: [] });
+  }
 });
 
 module.exports = router;

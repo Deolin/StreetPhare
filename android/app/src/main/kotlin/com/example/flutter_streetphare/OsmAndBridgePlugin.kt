@@ -27,17 +27,18 @@ import android.util.Log
 import com.graphhopper.GHRequest
 import com.graphhopper.GHResponse
 import com.graphhopper.GraphHopper
-import com.graphhopper.config.CHProfile
 import com.graphhopper.config.Profile
 import com.graphhopper.util.Parameters
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import io.flutter.plugin.common.EventChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -53,9 +54,18 @@ private const val TAG = "StreetPhare.OsmAndBridge"
 /// Nom du canal Flutter MethodChannel.
 const val CHANNEL_NAME = "com.streetphare/routing"
 
-/// Nom du fichier OSM PBF bundlé dans les assets Android.
-/// À placer dans : android/app/src/main/assets/osm/fleurus.osm.pbf
-private const val OSM_ASSET_NAME = "osm/fleurus.osm.pbf"
+/// Canal EventChannel pour la progression de l'initialisation du moteur.
+const val ROUTING_PROGRESS_EVENT = "com.streetphare/routing_progress"
+
+/// Fichiers OSM acceptés dans les assets Android, essayés dans l'ordre.
+///   - .osm.pbf : PBF (Geofabrik + osmium) — recommandé
+///   - .osm / .xml : XML (Overpass Turbo / JOSM) — plus simple sans osmium
+private val OSM_ASSET_CANDIDATES = listOf(
+    "osm/fleurus.osm.pbf",
+    "osm/fleurus.osm",
+    "osm/fleurus.osm.xml",
+    "osm/fleurus.xml",
+)
 
 /// Profil de routage piéton (foot).
 private const val FOOT_PROFILE = "foot"
@@ -72,7 +82,7 @@ private const val FOOT_PROFILE = "foot"
  *   - `isEngineReady` → Boolean : moteur initialisé et prêt
  *   - `computeRoute`  → Map    : calcule 1 itinéraire piéton principal
  *   - `computeRouteWithAlternatives` → Map : calcule jusqu'à 3 alternatives
- *   - `initEngine`    → void   : (ré)initialise GraphHopper en background
+ *   - `initEngine`    → Boolean: initialise GraphHopper et renvoie `ready`
  *
  * Format de retour pour `computeRoute` :
  * ```json
@@ -118,6 +128,36 @@ class OsmAndBridgePlugin(
         // bien après la stabilisation du DDS et du cycle de vie Flutter.
     }
 
+    // ── Progression de l'initialisation (EventChannel) ─────────────────────
+
+    @Volatile private var progressEventSink: EventChannel.EventSink? = null
+
+    /// StreamHandler exposé à MainActivity pour l'EventChannel de progression.
+    val progressStreamHandler = object : EventChannel.StreamHandler {
+        override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+            progressEventSink = events
+        }
+
+        override fun onCancel(arguments: Any?) {
+            progressEventSink = null
+        }
+    }
+
+    /// Émet un événement de progression vers Dart (non bloquant, silencieux).
+    private fun reportProgress(stage: String, message: String, progress: Double?) {
+        try {
+            progressEventSink?.success(
+                mapOf(
+                    "stage" to stage,
+                    "message" to message,
+                    "progress" to progress,
+                )
+            )
+        } catch (_: Exception) {
+            // Le reporting ne doit jamais faire échouer l'initialisation.
+        }
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     // MethodCallHandler
     // ════════════════════════════════════════════════════════════════════════
@@ -131,8 +171,8 @@ class OsmAndBridgePlugin(
 
             "initEngine" -> {
                 scope.launch {
-                    initEngineAsync()
-                    withContext(Dispatchers.Main) { result.success(engineReady) }
+                    val ready = initEngineBlocking()
+                    withContext(Dispatchers.Main) { result.success(ready) }
                 }
             }
 
@@ -220,61 +260,78 @@ class OsmAndBridgePlugin(
      * Lors des lancements suivants, si le cache existe, GraphHopper le
      * charge directement (< 1 seconde pour la zone de Fleurus).
      */
-    private fun initEngineAsync() {
-        // compareAndSet(false, true) : atomiquement vérifie que la valeur
-        // est false PUIS la passe à true. Retourne false si déjà true.
-        // Combiné avec le check engineReady, évite toute double-init.
-        if (engineReady || !engineInitializing.compareAndSet(false, true)) return
+    private suspend fun initEngineBlocking(): Boolean {
+        // Déjà prêt → aucune initialisation nécessaire.
+        if (engineReady) return true
 
-        scope.launch {
-            try {
-                Log.i(TAG, "Initialisation du moteur GraphHopper...")
-
-                // ── Copier le fichier OSM depuis les assets ──────────────
-                val osmFile = extractOsmAsset()
-                if (osmFile == null) {
-                    Log.w(TAG, "Fichier OSM absent — moteur désactivé. " +
-                            "Placez le fichier dans assets/$OSM_ASSET_NAME")
-                    engineReady = false
-                    engineInitializing.set(false)
-                    return@launch
+        // compareAndSet(false, true) : revendique atomiquement l'initialisation.
+        // Si un autre appel l'a déjà revendiquée, on attend sa fin.
+        if (!engineInitializing.compareAndSet(false, true)) {
+            withContext(Dispatchers.IO) {
+                while (engineInitializing.get() && !engineReady) {
+                    delay(200)
                 }
-
-                // ── Dossier de cache du graphe ───────────────────────────
-                val graphDir = File(context.filesDir, "graphhopper_cache")
-
-                // ── Configurer et initialiser GraphHopper ────────────────
-                val gh = GraphHopper()
-                gh.setOSMFile(osmFile.absolutePath)
-                gh.graphHopperLocation = graphDir.absolutePath
-
-                // Profil piéton strict (foot) — sans voiture/vélo
-                // Note GH 7.0 : utilisation directe du string "foot"
-                // (FlagEncoderFactory supprimé dans GH 6+)
-                gh.profiles = listOf(
-                    Profile(FOOT_PROFILE)
-                        .setVehicle("foot")
-                        .setWeighting("fastest")
-                        .setTurnCosts(false)
-                )
-
-                // Contraction Hierarchies pour accélérer les calculs
-                gh.chPreparationHandler.setCHProfiles(
-                    CHProfile(FOOT_PROFILE)
-                )
-
-                gh.importOrLoad()
-
-                hopper = gh
-                engineReady = true
-                Log.i(TAG, "✅ GraphHopper initialisé — profil piéton prêt")
-
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ Erreur initialisation GraphHopper: ${e.message}", e)
-                engineReady = false
-            } finally {
-                engineInitializing.set(false)
             }
+            return engineReady
+        }
+
+        try {
+            Log.i(TAG, "Initialisation du moteur GraphHopper...")
+            reportProgress("extract", "Copie du fichier OSM…", 0.05)
+
+            // ── Copier le fichier OSM depuis les assets ──────────────
+            val osmFile = extractOsmAsset()
+            if (osmFile == null) {
+                Log.w(TAG, "Fichier OSM absent — moteur désactivé. " +
+                        "Placez un fichier parmi : " +
+                        OSM_ASSET_CANDIDATES.joinToString(", ") { "assets/$it" })
+                reportProgress("error", "Fichier OSM manquant", null)
+                engineReady = false
+                return false
+            }
+
+            // ── Dossier de cache du graphe ───────────────────────────
+            val graphDir = File(context.filesDir, "graphhopper_cache")
+
+            // ── Configurer et initialiser GraphHopper ────────────────
+            val gh = GraphHopper()
+            gh.setOSMFile(osmFile.absolutePath)
+            gh.graphHopperLocation = graphDir.absolutePath
+
+            // Profil piéton strict (foot) — sans voiture/vélo
+            // Note GH 7.0 : utilisation directe du string "foot"
+            // (FlagEncoderFactory supprimé dans GH 6+)
+            gh.profiles = listOf(
+                Profile(FOOT_PROFILE)
+                    .setVehicle("foot")
+                    .setWeighting("fastest")
+                    .setTurnCosts(false)
+            )
+
+            // Contraction Hierarchies désactivée pour réduire la mémoire
+            // et le temps d'import sur appareil mobile (extrait petit :
+            // le routage de base reste rapide sans CH).
+
+            reportProgress("import", "Construction du graphe de routage…", null)
+            gh.importOrLoad()
+
+            hopper = gh
+            engineReady = true
+            reportProgress("ready", "Moteur de routage prêt", 1.0)
+            Log.i(TAG, "✅ GraphHopper initialisé — profil piéton prêt")
+            return true
+
+        } catch (e: Throwable) {
+            // Catch Throwable (et non Exception) : un OutOfMemoryError
+            // (Error, pas Exception) pendant l'import d'un gros fichier
+            // OSM ferait sinon crasher l'app. On dégrade proprement :
+            // moteur désactivé → la cascade bascule sur OSRM.
+            Log.e(TAG, "❌ Erreur initialisation GraphHopper: ${e.message}", e)
+            reportProgress("error", "Échec de l'initialisation du moteur", null)
+            engineReady = false
+            return false
+        } finally {
+            engineInitializing.set(false)
         }
     }
 
@@ -285,24 +342,39 @@ class OsmAndBridgePlugin(
      * Retourne null si le fichier n'est pas dans les assets.
      */
     private fun extractOsmAsset(): File? {
-        val destFile = File(context.filesDir, "fleurus.osm.pbf")
-        if (destFile.exists() && destFile.length() > 0) {
-            Log.d(TAG, "OSM cache déjà extrait: ${destFile.absolutePath}")
-            return destFile
+        for (assetName in OSM_ASSET_CANDIDATES) {
+            // On préserve l'extension (.pbf vs .osm/.xml) : GraphHopper
+            // détecte le format à partir de l'extension du fichier.
+            val destName = if (assetName.endsWith(".pbf")) "fleurus.osm.pbf" else "fleurus.osm"
+            val destFile = File(context.filesDir, destName)
+
+            // Cache déjà présent et non vide → réutilisé.
+            if (destFile.exists() && destFile.length() > 0) {
+                Log.d(TAG, "OSM cache déjà extrait: ${destFile.absolutePath}")
+                return destFile
+            }
+
+            val copied = try {
+                context.assets.open(assetName).use { input ->
+                    FileOutputStream(destFile).use { output -> input.copyTo(output) }
+                }
+                true
+            } catch (e: Exception) {
+                Log.v(TAG, "Asset OSM absent: $assetName")
+                false
+            }
+
+            if (copied && destFile.length() > 0) {
+                Log.i(TAG, "OSM extrait ($assetName) → ${destFile.absolutePath}")
+                return destFile
+            }
+            // Fichier copié mais vide → nettoyage puis tentative suivante.
+            if (destFile.exists()) destFile.delete()
         }
 
-        return try {
-            context.assets.open(OSM_ASSET_NAME).use { input ->
-                FileOutputStream(destFile).use { output ->
-                    input.copyTo(output)
-                }
-            }
-            Log.i(TAG, "OSM extrait vers: ${destFile.absolutePath}")
-            destFile
-        } catch (e: Exception) {
-            Log.w(TAG, "Asset OSM introuvable: $OSM_ASSET_NAME — ${e.message}")
-            null
-        }
+        Log.w(TAG, "Aucun asset OSM trouvé. Placez un fichier parmi : " +
+                OSM_ASSET_CANDIDATES.joinToString(", ") { "assets/$it" })
+        return null
     }
 
     // ════════════════════════════════════════════════════════════════════════

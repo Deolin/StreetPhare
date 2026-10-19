@@ -3,11 +3,13 @@
 ## Emplacement attendu du fichier
 
 ```text
-android/app/src/main/assets/osm/fleurus.osm.pbf
+android/app/src/main/assets/osm/fleurus.osm.pbf   ← recommandé (PBF)
+android/app/src/main/assets/osm/fleurus.osm       ← XML (Overpass Turbo)
 ```
 
-Ce fichier **n'est pas inclus** dans le dépôt Git (trop volumineux).
-Il doit être téléchargé et placé ici avant de compiler l'APK.
+Le plugin accepte **PBF** (`.osm.pbf`) **ou** XML (`.osm` / `.osm.xml`),
+essayés dans cet ordre. Le fichier **n'est pas inclus** dans le dépôt Git
+(trop volumineux). Il doit être téléchargé et placé ici avant de compiler.
 
 ---
 
@@ -29,13 +31,14 @@ osmium extract --bbox 4.50,50.44,4.60,50.52 belgium-latest.osm.pbf --output fleu
 cp fleurus.osm.pbf android/app/src/main/assets/osm/fleurus.osm.pbf
 ```
 
-### Option 2 — Overpass Turbo (petits extraits)
+### Option 2 — Overpass Turbo (petits extraits, sans osmium)
 
 1. Ouvrir <https://overpass-turbo.eu>
 2. Sélectionner la zone de Fleurus (6220)
-3. Exporter → OpenStreetMap XML / PBF
-4. Renommer le fichier `fleurus.osm.pbf`
-5. Copier dans `android/app/src/main/assets/osm/`
+3. Exporter → OpenStreetMap **XML**
+4. Enregistrer le fichier `fleurus.osm`
+5. Copier dans `android/app/src/main/assets/osm/fleurus.osm`
+   (le plugin le détecte automatiquement, pas besoin d'osmium)
 
 ---
 
