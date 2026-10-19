@@ -84,7 +84,7 @@ dependencies:
   flutter_background_service: ^5.0.1
   http: ^1.2.1
   connectivity_plus: ^7.1.1
-  url_launcher: ^6.3.2
+  url_launcher: ^6.3.3
   cryptography: ^2.9.0
   cryptography_flutter: ^2.3.4
   flutter_reactive_ble: ^5.5.0
