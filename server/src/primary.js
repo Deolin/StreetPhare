@@ -446,7 +446,7 @@ wss.on('connection', (ws, req) => {
           store.addMeshMessage({
             kind: parsed.kind || 'mesh',
             data: parsed,
-            sender_id: parsed.sender_id || parsed.peerId || 'unknown',
+            sender_id: parsed.sender_id || parsed.peerId || parsed.id || 'unknown',
           });
         } catch (_) {}
 

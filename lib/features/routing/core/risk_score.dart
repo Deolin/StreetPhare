@@ -7,7 +7,7 @@ import 'dart:math' as math;
 import 'package:latlong2/latlong.dart';
 
 /// Rayon d'influence d'un danger pour le score de risque (mètres).
-const double kRiskRadiusMeters = 50.0;
+const double kRiskRadiusMeters = 5.0;
 
 /// Calcule le score de risque agrégé d'un itinéraire.
 ///

@@ -27,7 +27,7 @@ import '../p2p_mesh_service.dart';
 class RelayMeshTransport implements MeshTransport {
   RelayMeshTransport({
     required this.relayUrl,
-    this.heartbeat = const Duration(seconds: 0),
+    this.heartbeat = const Duration(seconds: 15),
     String? peerId,
   }) : _peerId = peerId ?? _generateRandomPeerId();
 
@@ -39,7 +39,8 @@ class RelayMeshTransport implements MeshTransport {
 
   String get peerId => _peerId;
 
-  /// Intervalle du heartbeat applicatif. 0 = désactivé.
+  /// Intervalle du heartbeat applicatif (ping de présence permettant
+  /// aux autres clients du relay de compter ce pair). 0 = désactivé.
   final Duration heartbeat;
 
   WebSocketChannel? _channel;
@@ -219,6 +220,7 @@ class RelayMeshTransport implements MeshTransport {
       try {
         _channel?.sink.add(jsonEncode({
           'kind': 'ping',
+          'id': _peerId,
           'ts': DateTime.now().toUtc().toIso8601String(),
         }));
       } catch (e) {

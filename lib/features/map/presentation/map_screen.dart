@@ -916,8 +916,8 @@ class _MapScreenState extends State<MapScreen> {
   // Sélecteur de destination
   // --------------------------------------------------------------------------
 
-  void _openDestinationSelector() {
-    showModalBottomSheet(
+  Future<void> _openDestinationSelector() async {
+    final selected = await showModalBottomSheet<RouteDestinationType>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
@@ -926,6 +926,12 @@ class _MapScreenState extends State<MapScreen> {
         strings: AppLocale.instance.strings,
       ),
     );
+
+    // Fermé sans changement → on ne fait rien.
+    if (selected == null) return;
+
+    // La destination a changé → recalcul immédiat de l'itinéraire.
+    await _triggerRouteSafe();
   }
 
   // --------------------------------------------------------------------------
@@ -1830,31 +1836,32 @@ class _MapScreenState extends State<MapScreen> {
                                           valueListenable:
                                               AppPreferencesStore.instance,
                                           builder: (_, prefs, o) {
-                                            if (prefs.lowVisionMode) {
-                                              return const SizedBox.shrink();
-                                            }
-                                            return GestureDetector(
-                                              onTap: () =>
-                                                  _showAboutDialog(context),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(Icons.lightbulb,
-                                                      color: StreetPhareTheme
-                                                          .primary,
-                                                      size: 18),
-                                                  const SizedBox(width: 8),
-                                                  Text(
-                                                    s.appTitle,
-                                                    style: TextStyle(
-                                                      color: StreetPhareTheme
-                                                          .textPrimary,
-                                                      fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.w600,
+                                            return Offstage(
+                                              offstage: prefs.lowVisionMode,
+                                              child: GestureDetector(
+                                                onTap: () =>
+                                                    _showAboutDialog(context),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.lightbulb,
+                                                        color: StreetPhareTheme
+                                                            .primary,
+                                                        size: 18),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      s.appTitle,
+                                                      style: TextStyle(
+                                                        color: StreetPhareTheme
+                                                            .textPrimary,
+                                                        fontSize: 14,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
                                                     ),
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
                                             );
                                           },
@@ -2220,6 +2227,9 @@ class _DestinationSelectorSheet extends StatelessWidget {
                   onChanged: (v) {
                     if (v == null) return;
                     AppPreferencesStore.instance.setRouteDestination(v);
+                    // Ferme le sélecteur et signale le changement pour
+                    // déclencher le recalcul de l'itinéraire.
+                    Navigator.of(context).pop(v);
                   },
                   child: Column(
                     children: [
@@ -2982,50 +2992,51 @@ class _ConnectivityBannerState extends State<_ConnectivityBanner> {
             _wasIsolated = false;
           }
 
-          if (!isIsolated) {
-            return const SizedBox.shrink();
-          }
-
+          // Structure stable : Positioned + Offstage toujours présents pour
+          // éviter l'assertion framework « !semantics.parentDataDirty ».
           return Positioned(
             top: 120,
             left: 12,
             right: 12,
-            child: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(12),
-              color: const Color(0xFFF85149),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.wifi_off, color: Colors.white, size: 24),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            widget.strings.mapIsolatedTitle,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+            child: Offstage(
+              offstage: !isIsolated,
+              child: Material(
+                elevation: 8,
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFF85149),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wifi_off, color: Colors.white, size: 24),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.strings.mapIsolatedTitle,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            widget.strings.mapIsolatedMessage,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.strings.mapIsolatedMessage,
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -3036,7 +3047,12 @@ class _ConnectivityBannerState extends State<_ConnectivityBanner> {
           if (kDebugMode) {
             debugPrint('[ConnectivityBanner] erreur: $e');
           }
-          return const SizedBox.shrink();
+          return const Positioned(
+            top: 120,
+            left: 12,
+            right: 12,
+            child: Offstage(offstage: true, child: SizedBox.shrink()),
+          );
         }
       },
     );

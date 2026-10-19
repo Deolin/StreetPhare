@@ -56,12 +56,12 @@ class SafePathEngine {
 
   /// Rayon d'influence (en mètres) d'un danger AUTOUR de son
   /// point central : le danger occupe un disque de ce rayon.
-  static const double dangerRadiusMeters = 50.0;
+  static const double dangerRadiusMeters = 5.0;
 
   /// Rayon de "pénalité douce" (en mètres) pour les dangers
   /// que l'utilisateur accepte de traverser : on n'évite pas
   /// le danger, mais on s'en éloigne si possible.
-  static const double softPenaltyRadiusMeters = 100.0;
+  static const double softPenaltyRadiusMeters = 5.0;
 
   /// Pénalité (en mètres-équivalent) appliquée par cellule qui
   /// se trouve dans la zone douce d'un danger.

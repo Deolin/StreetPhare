@@ -436,20 +436,23 @@ class _OsmAndLaunchButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (route.points.isEmpty) return const SizedBox.shrink();
-
-    return OutlinedButton.icon(
-      onPressed: () => _launch(context),
-      icon: const Icon(Icons.map_outlined, size: 18),
-      label: Text(strings.routeOpenInOsmAnd),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: StreetPhareTheme.primary,
-        side: BorderSide(
-          color: StreetPhareTheme.primary.withValues(alpha: 0.6),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+    // Structure stable (Offstage) pour éviter l'assertion framework
+    // « !semantics.parentDataDirty » (Flutter 3.41+).
+    return Offstage(
+      offstage: route.points.isEmpty,
+      child: OutlinedButton.icon(
+        onPressed: () => _launch(context),
+        icon: const Icon(Icons.map_outlined, size: 18),
+        label: Text(strings.routeOpenInOsmAnd),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: StreetPhareTheme.primary,
+          side: BorderSide(
+            color: StreetPhareTheme.primary.withValues(alpha: 0.6),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       ),
     );

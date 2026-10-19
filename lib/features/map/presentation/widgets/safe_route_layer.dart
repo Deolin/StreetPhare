@@ -172,33 +172,36 @@ class SafeRouteLayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (routePoints.length < 2) return const SizedBox.shrink();
-
-    final allMarkers = [
-      ..._buildArrowMarkers(),
-      ..._buildEndpointMarkers(),
-    ];
+    // Structure stable (Stack toujours présent) : évite l'assertion framework
+    // « !semantics.parentDataDirty » (Flutter 3.41+) lors du passage
+    // route vide → route calculée.
+    final hasRoute = routePoints.length >= 2;
+    final allMarkers = hasRoute
+        ? <Marker>[..._buildArrowMarkers(), ..._buildEndpointMarkers()]
+        : <Marker>[];
 
     return Stack(
       children: [
         // ── Trait de la Route Safe ────────────────────────────────
         PolylineLayer(
-          polylines: [
-            // Halo contrasté : noir en clair, blanc en sombre pour isolation
-            Polyline(
-              points: routePoints,
-              color: isDarkMap
-                  ? Colors.black.withValues(alpha: 0.70)
-                  : Colors.black.withValues(alpha: 0.20),
-              strokeWidth: _effectiveStroke + 4.0,
-            ),
-            // Trait principal haute-visibilité
-            Polyline(
-              points: routePoints,
-              color: _effectiveColor,
-              strokeWidth: _effectiveStroke,
-            ),
-          ],
+          polylines: hasRoute
+              ? [
+                  // Halo contrasté : noir en clair, blanc en sombre pour isolation
+                  Polyline(
+                    points: routePoints,
+                    color: isDarkMap
+                        ? Colors.black.withValues(alpha: 0.70)
+                        : Colors.black.withValues(alpha: 0.20),
+                    strokeWidth: _effectiveStroke + 4.0,
+                  ),
+                  // Trait principal haute-visibilité
+                  Polyline(
+                    points: routePoints,
+                    color: _effectiveColor,
+                    strokeWidth: _effectiveStroke,
+                  ),
+                ]
+              : const <Polyline>[],
         ),
 
         // ── Flèches directionnelles + marqueurs de bornes ─────────

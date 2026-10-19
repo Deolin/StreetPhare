@@ -761,7 +761,7 @@ function parseAvoidPoints(raw) {
       return {
         lat,
         lon,
-        radius: Number.isFinite(radius) ? radius : 50,
+        radius: Number.isFinite(radius) ? radius : 5,
         weight: Number.isFinite(weight) ? weight : 1e6,
       };
     })

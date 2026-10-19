@@ -27,21 +27,29 @@ class MarsBackground extends StatelessWidget {
     return ValueListenableBuilder<AppSkin>(
       valueListenable: SkinController.instance,
       builder: (context, skin, _) {
-        if (skin != AppSkin.marsAttacks) return child;
-
+        final isMars = skin == AppSkin.marsAttacks;
+        // Structure stable (Stack + 3 enfants toujours présents) : évite le
+        // changement dynamique de type d'enfant qui déclenche l'assertion
+        // framework « !semantics.parentDataDirty » (Flutter 3.41+).
         return Stack(
           fit: StackFit.expand,
           children: [
             // Image de fond rétro-sci-fi (opacité réduite).
-            Opacity(
-              opacity: 0.15,
-              child: SvgPicture.asset(
-                'assets/mars/mars_background.svg',
-                fit: BoxFit.cover,
+            Offstage(
+              offstage: !isMars,
+              child: Opacity(
+                opacity: 0.15,
+                child: SvgPicture.asset(
+                  'assets/mars/mars_background.svg',
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
             // Filtre sombre pour garantir la lisibilité.
-            const ColoredBox(color: Color(0x66000000)),
+            Offstage(
+              offstage: !isMars,
+              child: const ColoredBox(color: Color(0x66000000)),
+            ),
             child,
           ],
         );

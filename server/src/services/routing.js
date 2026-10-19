@@ -142,7 +142,7 @@ class RoutingEngine {
       out.push({
         x: (lon - this.refLon) * 111320 * this.cosRef,
         y: (lat - this.refLat) * 110540,
-        radius: Number.isFinite(p.radius) ? p.radius : 50,
+        radius: Number.isFinite(p.radius) ? p.radius : 5,
         weight: Number.isFinite(p.weight) ? p.weight : 1e6,
       });
     }
@@ -243,7 +243,16 @@ class RoutingEngine {
     points[0] = [fromLat, fromLon];
     points[points.length - 1] = [toLat, toLon];
 
-    const distanceMeters = Math.round(dist[end]);
+    // Distance réelle (somme des distances de base des arêtes traversées),
+    // SANS les pénalités d'évitement (×1e6) qui fausseraient le kilométrage.
+    let realDistance = 0;
+    for (let i = 1; i < pathIdx.length; i++) {
+      const a = pathIdx[i - 1];
+      const b = pathIdx[i];
+      const edge = g.adj[a].find((e) => e[0] === b);
+      if (edge) realDistance += edge[1];
+    }
+    const distanceMeters = Math.round(realDistance);
     return {
       points,
       distanceMeters,

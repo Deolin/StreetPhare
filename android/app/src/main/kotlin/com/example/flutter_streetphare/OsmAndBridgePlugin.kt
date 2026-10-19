@@ -423,7 +423,7 @@ class OsmAndBridgePlugin(
                 for (pt in avoidPoints) {
                     val lat    = (pt["lat"]    as? Number)?.toDouble() ?: continue
                     val lon    = (pt["lon"]    as? Number)?.toDouble() ?: continue
-                    val radius = (pt["radius"] as? Number)?.toDouble() ?: 50.0
+                    val radius = (pt["radius"] as? Number)?.toDouble() ?: 5.0
                     val weight = (pt["weight"] as? Number)?.toDouble() ?: 1e6
 
                     val areaId = "area_${lat.toString().replace(".", "_")}_${lon.toString().replace(".", "_")}"

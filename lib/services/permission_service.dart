@@ -623,47 +623,51 @@ class PermissionWarningBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (missing.isEmpty) return const SizedBox.shrink();
-    return Material(
-      elevation: 6,
-      borderRadius: BorderRadius.circular(12),
-      color: const Color(0xFFFF6F00).withValues(alpha: 0.95),
-      child: InkWell(
-        onTap: onTap,
+    // Structure stable (Offstage) pour éviter l'assertion framework
+    // « !semantics.parentDataDirty » (Flutter 3.41+).
+    return Offstage(
+      offstage: missing.isEmpty,
+      child: Material(
+        elevation: 6,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              const Icon(Icons.warning_amber, color: Colors.white, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Permissions manquantes',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+        color: const Color(0xFFFF6F00).withValues(alpha: 0.95),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.warning_amber, color: Colors.white, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Permissions manquantes',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      missing.map((m) => m.label).join(', '),
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11,
+                      const SizedBox(height: 2),
+                      Text(
+                        missing.map((m) => m.label).join(', '),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const Icon(Icons.arrow_forward_ios,
-                  color: Colors.white, size: 14),
-            ],
+                const Icon(Icons.arrow_forward_ios,
+                    color: Colors.white, size: 14),
+              ],
+            ),
           ),
         ),
       ),

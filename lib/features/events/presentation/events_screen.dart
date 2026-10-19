@@ -598,15 +598,11 @@ class _EventCard extends StatelessWidget {
   }
 
   void _showQrDialog(BuildContext context) {
-    final qrData = jsonEncode({
-      'code': event.code,
-      'title': event.title,
-      'start': event.startAt.toUtc().toIso8601String(),
-      'destination': {
-        'lat': event.destinationLatitude,
-        'lng': event.destinationLongitude,
-      },
-    });
+    // Sérialise via toJson() pour que le QR contienne TOUS les champs
+    // attendus à la lecture (code, title, startAt, visibleAt, route,
+    // destLat, destLng, …). L'ancien format ad-hoc était incomplet et
+    // utilisait des clés erronées ('start', 'destination.lat/lng').
+    final qrData = jsonEncode(event.toJson());
 
     showDialog(
       context: context,

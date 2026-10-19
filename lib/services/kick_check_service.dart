@@ -212,10 +212,16 @@ class _AutoLockOverlayState extends State<AutoLockOverlay>
         AnimatedBuilder(
           animation: _anim,
           builder: (context, _) {
-            if (_anim.value == 0) return const SizedBox.shrink();
-            return Opacity(
-              opacity: _anim.value,
-              child: _buildLockScreen(context),
+            // Structure stable (Positioned.fill toujours présent) : évite
+            // l'assertion framework « !semantics.parentDataDirty ».
+            return Positioned.fill(
+              child: IgnorePointer(
+                ignoring: _anim.value == 0,
+                child: Opacity(
+                  opacity: _anim.value,
+                  child: _buildLockScreen(context),
+                ),
+              ),
             );
           },
         ),
@@ -224,44 +230,42 @@ class _AutoLockOverlayState extends State<AutoLockOverlay>
   }
 
   Widget _buildLockScreen(BuildContext context) {
-    return Positioned.fill(
-      child: Material(
-        color: Colors.black.withValues(alpha: 0.92),
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.lock, color: Colors.redAccent, size: 80),
-            SizedBox(height: 24),
-            Text(
-              '⚠️ Application verrouillée',
+    return Material(
+      color: Colors.black.withValues(alpha: 0.92),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.lock, color: Colors.redAccent, size: 80),
+          SizedBox(height: 24),
+          Text(
+            '⚠️ Application verrouillée',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 16),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'Votre appareil a été identifié comme source de comportements '
+              'malveillants et a été automatiquement verrouillé par '
+              'le système de modération.\n\n'
+              'Cette mesure est temporaire. Si vous pensez qu\'il s\'agit '
+              'd\'une erreur, contactez un administrateur de l\'événement.',
+              textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+                color: Colors.white70,
+                fontSize: 14,
+                height: 1.5,
               ),
             ),
-            SizedBox(height: 16),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                'Votre appareil a été identifié comme source de comportements '
-                'malveillants et a été automatiquement verrouillé par '
-                'le système de modération.\n\n'
-                'Cette mesure est temporaire. Si vous pensez qu\'il s\'agit '
-                'd\'une erreur, contactez un administrateur de l\'événement.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                  height: 1.5,
-                ),
-              ),
-            ),
-            SizedBox(height: 32),
-            // Affiche un compte à rebours de 30 minutes.
-            _LockCountdown(durationMinutes: 30),
-          ],
-        ),
+          ),
+          SizedBox(height: 32),
+          // Affiche un compte à rebours de 30 minutes.
+          _LockCountdown(durationMinutes: 30),
+        ],
       ),
     );
   }
