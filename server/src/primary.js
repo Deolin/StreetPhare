@@ -219,10 +219,10 @@ const PONG_TIMEOUT_MS = 10000;
 const MAX_MISSED_PONGS = 2;
 const lastPongSeen = new WeakMap(); // ws → timestamp du dernier pong
 
-// Écoute les pongs reçus (réponses aux pings serveur).
-wss.on('pong', (ws) => {
-  lastPongSeen.set(ws, Date.now());
-});
+// FIX v3.4.2 : `wss.on('pong')` ne fonctionne PAS — l'événement `pong` est
+// émis par l'instance `WebSocket` (le client), pas par le `WebSocketServer`.
+// Le listener est donc enregistré PAR CLIENT dans `wss.on('connection')`
+// ci-dessous (voir `ws.on('pong')`).
 
 const meshPingInterval = setInterval(() => {
   const now = Date.now();
@@ -311,6 +311,14 @@ wss.on('connection', (ws, req) => {
 
     ws.on('error', (err) => {
       log('MESH', `[${connId}] Erreur socket: ${err.message}`);
+    });
+
+    // FIX v3.4.2 : enregistre le pong PAR CLIENT (et non sur le serveur).
+    // Sinon `lastPongSeen` n'était jamais mis à jour et le serveur coupait
+    // la connexion toutes les ~70s (2 pings sans pong), provoquant une
+    // boucle déconnexion/reconnexion côté client.
+    ws.on('pong', () => {
+      lastPongSeen.set(ws, Date.now());
     });
 
     store.meshClients.add(ws);

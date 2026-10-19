@@ -17,6 +17,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../database/alert_visibility_policy.dart';
+import '../../../database/hive_alert_database.dart';
 import '../domain/models/avoidance_filters.dart';
 import '../domain/models/route_result.dart' as legacy;
 import '../domain/pedestrian_route_service.dart';
@@ -127,6 +129,14 @@ class RoutingEngine {
   }) async {
     // Met à jour le profil courant pour le label.
     _lastProfile = profile;
+
+    // Points de danger à éviter : construits à partir des signalements
+    // visibles ET des préférences utilisateur (filtres d'évitement).
+    // Si l'appelant fournit déjà des points, on les utilise tels quels.
+    final dangerPoints = avoidPoints.isNotEmpty
+        ? avoidPoints
+        : _collectDangerPoints(avoidFilters);
+
     // ── TENTATIVE 0 : Graphe .spg (nouveau moteur) ─────────────────────
     if (_state == EngineState.ready && _graph != null) {
       try {
@@ -136,7 +146,15 @@ class RoutingEngine {
           start: start,
           end: end,
           profile: profileSettings,
-          flags: flags,
+          flags: RoutingFlags(
+            includeAlternatives: flags.includeAlternatives,
+            maxAlternatives: flags.maxAlternatives,
+            avoidPoints: dangerPoints
+                .map((p) =>
+                    RoutingAvoidPoint(lat: p.latitude, lon: p.longitude))
+                .toList(),
+            timeoutMs: flags.timeoutMs,
+          ),
         );
         if (result.success) {
           onCascadeStep?.call(CascadeStep.spg);
@@ -159,7 +177,7 @@ class RoutingEngine {
           start: start,
           end: end,
           profile: profile,
-          avoidPoints: avoidPoints
+          avoidPoints: dangerPoints
               .map((p) => AvoidPoint(lat: p.latitude, lon: p.longitude))
               .toList(),
         );
@@ -185,7 +203,7 @@ class RoutingEngine {
         end: end,
         profile: profile,
         filters: avoidFilters,
-        avoidPoints: avoidPoints,
+        avoidPoints: dangerPoints,
       );
       if (!osmAndResult.isEmpty) {
         // Détermine l'étape cascade selon la source retournée
@@ -228,6 +246,25 @@ class RoutingEngine {
       errorMessage: 'Aucun moteur de routage disponible. '
           'Vérifiez la connexion réseau ou les fichiers de carte.',
     );
+  }
+
+  /// Collecte les points de danger à éviter à partir des signalements
+  /// visibles et des préférences utilisateur ([AvoidanceFilters]).
+  List<LatLng> _collectDangerPoints(AvoidanceFilters filters) {
+    try {
+      final alerts = AlertVisibilityPolicy.filterVisible(
+        HiveAlertDatabase.instance.getAllValid(),
+      );
+      return alerts
+          .where((a) => filters.shouldAvoid(a.type))
+          .map((a) => LatLng(a.latitude, a.longitude))
+          .toList();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[RoutingEngine] collecte dangers impossible : $e');
+      }
+      return const [];
+    }
   }
 
   /// Convertit un ComputeResult (Isolate) en RouteComputeResult.

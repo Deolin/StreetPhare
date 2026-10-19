@@ -17,6 +17,7 @@
 import 'dart:math' as math;
 
 import '../graph/spg_graph.dart';
+import '../graph/spg_types.dart';
 import '../models/routing_profile.dart';
 import 'dijkstra.dart';
 
@@ -57,6 +58,7 @@ class Astar {
     int endNode, {
     ProfileSettings profile = ProfileSettings.pedestrian,
     int maxNodes = 20000,
+    List<RoutingAvoidPoint> avoidPoints = const [],
   }) {
     if (startNode == endNode) {
       final path = PathResult(
@@ -125,7 +127,7 @@ class Astar {
           final w = (walkSpeed > 0 && speedKmh < 30)
               ? weightMeters / walkSpeed
               : weightMeters * diagPenalty;
-          final alt = fDist[fU] + w;
+          final alt = fDist[fU] + w + _avoidPenalty(graph, to, avoidPoints);
           if (alt < fDist[to]) {
             fDist[to] = alt;
             fHeuristic[to] = alt +
@@ -160,7 +162,7 @@ class Astar {
             final w = (walkSpeed > 0 && speedKmh < 30)
                 ? weightMeters / walkSpeed
                 : weightMeters * diagPenalty;
-            final alt = bDist[bU] + w;
+            final alt = bDist[bU] + w + _avoidPenalty(graph, v, avoidPoints);
             if (alt < bDist[v]) {
               bDist[v] = alt;
               bHeuristic[v] = alt +
@@ -185,8 +187,13 @@ class Astar {
     // Reconstruit le chemin complet.
     if (meetingNode == -1) {
       // Fallback : Dijkstra unidirectionnel.
-      final dijkstraResult =
-          Dijkstra.compute(graph, startNode, endNode, maxIterations: maxNodes);
+      final dijkstraResult = Dijkstra.compute(
+        graph,
+        startNode,
+        endNode,
+        maxIterations: maxNodes,
+        avoidPoints: avoidPoints,
+      );
       return AstarResult(
         path: dijkstraResult,
         totalWeight: dijkstraResult.totalWeight,
@@ -287,6 +294,27 @@ class Astar {
       }
     }
     return minVal;
+  }
+
+  /// Pénalité d'évitement appliquée à un nœud proche d'un point à éviter.
+  /// Retourne une valeur très élevée (blocage quasi-total) si le nœud se
+  /// trouve dans le rayon d'influence d'un danger.
+  static double _avoidPenalty(
+    SpgGraph graph,
+    int nodeIdx,
+    List<RoutingAvoidPoint> avoidPoints,
+  ) {
+    if (avoidPoints.isEmpty) return 0;
+    final lat = graph.nodeLat(nodeIdx);
+    final lon = graph.nodeLon(nodeIdx);
+    double penalty = 0;
+    for (final p in avoidPoints) {
+      final dist = _approxDistance(lat - p.lat, lon - p.lon, (lat + p.lat) / 2);
+      if (dist < p.radiusMeters) {
+        penalty += 1.0e9;
+      }
+    }
+    return penalty;
   }
 
   static double _approxDistance(

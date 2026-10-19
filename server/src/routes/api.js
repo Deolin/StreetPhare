@@ -58,13 +58,16 @@ const messageLimiter = rateLimit({
 /// Retourne l'alerte créée ou mise à jour, avec son statut de consensus.
 /// Protégé par reportLimiter (3 signalements max / 5 min / IP).
 router.post('/alerts', reportLimiter, (req, res) => {
+  // Les variables sont déclarées HORS du bloc try pour rester
+  // accessibles dans la suite du handler (validation du type, etc.).
+  let type, lat, lng, description, userId;
   try {
     if (!req.body || Object.keys(req.body).length === 0) {
       console.error('[API] POST /api/alerts — body vide ou mal formé');
       return res.status(400).json({ error: 'body JSON requis' });
     }
 
-    const { type, lat, lng, description, userId } = req.body;
+    ({ type, lat, lng, description, userId } = req.body);
     console.log(`[API] POST /api/alerts — type=${type} lat=${lat} lng=${lng} userId=${userId || 'anon'}`);
 
     if (!type || lat == null || lng == null) {

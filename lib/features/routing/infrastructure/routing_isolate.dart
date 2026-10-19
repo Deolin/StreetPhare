@@ -201,6 +201,7 @@ class RoutingIsolate {
           endIdx,
           profile: msg.profile,
           maxNodes: 20000,
+          avoidPoints: msg.flags.avoidPoints,
         );
         algoResult = _AstarOrDijkstraResult(
           nodeIds: astarResult.path.nodeIds,
@@ -216,6 +217,7 @@ class RoutingIsolate {
           startIdx,
           endIdx,
           maxIterations: 50000,
+          avoidPoints: msg.flags.avoidPoints,
         );
         algoResult = _AstarOrDijkstraResult(
           nodeIds: dijkstraResult.nodeIds,

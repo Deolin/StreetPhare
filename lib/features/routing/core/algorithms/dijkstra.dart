@@ -15,6 +15,7 @@
 // ```
 
 import '../graph/spg_graph.dart';
+import '../graph/spg_types.dart';
 
 /// Résultat d'un calcul Dijkstra/A*.
 class PathResult {
@@ -53,6 +54,7 @@ class Dijkstra {
     int endNode, {
     int maxIterations = 50000,
     double maxWeight = double.infinity,
+    List<RoutingAvoidPoint> avoidPoints = const [],
   }) {
     final n = graph.nodeCount;
     final dist = List<double>.filled(n, double.infinity);
@@ -88,7 +90,8 @@ class Dijkstra {
       // Relaxation des arêtes sortantes.
       graph.forEachEdge(u, (to, weightMeters, flags, speedKmh) {
         if (visited[to]) return;
-        final alt = dist[u] + weightMeters;
+        final alt =
+            dist[u] + weightMeters + _avoidPenalty(graph, to, avoidPoints);
         if (alt < dist[to]) {
           dist[to] = alt;
           prev[to] = u;
@@ -129,6 +132,25 @@ class Dijkstra {
       totalDistanceMeters: totalDistance,
       iterations: iterations,
     );
+  }
+
+  /// Pénalité d'évitement appliquée à un nœud proche d'un point à éviter.
+  static double _avoidPenalty(
+    SpgGraph graph,
+    int nodeIdx,
+    List<RoutingAvoidPoint> avoidPoints,
+  ) {
+    if (avoidPoints.isEmpty) return 0;
+    final lat = graph.nodeLat(nodeIdx);
+    final lon = graph.nodeLon(nodeIdx);
+    double penalty = 0;
+    for (final p in avoidPoints) {
+      final dist = _approxDistance(lat - p.lat, lon - p.lon, (lat + p.lat) / 2);
+      if (dist < p.radiusMeters) {
+        penalty += 1.0e9;
+      }
+    }
+    return penalty;
   }
 
   static double _approxDistance(
