@@ -27,7 +27,7 @@
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
-    "dotenv": "^16.4.5",
+    "dotenv": "^18.0.8",
     "express": "^4.19.2",
     "express-rate-limit": "^7.2.0",
     "helmet": "^7.1.0",
@@ -40,9 +40,9 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "cross-env": "^7.0.3",
+    "cross-env": "^10.1.0",
     "esbuild": "^0.25.0",
     "nodemon": "^3.1.0",
-    "pm2": "^5.4.2"
+    "pm2": "^7.0.4"
   }
 }
