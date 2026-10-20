@@ -13,6 +13,7 @@ const path = require('path');
 
 const OSM_FILE = process.argv[2] || 'android/app/src/main/assets/osm/fleurus.osm';
 const OUT_FILE = process.argv[3] || 'server/data/fleurus.graph.json';
+const CAR_OUT_FILE = OUT_FILE.replace(/\.json$/, '.car.graph.json');
 
 // Types de route non praticables à pied.
 const NON_WALKABLE = new Set([
@@ -28,6 +29,20 @@ const HIGHWAY_WEIGHT = {
   service: 1.2, track: 1.2, unclassified: 1.2,
   tertiary: 1.4, secondary: 1.6, primary: 1.8,
 };
+
+// Types de route carrossables (accessibles en voiture).
+// Exclut volontairement : footway, pedestrian, path, steps, cycleway,
+// corridor, bridleway, track (non revêtu), raceway.
+const CAR_ACCESSIBLE = new Set([
+  'motorway', 'motorway_link', 'trunk', 'trunk_link',
+  'primary', 'primary_link', 'secondary', 'secondary_link',
+  'tertiary', 'tertiary_link', 'unclassified', 'residential',
+  'living_street', 'service',
+]);
+
+// Valeurs OSM indiquant un sens unique.
+const ONEWAY_FORWARD = new Set(['yes', 'true', '1']);
+const ONEWAY_BACKWARD = new Set(['-1', 'reverse']);
 
 function toRad(d) {
   return (d * Math.PI) / 180;
@@ -46,22 +61,34 @@ function haversine(aLat, aLon, bLat, bLon) {
 async function main() {
   const nodes = []; // [[lat, lon], ...] — indexé par position
   const idToIndex = new Map();
-  const adjMap = new Map(); // index -> Map(neighbor -> minDist)
+  const footAdjMap = new Map(); // index -> Map(neighbor -> minDist) [piéton]
+  const carAdjMap = new Map();  // index -> Map(neighbor -> minDist) [voiture]
 
-  let currentWay = null; // { refs: [], highway: null }
-  let wayCount = 0;
-  let edgeCount = 0;
+  let currentWay = null; // { refs: [], highway: null, oneway: null, junction: null }
+  let footWayCount = 0, carWayCount = 0;
+  let footEdgeCount = 0, carEdgeCount = 0;
 
-  const addEdge = (a, b, dist) => {
+  const addFootEdge = (a, b, dist) => {
     if (a === b) return;
-    if (!adjMap.has(a)) adjMap.set(a, new Map());
-    if (!adjMap.has(b)) adjMap.set(b, new Map());
-    const am = adjMap.get(a);
-    const bm = adjMap.get(b);
+    if (!footAdjMap.has(a)) footAdjMap.set(a, new Map());
+    if (!footAdjMap.has(b)) footAdjMap.set(b, new Map());
+    const am = footAdjMap.get(a);
+    const bm = footAdjMap.get(b);
     if (dist < (am.get(b) ?? Infinity)) {
       am.set(b, dist);
       bm.set(a, dist);
-      edgeCount++;
+      footEdgeCount++;
+    }
+  };
+
+  // Arête ORIENTÉE (sens unique) pour le graphe voiture.
+  const addCarEdge = (a, b, dist) => {
+    if (a === b) return;
+    if (!carAdjMap.has(a)) carAdjMap.set(a, new Map());
+    const am = carAdjMap.get(a);
+    if (dist < (am.get(b) ?? Infinity)) {
+      am.set(b, dist);
+      carEdgeCount++;
     }
   };
 
@@ -79,24 +106,50 @@ async function main() {
         nodes.push([parseFloat(m[2]), parseFloat(m[3])]);
       }
     } else if (t.startsWith('<way ')) {
-      currentWay = { refs: [], highway: null };
+      currentWay = { refs: [], highway: null, oneway: null, junction: null };
     } else if (t.startsWith('<nd ')) {
       const m = t.match(/ref="(\d+)"/);
       if (m && currentWay) currentWay.refs.push(m[1]);
     } else if (t.startsWith('<tag ')) {
       const m = t.match(/k="([^"]+)"\s+v="([^"]*)"/);
-      if (m && currentWay && m[1] === 'highway') currentWay.highway = m[2];
+      if (m && currentWay) {
+        if (m[1] === 'highway') currentWay.highway = m[2];
+        else if (m[1] === 'oneway') currentWay.oneway = m[2];
+        else if (m[1] === 'junction') currentWay.junction = m[2];
+      }
     } else if (t.startsWith('</way>')) {
-      if (currentWay && currentWay.highway && !NON_WALKABLE.has(currentWay.highway)) {
-        wayCount++;
-        const mult = HIGHWAY_WEIGHT[currentWay.highway] || 1.5;
+      if (currentWay && currentWay.highway) {
         const refs = currentWay.refs;
-        for (let i = 0; i + 1 < refs.length; i++) {
-          const a = idToIndex.get(refs[i]);
-          const b = idToIndex.get(refs[i + 1]);
-          if (a === undefined || b === undefined) continue;
-          const dist = haversine(nodes[a][0], nodes[a][1], nodes[b][0], nodes[b][1]);
-          addEdge(a, b, Math.round(dist * mult));
+
+        // ── Graphe piéton ────────────────────────────────────────────
+        if (!NON_WALKABLE.has(currentWay.highway)) {
+          footWayCount++;
+          const mult = HIGHWAY_WEIGHT[currentWay.highway] || 1.5;
+          for (let i = 0; i + 1 < refs.length; i++) {
+            const a = idToIndex.get(refs[i]);
+            const b = idToIndex.get(refs[i + 1]);
+            if (a === undefined || b === undefined) continue;
+            const dist = haversine(nodes[a][0], nodes[a][1], nodes[b][0], nodes[b][1]);
+            addFootEdge(a, b, Math.round(dist * mult));
+          }
+        }
+
+        // ── Graphe voiture (routes carrossables + sens uniques) ─────
+        if (CAR_ACCESSIBLE.has(currentWay.highway)) {
+          carWayCount++;
+          const isOnewayForward =
+              ONEWAY_FORWARD.has(currentWay.oneway) ||
+              currentWay.junction === 'roundabout' ||
+              currentWay.junction === 'circular';
+          const isOnewayBackward = ONEWAY_BACKWARD.has(currentWay.oneway);
+          for (let i = 0; i + 1 < refs.length; i++) {
+            const a = idToIndex.get(refs[i]);
+            const b = idToIndex.get(refs[i + 1]);
+            if (a === undefined || b === undefined) continue;
+            const dist = Math.round(haversine(nodes[a][0], nodes[a][1], nodes[b][0], nodes[b][1]));
+            if (!isOnewayBackward) addCarEdge(a, b, dist); // sens de numérisation
+            if (!isOnewayForward) addCarEdge(b, a, dist);  // sens inverse
+          }
         }
       }
       currentWay = null;
@@ -104,31 +157,47 @@ async function main() {
   }
 
   // Sérialisation compacte : adj[i] = [[voisin, distance], ...]
-  const adj = nodes.map((_, i) => {
+  const serialize = (adjMap) => nodes.map((_, i) => {
     const m = adjMap.get(i);
     if (!m) return [];
     return Array.from(m.entries()).map(([to, dist]) => [to, dist]);
   });
 
-  const graph = {
+  const nowIso = new Date().toISOString();
+  const footGraph = {
     meta: {
-      generatedAt: new Date().toISOString(),
+      generatedAt: nowIso,
       source: path.basename(OSM_FILE),
+      profile: 'foot',
       nodes: nodes.length,
-      ways: wayCount,
-      edges: edgeCount,
+      ways: footWayCount,
+      edges: footEdgeCount,
     },
     nodes,
-    adj,
+    adj: serialize(footAdjMap),
+  };
+  const carGraph = {
+    meta: {
+      generatedAt: nowIso,
+      source: path.basename(OSM_FILE),
+      profile: 'car',
+      nodes: nodes.length,
+      ways: carWayCount,
+      edges: carEdgeCount,
+    },
+    nodes,
+    adj: serialize(carAdjMap),
   };
 
   fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
-  fs.writeFileSync(OUT_FILE, JSON.stringify(graph));
-  console.log(`[GRAPH] ✅ ${OUT_FILE}`);
-  console.log(`[GRAPH] nœuds=${nodes.length} ways=${wayCount} arêtes=${edgeCount}`);
-  console.log(
-    `[GRAPH] taille=${(fs.statSync(OUT_FILE).size / 1024 / 1024).toFixed(1)} Mo`,
-  );
+  fs.writeFileSync(OUT_FILE, JSON.stringify(footGraph));
+  console.log(`[GRAPH] ✅ ${OUT_FILE} (piéton)`);
+  console.log(`[GRAPH] nœuds=${nodes.length} ways=${footWayCount} arêtes=${footEdgeCount}`);
+  console.log(`[GRAPH] taille=${(fs.statSync(OUT_FILE).size / 1024 / 1024).toFixed(1)} Mo`);
+
+  fs.writeFileSync(CAR_OUT_FILE, JSON.stringify(carGraph));
+  console.log(`[GRAPH] ✅ ${CAR_OUT_FILE} (voiture)`);
+  console.log(`[GRAPH] nœuds=${nodes.length} ways=${carWayCount} arêtes=${carEdgeCount}`);
 }
 
 main().catch((e) => {
