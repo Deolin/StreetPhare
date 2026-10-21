@@ -45,6 +45,7 @@ class Store {
     this.bannedUsers = new Set();     // UUIDs d'émetteurs bannis (modération tchat)
     this.geofencingZones = [];        // Zones de géorepérage administrées
     this.tombstones = [];             // Tombstones (suppressions/rejets) pour sync différentielle
+    this.userCurrentEvent = new Map(); // userId -> code de l'événement actuellement suivi par l'utilisateur
     this._listeners = {};             // Événements internes (alert_added, …)
     this._msgTimestamps = [];         // Timestamps des messages (taux msg/s)
     this.syncState = {
@@ -188,11 +189,16 @@ class Store {
   // ═══════════════════════════════════════════════════════════════════════
 
   addAlert(alert) {
+    const nowIso = new Date().toISOString();
     const existing = this.alerts.find(a => a.id === alert.id);
     if (existing) {
       if (alert.votes && alert.votes.length > 0) {
         if (!existing.votes) existing.votes = [];
-        existing.votes.push(...alert.votes.filter(v => !existing.votes.includes(v)));
+        const newVotes = alert.votes.filter(v => !existing.votes.includes(v));
+        if (newVotes.length > 0) {
+          existing.votes.push(...newVotes);
+          existing.lastVoteAt = nowIso;
+        }
       }
       // Propagation des champs mutables lors de la réplication
       // Primary ↔ Backup : le statut (validé/rejeté) doit être
@@ -202,25 +208,176 @@ class Store {
       if (alert.lat !== undefined) existing.lat = alert.lat;
       if (alert.lng !== undefined) existing.lng = alert.lng;
       if (alert.description !== undefined) existing.description = alert.description;
-      existing.updatedAt = new Date().toISOString();
+      if (alert.eventId !== undefined) existing.eventId = alert.eventId;
+      if (alert.scoutValidated !== undefined) existing.scoutValidated = alert.scoutValidated;
+      if (alert.voidedBy !== undefined) existing.voidedBy = alert.voidedBy;
+      if (alert.voidedAt !== undefined) existing.voidedAt = alert.voidedAt;
+      if (alert.lastVoteAt !== undefined) existing.lastVoteAt = alert.lastVoteAt;
+      if (alert.downvotes !== undefined) existing.downvotes = alert.downvotes;
+      existing.updatedAt = nowIso;
       this._scheduleSave();
       return existing;
     }
-    this.alerts.push({ ...alert, createdAt: alert.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
+    this.alerts.push({
+      ...alert,
+      downvotes: Array.isArray(alert.downvotes) ? alert.downvotes : [],
+      createdAt: alert.createdAt || nowIso,
+      lastVoteAt: alert.lastVoteAt || alert.createdAt || nowIso,
+      updatedAt: nowIso,
+    });
     this._scheduleSave();
     this.emit('alert_added', this.alerts[this.alerts.length - 1]);
     return this.alerts[this.alerts.length - 1];
   }
 
+  /// Fusionne un signalement dans une alerte existante de MÊME type et proche
+  /// (anti-doublons : deux signalements identiques trop proches sont fusionnés
+  /// et le vote est incrémenté au lieu de créer un doublon).
+  ///
+  /// Retourne l'alerte existante si une fusion a eu lieu, sinon `null`.
+  mergeNearbyIdentical(alert, radiusMeters) {
+    const r = radiusMeters || config.mergeRadiusMeters || 50;
+    if (alert.lat == null || alert.lng == null || !alert.type) return null;
+
+    const target = this.alerts.find(a => {
+      if (!a || a.id === alert.id) return false;
+      if (a.status === 'rejected') return false;
+      if (a.type !== alert.type) return false;
+      if (a.lat == null || a.lng == null) return false;
+      return this._haversine(alert.lat, alert.lng, a.lat, a.lng) <= r;
+    });
+    if (!target) return null;
+
+    const incoming = Array.isArray(alert.votes) ? alert.votes : [];
+    if (!Array.isArray(target.votes)) target.votes = [];
+    for (const v of incoming) {
+      if (!target.votes.includes(v)) target.votes.push(v);
+    }
+    const nowIso = new Date().toISOString();
+    target.lastVoteAt = nowIso;
+    target.updatedAt = nowIso;
+    this._scheduleSave();
+    log('ALERT', `Fusion ${alert.type} (${alert.id}) → ${target.id} (${target.votes.length} votes)`);
+    return target;
+  }
+
+  /// Détecte les signalements actifs/validés situés au même endroit (≤ radiusMeters)
+  /// mais d'un type DIFFÉRENT / CONTRADICTOIRE (`a.type !== alert.type`).
+  findContradictoryNearby(alert, radiusMeters) {
+    const r = radiusMeters || config.mergeRadiusMeters || 50;
+    if (alert.lat == null || alert.lng == null || !alert.type) return [];
+
+    return this.alerts.filter(a => {
+      if (!a || a.id === alert.id) return false;
+      if (a.status === 'rejected' || a.status === 'voided' || a.status === 'tombstone') return false;
+      if (a.type === alert.type) return false;
+      if (a.lat == null || a.lng == null) return false;
+      return this._haversine(alert.lat, alert.lng, a.lat, a.lng) <= r;
+    });
+  }
+
+  /// Retourne les signalements actifs/validés qui n'ont reçu aucun vote/confirmation
+  /// depuis au moins `inactivityMs` (par défaut 5 minutes) et qui n'ont pas déjà
+  /// fait l'objet d'une demande de validation dynamique depuis `cooldownMs`.
+  getStaleAlertsForValidation(inactivityMs = 5 * 60 * 1000, cooldownMs = 5 * 60 * 1000) {
+    const now = Date.now();
+    const results = [];
+    for (const a of this.alerts) {
+      if (!a || a.status === 'rejected' || a.status === 'voided' || a.status === 'tombstone') continue;
+      const ageMinutes = (now - new Date(a.createdAt).getTime()) / 60000;
+      if (ageMinutes > config.ttls.absoluteRgpd) continue;
+
+      const lastVoteTs = new Date(a.lastVoteAt || a.updatedAt || a.createdAt).getTime();
+      if (isNaN(lastVoteTs) || (now - lastVoteTs) < inactivityMs) continue;
+
+      const lastReqTs = a.validationRequestedAt ? new Date(a.validationRequestedAt).getTime() : 0;
+      if (lastReqTs && (now - lastReqTs) < cooldownMs) continue;
+
+      results.push(a);
+    }
+    return results;
+  }
+
+  /// Enregistre la réponse d'un utilisateur proche à une demande de validation :
+  ///   - `isConfirmed === true`  : ajoute un vote positif et rafraîchit `lastVoteAt`.
+  ///   - `isConfirmed === false` : ajoute une infirmation (`downvotes`). Si le
+  ///     signalement est infirmé majoritairement ou atteint ≥ 2 infirmations,
+  ///     il est purgé (`status = 'rejected'` + tombstone).
+  recordValidationVote(id, userId, isConfirmed) {
+    const alert = this.alerts.find(a => a.id === id);
+    if (!alert) return null;
+    if (alert.status === 'rejected' || alert.status === 'voided' || alert.status === 'tombstone') {
+      return { alert, purged: true, validated: false };
+    }
+
+    const uid = String(userId || 'anonymous');
+    const nowIso = new Date().toISOString();
+    if (!Array.isArray(alert.votes)) alert.votes = [];
+    if (!Array.isArray(alert.downvotes)) alert.downvotes = [];
+
+    if (isConfirmed) {
+      alert.downvotes = alert.downvotes.filter(u => u !== uid);
+      if (!alert.votes.includes(uid)) {
+        alert.votes.push(uid);
+      }
+      alert.lastVoteAt = nowIso;
+      alert.updatedAt = nowIso;
+      const validated = alert.scoutValidated || alert.status === 'validated' || alert.votes.length >= config.consensusThreshold;
+      if (validated && alert.status === 'active') {
+        alert.status = 'validated';
+      }
+      this._scheduleSave();
+      return {
+        alert,
+        purged: false,
+        validated,
+        votesCount: alert.votes.length,
+        downvotesCount: alert.downvotes.length,
+      };
+    } else {
+      alert.votes = alert.votes.filter(u => u !== uid);
+      if (!alert.downvotes.includes(uid)) {
+        alert.downvotes.push(uid);
+      }
+      alert.lastVoteAt = nowIso;
+      alert.updatedAt = nowIso;
+
+      // Purge automatique si :
+      //   - >= 2 infirmations, OU
+      //   - le signalement n'a pas encore atteint le consensus (ou est sous vérification dynamique)
+      //     et les infirmations égalent/dépassent les votes positifs (hors éclaireur).
+      const hasReachedConsensus = alert.votes.length >= config.consensusThreshold;
+      const shouldPurge =
+        alert.downvotes.length >= 2 ||
+        (!alert.scoutValidated &&
+          (!hasReachedConsensus || Boolean(alert.validationRequestedAt)) &&
+          alert.downvotes.length >= alert.votes.length);
+      if (shouldPurge) {
+        alert.status = 'rejected';
+        alert.purgedReason = 'community_refuted';
+        this._addTombstone(alert.id, 'rejected');
+      }
+      this._scheduleSave();
+      return {
+        alert,
+        purged: shouldPurge,
+        validated: false,
+        votesCount: alert.votes.length,
+        downvotesCount: alert.downvotes.length,
+      };
+    }
+  }
+
   getActiveAlerts() {
     const now = new Date();
     return this.alerts.filter(a => {
-      if (a.status === 'rejected') return false;
+      if (a.status === 'rejected' || a.status === 'voided' || a.status === 'tombstone') return false;
       const ageMinutes = (now - new Date(a.createdAt)) / 60000;
       if (ageMinutes > config.ttls.absoluteRgpd) return false;
       const ttls = { mobile_danger: config.ttls.mobileDanger, police: config.ttls.staticDanger, fire_truck: config.ttls.staticDanger, filter: config.ttls.staticDanger, panic: config.ttls.panic, collective_danger: config.ttls.collectiveDanger };
       const maxAge = ttls[a.type] || config.ttls.mobileDanger;
       if (ageMinutes > maxAge) return false;
+      if (a.scoutValidated || a.status === 'validated') return true;
       return (a.votes?.length || 0) >= config.consensusThreshold;
     });
   }
@@ -295,6 +452,86 @@ class Store {
   getEventByCode(code) { return this.events.find(e => e.code === code.toUpperCase()); }
 
   getAllEvents() { return this.events; }
+
+  /// Met à jour (partiellement) un événement existant identifié par son code.
+  /// Retourne l'événement mis à jour ou `null` si le code est inconnu.
+  updateEvent(code, patch) {
+    const existing = this.getEventByCode(code);
+    if (!existing) return null;
+    Object.assign(existing, patch, { code: existing.code });
+    this._scheduleSave();
+    return existing;
+  }
+
+  /// Supprime un événement identifié par son code.
+  /// Retourne `true` si l'événement a été supprimé, `false` s'il est inconnu.
+  removeEvent(code) {
+    const idx = this.events.findIndex(e => e.code === String(code || '').toUpperCase());
+    if (idx === -1) return false;
+    this.events.splice(idx, 1);
+    this._scheduleSave();
+    return true;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SUIVI UTILISATEUR -> ÉVÉNEMENT (cycle de vie des signalements)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /// Enregistre l'événement actuellement suivi par un utilisateur.
+  setUserCurrentEvent(userId, eventCode) {
+    if (!userId || !eventCode) return false;
+    this.userCurrentEvent.set(String(userId), String(eventCode).toUpperCase());
+    this._scheduleSave();
+    return true;
+  }
+
+  /// Retourne le code de l'événement suivi par [userId], ou `undefined`.
+  getUserCurrentEvent(userId) {
+    return this.userCurrentEvent.get(String(userId));
+  }
+
+  /// Supprime le suivi de l'utilisateur (déconnexion / changement d'événement).
+  removeUserCurrentEvent(userId) {
+    const had = this.userCurrentEvent.has(String(userId));
+    this.userCurrentEvent.delete(String(userId));
+    if (had) this._scheduleSave();
+    return had;
+  }
+
+  /// Applique un statut "tombstone" (suppression logique) à tous les
+  /// signalements actifs rattachés à [eventCode].
+  /// Retourne { alertIds: [...], count }.
+  tombstoneEvent(eventCode) {
+    const code = String(eventCode || '').toUpperCase();
+    const alertIds = [];
+    for (const alert of this.alerts) {
+      if (
+        alert.eventId === code &&
+        alert.status !== 'tombstone' &&
+        alert.status !== 'rejected' &&
+        alert.status !== 'voided'
+      ) {
+        alert.status = 'tombstone';
+        alert.updatedAt = new Date().toISOString();
+        this._addTombstone(alert.id, 'tombstone');
+        alertIds.push(alert.id);
+      }
+    }
+    if (alertIds.length) this._scheduleSave();
+    return { alertIds, count: alertIds.length };
+  }
+
+  /// Clôture un événement et applique le tombstone à ses signalements actifs.
+  /// Retourne l'événement modifié ou `null` s'il est inconnu.
+  closeEvent(eventCode) {
+    const event = this.getEventByCode(eventCode);
+    if (!event) return null;
+    event.status = 'closed';
+    event.updatedAt = new Date().toISOString();
+    this.tombstoneEvent(event.code);
+    this._scheduleSave();
+    return event;
+  }
 
   // ═══════════════════════════════════════════════════════════════════════
   // PANIC
@@ -518,6 +755,20 @@ class Store {
     alert.status = 'rejected';
     alert.updatedAt = new Date().toISOString();
     this._addTombstone(id, 'rejected');
+    this._scheduleSave();
+    return true;
+  }
+
+  /// Marque un signalement comme « annulé » (faux signalement)
+  /// par un éclaireur. Diffère de rejectAlert par le statut `voided`
+  /// et le marquage du modérateur ayant procédé à l'annulation.
+  voidAlert(id, userId) {
+    const alert = this.alerts.find(a => a.id === id);
+    if (!alert) return false;
+    alert.status = 'voided';
+    alert.voidedBy = userId;
+    alert.voidedAt = new Date().toISOString();
+    this._addTombstone(id, 'voided');
     this._scheduleSave();
     return true;
   }

@@ -13,7 +13,7 @@ const path = require('path');
 
 const OSM_FILE = process.argv[2] || 'android/app/src/main/assets/osm/fleurus.osm';
 const OUT_FILE = process.argv[3] || 'server/data/fleurus.graph.json';
-const CAR_OUT_FILE = OUT_FILE.replace(/\.json$/, '.car.graph.json');
+const CAR_OUT_FILE = OUT_FILE.replace(/\.graph\.json$/, '.car.graph.json');
 
 // Types de route non praticables à pied.
 const NON_WALKABLE = new Set([
@@ -101,7 +101,9 @@ async function main() {
     const t = line.trim();
     if (t.startsWith('<node ')) {
       const m = t.match(/id="(\d+)"\s+lat="([-\d.]+)"\s+lon="([-\d.]+)"/);
-      if (m) {
+      // Ignore les doublons de nœud (la sortie Overpass peut ré-émettre un
+      // nœud déjà présent) pour ne garder qu'un seul index par ID.
+      if (m && !idToIndex.has(m[1])) {
         idToIndex.set(m[1], nodes.length);
         nodes.push([parseFloat(m[2]), parseFloat(m[3])]);
       }

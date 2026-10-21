@@ -11,7 +11,9 @@ const store = require('../store');
 const sync = require('../sync');
 const { broadcastToAll } = require('../services/broadcast');
 const { routingEngine } = require('../services/routing');
-const { authenticateToken, requireRole } = require('../middleware/auth');
+const { authenticateToken, requireRole, requireScout, requireSuperAdmin, canManageRoleMiddleware } = require('../middleware/auth');
+const scoutService = require('../auth/scoutService');
+const eventAdminService = require('../auth/eventAdminService');
 
 const router = express.Router();
 
@@ -55,21 +57,21 @@ const messageLimiter = rateLimit({
 // ═══════════════════════════════════════════════════════════════════════
 
 /// POST /api/alerts — Réception d'un signalement.
-/// Body: { type, lat, lng, description?, userId }
+/// Body: { type, lat, lng, description?, userId, eventId? }
 /// Retourne l'alerte créée ou mise à jour, avec son statut de consensus.
 /// Protégé par reportLimiter (3 signalements max / 5 min / IP).
 router.post('/alerts', reportLimiter, (req, res) => {
   // Les variables sont déclarées HORS du bloc try pour rester
   // accessibles dans la suite du handler (validation du type, etc.).
-  let type, lat, lng, description, userId;
+  let type, lat, lng, description, userId, eventId;
   try {
     if (!req.body || Object.keys(req.body).length === 0) {
       console.error('[API] POST /api/alerts — body vide ou mal formé');
       return res.status(400).json({ error: 'body JSON requis' });
     }
 
-    ({ type, lat, lng, description, userId } = req.body);
-    console.log(`[API] POST /api/alerts — type=${type} lat=${lat} lng=${lng} userId=${userId || 'anon'}`);
+    ({ type, lat, lng, description, userId, eventId } = req.body);
+    console.log(`[API] POST /api/alerts — type=${type} lat=${lat} lng=${lng} userId=${userId || 'anon'} eventId=${eventId || 'auto'}`);
 
     if (!type || lat == null || lng == null) {
       return res.status(400).json({ error: 'type, lat, lng requis' });
@@ -84,24 +86,88 @@ router.post('/alerts', reportLimiter, (req, res) => {
     return res.status(400).json({ error: `type invalide. Valides: ${validTypes.join(', ')}` });
   }
 
+  // ── Cycle de vie lié à l'événement suivi : rattachement obligatoire
+  const resolvedEventCode = eventId
+    ? String(eventId).toUpperCase().trim()
+    : (userId ? store.getUserCurrentEvent(userId) : null);
+
+  if (!resolvedEventCode) {
+    return res.status(409).json({
+      error: 'Aucun événement suivi — le signalement doit être rattaché à un événement actif',
+    });
+  }
+
+  const linkedEvent = store.getEventByCode(resolvedEventCode);
+  if (!linkedEvent) {
+    return res.status(400).json({ error: `Événement inconnu : ${resolvedEventCode}` });
+  }
+  if (linkedEvent.status === 'closed') {
+    return res.status(400).json({ error: `L'événement ${resolvedEventCode} est clôturé` });
+  }
+  if (userId) {
+    store.setUserCurrentEvent(userId, resolvedEventCode);
+  }
+
+  // ── Privilège Éclaireur : validation instantanée (bypass consensus 3 votes)
+  let isScout = false;
+  if (userId) {
+    isScout = scoutService.isScout(userId);
+  }
+  if (!isScout) {
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.verify(authHeader.slice(7), config.jwtSecret, { algorithms: ['HS256'] });
+        if (decoded && (decoded.role === 'scout' || decoded.role === 'admin' || decoded.role === 'superadmin')) {
+          isScout = true;
+          if (!userId && decoded.username) userId = decoded.username;
+        }
+      } catch (_) {}
+    }
+  }
+
   const alert = {
     id: uuidv4(),
     type,
     lat: parseFloat(lat),
     lng: parseFloat(lng),
     description: description || '',
-    votes: userId ? [userId] : [],
-    status: 'active',
+    userId,
+    eventId: resolvedEventCode,
+    votes: isScout ? [] : (userId ? [userId] : []),
+    status: isScout ? 'validated' : 'active',
+    scoutValidated: isScout,
     uploadedTo: '',
   };
 
-  const saved = store.addAlert(alert);
+  // 1) Anti-doublon : fusion si même type à ≤ 50 m
+  const merged = !isScout ? store.mergeNearbyIdentical(alert) : null;
+  const saved = merged || store.addAlert(alert);
+
+  // 2) Détection de signalement contradictoire/différent au même endroit (≤ 50 m)
+  const conflicts = store.findContradictoryNearby(saved);
+  if (conflicts.length > 0) {
+    const nowIso = new Date().toISOString();
+    saved.validationRequestedAt = nowIso;
+    for (const c of conflicts) {
+      c.validationRequestedAt = nowIso;
+    }
+    broadcastToAll('validation_requested', {
+      reason: 'contradictory_report',
+      conflictingAlert: { ...saved, votes: saved.votes || [] },
+      targetAlerts: conflicts.map(c => ({ ...c, votes: c.votes || [] })),
+      radiusMeters: 100,
+    });
+  }
 
   // Réplication vers le Backup via outbox (retry automatique).
   sync.enqueueAlert(saved);
 
-  // Diffusion temps réel si le signalement est déjà validé (≥ seuil).
-  if ((saved.votes || []).length >= config.consensusThreshold) {
+  // Diffusion temps réel :
+  //   - Éclaireur : validation immédiate (bypass consensus).
+  //   - Citoyen : validation dès atteinte du seuil de consensus.
+  const validated = isScout || ((saved.votes || []).length >= config.consensusThreshold);
+  if (validated) {
     broadcastToAll('report_validated', { alert: { ...saved, votes: saved.votes || [] } });
   }
 
@@ -109,8 +175,69 @@ router.post('/alerts', reportLimiter, (req, res) => {
     alert: { ...saved, votes: saved.votes || [] },
     votesCount: (saved.votes || []).length,
     consensusThreshold: config.consensusThreshold,
-    validated: (saved.votes || []).length >= config.consensusThreshold,
+    validated,
+    scoutValidated: isScout,
+    merged: Boolean(merged),
+    validationRequested: conflicts.length > 0,
+    conflicts: conflicts.map(c => ({ id: c.id, type: c.type, lat: c.lat, lng: c.lng })),
   });
+});
+
+/// GET /api/alerts/validation-requests — Demandes dynamiques de validation pour les utilisateurs proches.
+/// Sollicite les utilisateurs à portée si :
+///   a) Aucun vote/confirmation n'a été enregistré depuis ≥ 5 minutes (stale_5min).
+///   b) Un signalement contradictoire/différent existe au même endroit (contradictory_report).
+router.get('/alerts/validation-requests', (req, res) => {
+  const { lat, lng, radius_m, inactivity_ms } = req.query;
+  const inactivityMs = inactivity_ms ? parseInt(inactivity_ms, 10) : 5 * 60 * 1000;
+  const radiusMeters = radius_m ? parseFloat(radius_m) : 150;
+
+  const staleAlerts = store.getStaleAlertsForValidation(inactivityMs, 60 * 1000);
+  const requests = [];
+  const seenIds = new Set();
+
+  for (const a of staleAlerts) {
+    if (lat != null && lng != null) {
+      const dist = store._haversine(parseFloat(lat), parseFloat(lng), a.lat, a.lng);
+      if (dist > radiusMeters) continue;
+    }
+    seenIds.add(a.id);
+    requests.push({
+      reason: 'stale_5min',
+      alert: { ...a, votes: a.votes || [], downvotes: a.downvotes || [] },
+    });
+  }
+
+  // Vérifier également les paires de signalements contradictoires au même endroit
+  for (const a of store.alerts) {
+    if (!a || a.status === 'rejected' || a.status === 'voided' || a.status === 'tombstone') continue;
+    if (seenIds.has(a.id)) continue;
+    if (lat != null && lng != null) {
+      const dist = store._haversine(parseFloat(lat), parseFloat(lng), a.lat, a.lng);
+      if (dist > radiusMeters) continue;
+    }
+    const conflicts = store.findContradictoryNearby(a);
+    if (conflicts.length > 0) {
+      seenIds.add(a.id);
+      requests.push({
+        reason: 'contradictory_report',
+        alert: { ...a, votes: a.votes || [], downvotes: a.downvotes || [] },
+        conflictsWith: conflicts.map(c => ({ id: c.id, type: c.type })),
+      });
+    }
+  }
+
+  if (staleAlerts.length > 0) {
+    const nowIso = new Date().toISOString();
+    for (const s of staleAlerts) s.validationRequestedAt = nowIso;
+    broadcastToAll('validation_requested', {
+      reason: 'stale_5min',
+      targetAlerts: staleAlerts.map(a => ({ ...a, votes: a.votes || [] })),
+      radiusMeters,
+    });
+  }
+
+  res.json({ requests, count: requests.length });
 });
 
 /// GET /api/alerts/active — Alertes valides (≥3 votes, TTL respecté).
@@ -155,7 +282,9 @@ router.post('/alerts/:id/vote', (req, res) => {
   if (!alert.votes) alert.votes = [];
   if (!alert.votes.includes(userId)) {
     alert.votes.push(userId);
-    alert.updatedAt = new Date().toISOString();
+    const nowIso = new Date().toISOString();
+    alert.lastVoteAt = nowIso;
+    alert.updatedAt = nowIso;
 
     // Réplication vers le Backup via outbox.
     sync.enqueueAlert(alert);
@@ -176,16 +305,99 @@ router.post('/alerts/:id/vote', (req, res) => {
   });
 });
 
+/// POST /api/alerts/:id/verify — Réponse citoyenne à une demande de validation dynamique.
+/// Body: { userId, vote: 'confirm' | 'refute' } (ou { userId, confirmed: boolean })
+/// Purge automatiquement le signalement erroné si infirmé.
+router.post('/alerts/:id/verify', (req, res) => {
+  const { userId, vote, confirmed } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'userId requis' });
+
+  const isConfirmed = confirmed !== undefined
+    ? Boolean(confirmed)
+    : (vote === 'confirm' || vote === 'yes' || vote === 'oui');
+
+  const result = store.recordValidationVote(req.params.id, userId, isConfirmed);
+  if (!result) return res.status(404).json({ error: 'Alerte non trouvée' });
+
+  sync.enqueueAlert(result.alert);
+
+  if (result.purged) {
+    broadcastToAll('report_rejected', {
+      alert: { ...result.alert, votes: result.alert.votes || [] },
+      reason: 'community_refuted',
+    });
+  } else if (result.validated) {
+    broadcastToAll('report_validated', {
+      alert: { ...result.alert, votes: result.alert.votes || [] },
+    });
+  }
+
+  res.json({
+    success: true,
+    purged: result.purged,
+    validated: result.validated,
+    votesCount: result.votesCount,
+    downvotesCount: result.downvotesCount,
+    alert: result.alert,
+  });
+});
+
 /// POST /api/alerts/:id/reject — ADMIN : révoque un signalement (modération).
-router.post('/alerts/:id/reject', authenticateToken, requireRole(['admin']), (req, res) => {
+router.post('/alerts/:id/reject', authenticateToken, requireRole(['admin', 'superadmin', 'event_admin']), (req, res) => {
   const alert = store.alerts.find(a => a.id === req.params.id);
   if (!alert) return res.status(404).json({ error: 'Alerte non trouvée' });
+  if (req.user.role === 'event_admin') {
+    const managed = req.user.managedEventCodes || [];
+    if (!alert.eventId || !managed.includes(alert.eventId)) {
+      return res.status(403).json({ error: 'Ce signalement n\'appartient pas à vos événements gérés' });
+    }
+  }
   alert.status = 'rejected';
   alert.updatedAt = new Date().toISOString();
   sync.enqueueAlert(alert);
   // Diffusion temps réel du rejet aux clients mobiles.
   broadcastToAll('report_rejected', { alert: { ...alert, votes: alert.votes || [] } });
   res.json({ success: true, message: 'Signalement révoqué' });
+});
+
+/// POST /api/alerts/:id/void — Annulation d'un faux signalement par un éclaireur.
+/// Statut : 'voided' (tombstone vers le Backup).
+router.post('/alerts/:id/void', authenticateToken, requireScout, (req, res) => {
+  const alert = store.alerts.find(a => a.id === req.params.id);
+  if (!alert) return res.status(404).json({ error: 'Alerte non trouvée' });
+  if (alert.status === 'voided') return res.status(400).json({ error: 'Signalement déjà annulé' });
+  if (alert.status === 'rejected') return res.status(400).json({ error: 'Signalement déjà révoqué' });
+
+  const voided = store.voidAlert(req.params.id, req.user?.username || req.user?.role);
+  if (!voided) return res.status(404).json({ error: 'Alerte non trouvée' });
+
+  const updated = store.alerts.find(a => a.id === req.params.id);
+  sync.enqueueAlert(updated);
+  broadcastToAll('report_voided', { alert: { ...updated, votes: updated.votes || [] } });
+  res.json({ success: true, message: 'Signalement annulé (faux signalement)', alert: updated });
+});
+
+/// POST /api/user/follow-event — Lie un utilisateur à l'événement suivi.
+/// Body: { userId, eventCode } (si eventCode est null/vide, supprime le suivi)
+router.post('/user/follow-event', (req, res) => {
+  const { userId, eventCode } = req.body || {};
+  if (!userId) {
+    return res.status(400).json({ error: 'userId requis' });
+  }
+  if (!eventCode) {
+    store.removeUserCurrentEvent(userId);
+    return res.json({ success: true, userId, eventCode: null });
+  }
+  const upper = String(eventCode).toUpperCase().trim();
+  const event = store.getEventByCode(upper);
+  if (!event) {
+    return res.status(404).json({ error: `Événement non trouvé : ${upper}` });
+  }
+  if (event.status === 'closed') {
+    return res.status(410).json({ error: 'Cet événement est clôturé' });
+  }
+  store.setUserCurrentEvent(userId, upper);
+  res.json({ success: true, userId, eventCode: upper });
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -584,41 +796,94 @@ router.post('/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'username et password requis' });
     }
 
-    // Vérification du nom d'utilisateur (constant, configurable).
-    if (username !== config.adminUsername) {
-      console.log(`[AUTH] Tentative de connexion — utilisateur inconnu : "${username}"`);
-      // Délai artificiel pour contrer le timing attack sur le username.
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return res.status(401).json({ error: 'Identifiants invalides' });
+    // ── 1. Compte admin principal (ADMIN_HASH)
+    if (username === config.adminUsername) {
+      const isDevPlaceholder =
+        process.env.NODE_ENV !== 'production' &&
+        config.adminHash === '$2b$12$dev-placeholder-change-in-production-hash';
+      const passwordValid = isDevPlaceholder
+        ? password === 'admin123'
+        : await bcrypt.compare(password, config.adminHash);
+      if (!passwordValid) {
+        console.log(`[AUTH] Mot de passe incorrect pour "${username}"`);
+        return res.status(401).json({ error: 'Identifiants invalides' });
+      }
+
+      const tokenPayload = {
+        role: 'admin',
+        username: config.adminUsername,
+      };
+
+      const token = jwt.sign(tokenPayload, config.jwtSecret, {
+        algorithm: 'HS256',
+        expiresIn: config.jwtExpiresIn,
+      });
+
+      console.log(`[AUTH] Connexion admin réussie — "${username}" — token valide ${config.jwtExpiresIn}`);
+
+      return res.json({
+        success: true,
+        token,
+        expiresIn: config.jwtExpiresIn,
+        role: 'admin',
+      });
     }
 
-    // Vérification du mot de passe via bcrypt (12 rounds).
-    const passwordValid = await bcrypt.compare(password, config.adminHash);
+    // ── 2. Compte éclaireur
+    const scout = await scoutService.verify(username, password);
+    if (scout) {
+      const tokenPayload = {
+        role: 'scout',
+        username: scout.username,
+        permissions: scout.permissions,
+      };
 
-    if (!passwordValid) {
-      console.log(`[AUTH] Tentative de connexion — mot de passe incorrect pour "${username}"`);
-      return res.status(401).json({ error: 'Identifiants invalides' });
+      const token = jwt.sign(tokenPayload, config.jwtSecret, {
+        algorithm: 'HS256',
+        expiresIn: config.jwtExpiresIn,
+      });
+
+      console.log(`[AUTH] Connexion éclaireur réussie — "${username}" — token valide ${config.jwtExpiresIn}`);
+
+      return res.json({
+        success: true,
+        token,
+        expiresIn: config.jwtExpiresIn,
+        role: 'scout',
+      });
     }
 
-    // Génération du token JWT.
-    const tokenPayload = {
-      role: 'admin',
-      username: config.adminUsername,
-    };
+    // ── 3. Compte admin d'événement
+    const eventAdmin = await eventAdminService.verify(username, password);
+    if (eventAdmin) {
+      const tokenPayload = {
+        role: 'event_admin',
+        username: eventAdmin.username,
+        permissions: eventAdmin.permissions,
+        managedEventCodes: eventAdmin.managedEventCodes,
+      };
 
-    const token = jwt.sign(tokenPayload, config.jwtSecret, {
-      algorithm: 'HS256',
-      expiresIn: config.jwtExpiresIn,
-    });
+      const token = jwt.sign(tokenPayload, config.jwtSecret, {
+        algorithm: 'HS256',
+        expiresIn: config.jwtExpiresIn,
+      });
 
-    console.log(`[AUTH] Connexion réussie — "${username}" — token valide ${config.jwtExpiresIn}`);
+      console.log(`[AUTH] Connexion admin événement réussie — "${username}" — token valide ${config.jwtExpiresIn}`);
 
-    res.json({
-      success: true,
-      token,
-      expiresIn: config.jwtExpiresIn,
-      role: 'admin',
-    });
+      return res.json({
+        success: true,
+        token,
+        expiresIn: config.jwtExpiresIn,
+        role: 'event_admin',
+      });
+    }
+
+    // ── Aucun compte trouvé
+    console.log(`[AUTH] Tentative de connexion — utilisateur inconnu : "${username}"`);
+    // Délai artificiel pour contrer le timing attack sur le username.
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return res.status(401).json({ error: 'Identifiants invalides' });
+
   } catch (err) {
     console.error('[AUTH] Erreur login:', err.message);
     res.status(500).json({ error: 'Erreur interne lors de l\'authentification' });
@@ -655,6 +920,87 @@ router.post('/auth/verify', (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
+
+/// GET /api/admin/scouts — Liste des éclaireurs (réservé Superadmin).
+router.get('/admin/scouts', authenticateToken, requireSuperAdmin, (req, res) => {
+  res.json({ scouts: scoutService.list() });
+});
+
+/// POST /api/admin/scouts — Créer un éclaireur (réservé Superadmin).
+/// Body: { username, displayName?, permissions?, password? }
+router.post('/admin/scouts', authenticateToken, requireSuperAdmin, async (req, res) => {
+  try {
+    const { username, displayName, permissions, password } = req.body || {};
+    const result = await scoutService.create(username, { displayName, permissions, password });
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.status(201).json({ success: true, scout: result.scout });
+  } catch (err) {
+    console.error('[ADMIN] Erreur création scout:', err.message);
+    res.status(500).json({ error: 'Erreur interne lors de la création de l\'éclaireur' });
+  }
+});
+
+/// PUT /api/admin/scouts/:id — Modifier un éclaireur (réservé Superadmin).
+/// Body: { displayName?, permissions? }
+router.put('/admin/scouts/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
+  try {
+    const { displayName, permissions } = req.body || {};
+    const result = await scoutService.update(req.params.id, { displayName, permissions });
+    if (result.error) return res.status(404).json({ error: result.error });
+    res.json({ success: true, scout: result.scout });
+  } catch (err) {
+    console.error('[ADMIN] Erreur modification scout:', err.message);
+    res.status(500).json({ error: 'Erreur interne lors de la modification de l\'éclaireur' });
+  }
+});
+
+/// DELETE /api/admin/scouts/:id — Supprimer un éclaireur (réservé Superadmin).
+router.delete('/admin/scouts/:id', authenticateToken, requireSuperAdmin, (req, res) => {
+  const ok = scoutService.remove(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Éclaireur non trouvé' });
+  res.json({ success: true });
+});
+
+/// GET /api/admin/event-admins — Liste des admins d'événements (réservé Superadmin).
+router.get('/admin/event-admins', authenticateToken, requireSuperAdmin, (req, res) => {
+  res.json({ admins: eventAdminService.list() });
+});
+
+/// POST /api/admin/event-admins — Créer un admin d'événement (réservé Superadmin).
+/// Body: { username, displayName?, permissions?, managedEventCodes?, password? }
+router.post('/admin/event-admins', authenticateToken, requireSuperAdmin, async (req, res) => {
+  try {
+    const { username, displayName, permissions, managedEventCodes, password } = req.body || {};
+    const result = await eventAdminService.create(username, { displayName, permissions, managedEventCodes, password });
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.status(201).json({ success: true, admin: result.admin });
+  } catch (err) {
+    console.error('[ADMIN] Erreur création admin événement:', err.message);
+    res.status(500).json({ error: 'Erreur interne lors de la création de l\'admin d\'événement' });
+  }
+});
+
+/// PUT /api/admin/event-admins/:id — Modifier un admin d'événement (réservé Superadmin).
+/// Body: { displayName?, permissions?, managedEventCodes? }
+router.put('/admin/event-admins/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
+  try {
+    const { displayName, permissions, managedEventCodes } = req.body || {};
+    const result = await eventAdminService.update(req.params.id, { displayName, permissions, managedEventCodes });
+    if (result.error) return res.status(404).json({ error: result.error });
+    res.json({ success: true, admin: result.admin });
+  } catch (err) {
+    console.error('[ADMIN] Erreur modification admin événement:', err.message);
+    res.status(500).json({ error: 'Erreur interne lors de la modification de l\'admin d\'événement' });
+  }
+});
+
+/// DELETE /api/admin/event-admins/:id — Supprimer un admin d'événement (réservé Superadmin).
+router.delete('/admin/event-admins/:id', authenticateToken, requireSuperAdmin, (req, res) => {
+  const ok = eventAdminService.remove(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Admin d\'événement non trouvé' });
+  res.json({ success: true });
+});
+
 // BUG REPORT (Signalement de bug depuis l'application Flutter)
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -810,4 +1156,128 @@ router.get('/route', (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════
+// PARTAGE D'ÉVÉNEMENT / DEEP LINKING & REDIRECTION PLAY STORE
+// ═══════════════════════════════════════════════════════════════════════
+
+const PLAY_STORE_PACKAGE = 'com.example.flutter_streetphare';
+const PLAY_STORE_URL = `https://play.google.com/store/apps/details?id=${PLAY_STORE_PACKAGE}`;
+
+function handleInviteRequest(req, res) {
+  const rawCode = (req.query.code || '').toString().trim().toUpperCase();
+  const rawData = (req.query.data || '').toString().trim();
+  const session = (req.query.session || '').toString().trim();
+
+  let eventObj = null;
+  if (rawData) {
+    for (const enc of ['base64url', 'base64']) {
+      try {
+        const parsed = JSON.parse(Buffer.from(rawData, enc).toString('utf8'));
+        if (parsed && typeof parsed === 'object') { eventObj = parsed; break; }
+      } catch (_) {}
+    }
+  }
+
+  const effectiveCode = rawCode || (eventObj && eventObj.code ? String(eventObj.code).toUpperCase() : '');
+  if (!eventObj && effectiveCode) {
+    const stored = store.getEventByCode(effectiveCode);
+    if (stored) {
+      eventObj = {
+        code: stored.code,
+        title: stored.title,
+        startAt: stored.startAt,
+        visibleAt: stored.visibleAt || stored.startAt,
+        route: stored.routeGeoJson || '',
+        destLat: stored.destinationLatitude,
+        destLng: stored.destinationLongitude,
+        waypoints: stored.waypoints || [],
+        pois: stored.pois || [],
+        careCenters: stored.careCenters || [],
+        exitPoints: stored.exitPoints || [],
+        safeZones: stored.safeZones || [],
+      };
+    }
+  }
+
+  const encodedData = rawData || (eventObj ? Buffer.from(JSON.stringify(eventObj), 'utf8').toString('base64url') : '');
+  const queryParts = [];
+  if (effectiveCode) queryParts.push(`code=${encodeURIComponent(effectiveCode)}`);
+  if (encodedData) queryParts.push(`data=${encodeURIComponent(encodedData)}`);
+  if (session) queryParts.push(`session=${encodeURIComponent(session)}`);
+  const queryString = queryParts.join('&');
+
+  const deepLink = `streetphare://invite${queryString ? '?' + queryString : ''}`;
+  const referrer = encodeURIComponent(queryString || 'utm_source=streetphare_share');
+  const playStoreRedirectUrl = `${PLAY_STORE_URL}&referrer=${referrer}`;
+  const androidIntentUrl =
+    `intent://invite${queryString ? '?' + queryString : ''}#Intent;` +
+    `scheme=streetphare;package=${PLAY_STORE_PACKAGE};` +
+    `S.browser_fallback_url=${encodeURIComponent(playStoreRedirectUrl)};end`;
+
+  const wantsJson =
+    req.query.format === 'json' ||
+    (req.headers.accept && req.headers.accept.includes('application/json') && !req.headers.accept.includes('text/html'));
+
+  if (wantsJson) {
+    return res.json({
+      success: true,
+      code: effectiveCode || null,
+      session: session || null,
+      event: eventObj,
+      deepLink,
+      androidIntentUrl,
+      playStoreUrl: playStoreRedirectUrl,
+    });
+  }
+
+  const title = (eventObj && eventObj.title) ? String(eventObj.title) : (effectiveCode || 'Invitation StreetPhare');
+  const safeTitle = title.replace(/[<>&"']/g, '');
+  const safeCode = (effectiveCode || 'N/A').replace(/[<>&"']/g, '');
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StreetPhare — ${safeTitle}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #12181B; color: #F5F7F8; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+    .card { max-width: 420px; width: 100%; background: #1E272C; border: 1px solid #FFB300; border-radius: 16px; padding: 24px; text-align: center; }
+    h1 { color: #FFB300; font-size: 20px; margin-top: 0; }
+    .code { font-family: monospace; font-size: 16px; background: rgba(255,179,0,0.12); color: #FFB300; padding: 8px 14px; border-radius: 8px; display: inline-block; margin: 12px 0; }
+    .btn { display: block; width: 100%; padding: 14px; margin-top: 12px; border-radius: 10px; font-weight: 700; text-decoration: none; box-sizing: border-box; }
+    .btn-primary { background: #FFB300; color: #000; }
+    .btn-store { background: transparent; color: #FFB300; border: 1.5px solid #FFB300; }
+    p { color: #B0BEC5; font-size: 14px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>StreetPhare — Invitation</h1>
+    <p>Invitation à rejoindre l'événement <strong>${safeTitle}</strong>.</p>
+    <div class="code">Code : ${safeCode}</div>
+    <a id="open-app" class="btn btn-primary" href="${deepLink}">Ouvrir dans StreetPhare</a>
+    <a id="open-store" class="btn btn-store" href="${playStoreRedirectUrl}">Installer depuis Google Play</a>
+    <p style="font-size:12px; margin-top:16px;">Redirection automatique vers l'application ou le Play Store…</p>
+  </div>
+  <script>
+    (function() {
+      var deepLink = ${JSON.stringify(deepLink)};
+      var storeUrl = ${JSON.stringify(playStoreRedirectUrl)};
+      var hidden = false;
+      document.addEventListener('visibilitychange', function() { if (document.hidden) hidden = true; });
+      window.location.href = deepLink;
+      setTimeout(function() { if (!hidden) window.location.replace(storeUrl); }, 1800);
+    })();
+  </script>
+</body>
+</html>`);
+}
+
+router.get('/invite', handleInviteRequest);
+
 module.exports = router;
+module.exports.handleInviteRequest = handleInviteRequest;
+
+

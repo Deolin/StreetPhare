@@ -90,13 +90,25 @@ dependencies {
         // ── Exclusions des dépendances lourdes inutiles sur Android ─────
         // xmlgraphics-commons : import élévation TIF (inutilisé)
         exclude(group = "org.apache.xmlgraphics")
-        // jackson-dataformat-xml : lecture OSM XML via StAX (inutilisée, on lit du .pbf)
+        // jackson-dataformat-xml : EXCLU (tire JAXB/jakarta.*, lourd et
+        // conflictuel sur Android — duplicate META-INF/LICENSE.md).
+        // StAX est fourni séparément ci-dessous (woodstox-core).
         exclude(group = "com.fasterxml.jackson.dataformat")
         //
         // ⚠️ protobuf-java et jts-core SONT CONSERVÉS (plus d'exclusion) :
         //   - protobuf-java : requis par osmosis-osm-binary (lecture des .pbf)
         //   - jts-core      : requis par GraphHopper (AreaIndex, custom model « zones »)
     }
+    // StAX (javax.xml.stream) : non fourni par Android, requis par GraphHopper
+    // pour lire l'asset OSM au format XML (.osm).
+    // - woodstox-core : implémentation StAX
+    // - stax2-api     : API StAX2 (org.codehaus.stax2)
+    // - stax-api      : API StAX (javax.xml.stream.XMLInputFactory) — déclarée
+    //   en scope "provided" par stax2-api (JDK) donc ABSENTE d'Android :
+    //   à ajouter explicitement.
+    implementation("com.fasterxml.woodstox:woodstox-core:6.5.1")
+    implementation("org.codehaus.woodstox:stax2-api:4.2.1")
+    implementation("javax.xml.stream:stax-api:1.0-2")
     // SLF4J requis par GraphHopper (Android binding)
     implementation("org.slf4j:slf4j-android:1.7.36")
 }

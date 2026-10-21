@@ -39,6 +39,7 @@ import 'network/network_config.dart';
 import 'network/network_coordinator.dart';
 import 'network/server_heartbeat_service.dart';
 import 'services/apk_backup_service.dart';
+import 'services/app_share_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/notification_service.dart';
 import 'services/version_check_service.dart';
@@ -207,6 +208,7 @@ void main() async {
     // Les services sans accès natif lourd démarrent ici.
     ConnectivityService.instance.start();
     EventManager.instance.start();
+    unawaited(AppShareService.instance.initDeepLinks());
     HiveMessagingService.instance.start();
     unawaited(NotificationService.instance.showPersistentNotification());
 

@@ -48,6 +48,10 @@ class GeofencingService extends WidgetsBindingObserver {
   /// Rayon par défaut (en mètres) du ping de proximité.
   static const double defaultRadiusMeters = 50.0;
 
+  /// Délai sans vote/confirmation au-delà duquel les utilisateurs proches
+  /// sont re-sollicités dynamiquement (5 minutes).
+  static const Duration staleNoVoteThreshold = Duration(minutes: 5);
+
   StreamSubscription<Position>? _posSub;
   StreamSubscription<List<Alert>>? _alertsSub;
   Timer? _recheckTimer;
@@ -304,24 +308,97 @@ class GeofencingService extends WidgetsBindingObserver {
     final alerts = HiveAlertDatabase.instance.getAllValid();
     final visible = AlertVisibilityPolicy.filterVisible(alerts);
     final user = LatLng(pos.latitude, pos.longitude);
+    final now = DateTime.now().toUtc();
 
     for (final alert in visible) {
-      if (_alreadyTriggeredAlertIds.contains(alert.id)) continue;
       final dist = _distanceMeters(user, alert.position);
-      if (dist <= _radiusMeters) {
-        _alreadyTriggeredAlertIds.add(alert.id);
-        _eventsController.add(
-          GeofenceEvent(
-            alert: alert,
-            userPosition: user,
-            distanceMeters: dist,
-          ),
-        );
-        if (kDebugMode) {
-          debugPrint(
-              '[Geofencing] ping ! alerte=${alert.id} dist=${dist.toStringAsFixed(1)} m');
+      if (dist > _radiusMeters) continue;
+
+      // Condition (b) : existe-t-il un signalement contradictoire/différent au même endroit (≤ 50 m) ?
+      Alert? conflicting;
+      for (final other in visible) {
+        if (other.id == alert.id || other.type == alert.type) continue;
+        if (_distanceMeters(alert.position, other.position) <= defaultRadiusMeters) {
+          conflicting = other;
+          break;
         }
       }
+
+      // Condition (a) : aucun vote/confirmation enregistré depuis au moins 5 minutes
+      final isStale = now.difference(alert.lastModifiedAt) >= staleNoVoteThreshold;
+
+      // Si déjà déclenché, on ne re-sollicite que si (a) inactivité ≥ 5 min ou (b) conflit détecté
+      if (_alreadyTriggeredAlertIds.contains(alert.id) && !isStale && conflicting == null) {
+        continue;
+      }
+
+      final reason = conflicting != null
+          ? ValidationTriggerReason.contradictoryReport
+          : (isStale
+              ? ValidationTriggerReason.staleNoVote5Min
+              : ValidationTriggerReason.proximityEntry);
+
+      _alreadyTriggeredAlertIds.add(alert.id);
+      _eventsController.add(
+        GeofenceEvent(
+          alert: alert,
+          userPosition: user,
+          distanceMeters: dist,
+          reason: reason,
+          conflictingAlertType: conflicting?.type,
+        ),
+      );
+      if (kDebugMode) {
+        debugPrint(
+          '[Geofencing] ping ($reason) ! alerte=${alert.id} dist=${dist.toStringAsFixed(1)} m',
+        );
+      }
+    }
+  }
+
+  /// Traite une sollicitation dynamique envoyée par le serveur (`validation_requested`)
+  /// lorsqu'aucun vote n'a été reçu depuis ≥ 5 min (`stale_5min`) ou lorsqu'un
+  /// signalement contradictoire est émis au même endroit (`contradictory_report`).
+  void onServerValidationRequested(Map<String, dynamic> payload) {
+    final pos = _lastPosition;
+    if (pos == null) return;
+
+    final user = LatLng(pos.latitude, pos.longitude);
+    final reasonStr = (payload['reason'] ?? '').toString();
+    final maxRadius = (payload['radiusMeters'] as num?)?.toDouble() ?? 100.0;
+
+    final reason = reasonStr == 'contradictory_report'
+        ? ValidationTriggerReason.contradictoryReport
+        : ValidationTriggerReason.staleNoVote5Min;
+
+    AlertType? conflictingType;
+    final conflictingJson = payload['conflictingAlert'];
+    if (conflictingJson is Map<String, dynamic>) {
+      try {
+        conflictingType = Alert.fromJson(conflictingJson).type;
+      } catch (_) {}
+    }
+
+    final targets = payload['targetAlerts'];
+    if (targets is! List) return;
+
+    for (final item in targets) {
+      if (item is! Map<String, dynamic>) continue;
+      try {
+        final alert = Alert.fromJson(item);
+        final dist = _distanceMeters(user, alert.position);
+        if (dist <= maxRadius) {
+          _eventsController.add(
+            GeofenceEvent(
+              alert: alert,
+              userPosition: user,
+              distanceMeters: dist,
+              reason: reason,
+              conflictingAlertType: conflictingType,
+            ),
+          );
+        }
+      } catch (_) {}
     }
   }
 

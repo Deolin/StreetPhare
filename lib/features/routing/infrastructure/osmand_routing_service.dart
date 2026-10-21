@@ -364,6 +364,11 @@ class OsmAndRoutingService {
       'fromLon': start.longitude.toString(),
       'toLat': end.latitude.toString(),
       'toLon': end.longitude.toString(),
+      // Profil demandé au serveur : 'car' pour voiture/urgence, 'foot' sinon.
+      'profile': (profile == RoutingProfile.vehicle ||
+              profile == RoutingProfile.emergency)
+          ? 'car'
+          : 'foot',
     };
     if (avoidPoints.isNotEmpty) {
       params['avoid'] =

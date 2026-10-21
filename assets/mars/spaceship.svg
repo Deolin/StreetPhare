@@ -1,10 +1,89 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 24 24"
+   width="24"
+   height="24"
+   version="1.1"
+   id="svg3"
+   sodipodi:docname="spaceship.svg"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs3" />
+  <sodipodi:namedview
+     id="namedview3"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="35.625"
+     inkscape:cx="12"
+     inkscape:cy="12"
+     inkscape:window-width="2560"
+     inkscape:window-height="1057"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg3" />
   <!-- Vaisseau extraterrestre simplifié (skin Mars Attacks) -->
-  <path d="M9 9.6C9 5.9 15 5.9 15 9.6Z" fill="#cfd8dc"/>
-  <ellipse cx="12" cy="12.6" rx="9.2" ry="3.5" fill="#90a4ae"/>
-  <rect x="8" y="12.6" width="8" height="2.1" rx="1" fill="#607d8b"/>
-  <circle cx="6.8" cy="12.9" r="0.75" fill="#ffeb3b"/>
-  <circle cx="12" cy="13.7" r="0.75" fill="#ffeb3b"/>
-  <circle cx="17.2" cy="12.9" r="0.75" fill="#ffeb3b"/>
-  <path d="M8.5 15.7 7 20.4h10l-1.5-4.7Z" fill="#fff59d" opacity="0.45"/>
+  <path
+     d="M9 9.6C9 5.9 15 5.9 15 9.6Z"
+     fill="#cfd8dc"
+     id="path1" />
+  <ellipse
+     cx="12"
+     cy="12.6"
+     rx="9.2"
+     ry="3.5"
+     fill="#90a4ae"
+     id="ellipse1" />
+  <rect
+     x="8"
+     y="12.6"
+     width="8"
+     height="2.1"
+     rx="1"
+     fill="#607d8b"
+     id="rect1" />
+  <circle
+     cx="6.8"
+     cy="12.9"
+     r="0.75"
+     fill="#ffeb3b"
+     id="circle1" />
+  <circle
+     cx="12"
+     cy="13.7"
+     r="0.75"
+     fill="#ffeb3b"
+     id="circle2" />
+  <circle
+     cx="17.2"
+     cy="12.9"
+     r="0.75"
+     fill="#ffeb3b"
+     id="circle3" />
+  <path
+     d="M8.5 15.7 7 20.4h10l-1.5-4.7Z"
+     fill="#fff59d"
+     opacity="0.45"
+     id="path3" />
+  <path
+     style="fill:#ff0000;stroke:#3a29ff;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     d="M 6.7929825,13.052632 4.3508772,20.238596"
+     id="path4" />
+  <path
+     style="fill:none;stroke:#002de2;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     d="m 17.263158,12.968421 1.768421,7.410526"
+     id="path5" />
+  <g
+     inkscape:groupmode="layer"
+     id="layer1"
+     inkscape:label="Layer 1" />
 </svg>

@@ -25,6 +25,24 @@ class RoutePoi {
   final String icon;
 }
 
+/// Une portion restreinte d'un itinéraire (sens interdit, zone piétonne,
+/// barrage, zone filtrée, nasse, etc.) que le conducteur devrait éviter.
+///
+/// En mode voiture/urgence, ces portions sont mises en surbrillance sur la
+/// carte et déclenchent un avertissement visuel + sonore.
+class RestrictedSegment {
+  const RestrictedSegment({
+    required this.points,
+    required this.reason,
+  });
+
+  /// Suite ordonnée de points formant la sous-polyline restreinte.
+  final List<LatLng> points;
+
+  /// Raison lisible : "Barrage", "Zone filtrée", "Nasse", etc.
+  final String reason;
+}
+
 /// Un résultat de calcul d'itinéraire.
 class RouteResult {
   const RouteResult({
@@ -34,6 +52,7 @@ class RouteResult {
     required this.totalRiskScore,
     required this.pois,
     this.label = '',
+    this.restrictedSegments = const [],
   });
 
   /// Identifiant unique de l'itinéraire (utilisé pour les
@@ -56,6 +75,13 @@ class RouteResult {
   /// Libellé optionnel (ex: "Chemin rapide", "Contourne le centre").
   final String label;
 
+  /// Portions restreintes identifiées le long de l'itinéraire
+  /// (sens interdit / zone piétonne / barrage…). Vide si aucune.
+  final List<RestrictedSegment> restrictedSegments;
+
+  /// Vrai si l'itinéraire franchit au moins une portion restreinte.
+  bool get hasViolations => restrictedSegments.isNotEmpty;
+
   /// Durée estimée à pied (3 km/h ≈ 0.83 m/s).
   Duration get estimatedWalkDuration {
     final secs = (totalDistanceMeters / 0.83).round();
@@ -70,8 +96,21 @@ class RouteResult {
     return '${(totalDistanceMeters / 1000).toStringAsFixed(2)} km';
   }
 
-  /// Copie de l'itinéraire avec un score de risque mis à jour.
-  RouteResult copyWith({double? totalRiskScore}) {
+  /// Format lisible de la durée de marche estimée : "12 min", "1h05".
+  String get durationLabel {
+    final d = estimatedWalkDuration;
+    if (d.inMinutes < 1) return '1 min';
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    if (h == 0) return '$m min';
+    return '${h}h${m.toString().padLeft(2, '0')}';
+  }
+
+  /// Copie de l'itinéraire avec des champs mis à jour.
+  RouteResult copyWith({
+    double? totalRiskScore,
+    List<RestrictedSegment>? restrictedSegments,
+  }) {
     return RouteResult(
       id: id,
       points: points,
@@ -79,6 +118,7 @@ class RouteResult {
       totalRiskScore: totalRiskScore ?? this.totalRiskScore,
       pois: pois,
       label: label,
+      restrictedSegments: restrictedSegments ?? this.restrictedSegments,
     );
   }
 }

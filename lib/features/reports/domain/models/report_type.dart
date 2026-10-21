@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/models/alert_model.dart';
+
 /// Modèle décrivant un type de signalement citoyen.
 ///
 /// Chaque type est associé à :
@@ -68,4 +70,28 @@ enum ReportType {
   final String label;
   final IconData icon;
   final Color color;
+}
+
+/// Mapping entre un [ReportType] (UI) et un [AlertType] (base de données).
+extension ReportTypeAlertMapping on ReportType {
+  AlertType get alertType {
+    switch (this) {
+      case ReportType.barrages:
+        return AlertType.barrage;
+      case ReportType.zonesFiltrees:
+        return AlertType.filtre;
+      case ReportType.nasses:
+        return AlertType.filtre;
+      case ReportType.autopompes:
+        return AlertType.autopompes;
+      case ReportType.policiers:
+        return AlertType.policiers;
+      case ReportType.dangers:
+        return AlertType.danger;
+      case ReportType.groupesCasseurs:
+        return AlertType.casseurs;
+      case ReportType.zoneSafe:
+        return AlertType.autre;
+    }
+  }
 }

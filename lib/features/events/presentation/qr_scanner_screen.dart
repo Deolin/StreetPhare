@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
+import '../../../services/app_share_service.dart';
 
 /// Écran de scan QR Code plein écran.
 /// Pop avec `Map<String, dynamic>` (JSON parsé) si succès, `null` sinon.
@@ -58,9 +59,13 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     });
 
     try {
-      final decoded = jsonDecode(rawValue);
+      // Supporte à la fois un JSON brut ET un lien de partage StreetPhare
+      // (https://.../invite?code=...&data=... ou streetphare://invite?...).
+      final parsedInvite =
+          AppShareService.instance.parseSharedLinkOrPayload(rawValue);
+      final dynamic decoded = parsedInvite?.eventData ?? jsonDecode(rawValue);
       if (decoded is! Map<String, dynamic>) {
-        throw const FormatException('JSON attendu : objet { ... }');
+        throw const FormatException('JSON ou lien d\'invitation StreetPhare attendu');
       }
 
       // Vérifications minimales des champs obligatoires.

@@ -4,6 +4,8 @@
 // de partage système (Bluetooth, Proximité, etc.) sans dépendance aux stores.
 // v2.2.0 — Compatible Android 15+
 
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -11,7 +13,22 @@ import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../features/events/domain/models/event_model.dart';
+import '../features/events/presentation/event_manager.dart';
 import 'apk_backup_service.dart';
+
+/// Résultat du décodage d'un lien de partage ou payload QR StreetPhare.
+class ParsedShareInvite {
+  const ParsedShareInvite({
+    this.code,
+    this.session,
+    this.eventData,
+  });
+
+  final String? code;
+  final String? session;
+  final Map<String, dynamic>? eventData;
+}
 
 /// Service responsable de la localisation de l'APK de l'application et de son
 /// partage via la feuille de partage native Android.
@@ -21,6 +38,228 @@ class AppShareService {
   AppShareService._();
 
   static final AppShareService instance = AppShareService._();
+
+  static const String packageName = 'com.example.flutter_streetphare';
+  static const String playStoreUrl =
+      'https://play.google.com/store/apps/details?id=$packageName';
+  static const String shareBaseUrl = String.fromEnvironment(
+    'STREETPHARE_SHARE_BASE_URL',
+    defaultValue: 'https://streetphare.ddns.net',
+  );
+
+  static const MethodChannel _deepLinkChannel =
+      MethodChannel('streetphare/deeplink');
+
+  bool _deepLinksInitialized = false;
+
+  // --------------------------------------------------------------------------
+  // Deep Linking & Liens d'invitation d'événement / session
+  // --------------------------------------------------------------------------
+
+  /// Construit le lien universel de partage d'un événement/session.
+  /// Ce lien transmet l'intégralité des données de l'événement (`data` en base64url)
+  /// et redirige vers le Google Play Store si l'application n'est pas installée.
+  String buildEventShareUrl(
+    EventModel event, {
+    String? sessionId,
+    String? baseUrlOverride,
+  }) {
+    final base = baseUrlOverride ?? shareBaseUrl;
+    final jsonBytes = utf8.encode(jsonEncode(event.toJson()));
+    final encodedData = base64Url.encode(jsonBytes);
+    final queryParams = <String, String>{
+      'code': event.code.toUpperCase(),
+      'data': encodedData,
+      if (sessionId != null && sessionId.isNotEmpty) 'session': sessionId,
+    };
+    final baseUri = Uri.parse(base);
+    return baseUri
+        .replace(
+          path: '${baseUri.path.replaceAll(RegExp(r'/$'), '')}/invite',
+          queryParameters: queryParams,
+        )
+        .toString();
+  }
+
+  /// Construit le Deep Link natif `streetphare://invite?code=...&data=...`.
+  String buildEventDeepLink(EventModel event, {String? sessionId}) {
+    final jsonBytes = utf8.encode(jsonEncode(event.toJson()));
+    final encodedData = base64Url.encode(jsonBytes);
+    final queryParams = <String, String>{
+      'code': event.code.toUpperCase(),
+      'data': encodedData,
+      if (sessionId != null && sessionId.isNotEmpty) 'session': sessionId,
+    };
+    return Uri(
+      scheme: 'streetphare',
+      host: 'invite',
+      queryParameters: queryParams,
+    ).toString();
+  }
+
+  /// Construit l'URL de fallback Google Play Store avec le referrer contenant
+  /// le code de l'événement/session pour récupération après installation.
+  String buildPlayStoreFallbackUrl({String? eventCode, String? sessionId}) {
+    final refParts = <String>[
+      if (eventCode != null && eventCode.isNotEmpty)
+        'code=${eventCode.toUpperCase()}',
+      if (sessionId != null && sessionId.isNotEmpty) 'session=$sessionId',
+      'utm_source=streetphare_share',
+    ];
+    final referrer = Uri.encodeComponent(refParts.join('&'));
+    return '$playStoreUrl&referrer=$referrer';
+  }
+
+  /// Décode aussi bien :
+  ///   - un JSON brut d'événement (`{ "code": "...", ... }`),
+  ///   - une URL web d'invitation (`https://.../invite?code=...&data=...`),
+  ///   - un Deep Link (`streetphare://invite?code=...&data=...`).
+  ParsedShareInvite? parseSharedLinkOrPayload(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+
+    // 1. JSON brut (ex: QR Code direct)
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        final decoded = jsonDecode(trimmed);
+        if (decoded is Map<String, dynamic>) {
+          return ParsedShareInvite(
+            code: decoded['code']?.toString().toUpperCase(),
+            session: decoded['session']?.toString(),
+            eventData: decoded,
+          );
+        }
+      } catch (_) {}
+    }
+
+    // 2. URI (streetphare://invite?... ou https://.../invite?...)
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null &&
+        (uri.scheme == 'streetphare' ||
+            uri.scheme == 'http' ||
+            uri.scheme == 'https')) {
+      final code = uri.queryParameters['code']?.trim().toUpperCase();
+      final session = uri.queryParameters['session']?.trim();
+      final rawData = uri.queryParameters['data']?.trim();
+
+      Map<String, dynamic>? eventData;
+      if (rawData != null && rawData.isNotEmpty) {
+        try {
+          final normalized = base64Url.normalize(rawData);
+          final jsonStr = utf8.decode(base64Url.decode(normalized));
+          final parsed = jsonDecode(jsonStr);
+          if (parsed is Map<String, dynamic>) {
+            eventData = parsed;
+          }
+        } catch (_) {}
+      }
+
+      if (code != null || eventData != null) {
+        return ParsedShareInvite(
+          code: code ?? eventData?['code']?.toString().toUpperCase(),
+          session: session,
+          eventData: eventData,
+        );
+      }
+    }
+
+    return null;
+  }
+
+  /// Initialise l'écoute des Deep Links entrants (`streetphare/deeplink`).
+  Future<void> initDeepLinks() async {
+    if (_deepLinksInitialized) return;
+    _deepLinksInitialized = true;
+
+    _deepLinkChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onDeepLink') {
+        final link = call.arguments as String?;
+        if (link != null && link.isNotEmpty) {
+          await handleIncomingDeepLink(link);
+        }
+      }
+    });
+
+    try {
+      final initialLink =
+          await _deepLinkChannel.invokeMethod<String>('getInitialLink');
+      if (initialLink != null && initialLink.isNotEmpty) {
+        await handleIncomingDeepLink(initialLink);
+      }
+    } catch (_) {
+      // Canal non disponible (Desktop / Web / Tests).
+    }
+  }
+
+  /// Traite un lien d'invitation entrant et charge l'événement dans [EventManager].
+  Future<bool> handleIncomingDeepLink(String rawLink) async {
+    final parsed = parseSharedLinkOrPayload(rawLink);
+    if (parsed == null) return false;
+
+    if (parsed.eventData != null) {
+      final ok = await EventManager.instance.addFromSource(parsed.eventData!);
+      if (ok) return true;
+    }
+    if (parsed.code != null && parsed.code!.isNotEmpty) {
+      return EventManager.instance.loadByCode(parsed.code!);
+    }
+    return false;
+  }
+
+  /// Partage un événement/session via la feuille de partage système avec lien
+  /// d'invitation et fallback Google Play Store.
+  Future<bool> shareEventInvite(
+    EventModel event, {
+    BuildContext? context,
+    String? sessionId,
+  }) async {
+    try {
+      final inviteUrl = buildEventShareUrl(event, sessionId: sessionId);
+      final storeUrl = buildPlayStoreFallbackUrl(
+        eventCode: event.code,
+        sessionId: sessionId,
+      );
+      await SharePlus.instance.share(
+        ShareParams(
+          subject: 'StreetPhare — Rejoindre "${event.title}" (${event.code})',
+          text: 'Rejoignez l\'événement "${event.title}" sur StreetPhare !\n'
+              'Code d\'invitation : ${event.code}\n'
+              'Lien direct : $inviteUrl\n'
+              'Télécharger sur Google Play : $storeUrl',
+        ),
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[AppShareService] Erreur partage événement : $e');
+      if (context != null && context.mounted) {
+        _showError(context, 'Erreur lors du partage du lien : $e');
+      }
+      return false;
+    }
+  }
+
+  /// Partage le lien général de l'application (avec redirection Play Store).
+  Future<bool> shareAppLink({BuildContext? context}) async {
+    try {
+      final activeEvent = EventManager.instance.activeEvent;
+      if (activeEvent != null) {
+        return shareEventInvite(activeEvent, context: context);
+      }
+      final storeUrl = buildPlayStoreFallbackUrl();
+      await SharePlus.instance.share(
+        ShareParams(
+          subject: 'StreetPhare — Application de cartographie citoyenne',
+          text:
+              'Téléchargez StreetPhare (cartographie citoyenne collaborative) :\n'
+              '$storeUrl',
+        ),
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[AppShareService] Erreur partage lien app : $e');
+      return false;
+    }
+  }
 
   // --------------------------------------------------------------------------
   // Partager l'APK

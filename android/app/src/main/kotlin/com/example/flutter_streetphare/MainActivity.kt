@@ -24,6 +24,7 @@ import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.DeadObjectException
@@ -50,6 +51,10 @@ class MainActivity : FlutterActivity() {
     /// Event channel for incoming BLE data from remote peers.
     private var incomingEventSink: EventChannel.EventSink? = null
 
+    /// Canal MethodChannel pour la transmission des Deep Links vers Flutter.
+    private var deepLinkChannel: MethodChannel? = null
+    private var initialDeepLink: String? = null
+
     /// Handler to dispatch EventChannel calls onto the main thread.
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -62,6 +67,7 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val APK_INFO_CHANNEL = "streetphare/apk_info"
+        private const val DEEPLINK_CHANNEL = "streetphare/deeplink"
         private const val BLE_ADVERTISER_CHANNEL = "streetphare/ble_advertiser"
         private const val BLE_GATT_CHANNEL = "streetphare/ble_gatt"
         private const val BLE_GATT_EVENT = "streetphare/ble_gatt_events"
@@ -149,6 +155,33 @@ class MainActivity : FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+
+        // ── Canal Deep Link (streetphare://invite & https://.../invite) ─
+        initialDeepLink = intent?.dataString
+        val dlChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            DEEPLINK_CHANNEL
+        )
+        deepLinkChannel = dlChannel
+        dlChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getInitialLink" -> {
+                    val link = initialDeepLink
+                    initialDeepLink = null
+                    result.success(link)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val link = intent.dataString
+        if (!link.isNullOrEmpty()) {
+            deepLinkChannel?.invokeMethod("onDeepLink", link)
         }
     }
 

@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
 import '../../sandbox/sandbox_controller.dart';
+import 'rbac_management_screen.dart';
 
 /// Écran de débogage sandbox — contrôles d'injection uniquement.
 class AdminDashboardScreen extends StatefulWidget {
@@ -96,6 +97,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
+                _SandboxButton(
+                  label: 'Gestion RBAC (Scouts & Admins Événement)',
+                  icon: Icons.admin_panel_settings,
+                  color: Colors.tealAccent,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const RbacManagementScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
                 _SandboxButton(
                   label: 'Injecter Alertes (×3)',
                   icon: Icons.warning_amber,

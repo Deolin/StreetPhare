@@ -44,6 +44,11 @@ const config = {
   // ── Consensus ───────────────────────────────────────────────────────
   consensusThreshold: parseInt(process.env.CONSENSUS_THRESHOLD || '3', 10),
 
+  // ── Fusion des signalements identiques ──────────────────────────────
+  // Deux signalements de MÊME type plus proches que ce rayon (en mètres)
+  // sont fusionnés : le point existant est conservé et le vote incrémenté.
+  mergeRadiusMeters: parseInt(process.env.MERGE_RADIUS_METERS || '50', 10),
+
   // ── Synchronisation ─────────────────────────────────────────────────
   syncIntervalSeconds: parseInt(process.env.SYNC_INTERVAL_SECONDS || '30', 10),
 

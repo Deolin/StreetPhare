@@ -586,8 +586,14 @@ class NetworkCoordinator with WidgetsBindingObserver {
         _onServerAlertValidated(json);
         return;
       }
-      if (kind == 'report_rejected' || kind == 'report_deleted') {
+      if (kind == 'report_rejected' ||
+          kind == 'report_deleted' ||
+          kind == 'report_voided') {
         _onServerAlertRemoved(json);
+        return;
+      }
+      if (kind == 'validation_requested') {
+        GeofencingService.instance.onServerValidationRequested(json);
         return;
       }
       // Compatibilité ancien format : report_updated {status:'deleted'}.

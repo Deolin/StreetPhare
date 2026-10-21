@@ -229,26 +229,30 @@ class RoutingEngine {
       if (kDebugMode) debugPrint('[RoutingEngine] OsmAnd Bridge failed: $e');
     }
 
-    // ── TENTATIVE 4 : SafePathEngine (grille Dijkstra) ─────────────────
-    try {
-      onCascadeStep?.call(CascadeStep.safePath);
-      final paths = SafePathEngine.computePrimaryOnly(
-        start: start,
-        end: end,
-        filters: avoidFilters,
-        constraints: PedestrianConstraints.fromProfile(profile),
-      );
-      if (paths.isNotEmpty) {
-        return _applyRiskScore(
-          RouteComputeResult(
-            routes: paths,
-            source: 'safe_path_engine',
-          ),
-          dangerPoints,
+    // ── TENTATIVE 4 : SafePathEngine (grille Dijkstra) — PIÉTON/vélo uniquement ──
+    // La grille ne respecte ni le code de la route ni les routes carrossables :
+    // on la saute en mode voiture/urgence (serveur + OSRM = fallbacks conformes).
+    if (profile != RoutingProfile.vehicle && profile != RoutingProfile.emergency) {
+      try {
+        onCascadeStep?.call(CascadeStep.safePath);
+        final paths = SafePathEngine.computePrimaryOnly(
+          start: start,
+          end: end,
+          filters: avoidFilters,
+          constraints: PedestrianConstraints.fromProfile(profile),
         );
+        if (paths.isNotEmpty) {
+          return _applyRiskScore(
+            RouteComputeResult(
+              routes: paths,
+              source: 'safe_path_engine',
+            ),
+            dangerPoints,
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[RoutingEngine] SafePath failed: $e');
       }
-    } catch (e) {
-      if (kDebugMode) debugPrint('[RoutingEngine] SafePath failed: $e');
     }
 
     // ── ÉCHEC TOTAL ─────────────────────────────────────────────────────

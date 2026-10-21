@@ -45,6 +45,18 @@
     #login-error { color: #f85149; font-size: 12px; margin-top: 8px; }
     .perm-row { display: flex; align-items: center; gap: 6px; margin: 2px 0; }
     .perm-row input { width: auto; margin: 0; }
+    /* ── Édition des événements ── */
+    .ev-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .ev-item .ev-main { flex: 1; cursor: pointer; }
+    .ev-item.selected { background: #1f2733; border-left: 3px solid #1f6feb; padding-left: 6px; }
+    .ev-badge { display: inline-block; font-size: 9px; padding: 1px 5px; border-radius: 8px; color: #0d1117; font-weight: 600; }
+    .pt-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid #21262d; }
+    .pt-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+    .pt-main { flex: 1; cursor: pointer; }
+    .pt-main.selected { color: #79c0ff; }
+    .pt-actions button { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
+    .pt-actions button.danger { background: #da3633; border-color: #da3633; }
+    .pt-actions button.ok { background: #238636; border-color: #238636; }
   </style>
 </head>
 <body>
@@ -88,6 +100,56 @@
 
     <!-- ── ÉDITION ── -->
     <div id="tab-edition" class="tab-content" style="display:none">
+      <div class="card">
+        <h3>🎪 Événements</h3>
+        <div class="list" id="events-list">Aucun événement</div>
+        <label>Code du nouvel événement</label>
+        <input id="ev-code" placeholder="ex: MANIF-2026-01">
+        <label>Titre</label>
+        <input id="ev-title" placeholder="ex: Manifestation du 1er mai">
+        <label>Début</label>
+        <input id="ev-start" type="datetime-local">
+        <button onclick="createEvent()">➕ Créer l'événement</button>
+        <button class="danger" onclick="deleteSelectedEvent()">🗑 Supprimer l'événement</button>
+        <div id="ev-status" style="font-size:10px;color:#8b949e;margin-top:4px"></div>
+      </div>
+
+      <div class="card">
+        <h3>⚙️ Paramètres de l'événement</h3>
+        <label>Titre</label><input id="ev-edit-title">
+        <label>Début</label><input id="ev-edit-start" type="datetime-local">
+        <label>Fin</label><input id="ev-edit-end" type="datetime-local">
+        <label>Visible à partir de</label><input id="ev-edit-visible" type="datetime-local">
+        <label>Zone générale (libellé)</label><input id="ev-edit-zone" placeholder="ex: Fleurus">
+        <button onclick="saveEventMeta()">💾 Enregistrer</button>
+        <button onclick="startDestinationPlacement()">🎯 Définir la destination</button>
+      </div>
+
+      <div class="card">
+        <h3>📍 Points de l'événement</h3>
+        <label>Type de point</label>
+        <select id="ev-point-type" onchange="onPointTypeChange(this.value)"></select>
+        <div id="ev-point-fields"></div>
+        <button onclick="startPointPlacement()">🖱 Placer sur la carte</button>
+        <button onclick="submitPoint()">➕ Enregistrer le point</button>
+        <button class="danger" onclick="cancelPointEdit()">✕ Annuler l'édition</button>
+        <div id="ev-mode-indicator" style="font-size:11px;color:#8b949e;margin-top:4px">Mode : inactif.</div>
+      </div>
+
+      <div class="card">
+        <h3>🗺 Trajet (polyline)</h3>
+        <div style="font-size:10px;color:#8b949e;margin-bottom:6px">Cliquez pour ajouter des sommets à la route, puis validez.</div>
+        <button onclick="startRoutePlacement()">🖱 Tracer le trajet</button>
+        <button onclick="saveRoute()">💾 Valider le trajet</button>
+        <button class="danger" onclick="clearRoute()">🗑 Effacer le trajet</button>
+        <div id="ev-route-info" style="font-size:10px;color:#8b949e;margin-top:4px"></div>
+      </div>
+
+      <div class="card">
+        <h3>📋 Liste des points</h3>
+        <div class="list" id="ev-points-list">Sélectionnez un événement</div>
+      </div>
+
       <div class="card">
         <h3>💬 Tchat P2P / Relais</h3>
         <div class="list" id="chat-list">Chargement…</div>
@@ -207,6 +269,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/admin/events-editor.js"></script>
   <script>
     /* ── État global ─────────────────────────────────────────────────── */
     let ws, adminToken = '';
@@ -231,6 +294,9 @@
     const loadHistory = [];
 
     adminToken = sessionStorage.getItem('sp_admin_token') || '';
+
+    /* ── Éditeur d'événements : initialisation ────────────────────────── */
+    if (typeof initEventsEditor === 'function') initEventsEditor();
 
     /* ── LOGIN ───────────────────────────────────────────────────────── */
     async function doLogin() {
@@ -296,6 +362,8 @@
           refreshSnapshot();
         } else if (d.type === 'geofencing_changed') {
           loadZones();
+        } else if (d.type === 'events_changed') {
+          onEventsChanged(d.events || []);
         } else if (d.type === 'global_alert') {
           notify(d.message || 'Alerte globale');
         } else if (d.type === 'console_output') {
@@ -346,6 +414,10 @@
         document.getElementById('tab-btn-' + t).classList.toggle('active', t === name);
       });
       if (name === 'simulation') loadSimTypes();
+      if (name === 'edition' && typeof initEventsEditor === 'function') initEventsEditor();
+      // En quittant l'onglet Édition, on annule tout mode de placement actif
+      // afin de ne pas intercepter les clics destinés à la simulation.
+      if (name !== 'edition' && typeof cancelPlacement === 'function') cancelPlacement();
     }
 
     /* ── CARTE ───────────────────────────────────────────────────────── */
@@ -387,8 +459,51 @@
     function renderEvents(events) {
       layerGroups.events.clearLayers();
       (events || []).forEach(ev => {
+        // Trajet (polyline GeoJSON [[lng,lat],...]).
+        try {
+          const route = JSON.parse(ev.routeGeoJson || '[]');
+          if (Array.isArray(route) && route.length > 1) {
+            L.polyline(route.map(p => [p[1], p[0]]), { color: '#79c0ff', weight: 3, opacity: 0.7 })
+              .bindPopup(`<b>${escapeHtml(ev.title || ev.code)}</b><br><small>Trajet</small>`)
+              .addTo(layerGroups.events);
+          }
+        } catch (_) {}
+        // Points de passage du cortège (numérotés selon l'ordre).
+        (ev.waypoints || []).forEach((w, i) => {
+          L.circleMarker([w.lat, w.lng], { radius: 8, color: '#d29922', fillOpacity: 0.8 })
+            .bindPopup(`<b>${escapeHtml(w.label || 'Passage ' + (i + 1))}</b><br><small>Passage ${i + 1}</small>`)
+            .bindTooltip(`${i + 1}. ${escapeHtml(w.label || '')}`, { permanent: true, direction: 'top' })
+            .addTo(layerGroups.events);
+        });
+        // Points d'entrée / sortie.
+        (ev.exitPoints || []).forEach(x => {
+          L.circleMarker([x.lat, x.lng], { radius: 8, color: '#ffa657', fillOpacity: 0.8 })
+            .bindPopup(`<b>${escapeHtml(x.label || 'Sortie')}</b><br><small>${escapeHtml(x.direction || '')}</small>`)
+            .addTo(layerGroups.events);
+        });
+        // Zones sûres (cercles).
+        (ev.safeZones || []).forEach(z => {
+          L.circle([z.lat, z.lng], { radius: Number(z.radius) || 50, color: '#3fb950', fillOpacity: 0.12 })
+            .bindPopup(`<b>${escapeHtml(z.label || 'Zone sûre')}</b><br><small>rayon = ${z.radius} m</small>`)
+            .addTo(layerGroups.events);
+        });
+        // Centres de soins / street-medics.
+        (ev.careCenters || []).forEach(c => {
+          L.circleMarker([c.lat, c.lng], { radius: 9, color: '#f85149', fillOpacity: 0.85 })
+            .bindPopup(`<b>${escapeHtml(c.label || 'Soins')}</b><br><small>${escapeHtml(c.contact || '')}</small>`)
+            .addTo(layerGroups.events);
+        });
+        // Points remarquables (rassemblements).
+        (ev.pois || []).forEach(p => {
+          L.circleMarker([p.lat, p.lng], { radius: 8, color: '#bc8cff', fillOpacity: 0.8 })
+            .bindPopup(`<b>${escapeHtml(p.label || 'POI')}</b>`)
+            .addTo(layerGroups.events);
+        });
+        // Destination.
         if (ev.destinationLatitude != null && ev.destinationLongitude != null) {
-          L.marker([ev.destinationLatitude, ev.destinationLongitude]).addTo(layerGroups.events).bindPopup(`<b>${ev.title || ev.code}</b>`);
+          L.marker([ev.destinationLatitude, ev.destinationLongitude], {
+            icon: L.divIcon({ className: '', html: '<div style="font-size:18px">🏁</div>', iconSize: [18, 18] }),
+          }).bindPopup(`<b>${escapeHtml(ev.title || ev.code)}</b><br><small>Destination</small>`).addTo(layerGroups.events);
         }
       });
     }
@@ -609,6 +724,11 @@
 
     /* ── CARTE : clic → génération ───────────────────────────────────── */
     map.on('click', (e) => {
+      // Priorité à l'éditeur d'événements (onglet Édition) si un mode est actif.
+      if (typeof evMode !== 'undefined' && evMode) {
+        handleEditorMapClick(e.latlng.lat, e.latlng.lng);
+        return;
+      }
       if (!simMode) return;
       generateAt(simMode, e.latlng.lat, e.latlng.lng);
     });

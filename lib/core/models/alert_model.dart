@@ -57,6 +57,7 @@ class Alert {
     this.status = AlertStatus.pending,
     Set<String>? confirmations,
     this.uploadedTo = '',
+    this.eventId = null,
     DateTime? lastModifiedAt,
   })  : createdAt = createdAt ?? DateTime.now().toUtc(),
         confirmations = Set<String>.from(confirmations ?? <String>{}),
@@ -89,6 +90,8 @@ class Alert {
       uploadedTo: (json['uploadedTo'] as String?) ??
           (json['uploaded_to'] as String?) ??
           '',
+      eventId: (json['eventId'] as String?) ??
+          (json['event_code'] as String?),
       lastModifiedAt: _parseDate(json['updatedAt'] ?? json['last_modified_at']),
     );
   }
@@ -194,6 +197,10 @@ class Alert {
   /// (vide tant que pas synchronisée).
   String uploadedTo;
 
+  /// Code de l'événement auquel ce signalement est rattaché.
+  /// Correspond à l'événement actuellement suivi par l'utilisateur créateur.
+  final String? eventId;
+
   /// Horodatage de dernière modification.
   /// Mis à jour à chaque changement de statut, confirmation ou synchronisation.
   /// Utilisé pour la synchronisation différentielle Hive ↔ Serveur.
@@ -245,6 +252,7 @@ class Alert {
         'confirmations': confirmations.toList(),
         'signature': signature,
         'uploadedTo': uploadedTo,
+        if (eventId != null) 'eventId': eventId,
         'updatedAt': lastModifiedAt.toUtc().toIso8601String(),
         'last_modified_at': lastModifiedAt.toUtc().toIso8601String(),
       };

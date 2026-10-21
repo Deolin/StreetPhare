@@ -284,7 +284,8 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                     Navigator.of(context).pop(_selected ?? recommended),
                 icon: const Icon(Icons.check, color: Colors.black),
                 label: Text(
-                  '${s.routeAccept} : ${(_selected ?? recommended).distanceLabel}',
+                  '${s.routeAccept} : ${(_selected ?? recommended).distanceLabel}'
+                  ' \u2022 ${(_selected ?? recommended).durationLabel}',
                   style: const TextStyle(
                     color: Colors.black,
                     fontWeight: FontWeight.bold,
@@ -403,11 +404,31 @@ class _RouteTile extends StatelessWidget {
                             ),
                           ),
                         ],
+                        if (route.totalRiskScore <= 0.001) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2E7D32),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              '0 risque',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${route.distanceLabel} \u2022 ${strings.routeRisk} ${route.totalRiskScore.toStringAsFixed(0)}',
+                      '${route.distanceLabel} \u2022 ${route.durationLabel} à pied \u2022 '
+                      '${strings.routeRisk} ${route.totalRiskScore.toStringAsFixed(0)}',
                       style: TextStyle(
                         color: StreetPhareTheme.textSecondary,
                         fontSize: 12,
@@ -541,6 +562,8 @@ class _MiniRouteMap extends StatelessWidget {
               userAgentPackageName: 'com.streetphare.app',
               tileProvider: NetworkTileProvider(
                 headers: kStreetPhareTileHeaders,
+                // Ne pas rethrow les erreurs réseau (timeout tuiles).
+                silenceExceptions: true,
               ),
             ),
             if (pts.length >= 2)

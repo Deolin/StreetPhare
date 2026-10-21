@@ -84,6 +84,7 @@ class SafePathEngine {
     required LatLng end,
     required AvoidanceFilters filters,
     PedestrianConstraints constraints = PedestrianConstraints.urban,
+    double? dangerRadiusMeters,
   }) {
     final alerts = AlertVisibilityPolicy.filterAvoidable(
       HiveAlertDatabase.instance.getAllValid(),
@@ -94,6 +95,8 @@ class SafePathEngine {
       alerts: alerts,
       filters: filters,
       constraints: constraints,
+      dangerRadiusMeters:
+          dangerRadiusMeters ?? SafePathEngine.dangerRadiusMeters,
     );
     final primary = _dijkstra(grid, grid.startIdx, grid.endIdx, jitter: 0.0);
     if (primary == null || primary.points.isEmpty) {
@@ -399,6 +402,7 @@ class _Grid {
     LatLng point,
     List<Alert> alerts,
     AvoidanceFilters filters,
+    double dangerRadiusMeters,
   ) {
     double penalty = 0;
     for (final a in alerts) {
@@ -414,7 +418,7 @@ class _Grid {
         }
       } else {
         // Danger à éviter → bloquant dans le rayon d'influence.
-        if (dist < SafePathEngine.dangerRadiusMeters) {
+        if (dist < dangerRadiusMeters) {
           return 1.0e12;
         }
       }
@@ -428,6 +432,7 @@ class _Grid {
     required List<Alert> alerts,
     required AvoidanceFilters filters,
     PedestrianConstraints constraints = PedestrianConstraints.urban,
+    double dangerRadiusMeters = SafePathEngine.dangerRadiusMeters,
   }) {
     // 1) Calcule la BBox englobante (avec padding).
     final pad = _bboxPaddingDeg(start, end);
@@ -461,7 +466,9 @@ class _Grid {
         final lat = minLat + (i + 0.5) * stepLat;
         final lng = minLng + (j + 0.5) * stepLng;
         final point = LatLng(lat, lng);
-        cells.add(_GridCell(point, _riskAt(point, alerts, filters)));
+        cells.add(
+          _GridCell(point, _riskAt(point, alerts, filters, dangerRadiusMeters)),
+        );
       }
     }
 

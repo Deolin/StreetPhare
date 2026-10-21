@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PEDESTRIAN_SPEED_MS = 1.2; // ~4.3 km/h
+const CAR_SPEED_MS = 8.0; // ~29 km/h (vitesse urbaine moyenne)
 
 // ── Binary min-heap ────────────────────────────────────────────────────────
 class MinHeap {
@@ -68,8 +69,10 @@ function pointSegDist(px, py, ax, ay, bx, by) {
 
 class RoutingEngine {
   constructor() {
-    this.graph = null;
+    this.graph = null; // graphe piéton
+    this.carGraph = null; // graphe voiture (optionnel)
     this.connected = [];
+    this.carConnected = [];
     this.nodesX = null;
     this.nodesY = null;
     this.refLat = 0;
@@ -90,6 +93,15 @@ class RoutingEngine {
     for (let i = 0; i < this.graph.adj.length; i++) {
       if (this.graph.adj[i].length > 0) this.connected.push(i);
     }
+    // Graphe voiture (routes carrossables + sens uniques) — optionnel.
+    const carFile = path.join(__dirname, '..', '..', 'data', 'fleurus.car.graph.json');
+    if (fs.existsSync(carFile)) {
+      this.carGraph = JSON.parse(fs.readFileSync(carFile, 'utf-8'));
+      this.carConnected = [];
+      for (let i = 0; i < this.carGraph.adj.length; i++) {
+        if (this.carGraph.adj[i].length > 0) this.carConnected.push(i);
+      }
+    }
     // Pré-calcul des coordonnées planaires (projection équirectangulaire)
     // pour des calculs de distance rapides et l'évitement des zones à risque.
     const nb = this.graph.nodes.length;
@@ -104,7 +116,10 @@ class RoutingEngine {
     }
     console.log(
       `[ROUTING] Graphe chargé : ${this.graph.meta.nodes} nœuds, ` +
-        `${this.connected.length} connectés, ${this.graph.meta.edges} arêtes`,
+        `${this.connected.length} connectés, ${this.graph.meta.edges} arêtes` +
+        (this.carGraph
+          ? ` (voiture: ${this.carConnected.length} connectés, ${this.carGraph.meta.edges} arêtes)`
+          : ''),
     );
     return this.graph;
   }
@@ -114,11 +129,13 @@ class RoutingEngine {
   }
 
   /** Renvoie l'index du nœud connecté le plus proche (distance angulaire). */
-  nearest(lat, lon) {
-    const nodes = this.graph.nodes;
+  nearest(lat, lon, useCar = false) {
+    const g = useCar && this.carGraph ? this.carGraph : this.graph;
+    const conn = useCar && this.carGraph ? this.carConnected : this.connected;
+    const nodes = g.nodes;
     let best = -1;
     let bestD = Infinity;
-    for (const idx of this.connected) {
+    for (const idx of conn) {
       const n = nodes[idx];
       const dLat = n[0] - lat;
       const dLon = n[1] - lon;
@@ -175,10 +192,11 @@ class RoutingEngine {
    *   être exclues (si aucun contournement n'existe, le chemin traverse).
    * @returns {Object|null} { points: [[lat,lon],...], distanceMeters, durationSeconds }
    */
-  route(fromLat, fromLon, toLat, toLon, avoidPoints = []) {
-    const g = this.load();
-    const start = this.nearest(fromLat, fromLon);
-    const end = this.nearest(toLat, toLon);
+  route(fromLat, fromLon, toLat, toLon, avoidPoints = [], profile = 'foot') {
+    const useCar = (profile === 'car' || profile === 'vehicle') && this.carGraph;
+    const g = useCar ? this.carGraph : this.load();
+    const start = this.nearest(fromLat, fromLon, useCar);
+    const end = this.nearest(toLat, toLon, useCar);
     if (start < 0 || end < 0) return null;
 
     // Départ et arrivée identiques.
@@ -253,10 +271,11 @@ class RoutingEngine {
       if (edge) realDistance += edge[1];
     }
     const distanceMeters = Math.round(realDistance);
+    const speed = useCar ? CAR_SPEED_MS : PEDESTRIAN_SPEED_MS;
     return {
       points,
       distanceMeters,
-      durationSeconds: Math.round(distanceMeters / PEDESTRIAN_SPEED_MS),
+      durationSeconds: Math.round(distanceMeters / speed),
     };
   }
 }

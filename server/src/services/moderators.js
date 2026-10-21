@@ -19,6 +19,7 @@ const PERMISSIONS = [
   'reportValidate',    // valider / rejeter / supprimer des signalements
   'consoleAccess',     // accès à la console d'administration
   'manageGeofencing',  // gérer les zones de géorepérage
+  'manageEvents',      // gérer les événements et leurs points (trajet, POI, soins…)
   'manageModerators',  // gérer les comptes modérateurs (réservé main admin)
   'simulateAccess',    // accès au panneau de test & simulation
 ];

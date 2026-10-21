@@ -218,6 +218,8 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
                 userAgentPackageName: 'com.streetphare.admin',
                 tileProvider: NetworkTileProvider(
                   headers: kStreetPhareTileHeaders,
+                  // Ne pas rethrow les erreurs réseau (timeout tuiles).
+                  silenceExceptions: true,
                 ),
                 maxNativeZoom: 19,
                 tileBuilder: widget.darkMode ? darkModeTileBuilder : null,

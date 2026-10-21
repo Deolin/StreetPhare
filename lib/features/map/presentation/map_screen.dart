@@ -19,6 +19,7 @@
 //  14. Mode Malvoyant : cache le titre, interface accessible.
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -50,17 +51,25 @@ import '../../../services/connectivity_service.dart';
 import '../../../services/version_check_service.dart';
 import '../../events/domain/models/event_model.dart';
 import '../../events/presentation/event_manager.dart';
+import '../../geofencing/domain/models/geofence_event.dart';
+import '../../geofencing/presentation/geofencing_service.dart';
+import '../../geofencing/presentation/proximity_validation_service.dart';
+import '../../geofencing/presentation/proximity_validation_sheet.dart';
 import '../../messaging/presentation/hive_messaging_screen.dart';
+import '../../reports/domain/models/report_type.dart';
 import '../../reports/presentation/report_bottom_sheet.dart';
 import '../../routing/core/models/routing_profile.dart';
-import '../../routing/core/routing_engine.dart';
+import '../../routing/core/safe_route_planner.dart';
 import '../../routing/data/avoidance_filter_store.dart';
+import '../../routing/domain/models/route_result.dart';
 import '../../routing/domain/pedestrian_route_service.dart';
 import '../../routing/presentation/route_result_sheet.dart';
 import '../../routing/presentation/safe_path_engine.dart';
 import '../../settings/data/app_preferences_store.dart';
 import '../../settings/data/panic_contact_store.dart';
 import '../../settings/presentation/settings_screen.dart';
+import 'widgets/long_press_detector.dart';
+import 'widgets/restricted_segment_layer.dart';
 import 'widgets/safe_route_layer.dart';
 import 'widgets/user_heading_marker.dart';
 
@@ -99,6 +108,11 @@ class _MapScreenState extends State<MapScreen> {
   /// Zoom "recentrage précis" ≈ 100 m au sol (rue adjacente visible).
   static const double _kRecenterZoom = 16.0;
 
+  /// Distance maximale autorisée entre l'utilisateur et son signalement
+  /// (en mètres). Anti-spam : l'utilisateur doit être proche de la zone
+  /// signalée pour garantir qu'il en a réellement une vue.
+  static const double _kMaxReportDistanceMeters = 50.0;
+
   Position? _userPosition;
   String? _positionError;
   bool _locating = true;
@@ -106,6 +120,11 @@ class _MapScreenState extends State<MapScreen> {
 
   /// [3] Tracking actif — `false` dès que l'utilisateur clique X.
   bool _isTracking = false;
+
+  /// Mode « suivre l'utilisateur » : la carte reste centrée sur la position
+  /// GPS (comme Google Maps). Désactivé automatiquement dès que l'utilisateur
+  /// déplace la carte manuellement.
+  bool _followUser = false;
 
   StreamSubscription<CollectivePanicEvent>? _collectivePanicSub;
 
@@ -133,9 +152,23 @@ class _MapScreenState extends State<MapScreen> {
   /// Points de la Route Safe active.
   List<LatLng>? _safeRoutePoints;
 
+  /// Portions restreintes (sens interdit / barrage…) du dernier itinéraire
+  /// voiture/urgence, à surligner en rouge sur la carte.
+  List<RestrictedSegment> _restrictedSegments = const [];
+
   /// Marqueur local immédiat d'un signalement tout juste émis (avant consensus).
   LatLng? _localReportMarker;
   AlertType? _localReportType;
+
+  /// Type de signalement en cours de placement (mode « choisir l'endroit »).
+  ReportType? _pendingReportType;
+
+  /// Position de l'icône glissable pendant le placement du signalement.
+  LatLng? _placementPoint;
+
+  /// Vrai pendant que l'utilisateur fait glisser l'icône de placement :
+  /// la carte est verrouillée pour ne pas se déplacer en même temps.
+  bool _draggingPlacement = false;
 
   /// Alertes réseau (validées par consensus ou simulées côté admin)
   /// à afficher sur la carte citoyenne.
@@ -143,6 +176,10 @@ class _MapScreenState extends State<MapScreen> {
 
   /// Abonnement au flux d'alertes réseau.
   StreamSubscription<List<Alert>>? _alertsSub;
+
+  /// Abonnement aux demandes dynamiques de validation de proximité.
+  StreamSubscription<GeofenceEvent>? _proximityValidationSub;
+  bool _validationSheetOpen = false;
 
   // --------------------------------------------------------------------------
   // Cycle de vie
@@ -152,10 +189,16 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     PeerCounterService.instance.start();
+    GeofencingService.instance.start();
+    ProximityValidationService.instance.start();
     _initUserLocation();
     _collectivePanicSub =
         CollectivePanicService.instance.collectivePanicEvents.listen(
       _onCollectivePanicAlert,
+    );
+    _proximityValidationSub =
+        ProximityValidationService.instance.filteredEvents.listen(
+      _onProximityValidationRequested,
     );
     _alertsSub = NetworkCoordinator.instance.alertsStream.listen(
       (alerts) {
@@ -170,10 +213,21 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  Future<void> _onProximityValidationRequested(GeofenceEvent event) async {
+    if (!mounted || _validationSheetOpen) return;
+    _validationSheetOpen = true;
+    try {
+      await showAndProcessProximityVote(context, event);
+    } finally {
+      _validationSheetOpen = false;
+    }
+  }
+
   @override
   void dispose() {
     _positionSub?.cancel();
     _collectivePanicSub?.cancel();
+    _proximityValidationSub?.cancel();
     _alertsSub?.cancel();
     _mapController.dispose();
     super.dispose();
@@ -277,6 +331,9 @@ class _MapScreenState extends State<MapScreen> {
             _userSpeed = p.speed < 0 ? 0 : p.speed;
             if (p.heading >= 0) _userHeading = p.heading;
           });
+          // Mode « suivre l'utilisateur » : on recentre la carte sur la
+          // nouvelle position GPS (zoom conservé).
+          if (_followUser) _followToUser(p);
         });
       });
     } catch (e) {
@@ -306,6 +363,17 @@ class _MapScreenState extends State<MapScreen> {
       doMove();
     } catch (_) {
       WidgetsBinding.instance.addPostFrameCallback((_) => doMove());
+    }
+  }
+
+  /// Centre la carte sur la position GPS en CONSERVANT le zoom courant
+  /// (mode « suivre l'utilisateur »).
+  void _followToUser(Position pos) {
+    try {
+      final zoom = _mapController.camera.zoom;
+      _mapController.move(LatLng(pos.latitude, pos.longitude), zoom);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[MapScreen] échec suivi utilisateur: $e');
     }
   }
 
@@ -363,6 +431,48 @@ class _MapScreenState extends State<MapScreen> {
           ],
         ),
         child: const Icon(Icons.add_alert, color: Colors.white, size: 22),
+      ),
+    );
+  }
+
+  /// Icône glissable/déposable affichée pendant le mode « placement ».
+  Marker? _buildPlacementMarker() {
+    final type = _pendingReportType;
+    final point = _placementPoint;
+    if (type == null || point == null) return null;
+    return Marker(
+      point: point,
+      width: 64,
+      height: 64,
+      child: Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: _onPlacementDragStart,
+        onPointerMove: _onPlacementDragMove,
+        onPointerUp: (_) => _onPlacementDragEnd(),
+        onPointerCancel: (_) => _onPlacementDragEnd(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: type.color,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: type.color.withValues(alpha: 0.5),
+                    blurRadius: 12,
+                    spreadRadius: 3,
+                  ),
+                ],
+              ),
+              child: Icon(type.icon, color: Colors.white, size: 30),
+            ),
+            // Pointe visuelle indiquant le point exact de dépôt.
+            Icon(Icons.arrow_drop_down, color: type.color, size: 28),
+          ],
+        ),
       ),
     );
   }
@@ -664,6 +774,7 @@ class _MapScreenState extends State<MapScreen> {
     LatLng destination,
     String destinationLabel, {
     bool isFailover = false,
+    String? transportMode,
   }) async {
     final s = AppLocale.instance.strings;
     final start = _userPosition != null
@@ -680,11 +791,18 @@ class _MapScreenState extends State<MapScreen> {
     // avec la dernière valeur persistée, mais peut être changé.
     // Annuler = ne pas lancer le calcul.
     final prefs = AppPreferencesStore.instance.value;
-    final chosenMode = await _showTransportModePopup(
-      currentMode: prefs.defaultTransportMode ?? 'pedestrian',
-    );
-    if (chosenMode == null || !mounted) return;
-    await AppPreferencesStore.instance.setDefaultTransportMode(chosenMode);
+    String chosenMode;
+    if (transportMode != null) {
+      // Mode forcé (ex: appui long sur une icône d'événement) → pas de popup.
+      chosenMode = transportMode;
+    } else {
+      final chosen = await _showTransportModePopup(
+        currentMode: prefs.defaultTransportMode ?? 'pedestrian',
+      );
+      if (chosen == null || !mounted) return;
+      chosenMode = chosen;
+      await AppPreferencesStore.instance.setDefaultTransportMode(chosenMode);
+    }
 
     // Détermine le profil de routage selon le mode choisi.
     final routingProfile = _transportModeToRoutingProfile(chosenMode);
@@ -712,12 +830,12 @@ class _MapScreenState extends State<MapScreen> {
 
     final filters = AvoidanceFilterStore.instance.value;
 
-    // Tente d'abord via le nouveau RoutingEngine (SPG + cascade).
-    final result = await RoutingEngine.instance.computeRoute(
+    // Multi-itinéraires (≤ 3) + garantie « 0 risque » via SafeRoutePlanner.
+    final result = await SafeRoutePlanner.instance.computeRoutes(
       start: start,
       end: destination,
       profile: routingProfile,
-      avoidFilters: filters,
+      filters: filters,
     );
 
     if (!mounted) return;
@@ -740,6 +858,7 @@ class _MapScreenState extends State<MapScreen> {
       });
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _fitRouteBounds(selected.points);
+      _applyRoadRestrictions(selected, routingProfile);
       return;
     }
 
@@ -776,6 +895,7 @@ class _MapScreenState extends State<MapScreen> {
     });
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     _fitRouteBounds(selected.points);
+    _applyRoadRestrictions(selected, routingProfile);
   }
 
   /// Convertit le mode de transport (String) en profil de routage.
@@ -912,6 +1032,90 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  /// Détecte les portions restreintes d'un itinéraire et, en mode
+  /// voiture/urgence, met à jour la surbrillance + avertit l'utilisateur.
+  void _applyRoadRestrictions(RouteResult route, RoutingProfile profile) {
+    final isMotor = profile == RoutingProfile.vehicle ||
+        profile == RoutingProfile.emergency;
+    if (!isMotor) {
+      if (_restrictedSegments.isNotEmpty) {
+        setState(() => _restrictedSegments = const []);
+      }
+      return;
+    }
+
+    final segments = SafeRoutePlanner.instance.detectRestrictedSegments(
+      route.points,
+    );
+    setState(() => _restrictedSegments = segments);
+
+    if (segments.isEmpty) return;
+
+    // Alerte sonore + retour haptique.
+    SystemSound.play(SystemSoundType.alert);
+    HapticFeedback.vibrate();
+
+    if (mounted) {
+      _showRoadViolationWarning(segments);
+    }
+  }
+
+  /// Popup d'avertissement « entorse au code de la route ».
+  void _showRoadViolationWarning(List<RestrictedSegment> segments) {
+    final reasons = segments.map((s) => s.reason).toSet().join(', ');
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: StreetPhareTheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber, color: Color(0xFFFF6F00), size: 26),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Entorse au code de la route',
+                style: TextStyle(
+                  color: StreetPhareTheme.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'L\'itinéraire calculé franchit ${segments.length} portion(s) '
+          'restreinte(s) : $reasons.\n\n'
+          'Ces portions sont surlignées en rouge sur la carte.',
+          style: TextStyle(
+            color: StreetPhareTheme.textSecondary,
+            fontSize: 13,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Compris',
+              style: TextStyle(color: StreetPhareTheme.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Calcule et trace une « route safe » vers un point (icône d'événement),
+  /// sans popup de choix du mode : utilise le mode de transport par défaut.
+  Future<void> _triggerSafeRouteToPoint(LatLng destination, String label) async {
+    final prefs = AppPreferencesStore.instance.value;
+    final mode = prefs.defaultTransportMode ?? 'pedestrian';
+    await _computeAndShowRoute(destination, label, transportMode: mode);
+  }
+
+
   // --------------------------------------------------------------------------
   // Sélecteur de destination
   // --------------------------------------------------------------------------
@@ -953,10 +1157,157 @@ class _MapScreenState extends State<MapScreen> {
   // Signalement — feedback local immédiat
   // --------------------------------------------------------------------------
 
-  void _openReportSheet() => ReportBottomSheet.show(
-        context,
-        onLocalReport: _onLocalReportCreated,
+  Future<void> _openReportSheet() async {
+    final type = await ReportBottomSheet.show(context);
+    if (type == null || !mounted) return;
+    _enterReportPlacement(type);
+  }
+
+  /// Entre en mode « choisir l'endroit » : affiche une icône glissable
+  /// initialement positionnée sur l'utilisateur (ou le centre de la carte).
+  void _enterReportPlacement(ReportType type) {
+    final pos = _userPosition != null
+        ? LatLng(_userPosition!.latitude, _userPosition!.longitude)
+        : _mapController.camera.center;
+    setState(() {
+      _pendingReportType = type;
+      _placementPoint = pos;
+    });
+  }
+
+  /// Annule le placement en cours.
+  void _cancelReportPlacement() {
+    if (!mounted) return;
+    setState(() {
+      _pendingReportType = null;
+      _placementPoint = null;
+    });
+  }
+
+  /// Verrouille la carte dès que le doigt appuie sur l'icône de placement.
+  void _onPlacementDragStart(PointerDownEvent event) {
+    setState(() => _draggingPlacement = true);
+  }
+
+  /// Déplace l'icône glissable en convertissant le delta d'écran en coordonnées.
+  void _onPlacementDragMove(PointerMoveEvent event) {
+    if (!_draggingPlacement) return;
+    final point = _placementPoint;
+    if (point == null) return;
+    final screen = _mapController.camera.latLngToScreenOffset(point);
+    final moved = _mapController.camera.screenOffsetToLatLng(
+      screen + event.delta,
+    );
+    setState(() => _placementPoint = moved);
+  }
+
+  /// Déverrouille la carte au relâchement de l'icône.
+  void _onPlacementDragEnd() {
+    if (_draggingPlacement) {
+      setState(() => _draggingPlacement = false);
+    }
+  }
+
+  /// Confirme le signalement à la position choisie.
+  Future<void> _confirmReportPlacement() async {
+    final type = _pendingReportType;
+    final point = _placementPoint;
+    if (type == null || point == null) return;
+
+    // ── Vérification de distance (anti-spam) ───────────────────────────
+    // L'utilisateur ne peut signaler qu'à moins de 50 m de sa position réelle :
+    // cela évite de spammer la carte à distance et garantit qu'il a
+    // réellement la zone en vue.
+    final userPos = _userPosition;
+    if (userPos == null) {
+      _showReportSnackBar(
+        'Position GPS indisponible. Activez la localisation et réessayez.',
+        icon: Icons.location_off,
+        backgroundColor: StreetPhareTheme.danger,
       );
+      return;
+    }
+    final distance = const Distance().distance(
+      LatLng(userPos.latitude, userPos.longitude),
+      point,
+    );
+    if (distance > _kMaxReportDistanceMeters) {
+      _showReportSnackBar(
+        'Signalement trop éloigné (${distance.round()} m). '
+        'Placez l\'icône à moins de '
+        '${_kMaxReportDistanceMeters.round()} m de votre position.',
+        icon: Icons.wrong_location_outlined,
+        backgroundColor: StreetPhareTheme.danger,
+      );
+      return;
+    }
+
+    final alertType = type.alertType;
+
+    // Marqueur local immédiat (avant persistance réseau).
+    _onLocalReportCreated(point, alertType);
+
+    try {
+      await NetworkCoordinator.instance.createAlert(
+        type: alertType,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        description: type.label,
+      );
+      _showReportSnackBar(
+        '✅ Signalement "${type.label}" enregistré.\n'
+        'Visible des autres pairs dès 3 confirmations.',
+        icon: type.icon,
+        backgroundColor: type.color,
+      );
+    } on SocketException {
+      _showReportSnackBar(
+        '📡 Signalement "${type.label}" enregistré localement.\n'
+        'En attente d\'envoi — sera diffusé dès qu\'un pair est à portée.',
+        icon: Icons.cloud_off,
+        backgroundColor: StreetPhareTheme.primary,
+      );
+    } catch (e) {
+      _showReportSnackBar(
+        'Erreur lors de l\'enregistrement : $e',
+        icon: Icons.error_outline,
+        backgroundColor: StreetPhareTheme.danger,
+      );
+    }
+
+    if (mounted) {
+      setState(() {
+        _pendingReportType = null;
+        _placementPoint = null;
+      });
+    }
+  }
+
+  void _showReportSnackBar(
+    String message, {
+    required IconData icon,
+    required Color backgroundColor,
+  }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: backgroundColor,
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 
   /// Callback déclenché dès la création locale du signalement.
   void _onLocalReportCreated(LatLng position, AlertType type) {
@@ -1533,11 +1884,17 @@ class _MapScreenState extends State<MapScreen> {
           point: currentWp.position,
           width: 100,
           height: 72,
-          child: _WaypointMarker(
-            label: currentWp.label,
-            timeStr: currentWp.formattedTime,
-            color: color,
-            isCurrent: true,
+          child: LongPressDetector(
+            onLongPress: () => _triggerSafeRouteToPoint(
+              currentWp.position,
+              'Événement : ${currentWp.label}',
+            ),
+            child: _WaypointMarker(
+              label: currentWp.label,
+              timeStr: currentWp.formattedTime,
+              color: color,
+              isCurrent: true,
+            ),
           ),
         ));
 
@@ -1547,11 +1904,17 @@ class _MapScreenState extends State<MapScreen> {
             point: nextWp.position,
             width: 100,
             height: 72,
-            child: _WaypointMarker(
-              label: nextWp.label,
-              timeStr: nextWp.formattedTime,
-              color: color.withValues(alpha: 0.65),
-              isCurrent: false,
+            child: LongPressDetector(
+              onLongPress: () => _triggerSafeRouteToPoint(
+                nextWp.position,
+                'Événement : ${nextWp.label}',
+              ),
+              child: _WaypointMarker(
+                label: nextWp.label,
+                timeStr: nextWp.formattedTime,
+                color: color.withValues(alpha: 0.65),
+                isCurrent: false,
+              ),
             ),
           ));
         }
@@ -1562,16 +1925,20 @@ class _MapScreenState extends State<MapScreen> {
           point: cc.position,
           width: 36,
           height: 36,
-          child: Tooltip(
-            message: cc.label,
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1B5E20),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+          child: LongPressDetector(
+            onLongPress: () => _triggerSafeRouteToPoint(cc.position, cc.label),
+            child: Tooltip(
+              triggerMode: TooltipTriggerMode.tap,
+              message: cc.label,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1B5E20),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: const Icon(Icons.medical_services,
+                    color: Colors.white, size: 18),
               ),
-              child: const Icon(Icons.medical_services,
-                  color: Colors.white, size: 18),
             ),
           ),
         ));
@@ -1582,16 +1949,20 @@ class _MapScreenState extends State<MapScreen> {
           point: ep.position,
           width: 36,
           height: 36,
-          child: Tooltip(
-            message: '${s.mapDestinationExit} : ${ep.label}',
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1565C0),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+          child: LongPressDetector(
+            onLongPress: () => _triggerSafeRouteToPoint(ep.position, ep.label),
+            child: Tooltip(
+              triggerMode: TooltipTriggerMode.tap,
+              message: '${s.mapDestinationExit} : ${ep.label}',
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1565C0),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child:
+                    const Icon(Icons.exit_to_app, color: Colors.white, size: 18),
               ),
-              child:
-                  const Icon(Icons.exit_to_app, color: Colors.white, size: 18),
             ),
           ),
         ));
@@ -1602,15 +1973,19 @@ class _MapScreenState extends State<MapScreen> {
           point: sz.position,
           width: 40,
           height: 40,
-          child: Tooltip(
-            message: '🛡 ${s.mapDestinationSafeZone} : ${sz.label}',
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF2E7D32),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
+          child: LongPressDetector(
+            onLongPress: () => _triggerSafeRouteToPoint(sz.position, sz.label),
+            child: Tooltip(
+              triggerMode: TooltipTriggerMode.tap,
+              message: '🛡 ${s.mapDestinationSafeZone} : ${sz.label}',
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: const Icon(Icons.shield, color: Colors.white, size: 20),
               ),
-              child: const Icon(Icons.shield, color: Colors.white, size: 20),
             ),
           ),
         ));
@@ -1659,8 +2034,9 @@ class _MapScreenState extends State<MapScreen> {
                   valueListenable: EventManager.instance,
                   builder: (context, events, _) {
                     final layers = _buildEventLayers(events);
-                    final hasMarkers =
-                        layers.markers.isNotEmpty || _userPosition != null;
+                    final hasMarkers = layers.markers.isNotEmpty ||
+                        _userPosition != null ||
+                        _placementPoint != null;
 
                     // ── SafeArea global pour Android 15+ (Edge-to-Edge) ──
                     // Android 15 impose le mode Edge-to-Edge par défaut :
@@ -1681,11 +2057,20 @@ class _MapScreenState extends State<MapScreen> {
                                 initialZoom: _defaultZoom,
                                 minZoom: 3,
                                 maxZoom: 19,
-                                interactionOptions: const InteractionOptions(
-                                  flags: InteractiveFlag.all &
-                                      ~InteractiveFlag.rotate,
+                                interactionOptions: InteractionOptions(
+                                  flags: _draggingPlacement
+                                      ? InteractiveFlag.none
+                                      : (InteractiveFlag.all &
+                                          ~InteractiveFlag.rotate),
                                 ),
                                 onLongPress: _onMapLongPress,
+                                onPositionChanged: (camera, hasGesture) {
+                                  // Désactive le suivi auto dès que
+                                  // l'utilisateur déplace la carte à la main.
+                                  if (hasGesture && _followUser) {
+                                    setState(() => _followUser = false);
+                                  }
+                                },
                                 onMapReady: () {
                                   if (mounted) {
                                     setState(() => _mapReady = true);
@@ -1699,8 +2084,17 @@ class _MapScreenState extends State<MapScreen> {
                                   userAgentPackageName: 'com.streetphare.app',
                                   tileProvider: NetworkTileProvider(
                                     headers: kStreetPhareTileHeaders,
+                                    // Ne pas rethrow les erreurs réseau (timeout
+                                    // tuiles) → évite crash + rapport de bug.
+                                    silenceExceptions: true,
                                   ),
                                   maxNativeZoom: 19,
+                                  errorTileCallback: (tile, error, stackTrace) {
+                                    if (kDebugMode) {
+                                      debugPrint(
+                                          '[MapScreen] tuile en échec: $error');
+                                    }
+                                  },
                                   tileBuilder:
                                       isDark ? darkModeTileBuilder : null,
                                   tileDisplay: const TileDisplay.fadeIn(
@@ -1713,12 +2107,18 @@ class _MapScreenState extends State<MapScreen> {
                                     _safeRoutePoints!.length >= 2)
                                   SafeRouteLayer(
                                       routePoints: _safeRoutePoints!),
+                                if (_restrictedSegments.isNotEmpty)
+                                  RestrictedSegmentLayer(
+                                      segments: _restrictedSegments),
                                 if (hasMarkers)
                                   MarkerLayer(
                                     markers: [
                                       if (_userPosition != null)
                                         _buildUserMarker(),
                                       ...layers.markers,
+                                      if (_pendingReportType != null &&
+                                          _placementPoint != null)
+                                        _buildPlacementMarker()!,
                                     ],
                                   ),
                                 if (_locating)
@@ -1977,7 +2377,7 @@ class _MapScreenState extends State<MapScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  // Recentrer sur position GPS
+                                  // Recentrer / suivre la position GPS
                                   Material(
                                     elevation: 4,
                                     shape: const CircleBorder(),
@@ -1985,16 +2385,27 @@ class _MapScreenState extends State<MapScreen> {
                                         .withValues(alpha: 0.9),
                                     child: InkWell(
                                       customBorder: const CircleBorder(),
-                                      onTap: _isTracking
-                                          ? _animateToUser
-                                          : _initUserLocation,
+                                      onTap: () {
+                                        if (!_isTracking) {
+                                          _initUserLocation();
+                                          return;
+                                        }
+                                        // Bascule le mode « suivre » et
+                                        // recentre immédiatement si activé.
+                                        setState(() {
+                                          _followUser = !_followUser;
+                                        });
+                                        if (_followUser) _animateToUser();
+                                      },
                                       child: Padding(
                                         padding: const EdgeInsets.all(12),
                                         child: Icon(
-                                          _isTracking
-                                              ? Icons.gps_fixed
-                                              : Icons.gps_not_fixed,
-                                          color: _isTracking
+                                          !_isTracking
+                                              ? Icons.gps_not_fixed
+                                              : _followUser
+                                                  ? Icons.my_location
+                                                  : Icons.gps_fixed,
+                                          color: _followUser
                                               ? StreetPhareTheme.primary
                                               : StreetPhareTheme.textSecondary,
                                           size: 24,
@@ -2126,6 +2537,20 @@ class _MapScreenState extends State<MapScreen> {
                                 ],
                               ),
                             ),
+
+                            // ── Mode placement de signalement ─────────────────
+                            if (_pendingReportType != null &&
+                                _placementPoint != null)
+                              Positioned(
+                                top: 12,
+                                left: 12,
+                                right: 12,
+                                child: _PlacementBanner(
+                                  type: _pendingReportType!,
+                                  onCancel: _cancelReportPlacement,
+                                  onConfirm: _confirmReportPlacement,
+                                ),
+                              ),
 
                             // ── [DEBUG] Bouton de débogage ────
                             if (kDebugMode)
@@ -2555,6 +2980,76 @@ class _ServerStatusDotState extends State<_ServerStatusDot>
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bannière affichée pendant le mode « placement » d'un signalement.
+class _PlacementBanner extends StatelessWidget {
+  const _PlacementBanner({
+    required this.type,
+    required this.onCancel,
+    required this.onConfirm,
+  });
+
+  final ReportType type;
+  final VoidCallback onCancel;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: StreetPhareTheme.surface,
+      elevation: 8,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(type.icon, color: type.color),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Placer « ${type.label} »',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ).copyWith(color: StreetPhareTheme.textPrimary),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close,
+                      color: StreetPhareTheme.textSecondary),
+                  onPressed: onCancel,
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Faites glisser l\'icône sur la carte jusqu\'au lieu exact.',
+              style: TextStyle(
+                color: StreetPhareTheme.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onConfirm,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: type.color,
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.check),
+                label: const Text('Confirmer le signalement'),
+              ),
+            ),
+          ],
         ),
       ),
     );

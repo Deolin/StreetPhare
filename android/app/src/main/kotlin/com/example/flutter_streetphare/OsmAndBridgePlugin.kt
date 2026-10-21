@@ -298,7 +298,10 @@ class OsmAndBridgePlugin(
             }
 
             // ── Dossier de cache du graphe ───────────────────────────
-            val graphDir = File(context.filesDir, "graphhopper_cache")
+            // v2 : force la reconstruction du graphe avec les profils
+            // foot + car (l'ancien cache v1 n'avait que le profil foot,
+            // ce qui faisait retomber le mode voiture sur le piéton).
+            val graphDir = File(context.filesDir, "graphhopper_cache_v2")
 
             // ── Configurer et initialiser GraphHopper ────────────────
             val gh = GraphHopper()
@@ -331,7 +334,7 @@ class OsmAndBridgePlugin(
             hopper = gh
             engineReady = true
             reportProgress("ready", "Moteur de routage prêt", 1.0)
-            Log.i(TAG, "✅ GraphHopper initialisé — profil piéton prêt")
+            Log.i(TAG, "✅ GraphHopper initialisé — profils piéton + véhicule prêts")
             return true
 
         } catch (e: Throwable) {
@@ -358,7 +361,10 @@ class OsmAndBridgePlugin(
         for (assetName in OSM_ASSET_CANDIDATES) {
             // On préserve l'extension (.pbf vs .osm/.xml) : GraphHopper
             // détecte le format à partir de l'extension du fichier.
-            val destName = if (assetName.endsWith(".pbf")) "fleurus.osm.pbf" else "fleurus.osm"
+            // v3 : force la ré-extraction — le fichier OSM a été réordonné
+            // (nodes avant ways) ET dédupliqué (IDs de nœud uniques) ;
+            // les caches "fleurus.osm" et "fleurus_v2.osm" sont obsolètes.
+            val destName = if (assetName.endsWith(".pbf")) "fleurus_v3.osm.pbf" else "fleurus_v3.osm"
             val destFile = File(context.filesDir, destName)
 
             // Cache déjà présent et non vide → réutilisé.
@@ -428,6 +434,7 @@ class OsmAndBridgePlugin(
                 "vehicle", "emergency" -> CAR_PROFILE
                 else -> FOOT_PROFILE
             }
+            Log.i(TAG, "Profil routage sélectionné : $ghProfile (demandé : $profile)")
             val req = GHRequest(startLat, startLon, endLat, endLon)
                 .setProfile(ghProfile)
                 .setLocale(java.util.Locale.FRENCH)

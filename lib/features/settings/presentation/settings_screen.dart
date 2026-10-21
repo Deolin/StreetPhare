@@ -28,6 +28,7 @@ import '../../../core/theme/skins/mars_background.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../services/apk_downloader_service.dart';
+import '../../../services/app_share_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/permission_service.dart';
 import '../../../services/version_check_service.dart';
@@ -2131,9 +2132,17 @@ class _ShareApkSection extends StatelessWidget {
               backgroundColor: StreetPhareTheme.primary,
               foregroundColor: Colors.black,
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(ctx).pop();
-              ApkDownloaderService.instance.shareDownloader();
+              final ok = await ApkDownloaderService.instance.shareDownloader();
+              if (!ok && context.mounted) {
+                final apkOk =
+                    await AppShareService.instance.shareApk(context: context);
+                if (!apkOk && context.mounted) {
+                  await AppShareService.instance
+                      .shareAppLink(context: context);
+                }
+              }
             },
           ),
         ],

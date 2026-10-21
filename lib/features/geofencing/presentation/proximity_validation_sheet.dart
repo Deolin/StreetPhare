@@ -113,6 +113,20 @@ class ProximityValidationSheet extends StatelessWidget {
     }
   }
 
+  String _reasonBannerText() {
+    switch (event.reason) {
+      case ValidationTriggerReason.contradictoryReport:
+        final otherLabel = event.conflictingAlertType != null
+            ? ' (${_labelForType(event.conflictingAlertType!)})'
+            : '';
+        return '⚡ Signalement contradictoire émis au même endroit$otherLabel — Arbitrage requis';
+      case ValidationTriggerReason.staleNoVote5Min:
+        return '⏱ Aucun vote enregistré depuis plus de 5 min — Vérification requise';
+      case ValidationTriggerReason.proximityEntry:
+        return '📍 Signalement détecté à proximité';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final alert = event.alert;
@@ -135,12 +149,34 @@ class ProximityValidationSheet extends StatelessWidget {
             Container(
               width: 40,
               height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
+              margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
                 color: StreetPhareTheme.textSecondary.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+            // Bandeau de raison dynamique (inactivité 5 min / conflit / proximité)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: color.withValues(alpha: 0.5)),
+                ),
+                child: Text(
+                  _reasonBannerText(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: StreetPhareTheme.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             // Icône
             Container(
               width: 64,

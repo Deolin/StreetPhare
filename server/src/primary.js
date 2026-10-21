@@ -30,6 +30,7 @@ const store = require('./store');
 const sync = require('./sync');
 const apiRoutes = require('./routes/api');
 const adminRoutes = require('./routes/admin');
+const adminEventRoutes = require('./routes/adminEvents');
 const simulationRoutes = require('./routes/simulation');
 const { verifyWsToken } = require('./middleware/auth');
 const { setAdminBroadcaster, setMeshBroadcaster, broadcast, broadcastToAll } = require('./services/broadcast');
@@ -173,7 +174,38 @@ app.get('/tiles/:z/:x/:y.png', async (req, res) => {
 
 app.use('/api', apiRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/events', adminEventRoutes);
 app.use('/api/admin/simulation', simulationRoutes);
+
+// ── Route publique de partage d'invitation / Deep Link (/invite) ────────
+if (typeof apiRoutes.handleInviteRequest === 'function') {
+  app.get('/invite', apiRoutes.handleInviteRequest);
+}
+
+// ── Job périodique : sollicitation de validation pour signalements sans vote ≥ 5 min ─
+const STALE_VALIDATION_CHECK_MS = 60 * 1000;
+const staleValidationInterval = setInterval(() => {
+  try {
+    const stale = store.getStaleAlertsForValidation(5 * 60 * 1000, 5 * 60 * 1000);
+    if (stale.length > 0) {
+      const nowIso = new Date().toISOString();
+      for (const a of stale) {
+        a.validationRequestedAt = nowIso;
+      }
+      broadcastToAll('validation_requested', {
+        reason: 'stale_5min',
+        targetAlerts: stale.map(a => ({ ...a, votes: a.votes || [] })),
+        radiusMeters: 100,
+      });
+      log('CONSENSUS', `Demande de validation dynamique envoyée pour ${stale.length} signalement(s) sans vote ≥ 5 min`);
+    }
+  } catch (e) {
+    log('CONSENSUS', `Erreur job validation dynamique: ${e.message}`);
+  }
+}, STALE_VALIDATION_CHECK_MS);
+if (typeof staleValidationInterval.unref === 'function') {
+  staleValidationInterval.unref();
+}
 
 // ── Page d'accueil ──────────────────────────────────────────────────────
 app.get('/', (req, res) => {

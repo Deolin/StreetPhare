@@ -74,6 +74,24 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- Deep Linking : schéma personnalisé streetphare://invite -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="streetphare" android:host="invite"/>
+                <data android:scheme="streetphare" android:host="event"/>
+            </intent-filter>
+
+            <!-- App Links HTTP/HTTPS : /invite?code=...&data=... -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="streetphare.ddns.net" android:pathPrefix="/invite"/>
+                <data android:scheme="http" android:host="streetphare.ddns.net" android:pathPrefix="/invite"/>
+            </intent-filter>
         </activity>
 
         <!-- Récepteur pour relancer le service au démarrage du téléphone -->

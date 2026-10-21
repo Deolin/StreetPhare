@@ -19,6 +19,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
 import '../../../core/theme/streetphare_theme.dart';
+import '../../../services/app_share_service.dart';
 import '../../map/map_cache_manager.dart';
 import '../domain/models/event_model.dart';
 import 'event_manager.dart';
@@ -440,6 +441,16 @@ class _EventCard extends StatelessWidget {
                   ),
                 ),
                 IconButton(
+                  icon: Icon(Icons.share,
+                      size: 18, color: StreetPhareTheme.primary),
+                  tooltip: 'Partager le lien d\'invitation',
+                  onPressed: () => AppShareService.instance
+                      .shareEventInvite(event, context: context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 6),
+                IconButton(
                   icon: Icon(Icons.qr_code_2,
                       size: 18, color: StreetPhareTheme.primary),
                   tooltip: 'Partager via QR Code',
@@ -663,6 +674,15 @@ class _EventCard extends StatelessWidget {
           ],
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              AppShareService.instance
+                  .shareEventInvite(event, context: context);
+            },
+            icon: const Icon(Icons.share, size: 16),
+            label: const Text('Partager le lien'),
+          ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: const Text('Fermer'),

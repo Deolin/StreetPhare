@@ -80,6 +80,70 @@ function isPbf(buf) {
   return buf.length > 16 && buf.slice(4, 13).toString('latin1') === 'OSMHeader';
 }
 
+// Réordonne l'XML OSM : tous les <node> avant les <way> (GraphHopper l'exige).
+// La sortie Overpass `>; out skel qt;` place des <node> APRÈS les <way>.
+function reorderOsm(xml) {
+  const lines = xml.split(/\r?\n/);
+  const header = [];
+  const footer = [];
+  const nodes = [];
+  const ways = [];
+  const relations = [];
+  let current = null;
+
+  // Déduplique les nœuds : la sortie Overpass `>; out skel qt;` ré-émet des
+  // nœuds déjà présents via `out body` (même ID, mêmes coordonnées). GraphHopper
+  // refuse les IDs de nœud en double.
+  const seenNodeIds = new Set();
+
+  const flush = () => {
+    if (!current) return;
+    if (current.type === 'node') {
+      const m = (current.lines[0] || '').match(/id="([^"]+)"/);
+      if (m) {
+        if (seenNodeIds.has(m[1])) {
+          current = null;
+          return;
+        }
+        seenNodeIds.add(m[1]);
+      }
+    }
+    const arr = current.type === 'node' ? nodes
+      : current.type === 'way' ? ways : relations;
+    arr.push(...current.lines);
+    current = null;
+  };
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (t.startsWith('<?xml') || t.startsWith('<osm')) {
+      header.push(line);
+    } else if (t.startsWith('</osm>')) {
+      flush();
+      footer.push(line);
+    } else if (t.startsWith('<node')) {
+      flush();
+      current = { type: 'node', lines: [line] };
+      if (t.endsWith('/>')) flush();
+    } else if (t.startsWith('<way')) {
+      flush();
+      current = { type: 'way', lines: [line] };
+    } else if (t.startsWith('<relation')) {
+      flush();
+      current = { type: 'relation', lines: [line] };
+    } else if (
+      t.startsWith('</node>') || t.startsWith('</way>') || t.startsWith('</relation>')
+    ) {
+      if (current) current.lines.push(line);
+      flush();
+    } else if (current) {
+      current.lines.push(line);
+    }
+  }
+
+  return [...header, ...nodes, ...ways, ...relations, ...footer].join('\n');
+}
+
 async function main() {
   // 1. Crée le dossier assets s'il n'existe pas.
   fs.mkdirSync(ASSETS_DIR, { recursive: true });
@@ -112,9 +176,10 @@ async function main() {
     console.error(text.slice(0, 300));
     process.exit(1);
   }
-  fs.writeFileSync(OUTPUT_FILE, text, 'utf-8');
-  const size = Buffer.byteLength(text, 'utf-8');
-  console.log(`[OSM] Fichier XML écrit : ${OUTPUT_FILE}`);
+  const ordered = reorderOsm(text);
+  fs.writeFileSync(OUTPUT_FILE, ordered, 'utf-8');
+  const size = Buffer.byteLength(ordered, 'utf-8');
+  console.log(`[OSM] Fichier XML écrit (réordonné) : ${OUTPUT_FILE}`);
   console.log(`[OSM] Taille : ${(size / 1024).toFixed(1)} Ko`);
 }
 
