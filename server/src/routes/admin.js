@@ -51,7 +51,7 @@ router.post('/moderators/login', async (req, res) => {
 
 /// GET /api/admin/moderators — Liste des modérateurs.
 router.get('/moderators', authenticateToken, (req, res) => {
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
     return res.status(403).json({ error: 'Réservé à l\'administrateur principal' });
   }
   res.json({ moderators: moderators.list(), permissions: moderators.PERMISSIONS });
@@ -60,7 +60,7 @@ router.get('/moderators', authenticateToken, (req, res) => {
 /// POST /api/admin/moderators — Créer un modérateur.
 router.post('/moderators', authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
       return res.status(403).json({ error: 'Réservé à l\'administrateur principal' });
     }
     const { username, password, permissions } = req.body || {};

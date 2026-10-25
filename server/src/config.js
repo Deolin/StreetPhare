@@ -127,6 +127,10 @@ const config = {
     autoZoneRadius: 100,     // rayon zone de danger auto-générée
   },
 
+  // ── Seuil d'alerte de densité de foule (nombre minimum d'utilisateurs proches) ──
+  crowdDensityThreshold: parseInt(process.env.CROWD_DENSITY_THRESHOLD || '25', 10),
+  crowdDensityRadiusMeters: parseInt(process.env.CROWD_DENSITY_RADIUS_METERS || '50', 10),
+
   /// Retourne true si ce serveur est le PRIMARY.
   get isPrimary() { return this.serverType === 'PRIMARY'; },
 

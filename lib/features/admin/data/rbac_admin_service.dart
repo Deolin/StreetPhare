@@ -92,6 +92,97 @@ class AuthLoginResult {
   final String username;
 }
 
+/// Modèle représentant un compte Modérateur.
+class ModeratorAccount {
+  const ModeratorAccount({
+    required this.id,
+    required this.username,
+    required this.permissions,
+    this.createdAt,
+  });
+
+  factory ModeratorAccount.fromJson(Map<String, dynamic> json) {
+    return ModeratorAccount(
+      id: (json['id'] ?? '').toString(),
+      username: (json['username'] ?? '').toString(),
+      permissions: (json['permissions'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      createdAt: json['createdAt']?.toString(),
+    );
+  }
+
+  final String id;
+  final String username;
+  final List<String> permissions;
+  final String? createdAt;
+}
+
+/// Modèle résumé d'un événement géré depuis le panneau d'administration.
+class AdminEventSummary {
+  const AdminEventSummary({
+    required this.code,
+    required this.title,
+    required this.startAt,
+    this.endAt,
+    this.generalZone,
+    this.status,
+  });
+
+  factory AdminEventSummary.fromJson(Map<String, dynamic> json) {
+    return AdminEventSummary(
+      code: (json['code'] ?? '').toString().toUpperCase(),
+      title: (json['title'] ?? '').toString(),
+      startAt: (json['startAt'] ?? '').toString(),
+      endAt: json['endAt']?.toString(),
+      generalZone: json['generalZone']?.toString(),
+      status: json['status']?.toString(),
+    );
+  }
+
+  final String code;
+  final String title;
+  final String startAt;
+  final String? endAt;
+  final String? generalZone;
+  final String? status;
+}
+
+/// Statistiques temps réel du serveur pour le panneau d'administration.
+class AdminServerStats {
+  const AdminServerStats({
+    required this.alertsActive,
+    required this.alertsTotal,
+    required this.eventsCount,
+    required this.meshClients,
+    required this.adminClients,
+    required this.uptimeSeconds,
+    required this.serverType,
+  });
+
+  factory AdminServerStats.fromJson(Map<String, dynamic> json) {
+    final alerts = json['alerts'] as Map<String, dynamic>? ?? const {};
+    return AdminServerStats(
+      alertsActive: (alerts['active'] as num?)?.toInt() ?? 0,
+      alertsTotal: (alerts['total'] as num?)?.toInt() ?? 0,
+      eventsCount: (json['events'] as num?)?.toInt() ?? 0,
+      meshClients: (json['meshClients'] as num?)?.toInt() ?? 0,
+      adminClients: (json['adminClients'] as num?)?.toInt() ?? 0,
+      uptimeSeconds: (json['uptime'] as num?)?.toInt() ?? 0,
+      serverType: (json['serverType'] ?? 'PRIMARY').toString(),
+    );
+  }
+
+  final int alertsActive;
+  final int alertsTotal;
+  final int eventsCount;
+  final int meshClients;
+  final int adminClients;
+  final int uptimeSeconds;
+  final String serverType;
+}
+
 /// Service d'administration des comptes RBAC (Superadmin).
 class RbacAdminService {
   RbacAdminService({String? baseUrl}) : _baseUrl = baseUrl ?? _defaultApiBase;
@@ -309,5 +400,155 @@ class RbacAdminService {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       throw Exception(data['error'] ?? 'Erreur lors de la suppression de l\'admin d\'événement');
     }
+  }
+
+  // ── GESTION DES ÉVÉNEMENTS (/api/admin/events) ───────────────────────────
+
+  Future<List<AdminEventSummary>> listEvents() async {
+    final uri = Uri.parse('$_baseUrl/api/admin/events');
+    final res = await http
+        .get(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 200) {
+      throw Exception(data['error'] ?? 'Erreur lors du chargement des événements');
+    }
+    final list = (data['events'] as List<dynamic>?) ?? const [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(AdminEventSummary.fromJson)
+        .toList();
+  }
+
+  Future<AdminEventSummary> createEvent({
+    required String code,
+    required String title,
+    String? startAt,
+    String? endAt,
+    String? visibleAt,
+    String? generalZone,
+    double? destinationLatitude,
+    double? destinationLongitude,
+  }) async {
+    if (_token == null || _token!.isEmpty) {
+      throw Exception('Authentification admin requise (jeton Bearer manquant)');
+    }
+    final cleanCode = code.trim().toUpperCase();
+    final cleanTitle = title.trim();
+    if (cleanCode.isEmpty || cleanTitle.isEmpty) {
+      throw Exception('Le code et le titre de l\'événement sont obligatoires');
+    }
+    final effectiveStart = (startAt != null && startAt.trim().isNotEmpty)
+        ? startAt.trim()
+        : DateTime.now().toUtc().toIso8601String();
+
+    final uri = Uri.parse('$_baseUrl/api/admin/events');
+    final res = await http
+        .post(
+          uri,
+          headers: _authHeaders,
+          body: jsonEncode({
+            'code': cleanCode,
+            'title': cleanTitle,
+            'startAt': effectiveStart,
+            if (endAt != null && endAt.isNotEmpty) 'endAt': endAt,
+            if (visibleAt != null && visibleAt.isNotEmpty) 'visibleAt': visibleAt,
+            if (generalZone != null && generalZone.trim().isNotEmpty)
+              'generalZone': generalZone.trim(),
+            if (destinationLatitude != null)
+              'destinationLatitude': destinationLatitude,
+            if (destinationLongitude != null)
+              'destinationLongitude': destinationLongitude,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 201 && res.statusCode != 200) {
+      throw Exception(
+        data['error'] ?? 'Échec de la création de l\'événement (HTTP ${res.statusCode})',
+      );
+    }
+    final evMap = (data['event'] as Map<String, dynamic>?) ?? data;
+    return AdminEventSummary.fromJson(evMap);
+  }
+
+  Future<void> deleteEvent(String code) async {
+    final cleanCode = Uri.encodeComponent(code.trim().toUpperCase());
+    final uri = Uri.parse('$_baseUrl/api/admin/events/$cleanCode');
+    final res = await http
+        .delete(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(data['error'] ?? 'Erreur lors de la suppression de l\'événement');
+    }
+  }
+
+  // ── MODÉRATEURS (/api/admin/moderators) ──────────────────────────────────
+
+  Future<List<ModeratorAccount>> listModerators() async {
+    final uri = Uri.parse('$_baseUrl/api/admin/moderators');
+    final res = await http
+        .get(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 200) {
+      throw Exception(data['error'] ?? 'Erreur lors du chargement des modérateurs');
+    }
+    final list = (data['moderators'] as List<dynamic>?) ?? const [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(ModeratorAccount.fromJson)
+        .toList();
+  }
+
+  Future<ModeratorAccount> createModerator({
+    required String username,
+    required String password,
+    List<String> permissions = const ['reportValidate', 'chatModerate'],
+  }) async {
+    final uri = Uri.parse('$_baseUrl/api/admin/moderators');
+    final res = await http
+        .post(
+          uri,
+          headers: _authHeaders,
+          body: jsonEncode({
+            'username': username.trim(),
+            'password': password,
+            'permissions': permissions,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 201 && res.statusCode != 200) {
+      throw Exception(data['error'] ?? 'Erreur lors de la création du modérateur');
+    }
+    return ModeratorAccount.fromJson(data['moderator'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteModerator(String id) async {
+    final uri = Uri.parse('$_baseUrl/api/admin/moderators/$id');
+    final res = await http
+        .delete(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(data['error'] ?? 'Erreur lors de la suppression du modérateur');
+    }
+  }
+
+  // ── STATISTIQUES SERVEUR (/api/status) ───────────────────────────────────
+
+  Future<AdminServerStats> fetchServerStats() async {
+    final uri = Uri.parse('$_baseUrl/api/status');
+    final res = await http
+        .get(uri, headers: {'Accept': 'application/json'})
+        .timeout(const Duration(seconds: 10));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 200) {
+      throw Exception(data['error'] ?? 'Impossible de récupérer les statistiques');
+    }
+    return AdminServerStats.fromJson(data);
   }
 }

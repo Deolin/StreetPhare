@@ -35,6 +35,7 @@ import 'package:flutter/widgets.dart';
 import '../core/models/alert_model.dart';
 import '../core/network/peer_counter_service.dart';
 import '../database/alert_ttl_policy.dart';
+import '../database/alert_visibility_policy.dart';
 import '../database/crypto_utils.dart';
 import '../database/hive_alert_database.dart';
 import '../features/geofencing/presentation/geofencing_service.dart';
@@ -800,13 +801,17 @@ class NetworkCoordinator with WidgetsBindingObserver {
   }
 
   /// [3] Rapport de densité locale HIVE.
-  /// Envoie le nombre d'appareils uniques détectés au serveur et au mesh.
+  /// Envoie le nombre d'appareils uniques détectés au serveur et au mesh
+  /// uniquement lorsque la densité atteint le seuil de foule configuré
+  /// ([AlertVisibilityPolicy.minCrowdDensityThreshold], par défaut 25 utilisateurs).
   Future<void> _reportLocalDensity() async {
     final pos = GeofencingService.instance.lastPosition;
     if (pos == null) return;
 
     final count = PeerCounterService.instance.value;
-    if (count == 0) return; // Pas d'intérêt si vide
+    if (count < AlertVisibilityPolicy.minCrowdDensityThreshold) {
+      return; // Ne déclenche pas d'alerte de densité sous le seuil de foule (ex: < 25)
+    }
 
     final id = 'density_$_ephemeralUserId';
     final alert = Alert(
@@ -818,10 +823,10 @@ class NetworkCoordinator with WidgetsBindingObserver {
       latitude: pos.latitude,
       longitude: pos.longitude,
       densityValue: count,
-      description: 'Densité locale (Bluetooth)',
+      description: 'Forte densité de foule ($count utilisateurs proches)',
       createdAt: DateTime.now().toUtc(),
       ttlHours: 1, // Durée de vie courte
-      status: AlertStatus.active, // La densité est valide par défaut
+      status: AlertStatus.active,
     );
 
     // Diffusion prioritaire HIVE (BLE/Wi-Fi)

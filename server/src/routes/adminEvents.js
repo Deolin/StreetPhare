@@ -212,36 +212,73 @@ router.get('/:code', authenticateToken, requirePermission('manageEvents'), (req,
 });
 
 /// POST /api/admin/events : Cree un evenement.
-/// Body: { code, title, startAt, endAt?, visibleAt?, generalZone? }
+/// Body: { code, title, startAt?, endAt?, visibleAt?, generalZone?, routeGeoJson?, destinationLatitude?, destinationLongitude?, waypoints?, pois?, careCenters?, exitPoints?, safeZones? }
 router.post('/', authenticateToken, requirePermission('manageEvents'), (req, res) => {
   try {
-    const { code, title, startAt, endAt, visibleAt, generalZone } = req.body || {};
-    if (!code || !title || !startAt) {
-      return res.status(400).json({ error: 'code, title et startAt sont requis' });
+    const {
+      code,
+      title,
+      startAt,
+      endAt,
+      visibleAt,
+      generalZone,
+      routeGeoJson,
+      destinationLatitude,
+      destinationLongitude,
+      waypoints,
+      pois,
+      careCenters,
+      exitPoints,
+      safeZones,
+    } = req.body || {};
+
+    const cleanCode = String(code || '').toUpperCase().trim();
+    const cleanTitle = String(title || '').trim();
+    if (!cleanCode || !cleanTitle) {
+      return res.status(400).json({ error: 'Les champs code et title sont obligatoires' });
     }
-    const upper = String(code).toUpperCase().trim();
-    if (store.getEventByCode(upper)) {
-      return res.status(409).json({ error: `L'evenement ${upper} existe deja` });
+    if (store.getEventByCode(cleanCode)) {
+      return res.status(409).json({ error: `L'evenement ${cleanCode} existe deja` });
     }
 
-    const event = {
-      code: upper,
-      title: String(title),
-      startAt,
+    const effectiveStartAt = startAt && !isNaN(new Date(startAt).getTime())
+      ? new Date(startAt).toISOString()
+      : new Date().toISOString();
+
+    const event = normalizeEvent({
+      code: cleanCode,
+      title: cleanTitle,
+      startAt: effectiveStartAt,
       endAt: endAt || null,
-      visibleAt: visibleAt || startAt,
+      visibleAt: visibleAt || effectiveStartAt,
       generalZone: generalZone || null,
-      routeGeoJson: '',
-      waypoints: [],
-      pois: [],
-      careCenters: [],
-      exitPoints: [],
-      safeZones: [],
-      destinationLatitude: null,
-      destinationLongitude: null,
-    };
+      routeGeoJson: routeGeoJson || '',
+      waypoints: Array.isArray(waypoints) ? waypoints : [],
+      pois: Array.isArray(pois) ? pois : [],
+      careCenters: Array.isArray(careCenters) ? careCenters : [],
+      exitPoints: Array.isArray(exitPoints) ? exitPoints : [],
+      safeZones: Array.isArray(safeZones) ? safeZones : [],
+      destinationLatitude: destinationLatitude !== undefined && destinationLatitude !== '' ? Number(destinationLatitude) : null,
+      destinationLongitude: destinationLongitude !== undefined && destinationLongitude !== '' ? Number(destinationLongitude) : null,
+    });
 
     const saved = store.addEvent(event);
+
+    // Si créé par un event_admin, rattacher automatiquement le code à ses managedEventCodes
+    if (req.user && req.user.role === 'event_admin') {
+      if (!Array.isArray(req.user.managedEventCodes)) req.user.managedEventCodes = [];
+      if (!req.user.managedEventCodes.includes(cleanCode)) {
+        req.user.managedEventCodes.push(cleanCode);
+      }
+      try {
+        const eventAdminService = require('../auth/eventAdminService');
+        const adm = eventAdminService.getByUsername(req.user.username);
+        if (adm && Array.isArray(adm.managedEventCodes) && !adm.managedEventCodes.includes(cleanCode)) {
+          eventAdminService.update(adm.id, { managedEventCodes: [...adm.managedEventCodes, cleanCode] });
+        }
+      } catch (_) {}
+    }
+
     sync.enqueueEvent(saved);
     publishEvents();
     log('EVENT', `Cree : ${saved.code} - ${saved.title}`);

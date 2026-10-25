@@ -24,12 +24,33 @@ class AlertVisibilityPolicy {
   /// apparaisse sur la carte générale.
   static const int minConfirmationsToShow = 3;
 
+  /// Seuil minimum d'utilisateurs proches requis pour déclencher et afficher
+  /// une alerte de densité de foule (par défaut 25 utilisateurs, configurable).
+  /// Corrige le bug où l'alerte de densité se déclenchait à tort dès 2 utilisateurs.
+  static int minCrowdDensityThreshold = const int.fromEnvironment(
+    'STREETPHARE_DENSITY_THRESHOLD',
+    defaultValue: 25,
+  );
+
+  /// Permet de reconfigurer dynamiquement le seuil de densité de foule (ex: 20 à 50).
+  static void setMinCrowdDensityThreshold(int threshold) {
+    if (threshold >= 5) {
+      minCrowdDensityThreshold = threshold;
+    }
+  }
+
   /// Indique si une alerte doit être visible sur la carte
   /// (carte générale) en appliquant les deux règles :
   ///   1. Au moins [minConfirmationsToShow] confirmations ACTIVES
   ///      (TTL Phase 2 non expiré).
   ///   2. OU statut `validated` par consensus.
+  ///   3. Pour une alerte de type `density`, la valeur de densité doit
+  ///      impérativement atteindre [minCrowdDensityThreshold] (≥ 25 par défaut).
   static bool isVisible(Alert alert, {DateTime? now}) {
+    if (alert.type == AlertType.density) {
+      return (alert.densityValue ?? 0) >= minCrowdDensityThreshold;
+    }
+
     // Règle 1 : consensus collectif atteint.
     if (alert.status == AlertStatus.active) return true;
     if (alert.isValidatedByConsensus) return true;

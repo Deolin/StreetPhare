@@ -689,33 +689,43 @@ router.post('/events/join', (req, res) => {
   });
 });
 
-/// POST /api/events/create — ADMIN : crée un événement.
-router.post('/events/create', authenticateToken, requireRole(['admin']), (req, res) => {
-  const { code, title, startAt, endAt, visibleAt, routeGeoJson, waypoints, pois, careCenters, exitPoints, safeZones, destinationLatitude, destinationLongitude } = req.body || {};
+/// POST /api/events/create — ADMIN : crée un événement (compatible tous rôles ayant manageEvents).
+router.post('/events/create', authenticateToken, requireRole(['admin', 'superadmin', 'event_admin', 'moderator']), (req, res) => {
+  const { code, title, startAt, endAt, visibleAt, generalZone, routeGeoJson, waypoints, pois, careCenters, exitPoints, safeZones, destinationLatitude, destinationLongitude } = req.body || {};
 
-  if (!code || !title || !startAt) {
-    return res.status(400).json({ error: 'code, title, startAt requis' });
+  const cleanCode = String(code || '').toUpperCase().trim();
+  const cleanTitle = String(title || '').trim();
+  if (!cleanCode || !cleanTitle) {
+    return res.status(400).json({ error: 'code et title sont requis' });
+  }
+  if (store.getEventByCode(cleanCode)) {
+    return res.status(409).json({ error: `L'événement ${cleanCode} existe déjà` });
   }
 
+  const effectiveStartAt = startAt && !isNaN(new Date(startAt).getTime())
+    ? new Date(startAt).toISOString()
+    : new Date().toISOString();
+
   const event = {
-    code: code.toUpperCase(),
-    title,
-    startAt,
+    code: cleanCode,
+    title: cleanTitle,
+    startAt: effectiveStartAt,
     endAt: endAt || null,
-    visibleAt: visibleAt || startAt,
+    visibleAt: visibleAt || effectiveStartAt,
+    generalZone: generalZone || null,
     routeGeoJson: routeGeoJson || '',
     waypoints: waypoints || [],
     pois: pois || [],
     careCenters: careCenters || [],
     exitPoints: exitPoints || [],
     safeZones: safeZones || [],
-    destinationLatitude,
-    destinationLongitude,
+    destinationLatitude: destinationLatitude !== undefined && destinationLatitude !== '' ? Number(destinationLatitude) : null,
+    destinationLongitude: destinationLongitude !== undefined && destinationLongitude !== '' ? Number(destinationLongitude) : null,
   };
 
   const saved = store.addEvent(event);
   sync.enqueueEvent(saved);
-  res.status(201).json(saved);
+  res.status(201).json({ success: true, event: saved, ...saved });
 });
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -72,9 +72,15 @@ let evLayer = null;
 
 /// Appel JSON authentifie vers l API d administration des evenements.
 async function evApi(method, path, body) {
+  const token = (typeof adminToken !== 'undefined' && adminToken)
+    ? adminToken
+    : (sessionStorage.getItem('sp_admin_token') || '');
   const opts = {
     method,
-    headers: { 'Authorization': `Bearer ${adminToken}` },
+    headers: {
+      'Accept': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
   };
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
@@ -82,6 +88,9 @@ async function evApi(method, path, body) {
   }
   const res = await fetch(`/api/admin/events${path}`, opts);
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(data.error || 'Session admin expirée ou permissions insuffisantes');
+  }
   if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
   return data;
 }

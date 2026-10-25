@@ -189,6 +189,15 @@ class Store {
   // ═══════════════════════════════════════════════════════════════════════
 
   addAlert(alert) {
+    // Filtrage anti-faux-positif sur la densité : ignore les rapports de densité
+    // sous le seuil de foule configuré (ex: 25 utilisateurs minimum).
+    if (alert && alert.type === 'density') {
+      const dv = Number(alert.density_value ?? alert.densityValue ?? 0);
+      const minDensity = config.crowdDensityThreshold || 25;
+      if (dv < minDensity) {
+        return alert;
+      }
+    }
     const nowIso = new Date().toISOString();
     const existing = this.alerts.find(a => a.id === alert.id);
     if (existing) {
@@ -370,8 +379,13 @@ class Store {
 
   getActiveAlerts() {
     const now = new Date();
+    const minDensity = config.crowdDensityThreshold || 25;
     return this.alerts.filter(a => {
       if (a.status === 'rejected' || a.status === 'voided' || a.status === 'tombstone') return false;
+      if (a.type === 'density') {
+        const dv = Number(a.density_value ?? a.densityValue ?? 0);
+        if (dv < minDensity) return false;
+      }
       const ageMinutes = (now - new Date(a.createdAt)) / 60000;
       if (ageMinutes > config.ttls.absoluteRgpd) return false;
       const ttls = { mobile_danger: config.ttls.mobileDanger, police: config.ttls.staticDanger, fire_truck: config.ttls.staticDanger, filter: config.ttls.staticDanger, panic: config.ttls.panic, collective_danger: config.ttls.collectiveDanger };
