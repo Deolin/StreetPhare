@@ -1,5 +1,3 @@
-// android/build.gradle.kts
-//
 // Script Gradle RACINE du projet Android (Modernisé Kotlin DSL).
 //
 // Responsabilités :
