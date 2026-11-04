@@ -239,6 +239,7 @@ class RoutingEngine {
           start: start,
           end: end,
           filters: avoidFilters,
+          dangerPoints: dangerPoints,
           constraints: PedestrianConstraints.fromProfile(profile),
         );
         if (paths.isNotEmpty) {

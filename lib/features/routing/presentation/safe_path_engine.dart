@@ -56,7 +56,12 @@ class SafePathEngine {
 
   /// Rayon d'influence (en mètres) d'un danger AUTOUR de son
   /// point central : le danger occupe un disque de ce rayon.
-  static const double dangerRadiusMeters = 5.0;
+  ///
+  /// Valeur par défaut portée à 25 m (au lieu de 5 m) afin qu'un danger
+  /// bloque effectivement au moins une cellule de la grille (pas de 20 m).
+  /// Un rayon trop petit laissait les dangers "entre les cellules" : la grille
+  /// ne les bloquait jamais et le tracé les traversait sans contournement.
+  static const double dangerRadiusMeters = 25.0;
 
   /// Rayon de "pénalité douce" (en mètres) pour les dangers
   /// que l'utilisateur accepte de traverser : on n'évite pas
@@ -83,6 +88,7 @@ class SafePathEngine {
     required LatLng start,
     required LatLng end,
     required AvoidanceFilters filters,
+    List<LatLng> dangerPoints = const [],
     PedestrianConstraints constraints = PedestrianConstraints.urban,
     double? dangerRadiusMeters,
   }) {
@@ -93,6 +99,7 @@ class SafePathEngine {
       start: start,
       end: end,
       alerts: alerts,
+      dangerPoints: dangerPoints,
       filters: filters,
       constraints: constraints,
       dangerRadiusMeters:
@@ -121,6 +128,7 @@ class SafePathEngine {
     required LatLng start,
     required LatLng end,
     required AvoidanceFilters filters,
+    List<LatLng> dangerPoints = const [],
     PedestrianConstraints constraints = PedestrianConstraints.urban,
   }) {
     final alerts = AlertVisibilityPolicy.filterAvoidable(
@@ -130,6 +138,7 @@ class SafePathEngine {
       start: start,
       end: end,
       alerts: alerts,
+      dangerPoints: dangerPoints,
       filters: filters,
       constraints: constraints,
     );
@@ -179,6 +188,7 @@ class SafePathEngine {
     required LatLng start,
     required LatLng end,
     required AvoidanceFilters filters,
+    List<LatLng> dangerPoints = const [],
     PedestrianConstraints constraints = PedestrianConstraints.urban,
   }) {
     // 1) Récupère les signalements ACTIFS et VISIBLES (>3 votes).
@@ -193,6 +203,7 @@ class SafePathEngine {
       start: start,
       end: end,
       alerts: alerts,
+      dangerPoints: dangerPoints,
       filters: filters,
       constraints: constraints,
     );
@@ -398,9 +409,14 @@ class _Grid {
   ///   pas d'arête vers/depuis cette cellule).
   /// * `> 0` mais raisonnable → pénalité douce (on s'en éloigne).
   /// * `0` → pas de risque.
+  ///
+  /// [dangerPoints] sont des points d'évitement explicites (ex. signalements
+  /// validés côté client, pas encore en base). Ils sont traités comme des
+  /// dangers bloquants dans [dangerRadiusMeters].
   static double _riskAt(
     LatLng point,
     List<Alert> alerts,
+    List<LatLng> dangerPoints,
     AvoidanceFilters filters,
     double dangerRadiusMeters,
   ) {
@@ -423,6 +439,14 @@ class _Grid {
         }
       }
     }
+    // Points d'évitement explicites : toujours bloquants (pas de filtre
+    // d'évitement applicable, l'appelant a déjà validé leur pertinence).
+    for (final dp in dangerPoints) {
+      final dist = GeofencingService.distanceBetween(point, dp);
+      if (dist < dangerRadiusMeters) {
+        return 1.0e12;
+      }
+    }
     return penalty;
   }
 
@@ -430,6 +454,7 @@ class _Grid {
     required LatLng start,
     required LatLng end,
     required List<Alert> alerts,
+    required List<LatLng> dangerPoints,
     required AvoidanceFilters filters,
     PedestrianConstraints constraints = PedestrianConstraints.urban,
     double dangerRadiusMeters = SafePathEngine.dangerRadiusMeters,
@@ -467,7 +492,10 @@ class _Grid {
         final lng = minLng + (j + 0.5) * stepLng;
         final point = LatLng(lat, lng);
         cells.add(
-          _GridCell(point, _riskAt(point, alerts, filters, dangerRadiusMeters)),
+          _GridCell(
+            point,
+            _riskAt(point, alerts, dangerPoints, filters, dangerRadiusMeters),
+          ),
         );
       }
     }

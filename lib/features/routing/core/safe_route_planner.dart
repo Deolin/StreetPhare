@@ -47,6 +47,10 @@ class SafeRoutePlanner {
     RoutingProfile profile = RoutingProfile.pedestrian,
     AvoidanceFilters filters = const AvoidanceFilters(),
   }) async {
+    // 0) Collecte les dangers visibles (utilisés par le moteur central ET
+    //    par SafePathEngine en fallback, pour garantir le contournement).
+    final dangers = _collectDangerPoints(filters);
+
     // 1) Demande les alternatives au moteur central (cascade SPG → natif →
     //    serveur/OSRM → SafePathEngine).
     final result = await RoutingEngine.instance.computeRoute(
@@ -55,13 +59,15 @@ class SafeRoutePlanner {
       profile: profile,
       flags: const RoutingFlags(includeAlternatives: true, maxAlternatives: 3),
       avoidFilters: filters,
+      avoidPoints: dangers,
     );
 
     var routes = List<RouteResult>.from(result.routes);
 
     // 2) Si la cascade a échoué et que le profil est piéton/vélo, on tente
     //    directement le moteur local (grille Dijkstra) pour produire 1..3
-    //    itinéraires.
+    //    itinéraires. Les mêmes dangers sont transmis pour que la grille
+    //    les bloque et force un contournement.
     if (routes.isEmpty &&
         profile != RoutingProfile.vehicle &&
         profile != RoutingProfile.emergency) {
@@ -69,12 +75,12 @@ class SafeRoutePlanner {
         start: start,
         end: end,
         filters: filters,
+        dangerPoints: dangers,
         constraints: PedestrianConstraints.fromProfile(profile),
       );
     }
 
-    // 3) Collecte les dangers visibles pour la garantie « 0 risque ».
-    final dangers = _collectDangerPoints(filters);
+    // 3) Trie + déduplique, puis tronque à 3.
 
     // 4) Trie + déduplique, puis tronque à 3.
     routes = _dedupeAndSort(routes);
@@ -201,6 +207,7 @@ class SafeRoutePlanner {
         start: start,
         end: end,
         filters: filters,
+        dangerPoints: dangers,
         dangerRadiusMeters: radius,
       );
       if (routes.isEmpty) continue;

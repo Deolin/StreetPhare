@@ -184,6 +184,7 @@ class PedestrianRouteService {
       start: start,
       end: end,
       filters: filters,
+      dangerPoints: avoidPoints,
       constraints: constraints,
     );
   }
@@ -194,11 +195,13 @@ class PedestrianRouteService {
     required LatLng end,
     required AvoidanceFilters filters,
     PedestrianConstraints constraints = PedestrianConstraints.urban,
+    List<LatLng> avoidPoints = const [],
   }) async {
     return SafePathEngine.computeAlternatives(
       start: start,
       end: end,
       filters: filters,
+      dangerPoints: avoidPoints,
       constraints: constraints,
     );
   }
@@ -265,6 +268,7 @@ class PedestrianRouteService {
       start: start,
       end: end,
       filters: filters,
+      dangerPoints: avoidPoints,
       constraints: constraints,
     );
   }
