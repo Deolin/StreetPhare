@@ -15,6 +15,11 @@ enum RoutingProfile {
   /// Véhicule motorisé — vitesse réelle, favorise axes principaux.
   vehicle,
 
+  /// Transports en commun — trajets multi-paliers (marche + bus/métro/tram).
+  /// Calculé par OpenTripPlanner (voir OpenTripPlannerService). Si le serveur
+  /// OTP est indisponible, le calcul retombe sur un tracé piéton de rabattement.
+  transit,
+
   /// Urgence — priorité absolue aux axes rapides, ignore les blocages.
   emergency,
 }
@@ -109,12 +114,29 @@ class ProfileSettings {
     penaltyFactorTurn: 0.0, // pas de pénalité de virage
   );
 
+  /// Transports en commun — repli de rabattement à pied uniquement.
+  ///
+  /// Ce profil n'est utilisé en local QUE comme repli quand OpenTripPlanner
+  /// n'est pas joignable : il produit alors un tracé piéton (marche vers/depuis
+  /// un arrêt). Le vrai calcul multi-paliers TC est délégué à OTP.
+  static const transit = ProfileSettings(
+    maxSpeedKmh: 6,
+    walkSpeedMs: 1.4, // 5.0 km/h (marche de rabattement)
+    avoidStairs: false,
+    avoidUnpaved: false,
+    useContractionHierarchies: true,
+    heuristicWeight: 1.2,
+    penaltyFactorDiagonal: 3.5,
+    penaltyFactorTurn: 1.0,
+  );
+
   /// Résout le profil depuis l'enum.
   static ProfileSettings from(RoutingProfile profile) {
     return switch (profile) {
       RoutingProfile.pedestrian => pedestrian,
       RoutingProfile.bicycle => bicycle,
       RoutingProfile.vehicle => vehicle,
+      RoutingProfile.transit => transit,
       RoutingProfile.emergency => emergency,
     };
   }

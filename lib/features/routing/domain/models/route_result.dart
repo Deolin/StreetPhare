@@ -51,6 +51,7 @@ class RouteResult {
     required this.totalDistanceMeters,
     required this.totalRiskScore,
     required this.pois,
+    this.duration,
     this.label = '',
     this.restrictedSegments = const [],
   });
@@ -72,6 +73,11 @@ class RouteResult {
   /// Points d'intérêt traversés.
   final List<RoutePoi> pois;
 
+  /// Durée réelle du trajet fournie par le moteur de routage (ex: OTP pour
+  /// les transports en commun). `null` = non fournie → on retombe sur une
+  /// estimation à pied (`estimatedWalkDuration`).
+  final Duration? duration;
+
   /// Libellé optionnel (ex: "Chemin rapide", "Contourne le centre").
   final String label;
 
@@ -88,6 +94,14 @@ class RouteResult {
     return Duration(seconds: secs);
   }
 
+  /// Durée effective : la durée réelle du moteur si fournie (OTP/TC),
+  /// sinon l'estimation à pied.
+  Duration get effectiveDuration => duration ?? estimatedWalkDuration;
+
+  /// Qualifie la durée affichée : "à pied" quand c'est une estimation de
+  /// marche, vide quand la durée est fournie par un moteur (ex: TC via OTP).
+  String get durationQualifier => duration == null ? 'à pied' : '';
+
   /// Format lisible de la distance : "1.2 km" / "850 m".
   String get distanceLabel {
     if (totalDistanceMeters < 1000) {
@@ -96,9 +110,9 @@ class RouteResult {
     return '${(totalDistanceMeters / 1000).toStringAsFixed(2)} km';
   }
 
-  /// Format lisible de la durée de marche estimée : "12 min", "1h05".
+  /// Format lisible de la durée estimée : "12 min", "1h05".
   String get durationLabel {
-    final d = estimatedWalkDuration;
+    final d = effectiveDuration;
     if (d.inMinutes < 1) return '1 min';
     final h = d.inHours;
     final m = d.inMinutes % 60;
@@ -110,6 +124,7 @@ class RouteResult {
   RouteResult copyWith({
     double? totalRiskScore,
     List<RestrictedSegment>? restrictedSegments,
+    Duration? duration,
   }) {
     return RouteResult(
       id: id,
@@ -117,6 +132,7 @@ class RouteResult {
       totalDistanceMeters: totalDistanceMeters,
       totalRiskScore: totalRiskScore ?? this.totalRiskScore,
       pois: pois,
+      duration: duration ?? this.duration,
       label: label,
       restrictedSegments: restrictedSegments ?? this.restrictedSegments,
     );

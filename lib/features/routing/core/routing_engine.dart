@@ -22,6 +22,7 @@ import '../../../database/hive_alert_database.dart';
 import '../domain/models/avoidance_filters.dart';
 import '../domain/models/route_result.dart' as legacy;
 import '../domain/pedestrian_route_service.dart';
+import '../infrastructure/open_trip_planner_service.dart';
 import '../infrastructure/osmand_native_channel.dart';
 import '../infrastructure/osmand_routing_service.dart';
 import '../infrastructure/routing_isolate.dart';
@@ -54,6 +55,7 @@ enum CascadeStep {
   nativeAndroid, // MethodChannel Android
   graphHopper, // GraphHopper HTTP local
   osrmPublic, // OSRM public
+  openTripPlanner, // OpenTripPlanner (transports en commun)
   safePath, // SafePathEngine (grille)
 }
 
@@ -138,7 +140,38 @@ class RoutingEngine {
         ? avoidPoints
         : _collectDangerPoints(avoidFilters);
 
-    // ── TENTATIVE 0 : Graphe .spg (nouveau moteur) ─────────────────────
+    // ── TENTATIVE 0 : OpenTripPlanner (profil transports en commun) ───────
+    // OTP est le moteur dédié aux trajets multi-paliers (marche + TC). Il est
+    // tenté en priorité pour le profil transit ; s'il échoue, on retombe sur
+    // la cascade classique ci-dessous, qui produira un tracé piéton de
+    // rabattement (SPG/OsmAnd/SafePathEngine gèrent le profil transit comme
+    // un profil piéton de marche).
+    if (profile == RoutingProfile.transit) {
+      try {
+        final otpRoutes = await OpenTripPlannerService.instance.plan(
+          start: start,
+          end: end,
+        );
+        if (otpRoutes.isNotEmpty) {
+          onCascadeStep?.call(CascadeStep.openTripPlanner);
+          if (kDebugMode) {
+            debugPrint(
+                '[RoutingEngine] ✅ OTP → ${otpRoutes.length} itinéraire(s)');
+          }
+          return _applyRiskScore(
+            RouteComputeResult(
+              routes: otpRoutes,
+              source: 'open_trip_planner',
+            ),
+            dangerPoints,
+          );
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[RoutingEngine] OTP failed: $e');
+      }
+    }
+
+    // ── TENTATIVE 1 : Graphe .spg (nouveau moteur) ─────────────────────
     if (_state == EngineState.ready && _graph != null) {
       try {
         final profileSettings = ProfileSettings.from(profile);
@@ -326,6 +359,7 @@ class RoutingEngine {
     if (_lastProfile == RoutingProfile.pedestrian) return 'piéton';
     if (_lastProfile == RoutingProfile.bicycle) return 'vélo';
     if (_lastProfile == RoutingProfile.vehicle) return 'véhicule';
+    if (_lastProfile == RoutingProfile.transit) return 'transports en commun';
     return 'urgence';
   }
 

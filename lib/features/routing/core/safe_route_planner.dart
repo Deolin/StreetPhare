@@ -236,6 +236,7 @@ class SafeRoutePlanner {
         totalDistanceMeters: r.totalDistanceMeters,
         totalRiskScore: r.totalRiskScore,
         pois: r.pois,
+        duration: r.duration,
         label: label,
         restrictedSegments: r.restrictedSegments,
       );

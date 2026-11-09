@@ -906,11 +906,11 @@ class _MapScreenState extends State<MapScreen> {
       case 'car':
         return RoutingProfile.vehicle;
       case 'transit':
-        // Les transports en commun ne sont pas encore supportés nativement par
-        // les moteurs de routage (GraphHopper/OSRM). Fallback véhicule (car/bus)
-        // car le réseau routier est plus proche du trajet TC que le réseau piéton.
-        // TODO: Intégrer OpenTripPlanner pour un vrai profil TC.
-        return RoutingProfile.vehicle;
+        // Les transports en commun sont désormais calculés par OpenTripPlanner
+        // (voir OpenTripPlannerService). Si OTP est indisponible, le
+        // RoutingEngine retombe automatiquement sur un tracé piéton de
+        // rabattement (marche), jamais sur un profil voiture.
+        return RoutingProfile.transit;
       default:
         return RoutingProfile.pedestrian;
     }

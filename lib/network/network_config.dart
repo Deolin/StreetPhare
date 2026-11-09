@@ -80,6 +80,22 @@ class NetworkConfig {
   /// Synonyme de [baseUrl]. Production : https://streetphare.ddns.net
   static String get primaryServer => baseUrl;
 
+  /// URL de base du serveur OpenTripPlanner (router OTP) pour le profil
+  /// « transports en commun ».
+  ///
+  /// Format attendu : `https://host/otp/routers/<id>` — le service OTP y
+  /// ajoute `/plan`. Par défaut, on pointe vers l'instance auto-hébergée
+  /// (OTP déployé derrière le même domaine). Surcharge possible via :
+  ///   flutter run --dart-define=STREETPHARE_OTP_URL=https://otp.example.org/otp/routers/default
+  ///
+  /// Une valeur vide désactive OTP : le profil TC retombe alors sur un
+  /// tracé piéton de rabattement (marche).
+  static String get otpBaseUrl {
+    const envOverride = String.fromEnvironment('STREETPHARE_OTP_URL');
+    if (envOverride.isNotEmpty) return envOverride;
+    return 'https://$_productionHost/otp/routers/default';
+  }
+
   /// URL du serveur SECONDAIRE (secours).
   ///
   /// https://streetphare.ddns.net:3001

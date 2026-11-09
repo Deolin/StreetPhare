@@ -427,7 +427,8 @@ class _RouteTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${route.distanceLabel} \u2022 ${route.durationLabel} à pied \u2022 '
+                      '${route.distanceLabel} \u2022 '
+                      '${route.durationLabel}${route.durationQualifier.isEmpty ? '' : ' ${route.durationQualifier}'} \u2022 '
                       '${strings.routeRisk} ${route.totalRiskScore.toStringAsFixed(0)}',
                       style: TextStyle(
                         color: StreetPhareTheme.textSecondary,
