@@ -57,7 +57,7 @@ class Alert {
     this.status = AlertStatus.pending,
     Set<String>? confirmations,
     this.uploadedTo = '',
-    this.eventId = null,
+    this.eventId,
     DateTime? lastModifiedAt,
   })  : createdAt = createdAt ?? DateTime.now().toUtc(),
         confirmations = Set<String>.from(confirmations ?? <String>{}),

@@ -243,7 +243,7 @@ class AppShareService {
     try {
       final activeEvent = EventManager.instance.activeEvent;
       if (activeEvent != null) {
-        return shareEventInvite(activeEvent, context: context);
+        return await shareEventInvite(activeEvent, context: context);
       }
       final storeUrl = buildPlayStoreFallbackUrl();
       await SharePlus.instance.share(

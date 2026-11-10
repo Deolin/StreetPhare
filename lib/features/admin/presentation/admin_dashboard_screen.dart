@@ -36,7 +36,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final TextEditingController _evCodeCtrl = TextEditingController();
   final TextEditingController _evTitleCtrl = TextEditingController();
   final TextEditingController _evZoneCtrl = TextEditingController();
-  DateTime _evStartAt = DateTime.now().add(const Duration(hours: 1));
+  final DateTime _evStartAt = DateTime.now().add(const Duration(hours: 1));
 
   bool _loggingIn = false;
   bool _loadingDashboard = false;
