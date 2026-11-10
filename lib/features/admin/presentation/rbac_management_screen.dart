@@ -110,12 +110,14 @@ class _RbacManagementScreenState extends State<RbacManagementScreen>
           children: [
             TextField(
               controller: usernameCtrl,
-              decoration: const InputDecoration(labelText: 'Identifiant (username)'),
+              decoration:
+                  const InputDecoration(labelText: 'Identifiant (username)'),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: displayCtrl,
-              decoration: const InputDecoration(labelText: 'Nom affiché (optionnel)'),
+              decoration:
+                  const InputDecoration(labelText: 'Nom affiché (optionnel)'),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -155,9 +157,11 @@ class _RbacManagementScreenState extends State<RbacManagementScreen>
     }
   }
 
-  Future<void> _showCreateOrEditEventAdminDialog({EventAdminAccount? existing}) async {
+  Future<void> _showCreateOrEditEventAdminDialog(
+      {EventAdminAccount? existing}) async {
     final usernameCtrl = TextEditingController(text: existing?.username ?? '');
-    final displayCtrl = TextEditingController(text: existing?.displayName ?? '');
+    final displayCtrl =
+        TextEditingController(text: existing?.displayName ?? '');
     final codesCtrl = TextEditingController(
       text: existing?.managedEventCodes.join(', ') ?? '',
     );
@@ -179,7 +183,8 @@ class _RbacManagementScreenState extends State<RbacManagementScreen>
             if (existing == null) ...[
               TextField(
                 controller: usernameCtrl,
-                decoration: const InputDecoration(labelText: 'Identifiant (username)'),
+                decoration:
+                    const InputDecoration(labelText: 'Identifiant (username)'),
               ),
               const SizedBox(height: 12),
             ],
@@ -261,8 +266,12 @@ class _RbacManagementScreenState extends State<RbacManagementScreen>
             ? TabBar(
                 controller: _tabController,
                 tabs: const [
-                  Tab(icon: Icon(Icons.verified_user), text: 'Éclaireurs (Scouts)'),
-                  Tab(icon: Icon(Icons.event_available), text: 'Admins d\'Événements'),
+                  Tab(
+                      icon: Icon(Icons.verified_user),
+                      text: 'Éclaireurs (Scouts)'),
+                  Tab(
+                      icon: Icon(Icons.event_available),
+                      text: 'Admins d\'Événements'),
                 ],
               )
             : null,
@@ -334,7 +343,8 @@ class _RbacManagementScreenState extends State<RbacManagementScreen>
                   const SizedBox(height: 12),
                   Text(
                     _error!,
-                    style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                    style:
+                        const TextStyle(color: Colors.redAccent, fontSize: 13),
                   ),
                 ],
                 const SizedBox(height: 20),
@@ -430,7 +440,8 @@ class _RbacManagementScreenState extends State<RbacManagementScreen>
         return Card(
           color: StreetPhareTheme.darkSurface,
           child: ListTile(
-            leading: const Icon(Icons.event_available, color: Colors.amberAccent),
+            leading:
+                const Icon(Icons.event_available, color: Colors.amberAccent),
             title: Text(
               '${admin.displayName} (@${admin.username})',
               style: const TextStyle(color: StreetPhareTheme.darkTextPrimary),
@@ -443,11 +454,14 @@ class _RbacManagementScreenState extends State<RbacManagementScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.edit_outlined, color: Colors.lightBlueAccent),
-                  onPressed: () => _showCreateOrEditEventAdminDialog(existing: admin),
+                  icon: const Icon(Icons.edit_outlined,
+                      color: Colors.lightBlueAccent),
+                  onPressed: () =>
+                      _showCreateOrEditEventAdminDialog(existing: admin),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                  icon:
+                      const Icon(Icons.delete_outline, color: Colors.redAccent),
                   onPressed: () async {
                     await _service.deleteEventAdmin(admin.id);
                     await _refreshAll();

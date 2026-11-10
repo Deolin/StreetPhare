@@ -327,15 +327,17 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _waitForRoutingEngine() async {
     final channel = OsmAndNativeChannel.instance;
     if (!channel.isSupported) {
-      _updateProgress(0.95, 'Moteur de routage indisponible sur cette plateforme');
+      _updateProgress(
+          0.95, 'Moteur de routage indisponible sur cette plateforme');
       return;
     }
 
     void onProgress() {
       if (!mounted) return;
       final p = channel.initProgress.value;
-      final msg =
-          p.message.isNotEmpty ? p.message : 'Initialisation du moteur de routage…';
+      final msg = p.message.isNotEmpty
+          ? p.message
+          : 'Initialisation du moteur de routage…';
       if (p.stage == 'extract') {
         _updateProgress(0.86, msg);
       } else if (p.stage == 'import') {
@@ -357,12 +359,14 @@ class _SplashScreenState extends State<SplashScreen>
       if (ready) {
         _updateProgress(0.96, 'Moteur de routage prêt');
       } else {
-        _updateProgress(0.96, 'Moteur de routage indisponible — itinéraires en ligne');
+        _updateProgress(
+            0.96, 'Moteur de routage indisponible — itinéraires en ligne');
       }
     } catch (e) {
       debugPrint('[Splash] Init moteur routage : $e');
       if (mounted) {
-        _updateProgress(0.96, 'Moteur de routage indisponible — itinéraires en ligne');
+        _updateProgress(
+            0.96, 'Moteur de routage indisponible — itinéraires en ligne');
       }
     } finally {
       channel.initProgress.removeListener(onProgress);

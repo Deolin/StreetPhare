@@ -205,4 +205,3 @@ class _ReportTypeTile extends StatelessWidget {
     );
   }
 }
-

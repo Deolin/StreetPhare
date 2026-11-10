@@ -184,8 +184,8 @@ class RoutingEngine {
             includeAlternatives: flags.includeAlternatives,
             maxAlternatives: flags.maxAlternatives,
             avoidPoints: dangerPoints
-                .map((p) =>
-                    RoutingAvoidPoint(lat: p.latitude, lon: p.longitude))
+                .map(
+                    (p) => RoutingAvoidPoint(lat: p.latitude, lon: p.longitude))
                 .toList(),
             timeoutMs: flags.timeoutMs,
           ),
@@ -265,7 +265,8 @@ class RoutingEngine {
     // ── TENTATIVE 4 : SafePathEngine (grille Dijkstra) — PIÉTON/vélo uniquement ──
     // La grille ne respecte ni le code de la route ni les routes carrossables :
     // on la saute en mode voiture/urgence (serveur + OSRM = fallbacks conformes).
-    if (profile != RoutingProfile.vehicle && profile != RoutingProfile.emergency) {
+    if (profile != RoutingProfile.vehicle &&
+        profile != RoutingProfile.emergency) {
       try {
         onCascadeStep?.call(CascadeStep.safePath);
         final paths = SafePathEngine.computePrimaryOnly(

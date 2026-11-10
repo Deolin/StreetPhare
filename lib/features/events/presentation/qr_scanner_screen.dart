@@ -65,7 +65,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           AppShareService.instance.parseSharedLinkOrPayload(rawValue);
       final dynamic decoded = parsedInvite?.eventData ?? jsonDecode(rawValue);
       if (decoded is! Map<String, dynamic>) {
-        throw const FormatException('JSON ou lien d\'invitation StreetPhare attendu');
+        throw const FormatException(
+            'JSON ou lien d\'invitation StreetPhare attendu');
       }
 
       // Vérifications minimales des champs obligatoires.

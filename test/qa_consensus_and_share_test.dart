@@ -61,7 +61,8 @@ void main() {
     });
   });
 
-  group('2. Audit & Vérification du Partage (Deep Link, QR Code & Play Store)', () {
+  group('2. Audit & Vérification du Partage (Deep Link, QR Code & Play Store)',
+      () {
     late EventModel sampleEvent;
 
     setUp(() {
@@ -79,7 +80,9 @@ void main() {
       );
     });
 
-    test('buildEventShareUrl et buildEventDeepLink transmettent événement et session', () {
+    test(
+        'buildEventShareUrl et buildEventDeepLink transmettent événement et session',
+        () {
       final shareUrl = AppShareService.instance.buildEventShareUrl(
         sampleEvent,
         sessionId: 'sess_42',
@@ -118,18 +121,23 @@ void main() {
       expect(parsed.eventData!['title'], 'Cortège Test QA');
     });
 
-    test('handleIncomingDeepLink charge automatiquement l\'événement dans EventManager', () async {
+    test(
+        'handleIncomingDeepLink charge automatiquement l\'événement dans EventManager',
+        () async {
       final deepLink = AppShareService.instance.buildEventDeepLink(
         sampleEvent,
         sessionId: 'sess_99',
       );
-      final ok = await AppShareService.instance.handleIncomingDeepLink(deepLink);
+      final ok =
+          await AppShareService.instance.handleIncomingDeepLink(deepLink);
       expect(ok, isTrue);
       expect(EventManager.instance.count, 1);
       expect(EventManager.instance.activeEvent?.code, 'SHARE-QA-01');
     });
 
-    test('buildPlayStoreFallbackUrl génère un lien Play Store avec referrer complet', () {
+    test(
+        'buildPlayStoreFallbackUrl génère un lien Play Store avec referrer complet',
+        () {
       final fallbackUrl = AppShareService.instance.buildPlayStoreFallbackUrl(
         eventCode: 'SHARE-QA-01',
         sessionId: 'sess_42',

@@ -15,7 +15,6 @@ import '../../../database/alert_visibility_policy.dart';
 import '../../sandbox/sandbox_controller.dart';
 import '../data/rbac_admin_service.dart';
 
-
 /// Écran d'administration principal de StreetPhare.
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key, this.service});
@@ -29,7 +28,8 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   late final RbacAdminService _service;
 
-  final TextEditingController _loginUserCtrl = TextEditingController(text: 'admin');
+  final TextEditingController _loginUserCtrl =
+      TextEditingController(text: 'admin');
   final TextEditingController _loginPassCtrl = TextEditingController();
 
   final GlobalKey<FormState> _eventFormKey = GlobalKey<FormState>();
@@ -113,13 +113,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final user = _loginUserCtrl.text.trim();
     final pass = _loginPassCtrl.text;
     if (user.isEmpty || pass.isEmpty) {
-      _showErrorSnackBar("Veuillez renseigner l'identifiant et le mot de passe.");
+      _showErrorSnackBar(
+          "Veuillez renseigner l'identifiant et le mot de passe.");
       return;
     }
     setState(() => _loggingIn = true);
     try {
       final res = await _service.login(username: user, password: pass);
-      _showSuccessSnackBar('Connecté en tant que ${res.username} (${res.role})');
+      _showSuccessSnackBar(
+          'Connecté en tant que ${res.username} (${res.role})');
       await _refreshAllAdminData();
     } catch (e) {
       _showErrorSnackBar(e.toString());
@@ -153,11 +155,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Future<void> _handleCreateEvent() async {
     if (!_service.isAuthenticated) {
-      _showErrorSnackBar("Veuillez d'abord vous authentifier en tant qu'administrateur.");
+      _showErrorSnackBar(
+          "Veuillez d'abord vous authentifier en tant qu'administrateur.");
       return;
     }
     if (_eventFormKey.currentState?.validate() != true) {
-      _showErrorSnackBar("Veuillez compléter tous les champs obligatoires de l'événement.");
+      _showErrorSnackBar(
+          "Veuillez compléter tous les champs obligatoires de l'événement.");
       return;
     }
     setState(() => _creatingEvent = true);
@@ -166,12 +170,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         code: _evCodeCtrl.text.trim().toUpperCase(),
         title: _evTitleCtrl.text.trim(),
         startAt: _evStartAt.toUtc().toIso8601String(),
-        generalZone: _evZoneCtrl.text.trim().isEmpty ? null : _evZoneCtrl.text.trim(),
+        generalZone:
+            _evZoneCtrl.text.trim().isEmpty ? null : _evZoneCtrl.text.trim(),
       );
       _evCodeCtrl.clear();
       _evTitleCtrl.clear();
       _evZoneCtrl.clear();
-      _showSuccessSnackBar('Événement "${created.title}" (${created.code}) créé avec succès !');
+      _showSuccessSnackBar(
+          'Événement "${created.title}" (${created.code}) créé avec succès !');
       await _refreshAllAdminData();
     } catch (e) {
       _showErrorSnackBar(e.toString());
@@ -184,7 +190,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     setState(() => _loadingDashboard = true);
     try {
       await _service.deleteEvent(code);
-      _showSuccessSnackBar('Événement $code supprimé (signalements liés purgés).');
+      _showSuccessSnackBar(
+          'Événement $code supprimé (signalements liés purgés).');
       await _refreshAllAdminData();
     } catch (e) {
       _showErrorSnackBar(e.toString());
@@ -192,7 +199,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (mounted) setState(() => _loadingDashboard = false);
     }
   }
-
 
   Future<void> _handleDeleteModerator(ModeratorAccount mod) async {
     setState(() => _loadingDashboard = true);
@@ -242,9 +248,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(_statusIcon(state), size: 12, color: _statusColor(state)),
+                    Icon(_statusIcon(state),
+                        size: 12, color: _statusColor(state)),
                     const SizedBox(width: 6),
-                    Text(_statusLabel(state), style: TextStyle(fontSize: 12, color: _statusColor(state))),
+                    Text(_statusLabel(state),
+                        style: TextStyle(
+                            fontSize: 12, color: _statusColor(state))),
                   ],
                 ),
               );
@@ -289,11 +298,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           leading: const Icon(Icons.verified_user, color: Colors.tealAccent),
           title: Text(
             'Session Admin active (rôle : ${_service.role ?? 'admin'})',
-            style: const TextStyle(color: StreetPhareTheme.darkTextPrimary, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+                color: StreetPhareTheme.darkTextPrimary,
+                fontWeight: FontWeight.bold),
           ),
           subtitle: const Text(
             'Jeton Bearer actif — Toutes les actions d’administration sont déverrouillées.',
-            style: TextStyle(color: StreetPhareTheme.darkTextSecondary, fontSize: 12),
+            style: TextStyle(
+                color: StreetPhareTheme.darkTextSecondary, fontSize: 12),
           ),
           trailing: OutlinedButton.icon(
             onPressed: () {
@@ -323,20 +335,38 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 SizedBox(width: 8),
                 Text(
                   'Authentification Administrateur',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: StreetPhareTheme.darkTextPrimary),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: StreetPhareTheme.darkTextPrimary),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: TextField(controller: _loginUserCtrl, decoration: const InputDecoration(labelText: 'Identifiant', isDense: true))),
+                Expanded(
+                    child: TextField(
+                        controller: _loginUserCtrl,
+                        decoration: const InputDecoration(
+                            labelText: 'Identifiant', isDense: true))),
                 const SizedBox(width: 12),
-                Expanded(child: TextField(controller: _loginPassCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'Mot de passe', isDense: true), onSubmitted: (_) => _handleLogin())),
+                Expanded(
+                    child: TextField(
+                        controller: _loginPassCtrl,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                            labelText: 'Mot de passe', isDense: true),
+                        onSubmitted: (_) => _handleLogin())),
                 const SizedBox(width: 12),
                 ElevatedButton.icon(
                   onPressed: _loggingIn ? null : _handleLogin,
-                  icon: _loggingIn ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.login, size: 18),
+                  icon: _loggingIn
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.login, size: 18),
                   label: Text(_loggingIn ? 'Connexion…' : 'Connexion'),
                 ),
               ],
@@ -363,7 +393,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 SizedBox(width: 8),
                 Text(
                   'Statistiques & Paramètres de Densité',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: StreetPhareTheme.darkTextPrimary),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: StreetPhareTheme.darkTextPrimary),
                 ),
               ],
             ),
@@ -372,10 +405,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               spacing: 12,
               runSpacing: 12,
               children: [
-                _buildStatTile(label: 'Alertes actives', value: stats != null ? '${stats.alertsActive} / ${stats.alertsTotal}' : '—', icon: Icons.warning_amber, color: Colors.orangeAccent),
-                _buildStatTile(label: 'Événements', value: stats != null ? '${stats.eventsCount}' : '${_events.length}', icon: Icons.event_available, color: Colors.greenAccent),
-                _buildStatTile(label: 'Clients Mesh', value: stats != null ? '${stats.meshClients}' : '—', icon: Icons.hub_outlined, color: Colors.cyanAccent),
-                _buildStatTile(label: 'Seuil Densité Foule', value: '≥ ${AlertVisibilityPolicy.minCrowdDensityThreshold} pers.', icon: Icons.groups, color: Colors.purpleAccent),
+                _buildStatTile(
+                    label: 'Alertes actives',
+                    value: stats != null
+                        ? '${stats.alertsActive} / ${stats.alertsTotal}'
+                        : '—',
+                    icon: Icons.warning_amber,
+                    color: Colors.orangeAccent),
+                _buildStatTile(
+                    label: 'Événements',
+                    value: stats != null
+                        ? '${stats.eventsCount}'
+                        : '${_events.length}',
+                    icon: Icons.event_available,
+                    color: Colors.greenAccent),
+                _buildStatTile(
+                    label: 'Clients Mesh',
+                    value: stats != null ? '${stats.meshClients}' : '—',
+                    icon: Icons.hub_outlined,
+                    color: Colors.cyanAccent),
+                _buildStatTile(
+                    label: 'Seuil Densité Foule',
+                    value:
+                        '≥ ${AlertVisibilityPolicy.minCrowdDensityThreshold} pers.',
+                    icon: Icons.groups,
+                    color: Colors.purpleAccent),
               ],
             ),
           ],
@@ -384,7 +438,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildStatTile({required String label, required String value, required IconData icon, required Color color}) {
+  Widget _buildStatTile(
+      {required String label,
+      required String value,
+      required IconData icon,
+      required Color color}) {
     return Container(
       width: 175,
       padding: const EdgeInsets.all(12),
@@ -401,8 +459,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: StreetPhareTheme.darkTextPrimary)),
-                Text(label, style: const TextStyle(fontSize: 11, color: StreetPhareTheme.darkTextSecondary)),
+                Text(value,
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: StreetPhareTheme.darkTextPrimary)),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: StreetPhareTheme.darkTextSecondary)),
               ],
             ),
           ),
@@ -426,7 +491,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 SizedBox(width: 8),
                 Text(
                   'Gestion des Événements',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: StreetPhareTheme.darkTextPrimary),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: StreetPhareTheme.darkTextPrimary),
                 ),
               ],
             ),
@@ -443,8 +511,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         child: TextFormField(
                           controller: _evCodeCtrl,
                           textCapitalization: TextCapitalization.characters,
-                          decoration: const InputDecoration(labelText: 'Code *', hintText: 'MANIF-2026', isDense: true),
-                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Code requis' : null,
+                          decoration: const InputDecoration(
+                              labelText: 'Code *',
+                              hintText: 'MANIF-2026',
+                              isDense: true),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Code requis'
+                              : null,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -452,8 +525,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         flex: 2,
                         child: TextFormField(
                           controller: _evTitleCtrl,
-                          decoration: const InputDecoration(labelText: 'Titre *', hintText: 'Cortège citoyen', isDense: true),
-                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Titre requis' : null,
+                          decoration: const InputDecoration(
+                              labelText: 'Titre *',
+                              hintText: 'Cortège citoyen',
+                              isDense: true),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Titre requis'
+                              : null,
                         ),
                       ),
                     ],
@@ -461,13 +539,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      Expanded(child: TextFormField(controller: _evZoneCtrl, decoration: const InputDecoration(labelText: 'Zone (optionnel)', hintText: 'Fleurus', isDense: true))),
+                      Expanded(
+                          child: TextFormField(
+                              controller: _evZoneCtrl,
+                              decoration: const InputDecoration(
+                                  labelText: 'Zone (optionnel)',
+                                  hintText: 'Fleurus',
+                                  isDense: true))),
                       const SizedBox(width: 12),
                       ElevatedButton.icon(
                         onPressed: _creatingEvent ? null : _handleCreateEvent,
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.amberAccent, foregroundColor: Colors.black),
-                        icon: _creatingEvent ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black)) : const Icon(Icons.add, size: 18),
-                        label: Text(_creatingEvent ? 'Création…' : 'Créer l’événement'),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.amberAccent,
+                            foregroundColor: Colors.black),
+                        icon: _creatingEvent
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.black))
+                            : const Icon(Icons.add, size: 18),
+                        label: Text(
+                            _creatingEvent ? 'Création…' : 'Créer l’événement'),
                       ),
                     ],
                   ),
@@ -476,20 +569,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
             const Divider(height: 20),
             if (!_service.isAuthenticated)
-              const Text('Authentifiez-vous pour gérer les événements.', style: TextStyle(color: StreetPhareTheme.darkTextSecondary, fontSize: 12))
+              const Text('Authentifiez-vous pour gérer les événements.',
+                  style: TextStyle(
+                      color: StreetPhareTheme.darkTextSecondary, fontSize: 12))
             else if (_events.isEmpty)
-              const Text('Aucun événement enregistré.', style: TextStyle(color: StreetPhareTheme.darkTextSecondary, fontSize: 12))
+              const Text('Aucun événement enregistré.',
+                  style: TextStyle(
+                      color: StreetPhareTheme.darkTextSecondary, fontSize: 12))
             else
               for (final ev in _events)
                 ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.flag_circle, color: Colors.greenAccent),
-                  title: Text('${ev.title} (${ev.code})', style: const TextStyle(color: StreetPhareTheme.darkTextPrimary, fontWeight: FontWeight.w600)),
-                  subtitle: Text('Début : ${ev.startAt}', style: const TextStyle(color: StreetPhareTheme.darkTextSecondary, fontSize: 11)),
+                  leading:
+                      const Icon(Icons.flag_circle, color: Colors.greenAccent),
+                  title: Text('${ev.title} (${ev.code})',
+                      style: const TextStyle(
+                          color: StreetPhareTheme.darkTextPrimary,
+                          fontWeight: FontWeight.w600)),
+                  subtitle: Text('Début : ${ev.startAt}',
+                      style: const TextStyle(
+                          color: StreetPhareTheme.darkTextSecondary,
+                          fontSize: 11)),
                   trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                    onPressed: _loadingDashboard ? null : () => _handleDeleteEvent(ev.code),
+                    icon: const Icon(Icons.delete_outline,
+                        color: Colors.redAccent, size: 20),
+                    onPressed: _loadingDashboard
+                        ? null
+                        : () => _handleDeleteEvent(ev.code),
                   ),
                 ),
           ],
@@ -513,26 +620,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 SizedBox(width: 8),
                 Text(
                   'Gestion des Modérateurs',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: StreetPhareTheme.darkTextPrimary),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: StreetPhareTheme.darkTextPrimary),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             if (!_service.isAuthenticated)
-              const Text('Authentifiez-vous pour gérer les modérateurs.', style: TextStyle(color: StreetPhareTheme.darkTextSecondary, fontSize: 12))
+              const Text('Authentifiez-vous pour gérer les modérateurs.',
+                  style: TextStyle(
+                      color: StreetPhareTheme.darkTextSecondary, fontSize: 12))
             else if (_moderators.isEmpty)
-              const Text('Aucun modérateur enregistré.', style: TextStyle(color: StreetPhareTheme.darkTextSecondary, fontSize: 12))
+              const Text('Aucun modérateur enregistré.',
+                  style: TextStyle(
+                      color: StreetPhareTheme.darkTextSecondary, fontSize: 12))
             else
               for (final mod in _moderators)
                 ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.person, color: Colors.greenAccent),
-                  title: Text(mod.username, style: const TextStyle(color: StreetPhareTheme.darkTextPrimary, fontWeight: FontWeight.w600)),
-                  subtitle: Text('Rôles : ${mod.permissions.join(', ')}', style: const TextStyle(color: StreetPhareTheme.darkTextSecondary, fontSize: 11)),
+                  title: Text(mod.username,
+                      style: const TextStyle(
+                          color: StreetPhareTheme.darkTextPrimary,
+                          fontWeight: FontWeight.w600)),
+                  subtitle: Text('Rôles : ${mod.permissions.join(', ')}',
+                      style: const TextStyle(
+                          color: StreetPhareTheme.darkTextSecondary,
+                          fontSize: 11)),
                   trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                    onPressed: _loadingDashboard ? null : () => _handleDeleteModerator(mod),
+                    icon: const Icon(Icons.delete_outline,
+                        color: Colors.redAccent, size: 20),
+                    onPressed: _loadingDashboard
+                        ? null
+                        : () => _handleDeleteModerator(mod),
                   ),
                 ),
           ],
@@ -556,7 +679,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 SizedBox(width: 8),
                 Text(
                   'Contrôles Sandbox',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: StreetPhareTheme.darkTextPrimary),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: StreetPhareTheme.darkTextPrimary),
                 ),
               ],
             ),
@@ -564,11 +690,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _SandboxButton(label: 'Connexion au sandbox', icon: Icons.link, color: Colors.blueAccent, onTap: _toggleSandboxConnection),
+                _SandboxButton(
+                    label: 'Connexion au sandbox',
+                    icon: Icons.link,
+                    color: Colors.blueAccent,
+                    onTap: _toggleSandboxConnection),
                 const SizedBox(height: 8),
-                _SandboxButton(label: 'Lancer une simulation', icon: Icons.play_circle_fill, color: Colors.greenAccent, onTap: _runSandboxSimulation),
+                _SandboxButton(
+                    label: 'Lancer une simulation',
+                    icon: Icons.play_circle_fill,
+                    color: Colors.greenAccent,
+                    onTap: _runSandboxSimulation),
                 const SizedBox(height: 8),
-                _SandboxButton(label: 'Recharger le sandbox', icon: Icons.refresh, color: Colors.amberAccent, onTap: _reloadSandbox),
+                _SandboxButton(
+                    label: 'Recharger le sandbox',
+                    icon: Icons.refresh,
+                    color: Colors.amberAccent,
+                    onTap: _reloadSandbox),
               ],
             ),
           ],

@@ -152,8 +152,7 @@ class OpenTripPlannerService {
 
       // Concatène la géométrie du leg en évitant les doublons de jonction.
       for (final p in _decodeLegGeometry(rawLeg)) {
-        if (points.isEmpty ||
-            const Distance().distance(points.last, p) > 0.5) {
+        if (points.isEmpty || const Distance().distance(points.last, p) > 0.5) {
           points.add(p);
         }
       }
@@ -175,9 +174,8 @@ class OpenTripPlannerService {
       totalDistanceMeters: distanceM,
       totalRiskScore: 0,
       pois: const [],
-      duration: durationSec == null
-          ? null
-          : Duration(seconds: durationSec.round()),
+      duration:
+          durationSec == null ? null : Duration(seconds: durationSec.round()),
       label: _buildLabel(index, transitModes.length),
     );
   }

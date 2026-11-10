@@ -170,8 +170,8 @@ class SafeRoutePlanner {
         HiveAlertDatabase.instance.getAllValid(),
       );
       return alerts
-          .where((a) =>
-              a.type == AlertType.barrage || a.type == AlertType.filtre)
+          .where(
+              (a) => a.type == AlertType.barrage || a.type == AlertType.filtre)
           .toList();
     } catch (e) {
       if (kDebugMode) {
@@ -278,7 +278,3 @@ class SafeRoutePlanner {
         .join('|');
   }
 }
-
-
-
-

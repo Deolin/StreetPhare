@@ -80,39 +80,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: MarsBackground(
         child: Scrollbar(
           controller: _scrollController,
-        thumbVisibility: true,
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: ValueListenableBuilder<AppLanguage>(
-            valueListenable: AppLocale.instance,
-            builder: (context, _, child) {
-              final s = AppLocale.instance.strings;
-              return Column(
-                children: [
-                  _EventsSection(strings: s),
-                  _LanguageSection(strings: s),
-                  _LowVisionSection(strings: s),
-                  _MessageFilterSection(strings: s),
-                  _BlockedUsersSection(strings: s),
-                  _ThemeSection(strings: s),
-                  _SkinSection(strings: s),
-                  _BatterySaverSection(strings: s),
-                  _AndroidNotificationSection(strings: s),
-                  _AvoidanceFiltersSection(strings: s),
-                  _MapCacheSection(strings: s),
-                  _BackgroundServiceSection(strings: s),
-                  _PanicContactsSection(strings: s),
-                  _ShareApkSection(strings: s),
-                  _TutorialSection(strings: s),
-                  _AboutSection(strings: s),
-                  _BugReportSection(strings: s),
-                ],
-              );
-            },
+          thumbVisibility: true,
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: ValueListenableBuilder<AppLanguage>(
+              valueListenable: AppLocale.instance,
+              builder: (context, _, child) {
+                final s = AppLocale.instance.strings;
+                return Column(
+                  children: [
+                    _EventsSection(strings: s),
+                    _LanguageSection(strings: s),
+                    _LowVisionSection(strings: s),
+                    _MessageFilterSection(strings: s),
+                    _BlockedUsersSection(strings: s),
+                    _ThemeSection(strings: s),
+                    _SkinSection(strings: s),
+                    _BatterySaverSection(strings: s),
+                    _AndroidNotificationSection(strings: s),
+                    _AvoidanceFiltersSection(strings: s),
+                    _MapCacheSection(strings: s),
+                    _BackgroundServiceSection(strings: s),
+                    _PanicContactsSection(strings: s),
+                    _ShareApkSection(strings: s),
+                    _TutorialSection(strings: s),
+                    _AboutSection(strings: s),
+                    _BugReportSection(strings: s),
+                  ],
+                );
+              },
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -2139,8 +2139,7 @@ class _ShareApkSection extends StatelessWidget {
                 final apkOk =
                     await AppShareService.instance.shareApk(context: context);
                 if (!apkOk && context.mounted) {
-                  await AppShareService.instance
-                      .shareAppLink(context: context);
+                  await AppShareService.instance.shareAppLink(context: context);
                 }
               }
             },

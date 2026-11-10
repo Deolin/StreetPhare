@@ -90,8 +90,7 @@ class Alert {
       uploadedTo: (json['uploadedTo'] as String?) ??
           (json['uploaded_to'] as String?) ??
           '',
-      eventId: (json['eventId'] as String?) ??
-          (json['event_code'] as String?),
+      eventId: (json['eventId'] as String?) ?? (json['event_code'] as String?),
       lastModifiedAt: _parseDate(json['updatedAt'] ?? json['last_modified_at']),
     );
   }

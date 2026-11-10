@@ -1109,12 +1109,12 @@ class _MapScreenState extends State<MapScreen> {
 
   /// Calcule et trace une « route safe » vers un point (icône d'événement),
   /// sans popup de choix du mode : utilise le mode de transport par défaut.
-  Future<void> _triggerSafeRouteToPoint(LatLng destination, String label) async {
+  Future<void> _triggerSafeRouteToPoint(
+      LatLng destination, String label) async {
     final prefs = AppPreferencesStore.instance.value;
     final mode = prefs.defaultTransportMode ?? 'pedestrian';
     await _computeAndShowRoute(destination, label, transportMode: mode);
   }
-
 
   // --------------------------------------------------------------------------
   // Sélecteur de destination
@@ -1960,8 +1960,8 @@ class _MapScreenState extends State<MapScreen> {
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 2),
                 ),
-                child:
-                    const Icon(Icons.exit_to_app, color: Colors.white, size: 18),
+                child: const Icon(Icons.exit_to_app,
+                    color: Colors.white, size: 18),
               ),
             ),
           ),
@@ -3022,8 +3022,8 @@ class _PlacementBanner extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close,
-                      color: StreetPhareTheme.textSecondary),
+                  icon:
+                      Icon(Icons.close, color: StreetPhareTheme.textSecondary),
                   onPressed: onCancel,
                 ),
               ],

@@ -247,7 +247,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 200) {
-      throw Exception(data['error'] ?? 'Erreur lors du chargement des éclaireurs');
+      throw Exception(
+          data['error'] ?? 'Erreur lors du chargement des éclaireurs');
     }
     final list = (data['scouts'] as List<dynamic>?) ?? const [];
     return list
@@ -278,7 +279,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 201 && res.statusCode != 200) {
-      throw Exception(data['error'] ?? 'Erreur lors de la création de l\'éclaireur');
+      throw Exception(
+          data['error'] ?? 'Erreur lors de la création de l\'éclaireur');
     }
     return ScoutAccount.fromJson(data['scout'] as Map<String, dynamic>);
   }
@@ -301,7 +303,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 200) {
-      throw Exception(data['error'] ?? 'Erreur lors de la modification de l\'éclaireur');
+      throw Exception(
+          data['error'] ?? 'Erreur lors de la modification de l\'éclaireur');
     }
     return ScoutAccount.fromJson(data['scout'] as Map<String, dynamic>);
   }
@@ -313,7 +316,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     if (res.statusCode != 200) {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      throw Exception(data['error'] ?? 'Erreur lors de la suppression de l\'éclaireur');
+      throw Exception(
+          data['error'] ?? 'Erreur lors de la suppression de l\'éclaireur');
     }
   }
 
@@ -326,7 +330,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 200) {
-      throw Exception(data['error'] ?? 'Erreur lors du chargement des admins d\'événements');
+      throw Exception(data['error'] ??
+          'Erreur lors du chargement des admins d\'événements');
     }
     final list = (data['admins'] as List<dynamic>?) ?? const [];
     return list
@@ -360,7 +365,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 201 && res.statusCode != 200) {
-      throw Exception(data['error'] ?? 'Erreur lors de la création de l\'admin d\'événement');
+      throw Exception(data['error'] ??
+          'Erreur lors de la création de l\'admin d\'événement');
     }
     return EventAdminAccount.fromJson(data['admin'] as Map<String, dynamic>);
   }
@@ -386,7 +392,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 200) {
-      throw Exception(data['error'] ?? 'Erreur lors de la modification de l\'admin d\'événement');
+      throw Exception(data['error'] ??
+          'Erreur lors de la modification de l\'admin d\'événement');
     }
     return EventAdminAccount.fromJson(data['admin'] as Map<String, dynamic>);
   }
@@ -398,7 +405,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     if (res.statusCode != 200) {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      throw Exception(data['error'] ?? 'Erreur lors de la suppression de l\'admin d\'événement');
+      throw Exception(data['error'] ??
+          'Erreur lors de la suppression de l\'admin d\'événement');
     }
   }
 
@@ -411,7 +419,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 200) {
-      throw Exception(data['error'] ?? 'Erreur lors du chargement des événements');
+      throw Exception(
+          data['error'] ?? 'Erreur lors du chargement des événements');
     }
     final list = (data['events'] as List<dynamic>?) ?? const [];
     return list
@@ -452,7 +461,8 @@ class RbacAdminService {
             'title': cleanTitle,
             'startAt': effectiveStart,
             if (endAt != null && endAt.isNotEmpty) 'endAt': endAt,
-            if (visibleAt != null && visibleAt.isNotEmpty) 'visibleAt': visibleAt,
+            if (visibleAt != null && visibleAt.isNotEmpty)
+              'visibleAt': visibleAt,
             if (generalZone != null && generalZone.trim().isNotEmpty)
               'generalZone': generalZone.trim(),
             if (destinationLatitude != null)
@@ -466,7 +476,8 @@ class RbacAdminService {
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 201 && res.statusCode != 200) {
       throw Exception(
-        data['error'] ?? 'Échec de la création de l\'événement (HTTP ${res.statusCode})',
+        data['error'] ??
+            'Échec de la création de l\'événement (HTTP ${res.statusCode})',
       );
     }
     final evMap = (data['event'] as Map<String, dynamic>?) ?? data;
@@ -481,7 +492,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     if (res.statusCode != 200) {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      throw Exception(data['error'] ?? 'Erreur lors de la suppression de l\'événement');
+      throw Exception(
+          data['error'] ?? 'Erreur lors de la suppression de l\'événement');
     }
   }
 
@@ -494,7 +506,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 200) {
-      throw Exception(data['error'] ?? 'Erreur lors du chargement des modérateurs');
+      throw Exception(
+          data['error'] ?? 'Erreur lors du chargement des modérateurs');
     }
     final list = (data['moderators'] as List<dynamic>?) ?? const [];
     return list
@@ -522,7 +535,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 201 && res.statusCode != 200) {
-      throw Exception(data['error'] ?? 'Erreur lors de la création du modérateur');
+      throw Exception(
+          data['error'] ?? 'Erreur lors de la création du modérateur');
     }
     return ModeratorAccount.fromJson(data['moderator'] as Map<String, dynamic>);
   }
@@ -534,7 +548,8 @@ class RbacAdminService {
         .timeout(const Duration(seconds: 15));
     if (res.statusCode != 200) {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      throw Exception(data['error'] ?? 'Erreur lors de la suppression du modérateur');
+      throw Exception(
+          data['error'] ?? 'Erreur lors de la suppression du modérateur');
     }
   }
 
@@ -542,12 +557,13 @@ class RbacAdminService {
 
   Future<AdminServerStats> fetchServerStats() async {
     final uri = Uri.parse('$_baseUrl/api/status');
-    final res = await http
-        .get(uri, headers: {'Accept': 'application/json'})
-        .timeout(const Duration(seconds: 10));
+    final res = await http.get(uri, headers: {
+      'Accept': 'application/json'
+    }).timeout(const Duration(seconds: 10));
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 200) {
-      throw Exception(data['error'] ?? 'Impossible de récupérer les statistiques');
+      throw Exception(
+          data['error'] ?? 'Impossible de récupérer les statistiques');
     }
     return AdminServerStats.fromJson(data);
   }

@@ -33,8 +33,8 @@ class LongPressDetector extends StatelessWidget {
     return RawGestureDetector(
       behavior: HitTestBehavior.opaque,
       gestures: <Type, GestureRecognizerFactory>{
-        LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<
-            LongPressGestureRecognizer>(
+        LongPressGestureRecognizer:
+            GestureRecognizerFactoryWithHandlers<LongPressGestureRecognizer>(
           () => LongPressGestureRecognizer(duration: duration),
           (LongPressGestureRecognizer recognizer) {
             recognizer.onLongPress = onLongPress;

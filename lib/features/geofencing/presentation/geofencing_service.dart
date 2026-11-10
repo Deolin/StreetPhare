@@ -318,17 +318,21 @@ class GeofencingService extends WidgetsBindingObserver {
       Alert? conflicting;
       for (final other in visible) {
         if (other.id == alert.id || other.type == alert.type) continue;
-        if (_distanceMeters(alert.position, other.position) <= defaultRadiusMeters) {
+        if (_distanceMeters(alert.position, other.position) <=
+            defaultRadiusMeters) {
           conflicting = other;
           break;
         }
       }
 
       // Condition (a) : aucun vote/confirmation enregistré depuis au moins 5 minutes
-      final isStale = now.difference(alert.lastModifiedAt) >= staleNoVoteThreshold;
+      final isStale =
+          now.difference(alert.lastModifiedAt) >= staleNoVoteThreshold;
 
       // Si déjà déclenché, on ne re-sollicite que si (a) inactivité ≥ 5 min ou (b) conflit détecté
-      if (_alreadyTriggeredAlertIds.contains(alert.id) && !isStale && conflicting == null) {
+      if (_alreadyTriggeredAlertIds.contains(alert.id) &&
+          !isStale &&
+          conflicting == null) {
         continue;
       }
 

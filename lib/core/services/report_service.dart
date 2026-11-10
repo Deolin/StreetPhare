@@ -19,8 +19,8 @@ import '../../features/events/presentation/event_manager.dart';
 import '../models/alert_model.dart';
 
 /// Base URL de l'API StreetPhare (surchargeable via variable d'environnement).
-const String _apiBase =
-    String.fromEnvironment('STREETPHARE_API_BASE', defaultValue: 'http://10.0.2.2:3000');
+const String _apiBase = String.fromEnvironment('STREETPHARE_API_BASE',
+    defaultValue: 'http://10.0.2.2:3000');
 
 /// Identifiant éphémère de l'utilisateur courant (injecté par la couche auth).
 String? _currentUserId;
@@ -84,18 +84,20 @@ Future<Alert> submitReport({
     if (_authToken != null && _authToken!.isNotEmpty)
       'Authorization': 'Bearer $_authToken',
   };
-  final response = await http.post(
-    uri,
-    headers: headers,
-    body: jsonEncode({
-      'type': type.name,
-      'lat': latitude,
-      'lng': longitude,
-      'description': description,
-      'userId': uid,
-      'eventId': effectiveEventId,
-    }),
-  ).timeout(const Duration(seconds: 15));
+  final response = await http
+      .post(
+        uri,
+        headers: headers,
+        body: jsonEncode({
+          'type': type.name,
+          'lat': latitude,
+          'lng': longitude,
+          'description': description,
+          'userId': uid,
+          'eventId': effectiveEventId,
+        }),
+      )
+      .timeout(const Duration(seconds: 15));
 
   if (response.statusCode == 409) {
     throw Exception(
@@ -105,7 +107,8 @@ Future<Alert> submitReport({
   if (response.statusCode == 400) {
     try {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      throw Exception(decoded['error'] ?? 'ID d\'événement invalide ou inconnu.');
+      throw Exception(
+          decoded['error'] ?? 'ID d\'événement invalide ou inconnu.');
     } catch (_) {
       throw Exception('ID d\'événement invalide ou inconnu.');
     }
@@ -126,7 +129,8 @@ Future<Alert> submitReport({
 Future<void> voidReport(String alertId, {String? token}) async {
   final jwt = token ?? _authToken;
   if (jwt == null || jwt.isEmpty) {
-    throw Exception('Authentification éclaireur requise pour annuler un signalement.');
+    throw Exception(
+        'Authentification éclaireur requise pour annuler un signalement.');
   }
 
   final uri = Uri.parse('$_apiBase/api/alerts/$alertId/void');
@@ -141,7 +145,8 @@ Future<void> voidReport(String alertId, {String? token}) async {
   if (response.statusCode != 200) {
     try {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      throw Exception(decoded['error'] ?? 'Échec de l\'annulation (HTTP ${response.statusCode}).');
+      throw Exception(decoded['error'] ??
+          'Échec de l\'annulation (HTTP ${response.statusCode}).');
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Échec de l\'annulation (HTTP ${response.statusCode}).');
@@ -157,16 +162,19 @@ Future<void> followEvent({String? userId, String? eventCode}) async {
   }
 
   final uri = Uri.parse('$_apiBase/api/user/follow-event');
-  final response = await http.post(
-    uri,
-    headers: {'Content-Type': 'application/json'},
-    body: jsonEncode({
-      'userId': uid,
-      'eventCode': eventCode,
-    }),
-  ).timeout(const Duration(seconds: 15));
+  final response = await http
+      .post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'userId': uid,
+          'eventCode': eventCode,
+        }),
+      )
+      .timeout(const Duration(seconds: 15));
 
   if (response.statusCode != 200) {
-    throw Exception('Impossible de mettre à jour l\'événement suivi (HTTP ${response.statusCode}).');
+    throw Exception(
+        'Impossible de mettre à jour l\'événement suivi (HTTP ${response.statusCode}).');
   }
 }
