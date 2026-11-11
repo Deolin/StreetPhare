@@ -724,6 +724,14 @@ class NetworkCoordinator with WidgetsBindingObserver {
     required double longitude,
     String description = '',
   }) async {
+    // Anti-doublon : si un danger du même type existe déjà à moins de 10 m,
+    // on fusionne les deux signalements en un seul, au centre des points,
+    // au lieu de créer un second marqueur.
+    final nearby = _db.findNearbyIdentical(type, latitude, longitude);
+    if (nearby != null) {
+      return _mergeAlertInto(nearby, latitude, longitude);
+    }
+
     final id = randomId(8);
     final createdAt = DateTime.now().toUtc();
     final signed = await _cryptoUtils.signAlert(
@@ -773,6 +781,41 @@ class NetworkCoordinator with WidgetsBindingObserver {
       debugPrint('[NetworkCoordinator] alerte créée : $alert');
     }
     return alert;
+  }
+
+  /// Fusionne un nouveau signalement identique dans un danger existant :
+  /// recentre au centroïde, ajoute la confirmation, puis re-publie.
+  Future<Alert> _mergeAlertInto(
+    Alert existing,
+    double latitude,
+    double longitude,
+  ) async {
+    final merged = existing.copyWithPosition(
+      latitude: (existing.latitude + latitude) / 2,
+      longitude: (existing.longitude + longitude) / 2,
+    );
+    merged.addConfirmation(_ephemeralUserId);
+
+    await _db.delete(existing.id);
+    await _db.upsert(merged);
+
+    try {
+      await _mesh?.broadcastAlert(merged);
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint(
+            '[NetworkCoordinator] échec broadcast fusion (non fatal): $e\n$st');
+      }
+    }
+
+    unawaited(_failover.uploadAlerts([merged.toJson()]));
+
+    if (kDebugMode) {
+      debugPrint(
+          '[NetworkCoordinator] fusion danger ${merged.type.name} → ${merged.id} '
+          '(${merged.latitude}, ${merged.longitude})');
+    }
+    return merged;
   }
 
   /// Diffuse le signal panic local sur le maillage P2P.

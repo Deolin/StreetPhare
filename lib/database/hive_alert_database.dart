@@ -15,6 +15,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../core/models/alert_model.dart';
 
@@ -79,6 +80,30 @@ class HiveAlertDatabase {
   Alert? getById(String id) {
     _ensureOpen();
     return _box!.get(id);
+  }
+
+  /// Cherche un danger du même type, non expiré, à moins de [radiusMeters]
+  /// de ([lat], [lon]).
+  ///
+  /// Utilisé pour fusionner les signalements identiques rapprochés
+  /// (anti-doublon) : le nouveau signalement est alors déplacé au centre
+  /// des deux points.
+  Alert? findNearbyIdentical(
+    AlertType type,
+    double lat,
+    double lon, {
+    double radiusMeters = 10,
+    DateTime? now,
+  }) {
+    _ensureOpen();
+    final reference = now ?? DateTime.now().toUtc();
+    for (final a in _box!.values) {
+      if (a.type != type) continue;
+      if (a.isExpired(reference)) continue;
+      final d = const Distance().distance(a.position, LatLng(lat, lon));
+      if (d <= radiusMeters) return a;
+    }
+    return null;
   }
 
   /// Insère ou met à jour une alerte.

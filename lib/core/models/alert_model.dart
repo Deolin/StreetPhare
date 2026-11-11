@@ -232,6 +232,33 @@ class Alert {
     return false;
   }
 
+  /// Copie l'alerte en remplaçant la position (lat/lon).
+  ///
+  /// Utilisée pour la fusion de signalements identiques rapprochés : le
+  /// signalement fusionné est déplacé au centre (centroïde) des deux points.
+  Alert copyWithPosition({
+    required double latitude,
+    required double longitude,
+  }) {
+    return Alert(
+      id: id,
+      ephemeralUserId: ephemeralUserId,
+      signature: signature,
+      type: type,
+      latitude: latitude,
+      longitude: longitude,
+      description: description,
+      densityValue: densityValue,
+      createdAt: createdAt,
+      ttlHours: ttlHours,
+      status: status,
+      confirmations: confirmations,
+      uploadedTo: uploadedTo,
+      eventId: eventId,
+      lastModifiedAt: lastModifiedAt,
+    );
+  }
+
   /// Sérialisation alignée sur le contrat serveur Node.js
   /// (POST /v1/reports + POST /alerts).
   Map<String, dynamic> toJson() => {
