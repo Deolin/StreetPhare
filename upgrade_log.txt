@@ -1,0 +1,147 @@
+Upgrading Flutter to 3.47.9 from 3.44.3 in C:\Users\Deolin\Documents\Develop\flutter...
+Expanding downloaded archive with PowerShell...
+Resolving dependencies...
+Downloading packages...
+Got dependencies.
+
+Upgrading engine...
+[1/11] Android SDK
+  ├─ [1/6] android-arm-profile/windows-x64                         754ms
+  ├─ [2/6] android-arm-release/windows-x64                         397ms
+  ├─ [3/6] android-arm64-profile/windows-x64                       480ms
+  ├─ [4/6] android-arm64-release/windows-x64                       501ms
+  ├─ [5/6] android-x64-profile/windows-x64                         423ms
+  └─ [6/6] android-x64-release/windows-x64                         387ms
+[2/11] Android Internal Build Artifacts
+  ├─ [1/10] android-x86                                            14,2s
+  ├─ [2/10] android-x64                                            14,4s
+  ├─ [3/10] android-arm                                            15,1s
+  ├─ [4/10] android-arm-profile                                     5,7s
+  ├─ [5/10] android-arm-release                                     5,1s
+  ├─ [6/10] android-arm64                                          21,4s
+  ├─ [7/10] android-arm64-profile                                   5,8s
+  ├─ [8/10] android-arm64-release                                   5,4s
+  ├─ [9/10] android-x64-profile                                     6,3s
+  └─ [10/10] android-x64-release                                    5,6s
+[4/11] Web SDK                                                      4,2s
+[5/11] Flutter SDK
+  ├─ [1/5] sky_engine                                              215ms
+  ├─ [2/5] flutter_gpu                                              30ms
+  ├─ [3/5] flutter_patched_sdk                                     512ms
+  ├─ [4/5] flutter_patched_sdk_product                             537ms
+  └─ [5/5] windows-x64                                              4,0s
+[6/11] Windows SDK
+  ├─ [1/4] windows-x64-debug/windows-x64-flutter                   10,9s
+  ├─ [2/4] windows-x64/flutter-cpp-client-wrapper                  142ms
+  ├─ [3/4] windows-x64-profile/windows-x64-flutter                  8,9s
+  └─ [4/4] windows-x64-release/windows-x64-flutter                  9,0s
+[11/11] windows-x64/font-subset                                    333ms
+
+Flutter 3.47.9 • channel stable • https://github.com/flutter/flutter.git
+Framework • revision c197ca5199 (13 days ago) • 2026-10-29 10:10:20 -0400
+Engine • hash 9e025265bef30b838c0c1b68cad19decf97048f2 (revision 89c39edfdf) (14 days ago) • 2026-10-27 19:51:20.000Z
+Tools • Dart 3.13.7 • DevTools 2.60.0
+
+Resolving dependencies...
+Downloading packages...
+  _discoveryapis_commons 1.0.7 (1.0.8 available)
+  _fe_analyzer_shared 95.0.0 (111.0.0 available)
+  adaptive_breakpoints 0.1.7 (discontinued)
+  analyzer 10.1.0 (14.7.0 available)
+  animations 2.2.0 (3.0.0 available)
+  archive 3.6.1 (4.6.0 available)
+  browser_launcher 1.1.3 (1.2.0 available)
+  built_collection 5.1.1 (6.0.0 available)
+  built_value 8.12.6 (8.13.0 available)
+  cli_util 0.4.2 (0.6.0 available)
+  clock 1.1.2 (1.1.3 available)
+  code_assets 1.2.1 (2.2.0 available)
+  code_builder 4.11.1 (4.13.0 available)
+  coverage 1.15.1 (1.16.0 available)
+  crypto 3.0.7 (3.0.8 available)
+  cupertino_icons 1.0.9 (2.0.0 available)
+  dart_style 3.1.7 (3.1.14 available)
+  devtools_shared 13.1.0 (14.0.0 available)
+  dwds 27.1.2 (27.2.1 available)
+  extension_discovery 2.1.0 (2.1.1 available)
+  ffigen 20.1.1 (23.0.0 available)
+  file_testing 3.0.2 (3.1.0 available)
+  flutter_template_images 5.0.0 (5.0.1 available)
+  frontend_server_client 4.0.0 (4.2.0 available)
+  gcloud 0.8.19 (0.9.0 available)
+  glob 2.1.3 (2.2.0 available)
+> google_cloud 0.5.0 (was 0.4.1)
+  google_fonts 6.3.3 (9.0.0 available)
+  google_mobile_ads 8.0.0 (9.2.0 available)
+  googleapis 14.0.0 (18.0.0 available)
+  googleapis_auth 2.3.2 (2.3.7 available)
+  hooks 2.0.2 (2.2.0 available)
+  hooks_runner 1.5.0 (2.0.0 available)
+  html 0.15.6 (0.15.7 available)
+  http_multi_server 3.2.2 (3.2.3 available)
+  image 4.3.0 (4.12.0 available)
+  io 1.0.5 (1.1.0 available)
+  isolate 2.1.1 (discontinued)
+> jni 1.1.2 (was 1.0.0)
+> jni_flutter 1.0.4+1 (was 1.0.1)
++ jni_util 1.0.0
+  js 0.7.2 (discontinued)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.3 (1.19.0 available)
+  mime 2.0.0 (2.1.0 available)
+  mustache_template 2.0.5 (2.0.6 available)
+  native_stack_traces 0.6.1 (0.7.1 available)
+  native_toolchain_c 0.19.2 (0.19.6 available)
+> objective_c 9.5.0 (was 9.4.1) (9.6.4 available)
+  package_config 2.2.0 (3.0.0 available)
+  petitparser 7.0.2 (7.1.0 available)
+  platform 3.1.6 (3.2.0 available)
+  pool 1.5.2 (1.5.3 available)
+  process 5.0.5 (5.0.6 available)
+  pub_semver 2.2.0 (2.2.1 available)
+  pubspec_parse 1.5.0 (1.7.0 available)
+  record_use 0.6.0 (1.1.1 available)
+  shelf 1.4.2 (1.4.3 available)
+  shelf_static 1.1.3 (1.2.0 available)
+  source_maps 0.10.13 (0.10.14 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test 1.31.1 (1.33.0 available)
+  test_api 0.7.12 (0.7.15 available)
+  test_core 0.6.18 (0.6.21 available)
+  unified_analytics 8.0.15 (8.4.0 available)
+  url_launcher 6.3.2 (6.3.3 available)
+  url_launcher_android 6.3.32 (6.3.33 available)
+  url_launcher_ios 6.4.1 (6.4.2 available)
+  url_launcher_linux 3.2.2 (3.2.3 available)
+  url_launcher_macos 3.2.5 (3.2.6 available)
+  url_launcher_windows 3.1.5 (3.1.6 available)
+  uuid 4.5.3 (4.6.0 available)
+> vector_math 2.4.4 (was 2.4.0)
+  video_player 2.11.1 (2.14.1 available)
+  video_player_android 2.10.0 (2.12.2 available)
+  video_player_avfoundation 2.10.0 (2.12.3 available)
+  vm_service 15.2.0 (15.4.0 available)
+  web 1.1.1 (1.1.2 available)
+  webdriver 3.1.0 (3.2.0 available)
+  webview_flutter_android 4.13.0 (4.14.1 available)
+  webview_flutter_wkwebview 3.26.0 (3.27.2 available)
+  xml 6.6.1 (7.1.0 available)
+  yaml 3.1.3 (3.1.4 available)
+Changed 6 dependencies!
+3 packages are discontinued.
+75 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+
+Running flutter doctor...
+Doctor summary (to see all details, run flutter doctor -v):
+[√] Flutter (Channel stable, 3.47.9, on Microsoft Windows [version 10.0.19044.7807], locale fr-BE)
+[√] Windows Version (10 Entreprise LTSC 64-bit, 21H2, 2009)
+[!] Android toolchain - develop for Android devices (Android SDK version 37.0.0)
+    ! Some Android licenses not accepted. To resolve this, run: flutter doctor --android-licenses
+[√] Chrome - develop for the web
+[√] Visual Studio - develop Windows apps (Visual Studio Build Tools 2026 18.11.3)
+[√] Connected device (4 available)
+[√] Network resources
+
+! Doctor found issues in 1 category.
+Took 5,5m

@@ -170,6 +170,22 @@ class MapTileDownloadService {
     }
   }
 
+  /// Retourne le chemin du répertoire PERSISTANT de cache des tuiles côté
+  /// natif (Android `getExternalFilesDir`, non effacé par « vider le cache »),
+  /// ou `null` si le canal natif est indisponible.
+  Future<String?> getTileCacheDir() async {
+    try {
+      return await _methodChannel.invokeMethod<String>('getTileCacheDir');
+    } on MissingPluginException {
+      return null;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[MapTileDownload] Erreur getTileCacheDir: $e');
+      }
+      return null;
+    }
+  }
+
   // ── Téléchargement par lot ───────────────────────────────────────────────
 
   Future<List<int>> downloadTileBatch({

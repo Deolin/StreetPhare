@@ -17,7 +17,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const http = require('http');
@@ -36,7 +36,6 @@ const { verifyWsToken } = require('./middleware/auth');
 const { setAdminBroadcaster, setMeshBroadcaster, broadcast, broadcastToAll } = require('./services/broadcast');
 const { routingEngine } = require('./services/routing');
 const { executeCommand } = require('./console');
-const fetch = require('node-fetch');
 
 const app = express();
 
@@ -82,8 +81,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Caddy transmet l'IP réelle du citoyen dans le header X-Forwarded-For.
 // `trust proxy` est limité à 1 saut (Caddy uniquement) pour éviter
 // l'erreur ERR_ERL_PERMISSIVE_TRUST_PROXY de express-rate-limit v7.
-// Les limiters utilisent `keyGenerator: (req) => req.ip` qui exploite
-// cette confiance pour retourner l'IP distante réelle.
+// Les limiters utilisent `keyGenerator: (req) => ipKeyGenerator(req.ip)` qui,
+// via `trust proxy`, retourne l'IP distante réelle normalisée (IPv4/IPv6).
 app.set('trust proxy', 1);
 
 // ── Logger HTTP personnalisé [YYYY-MM-DD HH:mm:ss] [HTTP] REQ: METHOD /ROUTE - IP: CLIENT
@@ -114,6 +113,11 @@ const limiter = rateLimit({
   max: config.rateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
+  // ── PER-USER ── une limite PAR IP réelle de client (via `trust proxy`).
+  // Sans quoi (ou avec un proxy mal configuré), tous les clients
+  // partageraient le même quota et quelques « chanceux » seuls auraient
+  // leurs tuiles. La clé explicite garantit un budget par utilisateur.
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
   message: {
     error: 'Trop de requêtes. Veuillez réessayer plus tard.',
   },
@@ -132,6 +136,9 @@ const limiter = rateLimit({
     if (req.path.startsWith('/api/sync')) return true;
     // Ne pas limiter le ping (healthcheck).
     if (req.path === '/api/ping') return true;
+    // Les tuiles ont LEUR PROPRE limite (tileLimiter, également par IP),
+    // pour ne pas consommer le quota API global de l'utilisateur.
+    if (req.path.startsWith('/tiles')) return true;
     return false;
   },
 });
@@ -151,11 +158,39 @@ app.get('/admin', (req, res) => {
 app.use('/admin', express.static(path.join(__dirname, '..', 'public', 'admin')));
 app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 
+// ── Rate Limiting des tuiles de carte — PAR UTILISATEUR ──────────────────
+// Le trafic de tuiles (volume élevé) est ISOLÉ des routes API. Chaque
+// utilisateur (IP réelle via X-Forwarded-For) dispose de son PROPRE budget,
+// afin qu'aucun utilisateur n'épuise le quota des autres.
+// Le handler renvoie 429 avec un code identifiable : l'app affiche alors
+// « patientez avant de charger de nouvelles zones de la carte ».
+const tileLimiter = rateLimit({
+  windowMs: config.rateLimitWindowMs,
+  max: config.tileRateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  message: {
+    error: 'Limite de tuiles atteinte. Patientez avant de charger de nouvelles zones de la carte.',
+    code: 'TILE_RATE_LIMITED',
+  },
+  handler: (req, res, _next, options) => {
+    const retryAfterSec = Math.ceil(options.windowMs / 1000);
+    log('RATELIMIT', `⛔ Limite TUILLES atteinte — IP: ${req.ip} — ${req.method} ${req.originalUrl}`);
+    res.set('Retry-After', String(retryAfterSec));
+    res.status(429).json({
+      error: options.message.error,
+      code: options.message.code,
+      retryAfterMs: options.windowMs,
+    });
+  },
+});
+
 // ── Routes API ──────────────────────────────────────────────────────────
 // ── Proxy de tuiles OSM (les clients téléchargent les cartes via StreetPhare) ─
 // Le client ne sollicite jamais tile.openstreetmap.org directement :
 // il passe par ce proxy qui relaie (et pourra mettre en cache) les tuiles.
-app.get('/tiles/:z/:x/:y.png', async (req, res) => {
+app.get('/tiles/:z/:x/:y.png', tileLimiter, async (req, res) => {
   const { z, x, y } = req.params;
   const tileUrl = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
   try {
@@ -163,7 +198,7 @@ app.get('/tiles/:z/:x/:y.png', async (req, res) => {
       headers: { 'User-Agent': 'StreetPhare/3.0 (proxy tuiles OSM)' },
     });
     if (!r.ok) return res.status(r.status).end();
-    const buf = await r.buffer();
+    const buf = Buffer.from(await r.arrayBuffer());
     res.set('Content-Type', 'image/png');
     res.set('Cache-Control', 'public, max-age=86400');
     res.send(buf);

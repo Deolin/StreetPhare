@@ -1,8 +1,16 @@
-// Built-in Kotlin is enabled (AGP 9.0+)
-// Ref: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin
+// Kotlin appliqué via le Kotlin Gradle Plugin (mode compatibilité).
+//
+// On n'utilise PAS le "Built-in Kotlin" d'AGP 9.x (android.builtInKotlin=false
+// dans gradle.properties) car celui-ci embarque le compilateur Kotlin 2.2.10 :
+//   1. Flutter 3.47 le rejette (min requis = 2.2.20, flutter/flutter#192167).
+//   2. Il ne sait pas lire le bytecode kotlin-stdlib 2.4.x tiré par les
+//      plugins récents (reactive_ble_mobile, etc.).
+// => KGP 2.4.0 est appliqué explicitement (déclaré dans settings.gradle.kts),
+//    ce qui fait que Flutter lit la vraie version 2.4.0 et non 2.2.10.
 
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }

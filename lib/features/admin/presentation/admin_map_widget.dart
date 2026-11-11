@@ -20,12 +20,16 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/models/alert_model.dart';
 import '../../../core/network/osm_tile_headers.dart';
+import '../../../network/network_config.dart';
 import '../../../network/network_coordinator.dart';
+import '../../map/local_first_tile_provider.dart';
 
-/// URL des tuiles OpenStreetMap Standard (gratuit, sans clé API).
+/// URL des tuiles : serveur StreetPhare en priorité. Le
+/// [LocalFirstTileProvider] privilégie d'abord le cache local, puis cette URL,
+/// avec repli OSM.
 /// Le mode sombre est obtenu via `darkModeTileBuilder` (filtre invert+hue-rotate).
-const String _kTileUrlDark = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-const String _kTileUrlLight = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+String get _kTileUrlDark => '${NetworkConfig.baseUrl}/tiles/{z}/{x}/{y}.png';
+String get _kTileUrlLight => '${NetworkConfig.baseUrl}/tiles/{z}/{x}/{y}.png';
 
 /// Widget de carte autonome pour le Dashboard Admin.
 ///
@@ -215,11 +219,10 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
             children: [
               TileLayer(
                 urlTemplate: tileUrl,
+                fallbackUrl: kStreetPhareOsmTileUrlTemplate,
                 userAgentPackageName: 'com.streetphare.admin',
-                tileProvider: NetworkTileProvider(
+                tileProvider: LocalFirstTileProvider(
                   headers: kStreetPhareTileHeaders,
-                  // Ne pas rethrow les erreurs réseau (timeout tuiles).
-                  silenceExceptions: true,
                 ),
                 maxNativeZoom: 19,
                 tileBuilder: widget.darkMode ? darkModeTileBuilder : null,

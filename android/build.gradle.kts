@@ -1,25 +1,21 @@
 // Script Gradle RACINE du projet Android (Modernisé Kotlin DSL).
 //
 // Responsabilités :
-//   1. Définir un répertoire de build partagé.
-//   2. === FORCER LE compileSdk DE TOUS LES PLUGINS ===
+//   1. === FORCER LE compileSdk DE TOUS LES PLUGINS ===
 //      Essentiel pour AGP 9+ quand des plugins tiers (ex: flutter_reactive_ble)
 //      déclarent un compileSdk obsolète (< 34).
-//   3. Déclarer la tâche `clean`.
+//   2. Déclarer la tâche `clean`.
+//
+// NOTE : on ne redirige PAS le répertoire de build vers un dossier partagé
+// (`../../build`). Ce hack plaçait le build des plugins Flutter (dont le
+// source vit dans le Pub Cache sur `C:`) sur un autre lecteur (`E:`),
+// provoquant l'erreur Gradle/AGP « this and base files have different roots »
+// sur `:flutter_secure_storage:compileDebugUnitTestSources`. Chaque projet
+// conserve donc son répertoire de build par défaut, co-localisé avec son
+// source (même lecteur) et il n'y a plus de franchissement de lecteurs.
 
 val targetCompileSdk: Int = 37
 val targetSdkVersion: Int = 36
-
-val newBuildDir: Directory =
-    rootProject.layout.buildDirectory
-        .dir("../../build")
-        .get()
-rootProject.layout.buildDirectory.value(newBuildDir)
-
-subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
-    project.layout.buildDirectory.value(newSubprojectBuildDir)
-}
 
 subprojects {
     project.evaluationDependsOn(":app")

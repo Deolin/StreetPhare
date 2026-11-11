@@ -12,7 +12,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const http = require('http');
@@ -86,6 +86,8 @@ const limiter = rateLimit({
   max: config.rateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
+  // ── PER-USER ── une limite PAR IP réelle de client (via `trust proxy`).
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
   message: {
     error: 'Trop de requêtes. Veuillez réessayer plus tard.',
   },

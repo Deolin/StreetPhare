@@ -58,8 +58,16 @@ class MapCacheManager {
   /// les entrées expirées.
   Future<void> init() async {
     try {
-      final appDir = await getApplicationDocumentsDirectory();
-      _cacheDir = Directory('${appDir.path}/map_tiles_cache');
+      // Répertoire PERSISTANT des tuiles : on interroge le natif (Android
+      // `getExternalFilesDir`, non effacé par « vider le cache »). Repli sur
+      // le dossier documents de l'app si le canal natif est indisponible.
+      final nativeDir = await MapTileDownloadService.instance.getTileCacheDir();
+      if (nativeDir != null && nativeDir.isNotEmpty) {
+        _cacheDir = Directory(nativeDir);
+      } else {
+        final appDir = await getApplicationDocumentsDirectory();
+        _cacheDir = Directory('${appDir.path}/map_tiles_cache');
+      }
       if (!_cacheDir!.existsSync()) {
         _cacheDir!.createSync(recursive: true);
       }

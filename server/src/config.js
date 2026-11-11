@@ -107,6 +107,13 @@ const config = {
   // Nombre maximum de requêtes par IP dans la fenêtre.
   rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '500', 10),
 
+  // ── Rate limiting des tuiles de carte ───────────────────────────────
+  // Les tuiles sont chargées en volume élevé (un simple panoramique
+  // demande des dizaines de tuiles). On isole donc ce trafic des routes
+  // API avec un budget PAR UTILISATEUR (IP réelle via X-Forwarded-For),
+  // pour qu'aucun utilisateur n'épuise le quota des autres.
+  tileRateLimitMax: parseInt(process.env.RATE_LIMIT_TILES_MAX || '4000', 10),
+
   // ── Logs ────────────────────────────────────────────────────────────
   logDir: process.env.LOG_DIR || './logs',
 

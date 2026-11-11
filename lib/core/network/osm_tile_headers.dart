@@ -31,3 +31,11 @@ final Map<String, String> kStreetPhareTileHeaders = {
   'User-Agent': kStreetPhareUserAgent,
   'Referer': kStreetPhareReferer,
 };
+
+/// Modèle d'URL de repli des tuiles OpenStreetMap publiques (internet).
+///
+/// Utilisé comme `TileLayer.fallbackUrl` : les tuiles sont chargées dans
+/// l'ordre cache local → serveur StreetPhare → OSM public
+/// (voir `LocalFirstTileProvider`).
+const String kStreetPhareOsmTileUrlTemplate =
+    'https://tile.openstreetmap.org/{z}/{x}/{y}.png';

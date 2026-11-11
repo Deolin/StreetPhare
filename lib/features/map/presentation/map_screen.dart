@@ -68,6 +68,7 @@ import '../../routing/presentation/safe_path_engine.dart';
 import '../../settings/data/app_preferences_store.dart';
 import '../../settings/data/panic_contact_store.dart';
 import '../../settings/presentation/settings_screen.dart';
+import '../local_first_tile_provider.dart';
 import 'widgets/long_press_detector.dart';
 import 'widgets/restricted_segment_layer.dart';
 import 'widgets/safe_route_layer.dart';
@@ -1107,6 +1108,26 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  /// Affiche un message quand la limite serveur de chargement des tuiles est
+  /// atteinte pour cet utilisateur (429 TILE_RATE_LIMITED).
+  void _onTileRateLimited(Duration? waitFor) {
+    if (!mounted) return;
+    final String message = waitFor != null
+        ? 'Limite de chargement de carte atteinte. Patientez environ '
+            '${waitFor.inMinutes} minute(s) avant de charger de nouvelles '
+            'zones de la carte.'
+        : 'Limite de chargement de carte atteinte. Patientez quelques '
+            'minutes avant de charger de nouvelles zones de la carte.';
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+  }
+
   /// Calcule et trace une « route safe » vers un point (icône d'événement),
   /// sans popup de choix du mode : utilise le mode de transport par défaut.
   Future<void> _triggerSafeRouteToPoint(
@@ -2081,12 +2102,11 @@ class _MapScreenState extends State<MapScreen> {
                                 TileLayer(
                                   key: ValueKey('tiles_$isDark'),
                                   urlTemplate: tileUrl,
+                                  fallbackUrl: kStreetPhareOsmTileUrlTemplate,
                                   userAgentPackageName: 'com.streetphare.app',
-                                  tileProvider: NetworkTileProvider(
+                                  tileProvider: LocalFirstTileProvider(
                                     headers: kStreetPhareTileHeaders,
-                                    // Ne pas rethrow les erreurs réseau (timeout
-                                    // tuiles) → évite crash + rapport de bug.
-                                    silenceExceptions: true,
+                                    onTileRateLimited: _onTileRateLimited,
                                   ),
                                   maxNativeZoom: 19,
                                   errorTileCallback: (tile, error, stackTrace) {

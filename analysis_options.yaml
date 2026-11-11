@@ -3,6 +3,15 @@
 # Règles d'analyse statique strictes activées le 29/06/2026 (P2.1).
 # Voir: docs/plan_et_audit_complet_28062026.md#P2.1
 
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 include: package:flutter_lints/flutter.yaml
 
 linter:

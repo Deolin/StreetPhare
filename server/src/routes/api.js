@@ -2,7 +2,7 @@
 // Routes API REST pour l'application Flutter StreetPhare.
 
 const express = require('express');
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -35,7 +35,8 @@ const reportLimiter = rateLimit({
     // Utilise l'IP réelle du citoyen transmise par Caddy via X-Forwarded-For.
     // `app.set('trust proxy', true)` dans primary.js/backup.js permet
     // à req.ip de retourner l'IP distante et non 127.0.0.1.
-    return req.ip;
+    // `ipKeyGenerator` normalise l'IPv6 (évite le contournement de limite).
+    return ipKeyGenerator(req.ip);
   },
 });
 
@@ -49,11 +50,8 @@ const messageLimiter = rateLimit({
   message: {
     error: 'Vitesse d\'envoi trop élevée. Ralentissez vos messages.',
   },
-  keyGenerator: (req) => req.ip,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
 });
-
-// ═══════════════════════════════════════════════════════════════════════
-// ALERTS (Signalements citoyens)
 // ═══════════════════════════════════════════════════════════════════════
 
 /// POST /api/alerts — Réception d'un signalement.

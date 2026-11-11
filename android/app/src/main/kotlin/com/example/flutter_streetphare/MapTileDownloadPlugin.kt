@@ -54,7 +54,8 @@ class MapTileDownloadPlugin(private val context: Context) : MethodChannel.Method
         const val METHOD_CHANNEL = "streetphare/map_tiles"
         const val EVENT_CHANNEL  = "streetphare/map_tiles_status"
 
-        /// Sous-dossier dans le cache externe pour les tuiles.
+        /// Sous-dossier PERSISTANT des tuiles (stockage externe propre à l'app,
+        /// non effacé par « vider le cache » ni par Android).
         const val TILES_SUBDIR = "map_tiles_cache"
 
         /// Base URL du serveur privé StreetPhare pour les tuiles.
@@ -206,6 +207,13 @@ class MapTileDownloadPlugin(private val context: Context) : MethodChannel.Method
         }
     }
 
+    // ── Répertoire PERSISTANT des tuiles ────────────────────────────────────
+    // `getExternalFilesDir` = stockage externe propre à l'app, NON effacé par
+    // « vider le cache » ni par Android en cas de manque d'espace (au contraire
+    // d'`externalCacheDir`). Repli sur le stockage interne `filesDir`.
+    private fun tilesCacheDir(): File =
+        File(context.getExternalFilesDir(null) ?: context.filesDir, TILES_SUBDIR)
+
     // ── MethodChannel Handler ────────────────────────────────────────────────
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -220,7 +228,7 @@ class MapTileDownloadPlugin(private val context: Context) : MethodChannel.Method
                 val privateUrl = "$PRIVATE_TILE_BASE/$tilePath"
                 val fallbackUrl = "$OSM_TILE_BASE/$tilePath"
 
-                val cacheDir = File(context.externalCacheDir ?: context.cacheDir, TILES_SUBDIR)
+                val cacheDir = tilesCacheDir()
                 val destDir = File(cacheDir, "$z/$x")
                 destDir.mkdirs()
                 val destFile = File(destDir, "$y.$ext")
@@ -249,13 +257,17 @@ class MapTileDownloadPlugin(private val context: Context) : MethodChannel.Method
                 val y = call.argument<Int>("y") ?: run { result.error("ARGS", "y missing", null); return }
                 val ext = call.argument<String>("ext") ?: "png"
 
-                val cacheDir = File(context.externalCacheDir ?: context.cacheDir, TILES_SUBDIR)
+                val cacheDir = tilesCacheDir()
                 val tile = File(File(cacheDir, "$z/$x"), "$y.$ext")
                 if (tile.exists() && tile.length() > 0) {
                     result.success(tile.absolutePath)
                 } else {
                     result.success(null)
                 }
+            }
+
+            "getTileCacheDir" -> {
+                result.success(tilesCacheDir().absolutePath)
             }
 
             else -> result.notImplemented()
