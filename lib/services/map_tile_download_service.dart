@@ -78,6 +78,16 @@ class MapTileDownloadService {
   static const _methodChannel = MethodChannel('streetphare/map_tiles');
   static const _eventChannel = EventChannel('streetphare/map_tiles_status');
 
+  /// `true` si le téléchargement natif des tuiles est disponible.
+  ///
+  /// Le DownloadManager / EventChannel de statut sont implémentés uniquement
+  /// côté Android (`MapTileDownloadPlugin.kt`). Sur les autres plateformes
+  /// (Windows, web…), on neutralise le service pour éviter un
+  /// `MissingPluginException` sur le canal `streetphare/map_tiles_status`
+  /// (cf. bug d1bfa126…).
+  bool get _isSupported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
   TileUrlConfig urlConfig = const TileUrlConfig();
 
   // ── Stream ───────────────────────────────────────────────────────────────
@@ -86,6 +96,9 @@ class MapTileDownloadService {
   StreamSubscription<dynamic>? _eventSub;
 
   Stream<TileDownloadEvent> get statusStream {
+    if (!_isSupported) {
+      return const Stream<TileDownloadEvent>.empty();
+    }
     _statusStream ??= _eventChannel.receiveBroadcastStream().map((data) {
       final map = Map<String, dynamic>.from(data as Map);
       return TileDownloadEvent(
@@ -118,6 +131,7 @@ class MapTileDownloadService {
     required int y,
     String ext = 'png',
   }) async {
+    if (!_isSupported) return -1;
     _downloadCount++;
 
     try {
@@ -197,6 +211,7 @@ class MapTileDownloadService {
     required int maxY,
     String ext = 'png',
   }) async {
+    if (!_isSupported) return const <int>[];
     final ids = <int>[];
     for (var z = minZ; z <= maxZ; z++) {
       for (var x = minX; x <= maxX; x++) {
@@ -213,17 +228,26 @@ class MapTileDownloadService {
   }
 
   void startTracking() {
+    if (!_isSupported) return;
     _eventSub?.cancel();
-    _eventSub = statusStream.listen((event) {
-      switch (event.status) {
-        case 'completed':
-          _successCount++;
-          if (event.attempt == 1) _osmFallbackCount++;
-        case 'failed':
-        case 'error':
-          _failCount++;
-      }
-    });
+    _eventSub = statusStream.listen(
+      (event) {
+        switch (event.status) {
+          case 'completed':
+            _successCount++;
+            if (event.attempt == 1) _osmFallbackCount++;
+          case 'failed':
+          case 'error':
+            _failCount++;
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        // Ne jamais faire crasher l'app si le flux natif est indisponible.
+        if (kDebugMode) {
+          debugPrint('[MapTileDownload] Erreur flux de statut: $error');
+        }
+      },
+    );
   }
 
   void stopTracking() {

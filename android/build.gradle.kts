@@ -1,21 +1,40 @@
 // Script Gradle RACINE du projet Android (Modernisé Kotlin DSL).
 //
 // Responsabilités :
-//   1. === FORCER LE compileSdk DE TOUS LES PLUGINS ===
+//   1. Définir un répertoire de build partagé (comportement standard Flutter).
+//   2. === FORCER LE compileSdk DE TOUS LES PLUGINS ===
 //      Essentiel pour AGP 9+ quand des plugins tiers (ex: flutter_reactive_ble)
 //      déclarent un compileSdk obsolète (< 34).
-//   2. Déclarer la tâche `clean`.
+//   3. Déclarer la tâche `clean`.
 //
-// NOTE : on ne redirige PAS le répertoire de build vers un dossier partagé
-// (`../../build`). Ce hack plaçait le build des plugins Flutter (dont le
-// source vit dans le Pub Cache sur `C:`) sur un autre lecteur (`E:`),
-// provoquant l'erreur Gradle/AGP « this and base files have different roots »
-// sur `:flutter_secure_storage:compileDebugUnitTestSources`. Chaque projet
-// conserve donc son répertoire de build par défaut, co-localisé avec son
-// source (même lecteur) et il n'y a plus de franchissement de lecteurs.
+// NOTE (répertoire de build) : l'outil Flutter cherche l'APK sous
+// `<projet>/build/app/outputs/flutter-apk/`. On redirige donc le buildDir des
+// MODULES LOCAUX (:app, :mini_downloader) vers le dossier partagé `../../build`.
+// En revanche, on EXCLUT les plugins Flutter tiers (chargés en sous-projets via
+// `settings.include`, sources dans le Pub Cache — souvent sur un autre lecteur
+// `C:`), car les rediriger provoquait l'erreur Gradle/AGP « this and base files
+// have different roots » sur `:flutter_secure_storage:compileDebugUnitTestSources`.
 
 val targetCompileSdk: Int = 37
 val targetSdkVersion: Int = 36
+
+// ── Répertoire de build partagé (Flutter attend l'APK sous build/app/) ──────
+val sharedBuildDir: Directory =
+    rootProject.layout.buildDirectory
+        .dir("../../build")
+        .get()
+
+val repoRoot: File = rootProject.projectDir.parentFile.canonicalFile
+
+subprojects {
+    // Redirige UNIQUEMENT les modules dont la source vit dans ce dépôt
+    // (:app, :mini_downloader). Les plugins Flutter tiers (Pub Cache sur un
+    // autre lecteur) conservent leur buildDir par défaut.
+    if (project.projectDir.canonicalFile.path.startsWith(repoRoot.path)) {
+        val newSubprojectBuildDir: Directory = sharedBuildDir.dir(project.name)
+        project.layout.buildDirectory.value(newSubprojectBuildDir)
+    }
+}
 
 subprojects {
     project.evaluationDependsOn(":app")
