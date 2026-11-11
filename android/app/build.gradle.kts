@@ -11,8 +11,9 @@ plugins {
 // (BaseAppModuleExtension toujours fonctionnel en attendant AGP 10.0)
 android {
     namespace = "com.example.flutter_streetphare"
-    // Android 16 (API 36) — Baklava
-    compileSdk = 36
+    // compileSdk 37 requis par flutter_local_notifications,
+    // permission_handler_android et reactive_ble_mobile.
+    compileSdk = 37
     ndkVersion = "28.2.13676358"
 
     compileOptions {

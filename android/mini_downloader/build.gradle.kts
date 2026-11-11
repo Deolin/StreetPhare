@@ -14,7 +14,7 @@ plugins {
 
 android {
     namespace = "com.streetphare.mini_downloader"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.streetphare.downloader"

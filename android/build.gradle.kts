@@ -7,7 +7,8 @@
 //      déclarent un compileSdk obsolète (< 34).
 //   3. Déclarer la tâche `clean`.
 
-val targetCompileSdk: Int = 36
+val targetCompileSdk: Int = 37
+val targetSdkVersion: Int = 36
 
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
@@ -25,7 +26,7 @@ subprojects {
 }
 
 // ============================================================================
-// === COMPATIBILITÉ : force compileSdk = 36 sur tous les plugins
+// === COMPATIBILITÉ : force compileSdk = 37 sur tous les plugins
 // ============================================================================
 
 gradle.beforeProject {
@@ -33,9 +34,9 @@ gradle.beforeProject {
 
     // Injection via les propriétés d'extension (extra)
     project.extra["compileSdkVersion"] = targetCompileSdk
-    project.extra["targetSdkVersion"] = targetCompileSdk
+    project.extra["targetSdkVersion"] = targetSdkVersion
     project.extra["compileSdk"] = targetCompileSdk
-    project.extra["targetSdk"] = targetCompileSdk
+    project.extra["targetSdk"] = targetSdkVersion
 }
 
 // ============================================================================
