@@ -18,8 +18,8 @@ void main() {
       expect(f.avoidRassemblements, isTrue);
     });
 
-    test('n\'évite pas accidents et autres par défaut', () {
-      expect(f.avoidAccidents, isFalse);
+    test('évite accidents par défaut mais pas les dangers « autres »', () {
+      expect(f.avoidAccidents, isTrue);
       expect(f.avoidAutres, isFalse);
     });
 
@@ -33,7 +33,7 @@ void main() {
 
     test('barrage → avoidBarrages', () {
       expect(f.shouldAvoid(AlertType.barrage), isTrue);
-      expect(f.shouldAvoid(AlertType.filtre), isTrue); // filtre → avoidBarrages
+      expect(f.shouldAvoid(AlertType.filtre), isTrue); // filtre → avoidNasses
     });
 
     test('casseurs → avoidRassemblements', () {
@@ -44,8 +44,12 @@ void main() {
       expect(f.shouldAvoid(AlertType.policiers), isTrue);
     });
 
-    test('danger → avoidAccidents (false par défaut)', () {
-      expect(f.shouldAvoid(AlertType.danger), isFalse);
+    test('danger → avoidAccidents (true par défaut)', () {
+      expect(f.shouldAvoid(AlertType.danger), isTrue);
+    });
+
+    test('autopompes → avoidAccidents', () {
+      expect(f.shouldAvoid(AlertType.autopompes), isTrue);
     });
 
     test('types résiduels (panic, density, autre) → avoidAutres', () {
