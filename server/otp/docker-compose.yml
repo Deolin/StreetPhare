@@ -1,0 +1,23 @@
+# OpenTripPlanner (OTP) — Transports en commun StreetPhare
+#
+# Moteur de routage multi-paliers (marche + bus/tram/train) utilisé par le
+# profil « transit » du client Flutter. Déployé en Docker, exposé en HTTPS
+# par Caddy sous https://streetphare.ddns.net/otp/routers/default.
+
+services:
+  otp:
+    image: docker.io/opentripplanner/opentripplanner:latest
+    container_name: streetphare-otp
+    restart: unless-stopped
+    environment:
+      # Mémoire JVM allouée à OTP. À ajuster selon la RAM du serveur :
+      #   ~4g pour une région (Wallonie), ~6-8g pour la Belgique entière.
+      JAVA_TOOL_OPTIONS: "-Xmx6g"
+    ports:
+      # Écoute UNIQUEMENT en local : Caddy expose /otp en HTTPS (port 443).
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # Répertoire contenant osm.pbf + gtfs + graphe pré-construit (voir build-graph.sh).
+      - ./data:/var/opentripplanner
+    # Sert le graphe pré-construit (voir build-graph.sh).
+    command: ["--load", "--serve"]

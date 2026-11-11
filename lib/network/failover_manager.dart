@@ -34,6 +34,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../core/network/peer_counter_service.dart';
 import '../database/crypto_utils.dart';
 import '../debug/client_debug_logger.dart';
 import 'network_config.dart';
@@ -565,7 +566,12 @@ class FailoverManager {
           .post(
             uri,
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'alerts': alerts}),
+            body: jsonEncode({
+              'alerts': alerts,
+              // Identifiant éphémère : permet au serveur d'appliquer un
+              // quota PERSONNEL (et non par IP) pour la synchronisation.
+              'peerId': PeerCounterService.instance.localPeerId ?? '',
+            }),
           )
           .timeout(_config!.pingTimeout);
 

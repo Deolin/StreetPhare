@@ -159,7 +159,7 @@ class RoutingEngine {
       out.push({
         x: (lon - this.refLon) * 111320 * this.cosRef,
         y: (lat - this.refLat) * 110540,
-        radius: Number.isFinite(p.radius) ? p.radius : 5,
+        radius: Number.isFinite(p.radius) ? p.radius : 25,
         weight: Number.isFinite(p.weight) ? p.weight : 1e6,
       });
     }
@@ -188,13 +188,18 @@ class RoutingEngine {
    *
    * @param {Array<{lat:number,lon:number,radius?:number,weight?:number}>} avoidPoints
    *   Zones de danger validées : les arêtes passant à moins de `radius` mètres
-   *   d'un point sont pondérées (×`weight`, défaut 10) pour être évitées sans
+   *   d'un point sont pondérées (×`weight`, défaut 1e6) pour être évitées sans
    *   être exclues (si aucun contournement n'existe, le chemin traverse).
    * @returns {Object|null} { points: [[lat,lon],...], distanceMeters, durationSeconds }
    */
   route(fromLat, fromLon, toLat, toLon, avoidPoints = [], profile = 'foot') {
-    const useCar = (profile === 'car' || profile === 'vehicle') && this.carGraph;
-    const g = useCar ? this.carGraph : this.load();
+    // Charge d'abord les graphes (idempotent) : au premier appel, `carGraph`
+    // est encore null, ce qui ferait retomber une demande voiture sur le
+    // graphe piéton (bug « voiture affichée à pied » intermittente).
+    this.load();
+    const useCar =
+        (profile === 'car' || profile === 'vehicle') && !!this.carGraph;
+    const g = useCar ? this.carGraph : this.graph;
     const start = this.nearest(fromLat, fromLon, useCar);
     const end = this.nearest(toLat, toLon, useCar);
     if (start < 0 || end < 0) return null;

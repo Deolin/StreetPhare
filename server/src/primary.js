@@ -29,6 +29,7 @@ const config = require('./config');
 const store = require('./store');
 const sync = require('./sync');
 const apiRoutes = require('./routes/api');
+const { userKeyGenerator } = apiRoutes;
 const adminRoutes = require('./routes/admin');
 const adminEventRoutes = require('./routes/adminEvents');
 const simulationRoutes = require('./routes/simulation');
@@ -113,11 +114,10 @@ const limiter = rateLimit({
   max: config.rateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
-  // ── PER-USER ── une limite PAR IP réelle de client (via `trust proxy`).
-  // Sans quoi (ou avec un proxy mal configuré), tous les clients
-  // partageraient le même quota et quelques « chanceux » seuls auraient
-  // leurs tuiles. La clé explicite garantit un budget par utilisateur.
-  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  // ── PER-USER ── quota PAR UTILISATEUR (identifiant éphémère userId/peerId),
+  // avec repli sur l'IP réelle (via `trust proxy`) pour les requêtes sans
+  // identifiant (GET). Chaque utilisateur dispose ainsi de son budget propre.
+  keyGenerator: userKeyGenerator,
   message: {
     error: 'Trop de requêtes. Veuillez réessayer plus tard.',
   },
@@ -169,7 +169,7 @@ const tileLimiter = rateLimit({
   max: config.tileRateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  keyGenerator: userKeyGenerator,
   message: {
     error: 'Limite de tuiles atteinte. Patientez avant de charger de nouvelles zones de la carte.',
     code: 'TILE_RATE_LIMITED',

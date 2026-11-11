@@ -194,7 +194,7 @@ class ProximityValidationSheet extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Text(
-                'La zone est-elle toujours sans danger ou le danger est-il toujours là ?',
+                'Le danger est-il toujours présent ?',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: StreetPhareTheme.textPrimary,
@@ -240,7 +240,7 @@ class ProximityValidationSheet extends StatelessWidget {
                       onPressed: () => Navigator.of(context).pop(false),
                       icon: Icon(Icons.close, color: StreetPhareTheme.danger),
                       label: Text(
-                        'NON',
+                        'Non, disparu',
                         style: TextStyle(
                           color: StreetPhareTheme.danger,
                           fontWeight: FontWeight.bold,
@@ -261,7 +261,7 @@ class ProximityValidationSheet extends StatelessWidget {
                       onPressed: () => Navigator.of(context).pop(true),
                       icon: const Icon(Icons.check, color: Colors.black),
                       label: const Text(
-                        'OUI',
+                        'Oui, toujours là',
                         style: TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,

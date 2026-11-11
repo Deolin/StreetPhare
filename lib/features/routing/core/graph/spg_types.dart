@@ -271,9 +271,14 @@ class RoutingAvoidPoint {
     required this.lat,
     required this.lon,
     this.radiusMeters = 5.0,
+    this.weight = 1e6,
   });
 
   final double lat;
   final double lon;
   final double radiusMeters;
+
+  /// Poids d'évitement (multiplicateur de coût) : barrage = quasi-infini,
+  /// autres dangers = fort mais franchissable.
+  final double weight;
 }

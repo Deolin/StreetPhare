@@ -27,8 +27,18 @@ import android.util.Log
 import com.graphhopper.GHRequest
 import com.graphhopper.GHResponse
 import com.graphhopper.GraphHopper
-import com.graphhopper.config.Profile
+import com.graphhopper.json.Statement
+import com.graphhopper.routing.weighting.custom.CustomProfile
+import com.graphhopper.util.CustomModel
+import com.graphhopper.util.JsonFeature
+import com.graphhopper.util.JsonFeatureCollection
 import com.graphhopper.util.Parameters
+import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.Geometry
+import org.locationtech.jts.geom.GeometryFactory
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
@@ -298,10 +308,11 @@ class OsmAndBridgePlugin(
             }
 
             // ── Dossier de cache du graphe ───────────────────────────
-            // v2 : force la reconstruction du graphe avec les profils
-            // foot + car (l'ancien cache v1 n'avait que le profil foot,
-            // ce qui faisait retomber le mode voiture sur le piéton).
-            val graphDir = File(context.filesDir, "graphhopper_cache_v2")
+            // v3 : profils en weighting "custom" (CustomProfile) pour
+            // activer l'évitement dynamique des zones de danger via
+            // custom_model. Le passage fastest -> custom invalide le
+            // cache v2 (simple foot/car fastest).
+            val graphDir = File(context.filesDir, "graphhopper_cache_v3")
 
             // ── Configurer et initialiser GraphHopper ────────────────
             val gh = GraphHopper()
@@ -313,14 +324,20 @@ class OsmAndBridgePlugin(
             // (FlagEncoderFactory supprimé dans GH 6+).
             // Le profil "car" respecte le code de la route (sens uniques,
             // restrictions) et n'emprunte que les routes carrossables.
+            // NOTE GH 7.0 : pour que l'évitement dynamique (custom_model)
+            // soit pris en compte, le profil doit utiliser le weighting
+            // "custom" et embarquer un CustomModel par défaut (sinon le
+            // hint custom_model de la requête est silencieusement ignoré).
             gh.profiles = listOf(
-                Profile(FOOT_PROFILE)
+                CustomProfile(FOOT_PROFILE)
+                    .setCustomModel(CustomModel().setDistanceInfluence(0.0))
                     .setVehicle("foot")
-                    .setWeighting("fastest")
+                    .setWeighting("custom")
                     .setTurnCosts(false),
-                Profile(CAR_PROFILE)
+                CustomProfile(CAR_PROFILE)
+                    .setCustomModel(CustomModel().setDistanceInfluence(0.0))
                     .setVehicle("car")
-                    .setWeighting("fastest")
+                    .setWeighting("custom")
                     .setTurnCosts(false),
             )
 
@@ -443,9 +460,10 @@ class OsmAndBridgePlugin(
             // Requirement #2 : n'exclus pas simplement la route, alourdis le poids.
             if (avoidPoints.isNotEmpty()) {
                 Log.d(TAG, "Application de ${avoidPoints.size} zones de pondération dynamique")
-                
-                val priorityStatements = mutableListOf<Map<String, String>>()
-                val areas = mutableMapOf<String, Any>()
+
+                val customModel = CustomModel()
+                val features = JsonFeatureCollection()
+                val geometryFactory = GeometryFactory()
 
                 for (pt in avoidPoints) {
                     val lat    = (pt["lat"]    as? Number)?.toDouble() ?: continue
@@ -454,30 +472,28 @@ class OsmAndBridgePlugin(
                     val weight = (pt["weight"] as? Number)?.toDouble() ?: 1e6
 
                     val areaId = "area_${lat.toString().replace(".", "_")}_${lon.toString().replace(".", "_")}"
-                    
-                    priorityStatements.add(mapOf(
-                        "if" to "in_$areaId",
-                        "multiply_by" to (1.0 / weight).toString()
-                    ))
-                    
-                    // Définition de l'aire circulaire (format GraphHopper CustomModel)
-                    areas[areaId] = mapOf(
-                        "type" to "Feature",
-                        "geometry" to mapOf(
-                            "type" to "Point",
-                            "coordinates" to listOf(lon, lat)
-                        ),
-                        "properties" to mapOf("radius" to radius)
+
+                    // Alourdit fortement la priorité dans la zone :
+                    // multiply_by = 1/weight (~1e-6) rend la traversée quasi-prohibitive.
+                    customModel.addToPriority(
+                        Statement.If("in_$areaId", Statement.Op.MULTIPLY, (1.0 / weight).toString())
+                    )
+
+                    // GraphHopper ne comprend que des POLYGONES pour les `areas` ;
+                    // on convertit le point+rayon en polygone circulaire (JTS).
+                    features.getFeatures().add(
+                        JsonFeature().apply {
+                            id = areaId
+                            geometry = circlePolygon(geometryFactory, lat, lon, radius)
+                            properties = emptyMap<String, Any>()
+                        }
                     )
                 }
-                
-                val customModel = mapOf(
-                    "priority" to priorityStatements,
-                    "areas" to areas
-                )
-                
-                req.putHint(Parameters.CH.DISABLE, true) 
-                req.putHint("custom_model", customModel)
+
+                customModel.setAreas(features)
+
+                req.putHint(Parameters.CH.DISABLE, true)
+                req.setCustomModel(customModel)
             }
 
             // ── Alternatives ─────────────────────────────────────────────
@@ -514,8 +530,9 @@ class OsmAndBridgePlugin(
 
                 routes.add(mapOf(
                     "id"              to if (i == 0) "gh_embedded_0" else "gh_embedded_alt$i",
-                    "label"           to if (i == 0) "🧭 Itinéraire piéton (GraphHopper embarqué)"
-                                         else "🛤 Alternative piétonne $i",
+                    "label"           to (if (i == 0)
+                        "🧭 Itinéraire ${if (ghProfile == CAR_PROFILE) "voiture" else "piéton"} (GraphHopper embarqué)"
+                        else "🛤 Alternative ${if (ghProfile == CAR_PROFILE) "voiture" else "piétonne"} $i"),
                     "distanceMeters"  to path.distance,
                     "durationSeconds" to (path.time / 1000L),
                     "points"          to pointsList
@@ -543,6 +560,29 @@ class OsmAndBridgePlugin(
     // ════════════════════════════════════════════════════════════════════════
     // Nettoyage
     // ════════════════════════════════════════════════════════════════════════
+
+    /// Génère un polygone circulaire (approx. 20 sommets) centré sur lat/lon,
+    /// utilisé comme zone d'évitement GraphHopper (CustomModel area).
+    /// GraphHopper ne gère que des POLYGONES pour les `areas` (pas de Point).
+    private fun circlePolygon(
+        geometryFactory: GeometryFactory,
+        lat: Double,
+        lon: Double,
+        radiusMeters: Double,
+    ): Geometry {
+        val segments = 20
+        val latRad = Math.toRadians(lat)
+        val coords = ArrayList<Coordinate>(segments + 1)
+        for (i in 0 until segments) {
+            val angle = 2.0 * PI * i / segments
+            val dLat = (radiusMeters / 111320.0) * cos(angle)
+            val dLon = (radiusMeters / (111320.0 * cos(latRad))) * sin(angle)
+            coords.add(Coordinate(lon + dLon, lat + dLat))
+        }
+        coords.add(coords[0]) // ferme l'anneau
+        val ring = geometryFactory.createLinearRing(coords.toTypedArray())
+        return geometryFactory.createPolygon(ring, null)
+    }
 
     fun dispose() {
         // Annule TOUTES les coroutines en cours avant de fermer le moteur.

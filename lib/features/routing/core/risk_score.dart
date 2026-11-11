@@ -7,7 +7,7 @@ import 'dart:math' as math;
 import 'package:latlong2/latlong.dart';
 
 /// Rayon d'influence d'un danger pour le score de risque (mètres).
-const double kRiskRadiusMeters = 5.0;
+const double kRiskRadiusMeters = 25.0;
 
 /// Calcule le score de risque agrégé d'un itinéraire.
 ///
@@ -29,6 +29,23 @@ double computeRiskScore(
     }
   }
   return score;
+}
+
+/// Retourne `true` si la polyligne [points] passe à moins de [radiusMeters]
+/// d'au moins un [danger].
+///
+/// Utilisé pour détecter qu'un itinéraire (ex: OSRM public, qui ne peut pas
+/// éviter les zones de danger) traverse un danger, afin de ne pas le proposer.
+bool routeCrossesDanger(
+  List<LatLng> points,
+  List<LatLng> dangers, {
+  double radiusMeters = kRiskRadiusMeters,
+}) {
+  if (dangers.isEmpty || points.length < 2) return false;
+  for (final danger in dangers) {
+    if (_minDistanceToPolyline(danger, points) <= radiusMeters) return true;
+  }
+  return false;
 }
 
 /// Distance minimale (mètres) entre un point et une polyligne.

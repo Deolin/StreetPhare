@@ -11,8 +11,10 @@
 //   1. MethodChannel Android (GraphHopper embarqué)  → ~200 ms ← Legacy
 //   2. GraphHopper HTTP local                        → ~500 ms ← Legacy
 //   3. OSRM public                                   → ~2 s    ← Legacy
-//   4. SafePathEngine (grille Dijkstra)              → ~100 ms ← Fallback
-//   5. Ligne droite                                  → ~1 ms   ← Ultime
+//
+// NOTE : il n'y a PLUS de fallback « grille Dijkstra / vol d'oiseau ».
+//   Un itinéraire proposé doit suivre la voirie réelle (SPG / GraphHopper
+//   / OSRM). Si tous les moteurs routables échouent, on renvoie un échec.
 
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
@@ -21,13 +23,12 @@ import '../../../database/alert_visibility_policy.dart';
 import '../../../database/hive_alert_database.dart';
 import '../domain/models/avoidance_filters.dart';
 import '../domain/models/route_result.dart' as legacy;
-import '../domain/pedestrian_route_service.dart';
 import '../infrastructure/open_trip_planner_service.dart';
 import '../infrastructure/osmand_native_channel.dart';
 import '../infrastructure/osmand_routing_service.dart';
 import '../infrastructure/routing_isolate.dart';
 import '../presentation/route_notifier.dart';
-import '../presentation/safe_path_engine.dart';
+import 'danger_point.dart';
 import 'graph/spg_graph.dart';
 import 'graph/spg_loader.dart';
 import 'graph/spg_types.dart';
@@ -128,7 +129,7 @@ class RoutingEngine {
     RoutingProfile profile = RoutingProfile.pedestrian,
     RoutingFlags flags = const RoutingFlags(),
     AvoidanceFilters avoidFilters = const AvoidanceFilters(),
-    List<LatLng> avoidPoints = const [],
+    List<DangerPoint> avoidPoints = const [],
   }) async {
     // Met à jour le profil courant pour le label.
     _lastProfile = profile;
@@ -184,8 +185,11 @@ class RoutingEngine {
             includeAlternatives: flags.includeAlternatives,
             maxAlternatives: flags.maxAlternatives,
             avoidPoints: dangerPoints
-                .map(
-                    (p) => RoutingAvoidPoint(lat: p.latitude, lon: p.longitude))
+                .map((p) => RoutingAvoidPoint(
+                    lat: p.lat,
+                    lon: p.lon,
+                    radiusMeters: p.radiusMeters,
+                    weight: p.weight))
                 .toList(),
             timeoutMs: flags.timeoutMs,
           ),
@@ -212,7 +216,11 @@ class RoutingEngine {
           end: end,
           profile: profile,
           avoidPoints: dangerPoints
-              .map((p) => AvoidPoint(lat: p.latitude, lon: p.longitude))
+              .map((p) => AvoidPoint(
+                  lat: p.lat,
+                  lon: p.lon,
+                  radiusMeters: p.radiusMeters,
+                  weight: p.weight))
               .toList(),
         );
         if (!nativeResult.isEmpty) {
@@ -262,33 +270,10 @@ class RoutingEngine {
       if (kDebugMode) debugPrint('[RoutingEngine] OsmAnd Bridge failed: $e');
     }
 
-    // ── TENTATIVE 4 : SafePathEngine (grille Dijkstra) — PIÉTON/vélo uniquement ──
-    // La grille ne respecte ni le code de la route ni les routes carrossables :
-    // on la saute en mode voiture/urgence (serveur + OSRM = fallbacks conformes).
-    if (profile != RoutingProfile.vehicle &&
-        profile != RoutingProfile.emergency) {
-      try {
-        onCascadeStep?.call(CascadeStep.safePath);
-        final paths = SafePathEngine.computePrimaryOnly(
-          start: start,
-          end: end,
-          filters: avoidFilters,
-          dangerPoints: dangerPoints,
-          constraints: PedestrianConstraints.fromProfile(profile),
-        );
-        if (paths.isNotEmpty) {
-          return _applyRiskScore(
-            RouteComputeResult(
-              routes: paths,
-              source: 'safe_path_engine',
-            ),
-            dangerPoints,
-          );
-        }
-      } catch (e) {
-        if (kDebugMode) debugPrint('[RoutingEngine] SafePath failed: $e');
-      }
-    }
+    // ── PLUS de fallback « grille Dijkstra » (SafePathEngine) ─────────────
+    // La grille trace des segments à vol d'oiseau qui traversent des
+    // bâtiments hors voirie. On ne renvoie donc QUE des itinéraires
+    // routables (SPG / GraphHopper / OSRM). Si tout échoue → échec total.
 
     // ── ÉCHEC TOTAL ─────────────────────────────────────────────────────
     return const RouteComputeResult(
@@ -301,14 +286,14 @@ class RoutingEngine {
 
   /// Collecte les points de danger à éviter à partir des signalements
   /// visibles et des préférences utilisateur ([AvoidanceFilters]).
-  List<LatLng> _collectDangerPoints(AvoidanceFilters filters) {
+  List<DangerPoint> _collectDangerPoints(AvoidanceFilters filters) {
     try {
       final alerts = AlertVisibilityPolicy.filterAvoidable(
         HiveAlertDatabase.instance.getAllValid(),
       );
       return alerts
           .where((a) => filters.shouldAvoid(a.type))
-          .map((a) => LatLng(a.latitude, a.longitude))
+          .map(DangerPoint.fromAlert)
           .toList();
     } catch (e) {
       if (kDebugMode) {
@@ -324,12 +309,13 @@ class RoutingEngine {
   /// (1.0 au centre d'un danger, décroissant jusqu'à 0 au bord du rayon).
   RouteComputeResult _applyRiskScore(
     RouteComputeResult result,
-    List<LatLng> dangerPoints,
+    List<DangerPoint> dangerPoints,
   ) {
     if (dangerPoints.isEmpty || result.routes.isEmpty) return result;
+    final dangerLatLngs = dangerPoints.map((p) => p.latLng).toList();
     final scored = result.routes
         .map((r) => r.copyWith(
-              totalRiskScore: computeRiskScore(r.points, dangerPoints),
+              totalRiskScore: computeRiskScore(r.points, dangerLatLngs),
             ))
         .toList();
     return RouteComputeResult(

@@ -45,7 +45,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../network/network_config.dart';
+import '../core/danger_point.dart';
 import '../core/models/routing_profile.dart';
+import '../core/risk_score.dart';
 import '../domain/models/avoidance_filters.dart';
 import '../domain/models/route_result.dart';
 import 'osmand_native_channel.dart';
@@ -267,7 +269,7 @@ class OsmAndRoutingService {
     required LatLng end,
     RoutingProfile profile = RoutingProfile.pedestrian,
     required AvoidanceFilters filters,
-    List<LatLng> avoidPoints = const [],
+    List<DangerPoint> avoidPoints = const [],
     String? eventId,
   }) async {
     // ── Tentative 0 (PRIORITAIRE) : MethodChannel Android (GraphHopper embarqué)
@@ -275,7 +277,11 @@ class OsmAndRoutingService {
     if (native.isSupported) {
       try {
         final avoidPointsNative = avoidPoints
-            .map((p) => AvoidPoint(lat: p.latitude, lon: p.longitude))
+            .map((p) => AvoidPoint(
+                lat: p.lat,
+                lon: p.lon,
+                radiusMeters: p.radiusMeters,
+                weight: p.weight))
             .toList();
 
         final nativeResult = await native.computeRoute(
@@ -328,11 +334,25 @@ class OsmAndRoutingService {
         profile: profile,
       );
       if (osrmRoutes.isNotEmpty) {
-        if (kDebugMode) {
-          debugPrint('[OsmAnd] ✅ OSRM public → '
-              '${osrmRoutes.first.points.length} points');
+        // OSRM public ne peut PAS éviter les zones de danger : on vérifie
+        // côté client qu'aucune route ne traverse un danger. Si c'est le cas,
+        // on ne propose pas un itinéraire dangereux (on remonte l'échec).
+        final dangerLatLngs = avoidPoints.map((p) => p.latLng).toList();
+        final safeRoutes = osrmRoutes
+            .where((r) => !routeCrossesDanger(r.points, dangerLatLngs))
+            .toList();
+        if (safeRoutes.isEmpty) {
+          if (kDebugMode) {
+            debugPrint(
+                '[OsmAnd] ⚠ OSRM traverse un danger — itinéraire rejeté');
+          }
+        } else {
+          if (kDebugMode) {
+            debugPrint('[OsmAnd] ✅ OSRM public → '
+                '${safeRoutes.first.points.length} points');
+          }
+          return OsmAndResult(routes: safeRoutes, source: 'osrm_public');
         }
-        return OsmAndResult(routes: osrmRoutes, source: 'osrm_public');
       }
     } catch (e) {
       if (kDebugMode) debugPrint('[OsmAnd] OSRM failed: $e');
@@ -357,7 +377,7 @@ class OsmAndRoutingService {
     required LatLng start,
     required LatLng end,
     RoutingProfile profile = RoutingProfile.pedestrian,
-    List<LatLng> avoidPoints = const [],
+    List<DangerPoint> avoidPoints = const [],
   }) async {
     final params = <String, String>{
       'fromLat': start.latitude.toString(),
@@ -371,8 +391,12 @@ class OsmAndRoutingService {
           : 'foot',
     };
     if (avoidPoints.isNotEmpty) {
-      params['avoid'] =
-          avoidPoints.map((p) => '${p.latitude},${p.longitude}').join('|');
+      // Chaque danger est envoyé avec son rayon ET son poids : les barrages
+      // (poids quasi-infini) deviennent infranchissables côté serveur, les
+      // autres dangers (poids ~1e6) sont fortement évités mais franchissables.
+      params['avoid'] = avoidPoints
+          .map((p) => '${p.lat},${p.lon},${p.radiusMeters.round()},${p.weight.round()}')
+          .join('|');
     }
     final uri = Uri.parse('${NetworkConfig.apiUrl}/route').replace(
       queryParameters: params,

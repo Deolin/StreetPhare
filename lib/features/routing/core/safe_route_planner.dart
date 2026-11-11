@@ -18,11 +18,9 @@ import '../../../database/alert_visibility_policy.dart';
 import '../../../database/hive_alert_database.dart';
 import '../domain/models/avoidance_filters.dart';
 import '../domain/models/route_result.dart';
-import '../domain/pedestrian_route_service.dart';
-import '../presentation/safe_path_engine.dart';
+import 'danger_point.dart';
 import 'graph/spg_types.dart';
 import 'models/routing_profile.dart';
-import 'risk_score.dart';
 import 'routing_engine.dart';
 
 /// Planificateur d'itinéraires sécurisés (multi-itinéraires + 0 risque).
@@ -37,22 +35,21 @@ class SafeRoutePlanner {
   /// alerte bloquante (barrage / zone filtrée / nasse).
   static const double restrictionThresholdMeters = 25.0;
 
-  /// Calcule jusqu'à [maxRoutes] itinéraires, triés par risque puis distance.
-  ///
-  /// Garantit la présence d'une alternative « 0 risque » si le trajet
-  /// principal comporte des risques/incidents.
+  /// Calcule jusqu'à [maxRoutes] itinéraires routables, triés par risque
+  /// puis distance. Ne renvoie que des tracés suivant la voirie réelle
+  /// (SPG / GraphHopper / OSRM) — jamais de tracé « à vol d'oiseau ».
   Future<RouteComputeResult> computeRoutes({
     required LatLng start,
     required LatLng end,
     RoutingProfile profile = RoutingProfile.pedestrian,
     AvoidanceFilters filters = const AvoidanceFilters(),
   }) async {
-    // 0) Collecte les dangers visibles (utilisés par le moteur central ET
-    //    par SafePathEngine en fallback, pour garantir le contournement).
+    // 0) Collecte les dangers visibles (transmis au moteur central pour
+    //    l'évitement des zones à risque).
     final dangers = _collectDangerPoints(filters);
 
-    // 1) Demande les alternatives au moteur central (cascade SPG → natif →
-    //    serveur/OSRM → SafePathEngine).
+    // 1) Demande les alternatives au moteur central (cascade routable
+    //    SPG → natif GraphHopper → serveur/OSRM).
     final result = await RoutingEngine.instance.computeRoute(
       start: start,
       end: end,
@@ -64,39 +61,10 @@ class SafeRoutePlanner {
 
     var routes = List<RouteResult>.from(result.routes);
 
-    // 2) Si la cascade a échoué et que le profil est piéton/vélo, on tente
-    //    directement le moteur local (grille Dijkstra) pour produire 1..3
-    //    itinéraires. Les mêmes dangers sont transmis pour que la grille
-    //    les bloque et force un contournement.
-    if (routes.isEmpty &&
-        profile != RoutingProfile.vehicle &&
-        profile != RoutingProfile.emergency) {
-      routes = SafePathEngine.computeRoutes(
-        start: start,
-        end: end,
-        filters: filters,
-        dangerPoints: dangers,
-        constraints: PedestrianConstraints.fromProfile(profile),
-      );
-    }
-
-    // 3) Trie + déduplique, puis tronque à 3.
-
-    // 4) Trie + déduplique, puis tronque à 3.
+    // Trie + déduplique, puis tronque à [maxRoutes].
     routes = _dedupeAndSort(routes);
     if (routes.length > maxRoutes) {
       routes = routes.sublist(0, maxRoutes);
-    }
-
-    // 5) Garantie « 0 risque ».
-    final hasZeroRisk = routes.any((r) => r.totalRiskScore <= 0.001);
-    if (!hasZeroRisk && dangers.isNotEmpty) {
-      final zeroRisk = _computeZeroRiskRoute(start, end, filters, dangers);
-      if (zeroRisk != null) {
-        if (routes.length >= maxRoutes) routes.removeLast();
-        routes.add(zeroRisk);
-        routes = _dedupeAndSort(routes);
-      }
     }
 
     return RouteComputeResult(
@@ -146,14 +114,14 @@ class SafeRoutePlanner {
     return segments;
   }
 
-  List<LatLng> _collectDangerPoints(AvoidanceFilters filters) {
+  List<DangerPoint> _collectDangerPoints(AvoidanceFilters filters) {
     try {
       final alerts = AlertVisibilityPolicy.filterAvoidable(
         HiveAlertDatabase.instance.getAllValid(),
       );
       return alerts
           .where((a) => filters.shouldAvoid(a.type))
-          .map((a) => LatLng(a.latitude, a.longitude))
+          .map(DangerPoint.fromAlert)
           .toList();
     } catch (e) {
       if (kDebugMode) {
@@ -163,16 +131,14 @@ class SafeRoutePlanner {
     }
   }
 
-  /// Alertes « bloquantes » physiques : barrage, zone filtrée/nasse.
+  /// Alertes « bloquantes » physiques : barrage uniquement (infranchissable).
+  /// Les filtres restent évitables mais franchissables (pondération douce).
   List<Alert> _collectBlockingAlerts() {
     try {
       final alerts = AlertVisibilityPolicy.filterAvoidable(
         HiveAlertDatabase.instance.getAllValid(),
       );
-      return alerts
-          .where(
-              (a) => a.type == AlertType.barrage || a.type == AlertType.filtre)
-          .toList();
+      return alerts.where((a) => a.type == AlertType.barrage).toList();
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[SafeRoutePlanner] collecte blocages impossible : $e');
@@ -191,55 +157,6 @@ class SafeRoutePlanner {
         return 'Zone restreinte';
     }
   }
-
-  RouteResult? _computeZeroRiskRoute(
-    LatLng start,
-    LatLng end,
-    AvoidanceFilters filters,
-    List<LatLng> dangers,
-  ) {
-    if (dangers.isEmpty) return null;
-    RouteResult? best;
-    double bestRisk = double.infinity;
-
-    for (final radius in const [30.0, 60.0, 100.0]) {
-      final routes = SafePathEngine.computePrimaryOnly(
-        start: start,
-        end: end,
-        filters: filters,
-        dangerPoints: dangers,
-        dangerRadiusMeters: radius,
-      );
-      if (routes.isEmpty) continue;
-
-      final scored = _withScore(routes.first, dangers);
-      if (scored.totalRiskScore <= 0.001) {
-        return _withLabel(scored, '🛡 0 risque (contournement)');
-      }
-      if (scored.totalRiskScore < bestRisk) {
-        bestRisk = scored.totalRiskScore;
-        best = scored;
-      }
-    }
-
-    return best == null
-        ? null
-        : _withLabel(best, '🛡 Contournement (risque min.)');
-  }
-
-  RouteResult _withScore(RouteResult r, List<LatLng> dangers) =>
-      r.copyWith(totalRiskScore: computeRiskScore(r.points, dangers));
-
-  RouteResult _withLabel(RouteResult r, String label) => RouteResult(
-        id: r.id,
-        points: r.points,
-        totalDistanceMeters: r.totalDistanceMeters,
-        totalRiskScore: r.totalRiskScore,
-        pois: r.pois,
-        duration: r.duration,
-        label: label,
-        restrictedSegments: r.restrictedSegments,
-      );
 
   List<RouteResult> _dedupeAndSort(List<RouteResult> routes) {
     final sorted = List<RouteResult>.from(routes)

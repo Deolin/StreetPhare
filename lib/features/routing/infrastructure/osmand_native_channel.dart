@@ -160,6 +160,7 @@ class OsmAndNativeChannel {
                     'lat': p.lat,
                     'lon': p.lon,
                     'radius': p.radiusMeters,
+                    'weight': p.weight,
                   })
               .toList(),
         },
@@ -204,6 +205,7 @@ class OsmAndNativeChannel {
                     'lat': p.lat,
                     'lon': p.lon,
                     'radius': p.radiusMeters,
+                    'weight': p.weight,
                   })
               .toList(),
         },
@@ -234,6 +236,7 @@ class AvoidPoint {
     required this.lat,
     required this.lon,
     this.radiusMeters = 5.0,
+    this.weight = 1e6,
   });
 
   final double lat;
@@ -241,6 +244,10 @@ class AvoidPoint {
 
   /// Rayon de la zone interdite en mètres (défaut : 5 m).
   final double radiusMeters;
+
+  /// Poids d'évitement (multiplicateur de coût) : barrage = quasi-infini,
+  /// autres dangers = fort mais franchissable.
+  final double weight;
 
   LatLng get latLng => LatLng(lat, lon);
 

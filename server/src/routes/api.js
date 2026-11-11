@@ -18,8 +18,26 @@ const eventAdminService = require('../auth/eventAdminService');
 const router = express.Router();
 
 // ═══════════════════════════════════════════════════════════════════════
-// RATE LIMITERS DÉDIÉS (anti-spam / anti-DoS)
+// RATE LIMITERS DÉDIÉS (anti-spam / anti-DoS, quota PAR UTILISATEUR)
 // ═══════════════════════════════════════════════════════════════════════
+
+/// Clé de quota PAR UTILISATEUR (identifiant éphémère) avec repli sur l'IP.
+///
+/// Derrière Caddy ou un NAT d'événement, plusieurs utilisateurs partagent la
+/// même IP : un quota par IP ferait qu'un seul « chanceux » épuiserait le
+/// budget de tous les autres. On préfère donc l'identifiant éphémère
+/// (userId/peerId) transmis dans le corps ou les en-têtes, avec repli sur
+/// l'IP normalisée (IPv4/IPv6) quand aucun identifiant n'est fourni.
+function userKeyGenerator(req) {
+  const body = req.body || {};
+  const headers = req.headers || {};
+  const uid = body.userId || body.peerId ||
+    headers['x-user-id'] || headers['x-peer-id'];
+  if (uid && typeof uid === 'string' && uid.trim().length > 0) {
+    return `u:${uid.trim()}`;
+  }
+  return `ip:${ipKeyGenerator(req.ip)}`;
+}
 
 /// Limiteur strict pour les signalements citoyens (alertes + panic).
 /// Un citoyen réel ne déclare pas plus de 3 alertes majeures en 5 minutes.
@@ -31,26 +49,23 @@ const reportLimiter = rateLimit({
   message: {
     error: 'Trop de signalements émis. Veuillez patienter avant de déclarer un nouvel événement.',
   },
-  keyGenerator: (req) => {
-    // Utilise l'IP réelle du citoyen transmise par Caddy via X-Forwarded-For.
-    // `app.set('trust proxy', true)` dans primary.js/backup.js permet
-    // à req.ip de retourner l'IP distante et non 127.0.0.1.
-    // `ipKeyGenerator` normalise l'IPv6 (évite le contournement de limite).
-    return ipKeyGenerator(req.ip);
-  },
+  keyGenerator: userKeyGenerator,
 });
 
-/// Limiteur pour la messagerie / chat P2P (sync-push).
-/// 15 messages par minute et par IP : fluide pour un humain, bloque un script.
+/// Limiteur pour la synchronisation client (sync-push).
+/// 30 requêtes par minute et par UTILISATEUR : largement suffisant pour la
+/// sync périodique (toutes les 3 min) + flush outbox, tout en bloquant un
+/// script. Le quota est personnel : un utilisateur n'épuise pas celui des
+/// autres même derrière le même NAT/proxy.
 const messageLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  limit: 15,
+  limit: 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     error: 'Vitesse d\'envoi trop élevée. Ralentissez vos messages.',
   },
-  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  keyGenerator: userKeyGenerator,
 });
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -454,7 +469,12 @@ router.post('/sync-push', messageLimiter, (req, res) => {
         if (!alert.votes) alert.votes = [];
         alert.votes.push(peerId);
       }
-      store.addAlert(alert);
+      // Anti-doublon : fusionne avec un danger identique à proximité
+      // (≤ mergeRadiusMeters) en recentrant au centre des deux points.
+      const merged = store.mergeNearbyIdentical(alert);
+      if (!merged) {
+        store.addAlert(alert);
+      }
       upserted++;
     }
 
@@ -1115,7 +1135,7 @@ function parseAvoidPoints(raw) {
       return {
         lat,
         lon,
-        radius: Number.isFinite(radius) ? radius : 5,
+        radius: Number.isFinite(radius) ? radius : 25,
         weight: Number.isFinite(weight) ? weight : 1e6,
       };
     })
@@ -1126,7 +1146,7 @@ function parseAvoidPoints(raw) {
 /// Query: ?fromLat=..&fromLon=..&toLat=..&toLon=..
 ///        &avoid=lat,lon[,radius[,weight]]|...   (zones de danger à pénaliser)
 router.get('/route', (req, res) => {
-  const { fromLat, fromLon, toLat, toLon } = req.query;
+  const { fromLat, fromLon, toLat, toLon, profile } = req.query;
   const lat1 = parseFloat(fromLat);
   const lon1 = parseFloat(fromLon);
   const lat2 = parseFloat(toLat);
@@ -1138,8 +1158,17 @@ router.get('/route', (req, res) => {
 
   const avoidPoints = parseAvoidPoints(req.query.avoid);
 
+  // Profil demandé : 'car'/'vehicle' → moteur voiture (réseau carrossable),
+  // sinon piéton. Sans cela, une demande voiture retournait un tracé piéton
+  // (bug « voiture affichée à pied » quand le moteur embarqué était absent).
+  const requestedProfile =
+    (profile === 'car' || profile === 'vehicle') ? 'car' : 'foot';
+  const isCar = requestedProfile === 'car';
+
   try {
-    const r = routingEngine.route(lat1, lon1, lat2, lon2, avoidPoints);
+    const r = routingEngine.route(
+      lat1, lon1, lat2, lon2, avoidPoints, requestedProfile,
+    );
     if (!r) {
       return res.status(404).json({
         error: 'Aucun itinéraire trouvé dans la zone couverte',
@@ -1151,7 +1180,9 @@ router.get('/route', (req, res) => {
       routes: [
         {
           id: 'sp_server_0',
-          label: 'Itinéraire piéton (serveur StreetPhare)',
+          label: isCar
+              ? 'Itinéraire voiture (serveur StreetPhare)'
+              : 'Itinéraire piéton (serveur StreetPhare)',
           distanceMeters: r.distanceMeters,
           durationSeconds: r.durationSeconds,
           points: r.points,
@@ -1287,5 +1318,6 @@ router.get('/invite', handleInviteRequest);
 
 module.exports = router;
 module.exports.handleInviteRequest = handleInviteRequest;
+module.exports.userKeyGenerator = userKeyGenerator;
 
 

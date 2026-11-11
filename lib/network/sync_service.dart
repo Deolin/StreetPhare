@@ -255,10 +255,11 @@ class SyncService {
           .take(maxPushBatchSize)
           .toList();
 
-      if (modified.isEmpty && _lastPushTs != null) {
-        // Rien à pousser, mais on peut quand même pull.
-        // On appelle le serveur avec un batch vide pour recevoir les deltas.
-        return await _pushBatch(serverBase, [], allLocal);
+      if (modified.isEmpty) {
+        // Rien à pousser : on n'envoie PAS de batch vide (le serveur le
+        // rejette en 400, ce qui consomme inutilement le quota de sync).
+        // `_pushAndPull` bascule alors directement en PULL-only.
+        return _SyncResult.failed;
       }
 
       return await _pushBatch(serverBase, modified, allLocal);

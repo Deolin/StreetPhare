@@ -21,6 +21,7 @@ const config = require('./config');
 const store = require('./store');
 const sync = require('./sync');
 const apiRoutes = require('./routes/api');
+const { userKeyGenerator } = apiRoutes;
 const adminRoutes = require('./routes/admin');
 const simulationRoutes = require('./routes/simulation');
 const { verifyWsToken } = require('./middleware/auth');
@@ -86,8 +87,8 @@ const limiter = rateLimit({
   max: config.rateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
-  // ── PER-USER ── une limite PAR IP réelle de client (via `trust proxy`).
-  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  // ── PER-USER ── quota PAR UTILISATEUR (identifiant éphémère, repli IP).
+  keyGenerator: userKeyGenerator,
   message: {
     error: 'Trop de requêtes. Veuillez réessayer plus tard.',
   },

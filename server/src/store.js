@@ -257,6 +257,12 @@ class Store {
     });
     if (!target) return null;
 
+    // ── Recentrage au centre (centroïde) des deux signalements ─────────
+    // Le signalement fusionné est déplacé au milieu des deux points pour
+    // refléter au mieux la position réelle du danger.
+    target.lat = (Number(target.lat) + Number(alert.lat)) / 2;
+    target.lng = (Number(target.lng) + Number(alert.lng)) / 2;
+
     const incoming = Array.isArray(alert.votes) ? alert.votes : [];
     if (!Array.isArray(target.votes)) target.votes = [];
     for (const v of incoming) {

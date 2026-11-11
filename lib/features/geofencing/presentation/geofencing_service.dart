@@ -17,7 +17,7 @@
 // DÉDUPLICATION : la détection d'entrée en zone est DÉDUPLIQUÉE
 // par id d'alerte (un ping par alerte tant qu'elle est visible).
 // Le COOLDOWN utilisateur de 5 minutes (anti-spam sur la question
-// "est-il toujours là ?") est appliqué en aval par
+// « Le danger est-il toujours présent ? ») est appliqué en aval par
 // `ProximityValidationService`.
 
 import 'dart:async';

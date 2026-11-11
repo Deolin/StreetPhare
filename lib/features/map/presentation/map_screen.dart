@@ -62,9 +62,7 @@ import '../../routing/core/models/routing_profile.dart';
 import '../../routing/core/safe_route_planner.dart';
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/domain/models/route_result.dart';
-import '../../routing/domain/pedestrian_route_service.dart';
 import '../../routing/presentation/route_result_sheet.dart';
-import '../../routing/presentation/safe_path_engine.dart';
 import '../../settings/data/app_preferences_store.dart';
 import '../../settings/data/panic_contact_store.dart';
 import '../../settings/presentation/settings_screen.dart';
@@ -863,40 +861,14 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    // Fallback : SafePathEngine (grille Dijkstra) avec contraintes
-    // adaptées au profil de transport sélectionné.
-    final localConstraints = PedestrianConstraints.fromProfile(routingProfile);
-    final localRoutes = SafePathEngine.computeRoutes(
-      start: start,
-      end: destination,
-      filters: filters,
-      constraints: localConstraints,
-    );
-
-    if (localRoutes.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      }
-      _showNoDestinationError();
-      return;
+    // Aucun itinéraire routable (SPG / GraphHopper / OSRM) n'a pu être
+    // calculé. On n'affiche JAMAIS de tracé « à vol d'oiseau » : une
+    // alternative doit suivre la voirie réelle. On prévient donc
+    // l'utilisateur qu'aucun itinéraire n'est disponible.
+    if (mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
     }
-
-    if (!mounted) return;
-    final selected = await RouteResultSheet.show(context, routes: localRoutes);
-
-    if (!mounted || selected == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      }
-      return;
-    }
-
-    setState(() {
-      _safeRoutePoints = selected.points;
-    });
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    _fitRouteBounds(selected.points);
-    _applyRoadRestrictions(selected, routingProfile);
+    _showNoDestinationError();
   }
 
   /// Convertit le mode de transport (String) en profil de routage.

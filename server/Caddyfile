@@ -96,6 +96,13 @@ streetphare.ddns.net {
 		}
 	}
 
+	# ── OpenTripPlanner (transports en commun) ─────────────────────────
+	# Le moteur OTP écoute sur 127.0.0.1:8080 (conteneur « streetphare-otp »).
+	# Le client Flutter interroge /otp/routers/default/plan.
+	handle /otp* {
+		reverse_proxy 127.0.0.1:8080
+	}
+
 	# ── Toutes les autres routes (API REST, admin, etc.) ───────────────
 	handle {
 		reverse_proxy 127.0.0.1:3000 {

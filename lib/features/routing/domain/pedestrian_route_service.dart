@@ -30,6 +30,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../../../network/network_config.dart';
+import '../core/danger_point.dart';
 import '../core/models/routing_profile.dart';
 import '../infrastructure/osmand_routing_service.dart';
 import '../presentation/safe_path_engine.dart';
@@ -143,7 +144,9 @@ class PedestrianRouteService {
         end: end,
         profile: profile,
         filters: filters,
-        avoidPoints: avoidPoints,
+        avoidPoints: avoidPoints
+            .map((p) => DangerPoint(lat: p.latitude, lon: p.longitude))
+            .toList(),
         eventId: eventId,
       );
       if (!osmAndResult.isEmpty) {
@@ -228,7 +231,9 @@ class PedestrianRouteService {
         end: end,
         profile: profile,
         filters: filters,
-        avoidPoints: avoidPoints,
+        avoidPoints: avoidPoints
+            .map((p) => DangerPoint(lat: p.latitude, lon: p.longitude))
+            .toList(),
         eventId: eventId,
       );
       if (!osmAndResult.isEmpty) {
