@@ -117,7 +117,7 @@
     "tag": "Téléchargement",
     "badge": "✅ Gratuit — Aucune publicité — Aucun traçage",
     "title": "Téléchargez StreetPhare<br>sur votre plateforme",
-    "sub": "Disponible sur Android, iOS et Windows Desktop. Entièrement gratuit, sans abonnement, sans achat intégré, pour toujours.",
+    "sub": "Disponible sur Android et Windows Desktop. iOS bientôt disponible. Entièrement gratuit, sans abonnement, sans achat intégré, pour toujours.",
     "pledge_title": "🔒 Notre engagement de transparence",
     "pledge_items": [
       "Aucune publicité, jamais",
@@ -129,10 +129,13 @@
       "Auditable par quiconque",
       "Fonctionne sans serveur (P2P)"
     ],
-    "android_req": "Android 8.0+ (API 26+)",
-    "ios_req": "iOS 14+ (iPhone & iPad)",
+    "android_req": "Android 7.0+ (API 24+)",
+    "ios_req": "iOS 13+ (iPhone & iPad)",
     "windows_req": "Windows 10/11 (64-bit)",
+    "web_req": "Navigateur (version en ligne)",
     "btn_download": "⬇ Télécharger",
+    "btn_web": "🌐 Ouvrir la version web",
+    "btn_coming_soon": "🚧 Prochainement",
     "note": "Les binaires sont compilés depuis le code source public. Vous pouvez également compiler l'application vous-même depuis GitHub en suivant les instructions d'installation."
   },
   "legal": {
@@ -197,7 +200,7 @@
       },
       {
         "name": "flutter_map",
-        "desc": "Cartographie interactive basée sur Leaflet.js pour Flutter. Affichage des tuiles OSM et des couches de données.",
+        "desc": "Cartographie interactive pour Flutter. Affichage des tuiles OSM et des couches de données.",
         "license": "MIT"
       },
       {
@@ -211,7 +214,7 @@
         "license": "MIT"
       },
       {
-        "name": "Hive (hive_flutter)",
+        "name": "Hive CE (hive_ce)",
         "desc": "Base de données locale légère et rapide pour Flutter. Stockage des alertes, préférences et messages.",
         "license": "Apache-2.0"
       },
@@ -226,14 +229,9 @@
         "license": "MIT"
       },
       {
-        "name": "flutter_compass",
-        "desc": "Accès à la boussole matérielle. Orientation directionnelle et flèche de navigation.",
-        "license": "MIT"
-      },
-      {
-        "name": "pointycastle / cryptography",
-        "desc": "Chiffrement AES-256, signatures ECDSA et dérivation de clés. Sécurité des messages et alertes Hive.",
-        "license": "MIT / MPL-2.0"
+        "name": "cryptography",
+        "desc": "Chiffrement AES-256, signatures Ed25519 et dérivation de clés. Sécurité des messages et alertes Hive.",
+        "license": "BSD-3-Clause"
       },
       {
         "name": "Node.js + Express",

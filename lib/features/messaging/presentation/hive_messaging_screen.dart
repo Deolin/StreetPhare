@@ -17,6 +17,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/theme/skins/mars_background.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../settings/data/app_preferences_store.dart';
 import '../data/hive_block_service.dart';
@@ -293,129 +294,133 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
             ),
         ],
       ),
-      body: Column(
-        children: [
-          // ── Bandeau transparence (fil temporaire) ────────────────────
-          if (isThreadView) _ThreadTransparencyBanner(color: threadColor),
+      body: MarsBackground(
+        child: Column(
+          children: [
+            // ── Bandeau transparence (fil temporaire) ────────────────────
+            if (isThreadView) _ThreadTransparencyBanner(color: threadColor),
 
-          // ── Bandeau compte à rebours (fil temporaire) ────────────────
-          if (isThreadView)
-            _ThreadCountdownBanner(
-              threadId: widget.threadId!,
-              color: threadColor,
-            ),
+            // ── Bandeau compte à rebours (fil temporaire) ────────────────
+            if (isThreadView)
+              _ThreadCountdownBanner(
+                threadId: widget.threadId!,
+                color: threadColor,
+              ),
 
-          // ── Bandeau filtre actif (fil principal) ─────────────────────
-          if (!isThreadView)
-            ValueListenableBuilder<AppPreferences>(
-              valueListenable: AppPreferencesStore.instance,
-              builder: (_, prefs, o) {
-                return Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  color: StreetPhareTheme.primary.withValues(alpha: 0.1),
-                  child: Row(
-                    children: [
-                      Icon(Icons.filter_alt,
-                          size: 14, color: StreetPhareTheme.primary),
-                      const SizedBox(width: 6),
-                      Text(
-                        prefs.messageFilter.label,
-                        style: TextStyle(
-                          color: StreetPhareTheme.primary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        prefs.messageFilter.description,
-                        style: TextStyle(
-                          color: onSurface.withValues(alpha: 0.5),
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-
-          // ── Fil de discussion actif (indicateur) ─────────────────────
-          if (!isThreadView && _activeThread != null && _activeThread!.isActive)
-            _ActiveThreadChip(
-              thread: _activeThread!,
-              onTap: () => _openThreadScreen(_activeThread!),
-            ),
-
-          // ── Liste des messages ────────────────────────────────────────
-          Expanded(
-            child: ValueListenableBuilder<List<HiveMessage>>(
-              valueListenable: HiveMessagingService.instance,
-              builder: (_, allMessages, o) {
-                // Filtre par threadId si on est dans un fil.
-                final messages = isThreadView
-                    ? allMessages
-                        .where((m) => m.threadId == widget.threadId)
-                        .toList()
-                    : allMessages.where((m) => m.threadId == null).toList();
-
-                if (messages.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+            // ── Bandeau filtre actif (fil principal) ─────────────────────
+            if (!isThreadView)
+              ValueListenableBuilder<AppPreferences>(
+                valueListenable: AppPreferencesStore.instance,
+                builder: (_, prefs, o) {
+                  return Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    color: StreetPhareTheme.primary.withValues(alpha: 0.1),
+                    child: Row(
                       children: [
-                        Icon(
-                          isThreadView
-                              ? Icons.chat_bubble_outline
-                              : Icons.forum_outlined,
-                          size: 48,
-                          color:
-                              (threadColor ?? onSurface).withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(height: 12),
+                        Icon(Icons.filter_alt,
+                            size: 14, color: StreetPhareTheme.primary),
+                        const SizedBox(width: 6),
                         Text(
-                          isThreadView
-                              ? 'Aucun message dans ce fil.\n'
-                                  'Soyez le premier à écrire ici !'
-                              : 'Aucun message reçu\n'
-                                  'Soyez le premier à diffuser !',
-                          textAlign: TextAlign.center,
+                          prefs.messageFilter.label,
+                          style: TextStyle(
+                            color: StreetPhareTheme.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          prefs.messageFilter.description,
                           style: TextStyle(
                             color: onSurface.withValues(alpha: 0.5),
-                            fontSize: 14,
+                            fontSize: 11,
                           ),
                         ),
                       ],
                     ),
                   );
-                }
+                },
+              ),
 
-                return ListView.builder(
-                  controller: _scrollCtrl,
-                  reverse: true,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  itemCount: messages.length,
-                  itemBuilder: (ctx, i) {
-                    final msg = messages[i];
-                    return GestureDetector(
-                      onLongPress: () => _onLongPressBubble(ctx, msg),
-                      child: _MessageTile(
-                        message: msg,
-                        isLocal: msg.senderEphemeralId ==
-                            HiveMessagingService.instance.localEphemeralId,
+            // ── Fil de discussion actif (indicateur) ─────────────────────
+            if (!isThreadView &&
+                _activeThread != null &&
+                _activeThread!.isActive)
+              _ActiveThreadChip(
+                thread: _activeThread!,
+                onTap: () => _openThreadScreen(_activeThread!),
+              ),
+
+            // ── Liste des messages ────────────────────────────────────────
+            Expanded(
+              child: ValueListenableBuilder<List<HiveMessage>>(
+                valueListenable: HiveMessagingService.instance,
+                builder: (_, allMessages, o) {
+                  // Filtre par threadId si on est dans un fil.
+                  final messages = isThreadView
+                      ? allMessages
+                          .where((m) => m.threadId == widget.threadId)
+                          .toList()
+                      : allMessages.where((m) => m.threadId == null).toList();
+
+                  if (messages.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isThreadView
+                                ? Icons.chat_bubble_outline
+                                : Icons.forum_outlined,
+                            size: 48,
+                            color: (threadColor ?? onSurface)
+                                .withValues(alpha: 0.3),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            isThreadView
+                                ? 'Aucun message dans ce fil.\n'
+                                    'Soyez le premier à écrire ici !'
+                                : 'Aucun message reçu\n'
+                                    'Soyez le premier à diffuser !',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: onSurface.withValues(alpha: 0.5),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
                       ),
                     );
-                  },
-                );
-              },
-            ),
-          ),
+                  }
 
-          // ── Zone de saisie ────────────────────────────────────────────
-          _buildInputBar(onSurface, threadColor),
-        ],
+                  return ListView.builder(
+                    controller: _scrollCtrl,
+                    reverse: true,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    itemCount: messages.length,
+                    itemBuilder: (ctx, i) {
+                      final msg = messages[i];
+                      return GestureDetector(
+                        onLongPress: () => _onLongPressBubble(ctx, msg),
+                        child: _MessageTile(
+                          message: msg,
+                          isLocal: msg.senderEphemeralId ==
+                              HiveMessagingService.instance.localEphemeralId,
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+
+            // ── Zone de saisie ────────────────────────────────────────────
+            _buildInputBar(onSurface, threadColor),
+          ],
+        ),
       ),
     );
   }

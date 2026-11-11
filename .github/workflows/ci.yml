@@ -38,3 +38,6 @@ jobs:
 
       - name: Run tests
         run: flutter test
+
+      - name: Check branding assets sync
+        run: node scripts/sync_branding.js --check

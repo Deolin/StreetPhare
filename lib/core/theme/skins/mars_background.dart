@@ -38,7 +38,7 @@ class MarsBackground extends StatelessWidget {
             Offstage(
               offstage: !isMars,
               child: Opacity(
-                opacity: 0.15,
+                opacity: 0.4,
                 child: SvgPicture.asset(
                   'assets/mars/mars_background.svg',
                   fit: BoxFit.cover,
@@ -48,7 +48,7 @@ class MarsBackground extends StatelessWidget {
             // Filtre sombre pour garantir la lisibilité.
             Offstage(
               offstage: !isMars,
-              child: const ColoredBox(color: Color(0x66000000)),
+              child: const ColoredBox(color: Color(0x40000000)),
             ),
             child,
           ],

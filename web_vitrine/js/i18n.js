@@ -147,7 +147,7 @@
       tag: "Téléchargement",
       badge: "✅ Gratuit — Aucune publicité — Aucun traçage",
       title: "Téléchargez StreetPhare<br>sur votre plateforme",
-      sub: "Disponible sur Android, iOS et Windows Desktop. Entièrement gratuit, sans abonnement, sans achat intégré, pour toujours.",
+      sub: "Disponible sur Android et Windows Desktop. iOS bientôt disponible. Entièrement gratuit, sans abonnement, sans achat intégré, pour toujours.",
       pledge_title: "🔒 Notre engagement de transparence",
       pledge_items: [
         "Aucune publicité, jamais",
@@ -159,10 +159,13 @@
         "Auditable par quiconque",
         "Fonctionne sans serveur (P2P)",
       ],
-      android_req: "Android 8.0+ (API 26+)",
-      ios_req: "iOS 14+ (iPhone & iPad)",
+      android_req: "Android 7.0+ (API 24+)",
+      ios_req: "iOS 13+ (iPhone & iPad)",
       windows_req: "Windows 10/11 (64-bit)",
+      web_req: "Navigateur (version en ligne)",
       btn_download: "⬇ Télécharger",
+      btn_web: "🌐 Ouvrir la version web",
+      btn_coming_soon: "🚧 Prochainement",
       note: "Les binaires sont compilés depuis le code source public. Vous pouvez également compiler l'application vous-même depuis GitHub en suivant les instructions d'installation.",
     },
     legal: {
@@ -227,7 +230,7 @@
         },
         {
           name: "flutter_map",
-          desc: "Cartographie interactive basée sur Leaflet.js pour Flutter. Affichage des tuiles OSM et des couches de données.",
+          desc: "Cartographie interactive pour Flutter. Affichage des tuiles OSM et des couches de données.",
           license: "MIT",
         },
         {
@@ -241,7 +244,7 @@
           license: "MIT",
         },
         {
-          name: "Hive (hive_flutter)",
+          name: "Hive CE (hive_ce)",
           desc: "Base de données locale légère et rapide pour Flutter. Stockage des alertes, préférences et messages.",
           license: "Apache-2.0",
         },
@@ -256,14 +259,9 @@
           license: "MIT",
         },
         {
-          name: "flutter_compass",
-          desc: "Accès à la boussole matérielle. Orientation directionnelle et flèche de navigation.",
-          license: "MIT",
-        },
-        {
-          name: "pointycastle / cryptography",
-          desc: "Chiffrement AES-256, signatures ECDSA et dérivation de clés. Sécurité des messages et alertes Hive.",
-          license: "MIT / MPL-2.0",
+          name: "cryptography",
+          desc: "Chiffrement AES-256, signatures Ed25519 et dérivation de clés. Sécurité des messages et alertes Hive.",
+          license: "BSD-3-Clause",
         },
         {
           name: "Node.js + Express",
@@ -414,7 +412,7 @@
       tag: "Download",
       badge: "✅ Free — No Ads — No Tracking",
       title: "Download StreetPhare<br>on your platform",
-      sub: "Available on Android, iOS, and Windows Desktop. Completely free, no subscription, no in-app purchases, forever.",
+      sub: "Available on Android and Windows Desktop. iOS coming soon. Completely free, no subscription, no in-app purchases, forever.",
       pledge_title: "🔒 Our Transparency Commitment",
       pledge_items: [
         "No ads, ever",
@@ -426,10 +424,13 @@
         "Auditable by anyone",
         "Works without server (P2P)",
       ],
-      android_req: "Android 8.0+ (API 26+)",
-      ios_req: "iOS 14+ (iPhone & iPad)",
+      android_req: "Android 7.0+ (API 24+)",
+      ios_req: "iOS 13+ (iPhone & iPad)",
       windows_req: "Windows 10/11 (64-bit)",
+      web_req: "Browser (online version)",
       btn_download: "⬇ Download",
+      btn_web: "🌐 Open web version",
+      btn_coming_soon: "🚧 Coming soon",
       note: "Binaries are compiled from public source code. You can also compile the application yourself from GitHub by following the build instructions.",
     },
     legal: {
@@ -494,7 +495,7 @@
         },
         {
           name: "flutter_map",
-          desc: "Interactive mapping based on Leaflet.js for Flutter. Display of OSM tiles and data layers.",
+          desc: "Interactive mapping for Flutter. Display of OSM tiles and data layers.",
           license: "MIT",
         },
         {
@@ -508,7 +509,7 @@
           license: "MIT",
         },
         {
-          name: "Hive (hive_flutter)",
+          name: "Hive CE (hive_ce)",
           desc: "Lightweight and fast local database for Flutter. Storage of alerts, preferences, and messages.",
           license: "Apache-2.0",
         },
@@ -523,14 +524,9 @@
           license: "MIT",
         },
         {
-          name: "flutter_compass",
-          desc: "Hardware compass access. Directional orientation and navigation arrow.",
-          license: "MIT",
-        },
-        {
-          name: "pointycastle / cryptography",
-          desc: "AES-256 encryption, ECDSA signatures, and key derivation. Hive messages and alerts security.",
-          license: "MIT / MPL-2.0",
+          name: "cryptography",
+          desc: "AES-256 encryption, Ed25519 signatures, and key derivation. Hive messages and alerts security.",
+          license: "BSD-3-Clause",
         },
         {
           name: "Node.js + Express",
@@ -681,7 +677,7 @@
       tag: "Downloaden",
       badge: "✅ Gratis — Geen reclame — Geen tracking",
       title: "Download StreetPhare<br>op uw platform",
-      sub: "Beschikbaar op Android, iOS en Windows Desktop. Volledig gratis, geen abonnement, geen in-app aankopen, voor altijd.",
+      sub: "Beschikbaar op Android en Windows Desktop. iOS binnenkort beschikbaar. Volledig gratis, geen abonnement, geen in-app aankopen, voor altijd.",
       pledge_title: "🔒 Onze transparantiebelofte",
       pledge_items: [
         "Nooit reclame",
@@ -693,10 +689,13 @@
         "Door iedereen te controleren",
         "Werkt zonder server (P2P)",
       ],
-      android_req: "Android 8.0+ (API 26+)",
-      ios_req: "iOS 14+ (iPhone & iPad)",
+      android_req: "Android 7.0+ (API 24+)",
+      ios_req: "iOS 13+ (iPhone & iPad)",
       windows_req: "Windows 10/11 (64-bit)",
+      web_req: "Browser (online versie)",
       btn_download: "⬇ Downloaden",
+      btn_web: "🌐 Open webversie",
+      btn_coming_soon: "🚧 Binnenkort",
       note: "Binaire bestanden worden gecompileerd vanuit openbare broncode. U kunt de applicatie ook zelf compileren vanaf GitHub door de bouwinstructies te volgen.",
     },
     legal: {
@@ -761,7 +760,7 @@
         },
         {
           name: "flutter_map",
-          desc: "Interactieve kaarten gebaseerd op Leaflet.js voor Flutter. Weergave van OSM-tegels en datalagen.",
+          desc: "Interactieve kaarten voor Flutter. Weergave van OSM-tegels en datalagen.",
           license: "MIT",
         },
         {
@@ -775,7 +774,7 @@
           license: "MIT",
         },
         {
-          name: "Hive (hive_flutter)",
+          name: "Hive CE (hive_ce)",
           desc: "Lichtgewicht en snelle lokale database voor Flutter. Opslag van waarschuwingen, voorkeuren en berichten.",
           license: "Apache-2.0",
         },
@@ -790,14 +789,9 @@
           license: "MIT",
         },
         {
-          name: "flutter_compass",
-          desc: "Toegang tot hardwarekompas. Richtingsoriëntatie en navigatiepijl.",
-          license: "MIT",
-        },
-        {
-          name: "pointycastle / cryptography",
-          desc: "AES-256 encryptie, ECDSA-handtekeningen en sleutelafleiding. Beveiliging van Hive-berichten en waarschuwingen.",
-          license: "MIT / MPL-2.0",
+          name: "cryptography",
+          desc: "AES-256 encryptie, Ed25519-handtekeningen en sleutelafleiding. Beveiliging van Hive-berichten en waarschuwingen.",
+          license: "BSD-3-Clause",
         },
         {
           name: "Node.js + Express",
@@ -949,7 +943,7 @@
       tag: "Herunterladen",
       badge: "✅ Kostenlos — Keine Werbung — Kein Tracking",
       title: "Laden Sie StreetPhare<br>für Ihre Plattform herunter",
-      sub: "Verfügbar für Android, iOS und Windows Desktop. Vollständig kostenlos, kein Abonnement, keine In-App-Käufe, für immer.",
+      sub: "Verfügbar für Android und Windows Desktop. iOS bald verfügbar. Vollständig kostenlos, kein Abonnement, keine In-App-Käufe, für immer.",
       pledge_title: "🔒 Unser Transparenzversprechen",
       pledge_items: [
         "Niemals Werbung",
@@ -961,10 +955,13 @@
         "Von jedem prüfbar",
         "Funktioniert ohne Server (P2P)",
       ],
-      android_req: "Android 8.0+ (API 26+)",
-      ios_req: "iOS 14+ (iPhone & iPad)",
+      android_req: "Android 7.0+ (API 24+)",
+      ios_req: "iOS 13+ (iPhone & iPad)",
       windows_req: "Windows 10/11 (64-bit)",
+      web_req: "Browser (Online-Version)",
       btn_download: "⬇ Herunterladen",
+      btn_web: "🌐 Webversion öffnen",
+      btn_coming_soon: "🚧 Demnächst",
       note: "Die Binärdateien werden aus öffentlichem Quellcode kompiliert. Sie können die Anwendung auch selbst von GitHub aus kompilieren, indem Sie den Build-Anweisungen folgen.",
     },
     legal: {
@@ -1029,7 +1026,7 @@
         },
         {
           name: "flutter_map",
-          desc: "Interaktive Kartendarstellung basierend auf Leaflet.js für Flutter. Anzeige von OSM-Kacheln und Datenebenen.",
+          desc: "Interaktive Kartendarstellung für Flutter. Anzeige von OSM-Kacheln und Datenebenen.",
           license: "MIT",
         },
         {
@@ -1043,7 +1040,7 @@
           license: "MIT",
         },
         {
-          name: "Hive (hive_flutter)",
+          name: "Hive CE (hive_ce)",
           desc: "Leichte und schnelle lokale Datenbank für Flutter. Speicherung von Warnungen, Einstellungen und Nachrichten.",
           license: "Apache-2.0",
         },
@@ -1058,14 +1055,9 @@
           license: "MIT",
         },
         {
-          name: "flutter_compass",
-          desc: "Hardware-Kompasszugriff. Richtungsorientierung und Navigationspfeil.",
-          license: "MIT",
-        },
-        {
-          name: "pointycastle / cryptography",
-          desc: "AES-256-Verschlüsselung, ECDSA-Signaturen und Schlüsselableitung. Sicherheit von Hive-Nachrichten und Warnungen.",
-          license: "MIT / MPL-2.0",
+          name: "cryptography",
+          desc: "AES-256-Verschlüsselung, Ed25519-Signaturen und Schlüsselableitung. Sicherheit von Hive-Nachrichten und Warnungen.",
+          license: "BSD-3-Clause",
         },
         {
           name: "Node.js + Express",

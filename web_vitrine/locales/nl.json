@@ -117,7 +117,7 @@
     "tag": "Downloaden",
     "badge": "✅ Gratis — Geen reclame — Geen tracking",
     "title": "Download StreetPhare<br>op uw platform",
-    "sub": "Beschikbaar op Android, iOS en Windows Desktop. Volledig gratis, geen abonnement, geen in-app aankopen, voor altijd.",
+    "sub": "Beschikbaar op Android en Windows Desktop. iOS binnenkort beschikbaar. Volledig gratis, geen abonnement, geen in-app aankopen, voor altijd.",
     "pledge_title": "🔒 Onze transparantiebelofte",
     "pledge_items": [
       "Nooit reclame",
@@ -129,10 +129,13 @@
       "Door iedereen te controleren",
       "Werkt zonder server (P2P)"
     ],
-    "android_req": "Android 8.0+ (API 26+)",
-    "ios_req": "iOS 14+ (iPhone & iPad)",
+    "android_req": "Android 7.0+ (API 24+)",
+    "ios_req": "iOS 13+ (iPhone & iPad)",
     "windows_req": "Windows 10/11 (64-bit)",
+    "web_req": "Browser (online versie)",
     "btn_download": "⬇ Downloaden",
+    "btn_web": "🌐 Open webversie",
+    "btn_coming_soon": "🚧 Binnenkort",
     "note": "Binaire bestanden worden gecompileerd vanuit openbare broncode. U kunt de applicatie ook zelf compileren vanaf GitHub door de bouwinstructies te volgen."
   },
   "legal": {
@@ -197,7 +200,7 @@
       },
       {
         "name": "flutter_map",
-        "desc": "Interactieve kaarten gebaseerd op Leaflet.js voor Flutter. Weergave van OSM-tegels en datalagen.",
+        "desc": "Interactieve kaarten voor Flutter. Weergave van OSM-tegels en datalagen.",
         "license": "MIT"
       },
       {
@@ -211,7 +214,7 @@
         "license": "MIT"
       },
       {
-        "name": "Hive (hive_flutter)",
+        "name": "Hive CE (hive_ce)",
         "desc": "Lichtgewicht en snelle lokale database voor Flutter. Opslag van waarschuwingen, voorkeuren en berichten.",
         "license": "Apache-2.0"
       },
@@ -226,14 +229,9 @@
         "license": "MIT"
       },
       {
-        "name": "flutter_compass",
-        "desc": "Toegang tot hardwarekompas. Richtingsoriëntatie en navigatiepijl.",
-        "license": "MIT"
-      },
-      {
-        "name": "pointycastle / cryptography",
-        "desc": "AES-256 encryptie, ECDSA-handtekeningen en sleutelafleiding. Beveiliging van Hive-berichten en waarschuwingen.",
-        "license": "MIT / MPL-2.0"
+        "name": "cryptography",
+        "desc": "AES-256 encryptie, Ed25519-handtekeningen en sleutelafleiding. Beveiliging van Hive-berichten en waarschuwingen.",
+        "license": "BSD-3-Clause"
       },
       {
         "name": "Node.js + Express",

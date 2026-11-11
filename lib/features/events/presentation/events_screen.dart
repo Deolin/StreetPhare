@@ -18,6 +18,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
+import '../../../core/theme/skins/mars_background.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../services/app_share_service.dart';
 import '../../map/map_cache_manager.dart';
@@ -219,78 +220,80 @@ class _EventsScreenState extends State<EventsScreen> {
                 color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
-            body: ValueListenableBuilder<List<EventModel>>(
-              valueListenable: EventManager.instance,
-              builder: (context, events, _) {
-                return ListView(
-                  padding: const EdgeInsets.all(12),
-                  children: [
-                    // ── Section : Mes événements ─────────────────────────────────
-                    _SectionHeader(
-                      icon: Icons.event_note,
-                      color: StreetPhareTheme.primary,
-                      title:
-                          '${s.eventsMyEvents} (${events.length}/${EventManager.maxEvents})',
-                    ),
-                    const SizedBox(height: 8),
-
-                    if (events.isEmpty)
-                      _EmptyEventsCard(strings: s)
-                    else
-                      ...events.asMap().entries.map(
-                            (e) => Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: _EventCard(
-                                event: e.value,
-                                color:
-                                    _kEventColors[e.key % _kEventColors.length],
-                                strings: s,
-                                onRemove: () => _removeEvent(e.value.code),
-                              ),
-                            ),
-                          ),
-
-                    const SizedBox(height: 16),
-
-                    // ── Section : Rejoindre un événement ─────────────────────────
-                    if (events.length < EventManager.maxEvents) ...[
+            body: MarsBackground(
+              child: ValueListenableBuilder<List<EventModel>>(
+                valueListenable: EventManager.instance,
+                builder: (context, events, _) {
+                  return ListView(
+                    padding: const EdgeInsets.all(12),
+                    children: [
+                      // ── Section : Mes événements ─────────────────────────────────
                       _SectionHeader(
-                        icon: Icons.add_circle_outline,
+                        icon: Icons.event_note,
                         color: StreetPhareTheme.primary,
-                        title: s.eventsJoinTitle,
+                        title:
+                            '${s.eventsMyEvents} (${events.length}/${EventManager.maxEvents})',
                       ),
                       const SizedBox(height: 8),
-                      _JoinCard(
-                        codeController: _codeController,
-                        loading: _loading,
-                        error: _error,
-                        strings: s,
-                        onLoadCode: _loadCode,
-                        onScanQr: _openQrScanner,
+
+                      if (events.isEmpty)
+                        _EmptyEventsCard(strings: s)
+                      else
+                        ...events.asMap().entries.map(
+                              (e) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _EventCard(
+                                  event: e.value,
+                                  color: _kEventColors[
+                                      e.key % _kEventColors.length],
+                                  strings: s,
+                                  onRemove: () => _removeEvent(e.value.code),
+                                ),
+                              ),
+                            ),
+
+                      const SizedBox(height: 16),
+
+                      // ── Section : Rejoindre un événement ─────────────────────────
+                      if (events.length < EventManager.maxEvents) ...[
+                        _SectionHeader(
+                          icon: Icons.add_circle_outline,
+                          color: StreetPhareTheme.primary,
+                          title: s.eventsJoinTitle,
+                        ),
+                        const SizedBox(height: 8),
+                        _JoinCard(
+                          codeController: _codeController,
+                          loading: _loading,
+                          error: _error,
+                          strings: s,
+                          onLoadCode: _loadCode,
+                          onScanQr: _openQrScanner,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // ── Section : Sécurité juste-à-temps ─────────────────────────
+                      _SectionHeader(
+                        icon: Icons.lock_clock,
+                        color: StreetPhareTheme.accent,
+                        title: s.eventsSecurityTitle,
+                      ),
+                      const SizedBox(height: 8),
+                      _InfoCard(
+                        child: Text(
+                          s.eventsSecurityDescription,
+                          style: TextStyle(
+                            color: StreetPhareTheme.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 16),
                     ],
-
-                    // ── Section : Sécurité juste-à-temps ─────────────────────────
-                    _SectionHeader(
-                      icon: Icons.lock_clock,
-                      color: StreetPhareTheme.accent,
-                      title: s.eventsSecurityTitle,
-                    ),
-                    const SizedBox(height: 8),
-                    _InfoCard(
-                      child: Text(
-                        s.eventsSecurityDescription,
-                        style: TextStyle(
-                          color: StreetPhareTheme.textSecondary,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                );
-              },
+                  );
+                },
+              ),
             ),
           );
         });

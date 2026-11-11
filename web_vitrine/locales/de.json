@@ -117,7 +117,7 @@
     "tag": "Herunterladen",
     "badge": "✅ Kostenlos — Keine Werbung — Kein Tracking",
     "title": "Laden Sie StreetPhare<br>für Ihre Plattform herunter",
-    "sub": "Verfügbar für Android, iOS und Windows Desktop. Vollständig kostenlos, kein Abonnement, keine In-App-Käufe, für immer.",
+    "sub": "Verfügbar für Android und Windows Desktop. iOS bald verfügbar. Vollständig kostenlos, kein Abonnement, keine In-App-Käufe, für immer.",
     "pledge_title": "🔒 Unser Transparenzversprechen",
     "pledge_items": [
       "Niemals Werbung",
@@ -129,10 +129,13 @@
       "Von jedem prüfbar",
       "Funktioniert ohne Server (P2P)"
     ],
-    "android_req": "Android 8.0+ (API 26+)",
-    "ios_req": "iOS 14+ (iPhone & iPad)",
+    "android_req": "Android 7.0+ (API 24+)",
+    "ios_req": "iOS 13+ (iPhone & iPad)",
     "windows_req": "Windows 10/11 (64-bit)",
+    "web_req": "Browser (Online-Version)",
     "btn_download": "⬇ Herunterladen",
+    "btn_web": "🌐 Webversion öffnen",
+    "btn_coming_soon": "🚧 Demnächst",
     "note": "Die Binärdateien werden aus öffentlichem Quellcode kompiliert. Sie können die Anwendung auch selbst von GitHub aus kompilieren, indem Sie den Build-Anweisungen folgen."
   },
   "legal": {
@@ -197,7 +200,7 @@
       },
       {
         "name": "flutter_map",
-        "desc": "Interaktive Kartendarstellung basierend auf Leaflet.js für Flutter. Anzeige von OSM-Kacheln und Datenebenen.",
+        "desc": "Interaktive Kartendarstellung für Flutter. Anzeige von OSM-Kacheln und Datenebenen.",
         "license": "MIT"
       },
       {
@@ -211,7 +214,7 @@
         "license": "MIT"
       },
       {
-        "name": "Hive (hive_flutter)",
+        "name": "Hive CE (hive_ce)",
         "desc": "Leichte und schnelle lokale Datenbank für Flutter. Speicherung von Warnungen, Einstellungen und Nachrichten.",
         "license": "Apache-2.0"
       },
@@ -226,14 +229,9 @@
         "license": "MIT"
       },
       {
-        "name": "flutter_compass",
-        "desc": "Hardware-Kompasszugriff. Richtungsorientierung und Navigationspfeil.",
-        "license": "MIT"
-      },
-      {
-        "name": "pointycastle / cryptography",
-        "desc": "AES-256-Verschlüsselung, ECDSA-Signaturen und Schlüsselableitung. Sicherheit von Hive-Nachrichten und Warnungen.",
-        "license": "MIT / MPL-2.0"
+        "name": "cryptography",
+        "desc": "AES-256-Verschlüsselung, Ed25519-Signaturen und Schlüsselableitung. Sicherheit von Hive-Nachrichten und Warnungen.",
+        "license": "BSD-3-Clause"
       },
       {
         "name": "Node.js + Express",

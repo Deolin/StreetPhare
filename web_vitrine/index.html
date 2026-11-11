@@ -813,6 +813,18 @@
       .dl-card .dl-btn:hover {
         background: var(--primary-d);
       }
+      .dl-card .dl-btn-disabled {
+        background: var(--s2);
+        color: var(--muted);
+        font-weight: 700;
+        font-size: 0.8rem;
+        padding: 7px 18px;
+        border-radius: 999px;
+        border: 1px dashed var(--border);
+        cursor: not-allowed;
+        margin-top: 4px;
+        display: inline-block;
+      }
       .dl-note {
         font-size: 0.8rem;
         color: var(--muted);
@@ -1386,8 +1398,9 @@
             Téléchargez StreetPhare<br />sur votre plateforme
           </h2>
           <p class="dl-sub" data-i18n="download.sub">
-            Disponible sur Android, iOS et Windows Desktop. Entièrement gratuit,
-            sans abonnement, sans achat intégré, pour toujours.
+            Disponible sur Android et Windows Desktop. iOS bientôt disponible.
+            Entièrement gratuit, sans abonnement, sans achat intégré, pour
+            toujours.
           </p>
         </div>
 
@@ -1422,7 +1435,7 @@
             <div class="platform-icon">🤖</div>
             <div class="platform-name">Android</div>
             <div class="platform-sub" data-i18n="download.android_req">
-              Android 8.0+ (API 26+)
+              Android 7.0+ (API 24+)
             </div>
             <a
               href="https://github.com/Deolin/StreetPhare/releases"
@@ -1438,17 +1451,14 @@
             <div class="platform-icon">🍎</div>
             <div class="platform-name">iOS</div>
             <div class="platform-sub" data-i18n="download.ios_req">
-              iOS 14+ (iPhone & iPad)
+              iOS 13+ (iPhone & iPad)
             </div>
-            <a
-              href="https://github.com/Deolin/StreetPhare/releases"
-              target="_blank"
-              rel="noopener"
-              class="dl-btn"
-              data-i18n="download.btn_download"
+            <div
+              class="dl-btn dl-btn-disabled"
+              data-i18n="download.btn_coming_soon"
             >
-              ⬇ Télécharger
-            </a>
+              🚧 Prochainement
+            </div>
           </div>
           <div class="dl-card">
             <div class="platform-icon">🖥️</div>
@@ -1464,6 +1474,22 @@
               data-i18n="download.btn_download"
             >
               ⬇ Télécharger
+            </a>
+          </div>
+          <div class="dl-card">
+            <div class="platform-icon">🌐</div>
+            <div class="platform-name">Web</div>
+            <div class="platform-sub" data-i18n="download.web_req">
+              Navigateur (version en ligne)
+            </div>
+            <a
+              href="https://deolin.github.io/StreetPhare/"
+              target="_blank"
+              rel="noopener"
+              class="dl-btn"
+              data-i18n="download.btn_web"
+            >
+              🌐 Ouvrir la version web
             </a>
           </div>
         </div>
@@ -1619,7 +1645,7 @@
             <li>
               <span class="lib">flutter_map</span>
               <span data-i18n="credits.libraries.1.desc"
-                >Cartographie interactive basée sur Leaflet.js pour Flutter.
+                >Cartographie interactive pour Flutter.
                 Affichage des tuiles OSM et des couches de données.</span
               >
               <span class="lic">MIT</span>
@@ -1641,7 +1667,7 @@
               <span class="lic">MIT</span>
             </li>
             <li>
-              <span class="lib">Hive (hive_flutter)</span>
+              <span class="lib">Hive CE (hive_ce)</span>
               <span data-i18n="credits.libraries.4.desc"
                 >Base de données locale légère et rapide pour Flutter. Stockage
                 des alertes, préférences et messages.</span
@@ -1665,24 +1691,16 @@
               <span class="lic">MIT</span>
             </li>
             <li>
-              <span class="lib">flutter_compass</span>
+              <span class="lib">cryptography</span>
               <span data-i18n="credits.libraries.7.desc"
-                >Accès à la boussole matérielle. Orientation directionnelle et
-                flèche de navigation.</span
-              >
-              <span class="lic">MIT</span>
-            </li>
-            <li>
-              <span class="lib">pointycastle / cryptography</span>
-              <span data-i18n="credits.libraries.8.desc"
-                >Chiffrement AES-256, signatures ECDSA et dérivation de clés.
+                >Chiffrement AES-256, signatures Ed25519 et dérivation de clés.
                 Sécurité des messages et alertes Hive.</span
               >
-              <span class="lic">MIT / MPL-2.0</span>
+              <span class="lic">BSD-3-Clause</span>
             </li>
             <li>
               <span class="lib">Node.js + Express</span>
-              <span data-i18n="credits.libraries.9.desc"
+              <span data-i18n="credits.libraries.8.desc"
                 >Serveurs de relais chiffrés (Port 3000/3001) et tableau de bord
                 d'administration web.</span
               >
@@ -1690,7 +1708,7 @@
             </li>
             <li>
               <span class="lib">OpenStreetMap contributors</span>
-              <span data-i18n="credits.libraries.10.desc"
+              <span data-i18n="credits.libraries.9.desc"
                 >Données cartographiques mondiales libres et collaboratives.
                 Tuiles fournies par CartoDB / OSM.</span
               >

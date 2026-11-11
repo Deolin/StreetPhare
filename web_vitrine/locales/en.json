@@ -117,7 +117,7 @@
     "tag": "Download",
     "badge": "✅ Free — No Ads — No Tracking",
     "title": "Download StreetPhare<br>on your platform",
-    "sub": "Available on Android, iOS, and Windows Desktop. Completely free, no subscription, no in-app purchases, forever.",
+    "sub": "Available on Android and Windows Desktop. iOS coming soon. Completely free, no subscription, no in-app purchases, forever.",
     "pledge_title": "🔒 Our Transparency Commitment",
     "pledge_items": [
       "No ads, ever",
@@ -129,10 +129,13 @@
       "Auditable by anyone",
       "Works without server (P2P)"
     ],
-    "android_req": "Android 8.0+ (API 26+)",
-    "ios_req": "iOS 14+ (iPhone & iPad)",
+    "android_req": "Android 7.0+ (API 24+)",
+    "ios_req": "iOS 13+ (iPhone & iPad)",
     "windows_req": "Windows 10/11 (64-bit)",
+    "web_req": "Browser (online version)",
     "btn_download": "⬇ Download",
+    "btn_web": "🌐 Open web version",
+    "btn_coming_soon": "🚧 Coming soon",
     "note": "Binaries are compiled from public source code. You can also compile the application yourself from GitHub by following the build instructions."
   },
   "legal": {
@@ -197,7 +200,7 @@
       },
       {
         "name": "flutter_map",
-        "desc": "Interactive mapping based on Leaflet.js for Flutter. Display of OSM tiles and data layers.",
+        "desc": "Interactive mapping for Flutter. Display of OSM tiles and data layers.",
         "license": "MIT"
       },
       {
@@ -211,7 +214,7 @@
         "license": "MIT"
       },
       {
-        "name": "Hive (hive_flutter)",
+        "name": "Hive CE (hive_ce)",
         "desc": "Lightweight and fast local database for Flutter. Storage of alerts, preferences, and messages.",
         "license": "Apache-2.0"
       },
@@ -226,14 +229,9 @@
         "license": "MIT"
       },
       {
-        "name": "flutter_compass",
-        "desc": "Hardware compass access. Directional orientation and navigation arrow.",
-        "license": "MIT"
-      },
-      {
-        "name": "pointycastle / cryptography",
-        "desc": "AES-256 encryption, ECDSA signatures, and key derivation. Hive messages and alerts security.",
-        "license": "MIT / MPL-2.0"
+        "name": "cryptography",
+        "desc": "AES-256 encryption, Ed25519 signatures, and key derivation. Hive messages and alerts security.",
+        "license": "BSD-3-Clause"
       },
       {
         "name": "Node.js + Express",
