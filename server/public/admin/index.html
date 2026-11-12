@@ -75,6 +75,7 @@
       <button class="tab" id="tab-btn-controle" onclick="switchTab('controle')">👥 Contrôle</button>
       <button class="tab" id="tab-btn-console" onclick="switchTab('console')">⌨️ Console</button>
       <button class="tab" id="tab-btn-simulation" onclick="switchTab('simulation')">🧪 Simulation</button>
+      <button class="tab" id="tab-btn-bugs" onclick="switchTab('bugs')">🐞 Bugs</button>
     </div>
 
     <!-- ── SURVEILLANCE ── -->
@@ -255,6 +256,20 @@
         <div id="load-stats" style="font-size:10px;color:#8b949e;margin-top:4px">—</div>
       </div>
     </div>
+
+    <!-- ── BUG REPORTS ── -->
+    <div id="tab-bugs" class="tab-content" style="display:none">
+      <div class="card">
+        <h3>🐞 Rapports de bug</h3>
+        <button onclick="loadBugReports()">🔄 Actualiser</button>
+        <div class="list" id="bugs-list" style="max-height:420px;overflow-y:auto">Chargement…</div>
+      </div>
+      <div class="card" id="bug-detail-card" style="display:none">
+        <h3>🔍 Détail</h3>
+        <button onclick="closeBugDetail()">✕ Fermer</button>
+        <pre id="bug-detail" style="font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow-y:auto"></pre>
+      </div>
+    </div>
   </div>
 
   <!-- ── LOGIN ── -->
@@ -409,11 +424,12 @@
 
     /* ── ONGLETS ─────────────────────────────────────────────────────── */
     function switchTab(name) {
-      ['surveillance', 'edition', 'controle', 'console', 'simulation'].forEach(t => {
+      ['surveillance', 'edition', 'controle', 'console', 'simulation', 'bugs'].forEach(t => {
         document.getElementById('tab-' + t).style.display = (t === name) ? 'flex' : 'none';
         document.getElementById('tab-btn-' + t).classList.toggle('active', t === name);
       });
       if (name === 'simulation') loadSimTypes();
+      if (name === 'bugs') loadBugReports();
       if (name === 'edition' && typeof initEventsEditor === 'function') initEventsEditor();
       // En quittant l'onglet Édition, on annule tout mode de placement actif
       // afin de ne pas intercepter les clics destinés à la simulation.
@@ -789,6 +805,68 @@
     }
 
     function escapeHtml(s) { return String(s || '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
+
+    /* ── BUG REPORTS ─────────────────────────────────────────────────── */
+    function loadBugReports() {
+      const list = document.getElementById('bugs-list');
+      list.innerHTML = 'Chargement…';
+      fetch('/api/bug-reports?limit=100', { headers: { 'Authorization': `Bearer ${adminToken}` } })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(d => renderBugReports(d.items || []))
+        .catch(e => { list.innerHTML = 'Erreur chargement : ' + escapeHtml(e.message); });
+    }
+    function renderBugReports(items) {
+      const list = document.getElementById('bugs-list');
+      if (!items.length) { list.innerHTML = 'Aucun rapport de bug'; return; }
+      list.innerHTML = items.map(b => `
+        <div class="item" onclick="showBugReport('${b.id}')" style="cursor:pointer">
+          <b>${escapeHtml(b.type || 'report')}</b>${b.title ? ' — ' + escapeHtml(b.title) : ''}
+          <span class="meta"> · ${escapeHtml(b.appVersion || '')} · ${escapeHtml(b.platform || '')}</span><br>
+          <span class="meta">${escapeHtml((b.message || '').slice(0, 140))}</span><br>
+          <span class="meta">${escapeHtml(formatDate(b.receivedAt))}</span>
+        </div>`).join('');
+    }
+    function showBugReport(id) {
+      fetch('/api/bug-reports/' + encodeURIComponent(id), { headers: { 'Authorization': `Bearer ${adminToken}` } })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(b => {
+          if (!b || !b.id) throw new Error('introuvable');
+          document.getElementById('bug-detail-card').style.display = 'block';
+          document.getElementById('bug-detail').textContent = formatBugDetail(b);
+        })
+        .catch(e => {
+          document.getElementById('bug-detail-card').style.display = 'block';
+          document.getElementById('bug-detail').textContent = 'Erreur : ' + e.message;
+        });
+    }
+    function closeBugDetail() { document.getElementById('bug-detail-card').style.display = 'none'; }
+    function formatDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? String(iso) : d.toLocaleString();
+    }
+    function formatBugDetail(b) {
+      return [
+        'ID: ' + (b.id || ''),
+        'Type: ' + (b.type || ''),
+        'Titre: ' + (b.title || ''),
+        'App: ' + (b.appVersion || ''),
+        'Plateforme: ' + (b.platform || ''),
+        'Reçu le: ' + (b.receivedAt || ''),
+        'Timestamp client: ' + (b.clientTimestamp || ''),
+        'Tentatives: ' + (b.attempts ?? 0),
+        'Device: ' + JSON.stringify(b.deviceInfo || null),
+        '',
+        '── MESSAGE ──',
+        (b.message || ''),
+        '',
+        '── STACK TRACE ──',
+        (b.stackTrace || ''),
+        '',
+        '── EXTRA LOGS ──',
+        (b.extraLogs || ''),
+      ].join('\n');
+    }
   </script>
 </body>
 </html>

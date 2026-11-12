@@ -1083,7 +1083,7 @@ router.post('/bug-report', (req, res) => {
 
 /// GET /api/bug-reports — ADMIN : liste des rapports de bug.
 /// Query: ?limit=50&offset=0
-router.get('/bug-reports', authenticateToken, requireRole(['admin']), (req, res) => {
+router.get('/bug-reports', authenticateToken, requireRole(['admin', 'superadmin']), (req, res) => {
   const limit = parseInt(req.query.limit, 10) || 50;
   const offset = parseInt(req.query.offset, 10) || 0;
   const result = store.getBugReports({ limit, offset });
@@ -1091,7 +1091,7 @@ router.get('/bug-reports', authenticateToken, requireRole(['admin']), (req, res)
 });
 
 /// GET /api/bug-reports/:id — ADMIN : détail d'un rapport de bug.
-router.get('/bug-reports/:id', authenticateToken, requireRole(['admin']), (req, res) => {
+router.get('/bug-reports/:id', authenticateToken, requireRole(['admin', 'superadmin']), (req, res) => {
   const report = store.getBugReportById(req.params.id);
   if (!report) return res.status(404).json({ error: 'Rapport non trouvé' });
   res.json(report);
