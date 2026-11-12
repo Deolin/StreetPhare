@@ -20,6 +20,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
+import '../../streetmedic/presentation/streetmedic_service.dart';
 import '../data/tutorial_store.dart';
 import '../domain/tutorial_entry.dart';
 
@@ -67,9 +68,14 @@ class _TutorialScreenState extends State<TutorialScreen> {
     final onSurface = Theme.of(context).colorScheme.onSurface;
 
     // Filtre les entrées selon la catégorie sélectionnée.
+    final showStreetMedic = StreetMedicService.instance.isAuthorized;
+    final allEntries = [
+      ...kTutorialEntries,
+      if (showStreetMedic) ...kStreetMedicTutorialEntries,
+    ];
     final entries = _selectedCategory == null
-        ? kTutorialEntries
-        : kTutorialEntries
+        ? allEntries
+        : allEntries
             .where((e) => e.category == _selectedCategory)
             .toList();
 

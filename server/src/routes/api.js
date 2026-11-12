@@ -335,6 +335,7 @@ router.post('/alerts/:id/verify', (req, res) => {
   sync.enqueueAlert(result.alert);
 
   if (result.purged) {
+    sync.enqueueTombstone(req.params.id, 'rejected');
     broadcastToAll('report_rejected', {
       alert: { ...result.alert, votes: result.alert.votes || [] },
       reason: 'community_refuted',

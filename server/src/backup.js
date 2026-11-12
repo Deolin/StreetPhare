@@ -23,6 +23,7 @@ const sync = require('./sync');
 const apiRoutes = require('./routes/api');
 const { userKeyGenerator } = apiRoutes;
 const adminRoutes = require('./routes/admin');
+const streetmedicRoutes = require('./routes/streetmedic');
 const simulationRoutes = require('./routes/simulation');
 const { verifyWsToken } = require('./middleware/auth');
 const { setAdminBroadcaster, setMeshBroadcaster, broadcast, broadcastToAll } = require('./services/broadcast');
@@ -117,6 +118,7 @@ app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 app.use('/api', apiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/simulation', simulationRoutes);
+app.use('/api/streetmedic', streetmedicRoutes);
 
 app.get('/', (req, res) => {
   res.json({

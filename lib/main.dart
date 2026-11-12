@@ -33,6 +33,7 @@ import 'features/settings/data/panic_contact_store.dart';
 import 'features/settings/data/settings_store.dart';
 import 'features/splash/presentation/splash_screen.dart';
 import 'features/start_screen/data/start_screen_store.dart';
+import 'features/streetmedic/presentation/streetmedic_service.dart';
 import 'features/tutorial/data/tutorial_store.dart';
 import 'network/bootstrap.dart';
 import 'network/network_config.dart';
@@ -211,6 +212,7 @@ void main() async {
     unawaited(AppShareService.instance.initDeepLinks());
     HiveMessagingService.instance.start();
     unawaited(NotificationService.instance.showPersistentNotification());
+unawaited(StreetMedicService.instance.init());
 
     networkInitOk = true;
 

@@ -39,6 +39,8 @@ class Store {
     this.events = [];
     this.panicPings = [];
     this.bugReports = [];
+    this.streetmedics = [];          // Street-medics autorisés + position temps réel
+    this.medicMissions = [];         // Missions d'intervention (appel → soin)
     this.meshMessages = [];      // Backlog de messages mesh (store-and-forward)
     this.meshClients = new Set();
     this.adminClients = new Set();
@@ -120,6 +122,14 @@ class Store {
         this.geofencingZones = data.geofencingZones;
       }
 
+      if (Array.isArray(data.streetmedics)) {
+        this.streetmedics = data.streetmedics.filter(s => s && s.userId);
+      }
+
+      if (Array.isArray(data.medicMissions)) {
+        this.medicMissions = data.medicMissions.filter(m => m && m.id);
+      }
+
       if (data.syncState && typeof data.syncState === 'object') {
         this.syncState = {
           lastSyncAt: data.syncState.lastSyncAt || null,
@@ -179,6 +189,8 @@ class Store {
       meshMessages: this.meshMessages.slice(-1000),
       bannedUsers: [...this.bannedUsers],
       geofencingZones: this.geofencingZones,
+      streetmedics: this.streetmedics,
+      medicMissions: this.medicMissions,
       tombstones: this.tombstones.slice(-5000),
       syncState: { ...this.syncState },
     };
@@ -285,6 +297,7 @@ class Store {
     return this.alerts.filter(a => {
       if (!a || a.id === alert.id) return false;
       if (a.status === 'rejected' || a.status === 'voided' || a.status === 'tombstone') return false;
+      if (this.alertNetScore(a) < 0) return false;
       if (a.type === alert.type) return false;
       if (a.lat == null || a.lng == null) return false;
       return this._haversine(alert.lat, alert.lng, a.lat, a.lng) <= r;
@@ -299,6 +312,7 @@ class Store {
     const results = [];
     for (const a of this.alerts) {
       if (!a || a.status === 'rejected' || a.status === 'voided' || a.status === 'tombstone') continue;
+      if (this.alertNetScore(a) < 0) continue;
       const ageMinutes = (now - new Date(a.createdAt).getTime()) / 60000;
       if (ageMinutes > config.ttls.absoluteRgpd) continue;
 
@@ -357,16 +371,9 @@ class Store {
       alert.lastVoteAt = nowIso;
       alert.updatedAt = nowIso;
 
-      // Purge automatique si :
-      //   - >= 2 infirmations, OU
-      //   - le signalement n'a pas encore atteint le consensus (ou est sous vérification dynamique)
-      //     et les infirmations égalent/dépassent les votes positifs (hors éclaireur).
-      const hasReachedConsensus = alert.votes.length >= config.consensusThreshold;
-      const shouldPurge =
-        alert.downvotes.length >= 2 ||
-        (!alert.scoutValidated &&
-          (!hasReachedConsensus || Boolean(alert.validationRequestedAt)) &&
-          alert.downvotes.length >= alert.votes.length);
+      // Purge automatique : score net <= 0 (downvotes >= votes) -> tombstone.
+      const netScore = this.alertNetScore(alert);
+      const shouldPurge = netScore <= 0;
       if (shouldPurge) {
         alert.status = 'rejected';
         alert.purgedReason = 'community_refuted';
@@ -383,11 +390,21 @@ class Store {
     }
   }
 
+  /// Score net d'un signalement = votes positifs - votes négatifs.
+  /// Un score négatif signifie que la communauté a infirmé le danger :
+  /// le signalement doit alors être tombstoné et ne plus solliciter de validation.
+  alertNetScore(alert) {
+    const up = Array.isArray(alert.votes) ? alert.votes.length : 0;
+    const down = Array.isArray(alert.downvotes) ? alert.downvotes.length : 0;
+    return up - down;
+  }
+
   getActiveAlerts() {
     const now = new Date();
     const minDensity = config.crowdDensityThreshold || 25;
     return this.alerts.filter(a => {
       if (a.status === 'rejected' || a.status === 'voided' || a.status === 'tombstone') return false;
+      if (this.alertNetScore(a) < 0) return false;
       if (a.type === 'density') {
         const dv = Number(a.density_value ?? a.densityValue ?? 0);
         if (dv < minDensity) return false;
@@ -722,6 +739,203 @@ class Store {
   }
 
   getGeofencingZones() { return this.geofencingZones; }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // STREET-MEDICS — statut, position temps réel & missions d'intervention
+  // ═══════════════════════════════════════════════════════════════════════
+
+  requestStreetMedic({ userId, eventId, lat, lng, contactMessage, contactCipher } = {}) {
+    if (!userId) return null;
+    let sm = this.streetmedics.find(s => s.userId === userId);
+    const nowIso = new Date().toISOString();
+    if (!sm) {
+      sm = {
+        id: require('uuid').v4(),
+        userId,
+        status: 'pending',
+        eventId: eventId || null,
+        lat: lat ?? null,
+        lng: lng ?? null,
+        contactMessage: contactMessage || null,
+        contactCipher: contactCipher || null,
+        sharing: false,
+        authorizedBy: null,
+        requestedAt: nowIso,
+        authorizedAt: null,
+        updatedAt: nowIso,
+      };
+      this.streetmedics.push(sm);
+    } else {
+      sm.requestedAt = nowIso;
+      if (sm.status === 'disabled') sm.status = 'pending';
+      if (contactMessage != null) sm.contactMessage = contactMessage;
+      if (contactCipher != null) sm.contactCipher = contactCipher;
+      if (lat != null) sm.lat = Number(lat);
+      if (lng != null) sm.lng = Number(lng);
+      if (eventId) sm.eventId = eventId;
+      sm.updatedAt = nowIso;
+    }
+    this._scheduleSave();
+    return sm;
+  }
+
+  authorizeStreetMedic(userId, adminName) {
+    const sm = this.streetmedics.find(s => s.userId === userId);
+    if (!sm) return null;
+    sm.status = 'authorized';
+    sm.authorizedBy = adminName || 'admin';
+    sm.authorizedAt = new Date().toISOString();
+    sm.updatedAt = sm.authorizedAt;
+    this._scheduleSave();
+    return sm;
+  }
+
+  revokeStreetMedic(userId) {
+    const sm = this.streetmedics.find(s => s.userId === userId);
+    if (!sm) return null;
+    sm.status = 'disabled';
+    sm.sharing = false;
+    sm.updatedAt = new Date().toISOString();
+    this._scheduleSave();
+    return sm;
+  }
+
+  reportStreetMedicPosition(userId, { lat, lng, sharing, eventId } = {}) {
+    const sm = this.streetmedics.find(s => s.userId === userId);
+    if (!sm || (sm.status !== 'authorized' && sm.status !== 'active')) return null;
+    if (typeof sharing === 'boolean') sm.sharing = sharing;
+    if (lat != null) sm.lat = Number(lat);
+    if (lng != null) sm.lng = Number(lng);
+    if (eventId) sm.eventId = eventId;
+    sm.status = sm.sharing ? 'active' : 'authorized';
+    sm.updatedAt = new Date().toISOString();
+    this._scheduleSave();
+    return sm;
+  }
+
+  removeStreetMedic(userId) {
+    const idx = this.streetmedics.findIndex(s => s.userId === userId);
+    if (idx === -1) return false;
+    this.streetmedics.splice(idx, 1);
+    this._scheduleSave();
+    return true;
+  }
+
+  getActiveStreetMedics() {
+    const now = Date.now();
+    const staleMs = 2 * 60 * 1000;
+    return this.streetmedics
+      .filter(s => s && s.status === 'active' && s.sharing)
+      .map(s => ({ ...s, stale: (now - new Date(s.updatedAt).getTime()) > staleMs }));
+  }
+
+  getStreetMedicByUser(userId) { return this.streetmedics.find(s => s.userId === userId) || null; }
+
+  getAllStreetMedics() { return this.streetmedics; }
+
+  createMedicMission({ callerUserId, lat, lng, note } = {}) {
+    if (!callerUserId) return null;
+    const target = this.findNearestStreetMedic(lat, lng);
+    if (!target) return null;
+    const mission = {
+      id: require('uuid').v4(),
+      callerUserId,
+      medicId: target.userId,
+      status: 'pending',
+      injuredLat: Number(lat),
+      injuredLng: Number(lng),
+      note: note || '',
+      refusedBy: [],
+      acceptedAt: null,
+      completedAt: null,
+      createdAt: new Date().toISOString(),
+    };
+    this.medicMissions.push(mission);
+    this._scheduleSave();
+    return mission;
+  }
+
+  getMissionById(id) { return this.medicMissions.find(m => m.id === id) || null; }
+
+  getAllMissionsForUser(userId) { return this.medicMissions.filter(m => m.callerUserId === userId || m.medicId === userId); }
+
+  getActiveMissionForMedic(medicUserId) { return this.medicMissions.find(m => m.medicId === medicUserId && m.status === 'accepted') || null; }
+
+  getPendingMissionForMedic(medicUserId) { return this.medicMissions.find(m => m.medicId === medicUserId && m.status === 'pending') || null; }
+
+  getActiveMedicMissions() {
+    return this.medicMissions.filter(m => m && (m.status === 'pending' || m.status === 'accepted'));
+  }
+
+  acceptMedicMission(id, medicUserId, lat, lng) {
+    const m = this.getMissionById(id);
+    if (!m || m.medicId !== medicUserId || m.status !== 'pending') return null;
+    for (const other of this.medicMissions) {
+      if (other.id !== id && other.medicId === medicUserId &&
+          (other.status === 'pending' || other.status === 'accepted')) {
+        other.status = 'cancelled';
+        other.completedAt = new Date().toISOString();
+      }
+    }
+    m.status = 'accepted';
+    m.acceptedAt = new Date().toISOString();
+    if (lat != null) m.injuredLat = Number(lat);
+    if (lng != null) m.injuredLng = Number(lng);
+    this._scheduleSave();
+    return m;
+  }
+
+  refuseMedicMission(id, medicUserId) {
+    const m = this.getMissionById(id);
+    if (!m || m.medicId !== medicUserId || m.status !== 'pending') return null;
+    const refused = new Set(m.refusedBy || []);
+    refused.add(medicUserId);
+    m.refusedBy = [...refused];
+    const next = this.findNearestStreetMedic(m.injuredLat, m.injuredLng, m.refusedBy);
+    if (!next || next.userId === medicUserId) {
+      m.status = 'cancelled';
+      m.completedAt = new Date().toISOString();
+    } else {
+      m.medicId = next.userId;
+    }
+    this._scheduleSave();
+    return m;
+  }
+
+  trackMedicMissionInjured(id, userId, lat, lng) {
+    const m = this.getMissionById(id);
+    if (!m || m.callerUserId !== userId) return null;
+    m.injuredLat = Number(lat);
+    m.injuredLng = Number(lng);
+    m.injuredUpdatedAt = new Date().toISOString();
+    this._scheduleSave();
+    return m;
+  }
+
+  completeMedicMission(id, medicUserId) {
+    const m = this.getMissionById(id);
+    if (!m || m.medicId !== medicUserId) return null;
+    m.status = 'completed';
+    m.completedAt = new Date().toISOString();
+    this._scheduleSave();
+    return m;
+  }
+
+  findNearestStreetMedic(lat, lng, excludeUserIds = []) {
+    let best = null;
+    let bestD = Infinity;
+    const exclude = new Set(excludeUserIds);
+    const now = Date.now();
+    for (const sm of this.streetmedics) {
+      if (!sm || sm.status !== 'active' || !sm.sharing) continue;
+      if (exclude.has(sm.userId)) continue;
+      if (sm.lat == null || sm.lng == null) continue;
+      if (now - new Date(sm.updatedAt).getTime() > 10 * 60 * 1000) continue;
+      const d = this._haversine(Number(lat), Number(lng), sm.lat, sm.lng);
+      if (d < bestD) { bestD = d; best = sm; }
+    }
+    return best ? { ...best, distanceMeters: Math.round(bestD) } : null;
+  }
 
   // ═══════════════════════════════════════════════════════════════════════
   // CONSOLE — Purge des vieux signalements

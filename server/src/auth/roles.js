@@ -80,6 +80,7 @@ const ALL_PERMISSIONS = [
   'scoutVoid',           // suppression directe de faux signalements (éclaireur)
   'manageScouts',        // gestion des éclaireurs (réservé superadmin)
   'manageEventAdmins',   // gestion des admins d'événements (réservé superadmin)
+  'manageStreetmedic',   // autoriser / révoquer les street-medics
 ];
 
 // Permissions par défaut assignées à chaque rôle.

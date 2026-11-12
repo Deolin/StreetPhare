@@ -66,6 +66,8 @@ import '../../routing/presentation/route_result_sheet.dart';
 import '../../settings/data/app_preferences_store.dart';
 import '../../settings/data/panic_contact_store.dart';
 import '../../settings/presentation/settings_screen.dart';
+import '../../streetmedic/presentation/streetmedic_overlay.dart';
+import '../../streetmedic/presentation/streetmedic_service.dart';
 import '../local_first_tile_provider.dart';
 import 'widgets/long_press_detector.dart';
 import 'widgets/restricted_segment_layer.dart';
@@ -101,6 +103,13 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
+
+  /// Fournisseur de tuiles réutilisé (identité stable) pour éviter de
+  /// recréer/déposer les streams d'images de tuiles à chaque rebuild.
+  late final LocalFirstTileProvider _tileProvider = LocalFirstTileProvider(
+    headers: kStreetPhareTileHeaders,
+    onTileRateLimited: _onTileRateLimited,
+  );
   static const LatLng _defaultCenter = LatLng(48.8566, 2.3522);
   static const double _defaultZoom = 13.0;
 
@@ -176,6 +185,9 @@ class _MapScreenState extends State<MapScreen> {
   /// Abonnement au flux d'alertes réseau.
   StreamSubscription<List<Alert>>? _alertsSub;
 
+  /// Écouteur de mise à jour de la liste des street-medics actifs.
+  VoidCallback? _streetMedicListener;
+
   /// Abonnement aux demandes dynamiques de validation de proximité.
   StreamSubscription<GeofenceEvent>? _proximityValidationSub;
   bool _validationSheetOpen = false;
@@ -210,6 +222,20 @@ class _MapScreenState extends State<MapScreen> {
     if (HiveAlertDatabase.instance.isInitialized) {
       _remoteAlerts = HiveAlertDatabase.instance.getAllValid();
     }
+
+    // Street-medic : init + rafraîchissement de la carte médicale.
+    StreetMedicService.instance.init();
+    _streetMedicListener = () {
+      if (!mounted) return;
+      // Diffère le setState APRÈS le frame courant : évite tout rebuild
+      // pendant la phase de layout (crash `!_debugDoingThisLayout`).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    };
+    StreetMedicService.instance.activeStreetmedics
+        .addListener(_streetMedicListener!);
+    unawaited(StreetMedicService.instance.refreshActiveStreetMedics());
   }
 
   Future<void> _onProximityValidationRequested(GeofenceEvent event) async {
@@ -228,6 +254,11 @@ class _MapScreenState extends State<MapScreen> {
     _collectivePanicSub?.cancel();
     _proximityValidationSub?.cancel();
     _alertsSub?.cancel();
+    if (_streetMedicListener != null) {
+      StreetMedicService.instance.activeStreetmedics
+          .removeListener(_streetMedicListener!);
+    }
+    _tileProvider.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -279,6 +310,7 @@ class _MapScreenState extends State<MapScreen> {
         _userPosition = pos;
         _locating = false;
       });
+      StreetMedicService.instance.updatePosition(pos.latitude, pos.longitude);
       _animateToUser();
       unawaited(_positionSub?.cancel());
       _isTracking = true;
@@ -323,6 +355,7 @@ class _MapScreenState extends State<MapScreen> {
         }
 
         _previousPosition = p;
+        StreetMedicService.instance.updatePosition(p.latitude, p.longitude);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           setState(() {
@@ -1804,6 +1837,53 @@ class _MapScreenState extends State<MapScreen> {
     return markers;
   }
 
+  /// Construit les marqueurs des street-medics actifs (croix blanche sur
+  /// fond rouge). Distinct en « mode alerté » quand le medic est en mission.
+  List<Marker> _buildStreetMedicMarkers() {
+    final markers = <Marker>[];
+    final service = StreetMedicService.instance;
+    final alertedMedicId = (service.myCall != null && service.myCall!.isActive)
+        ? service.myCall!.medicId
+        : service.activeMission?.medicId;
+    for (final sm in service.activeStreetmedics.value) {
+      if (sm.latitude == null || sm.longitude == null || sm.stale) continue;
+      markers.add(Marker(
+        point: LatLng(sm.latitude!, sm.longitude!),
+        width: 40,
+        height: 40,
+        child: Tooltip(
+          message: sm.userId == alertedMedicId
+              ? 'Street-medic en intervention'
+              : 'Street-medic',
+          child: StreetMedicMarkerIcon(alerted: sm.userId == alertedMedicId),
+        ),
+      ));
+    }
+    // Marqueur du blessé (visible par le medic en intervention uniquement).
+    final activeMission = service.activeMission;
+    if (activeMission != null && activeMission.isActive) {
+      markers.add(Marker(
+        point: LatLng(activeMission.injuredLatitude, activeMission.injuredLongitude),
+        width: 40,
+        height: 40,
+        child: Tooltip(
+          message: 'Blessé',
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1565C0),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: const Icon(Icons.accessible, color: Colors.white, size: 20),
+          ),
+        ),
+      ));
+    }
+    return markers;
+  }
+
   /// Asset SVG « Mars Attacks » pour un type d'alerte donné.
   ///
   /// Retourne `null` si le type conserve son icône Material standard.
@@ -2000,6 +2080,7 @@ class _MapScreenState extends State<MapScreen> {
 
     // Marqueurs des alertes réseau (signalements validés / simulés).
     markers.addAll(_buildAlertMarkers());
+      markers.addAll(_buildStreetMedicMarkers());
 
     return _EventLayers(polylines: polylines, markers: markers);
   }
@@ -2076,10 +2157,7 @@ class _MapScreenState extends State<MapScreen> {
                                   urlTemplate: tileUrl,
                                   fallbackUrl: kStreetPhareOsmTileUrlTemplate,
                                   userAgentPackageName: 'com.streetphare.app',
-                                  tileProvider: LocalFirstTileProvider(
-                                    headers: kStreetPhareTileHeaders,
-                                    onTileRateLimited: _onTileRateLimited,
-                                  ),
+                                  tileProvider: _tileProvider,
                                   maxNativeZoom: 19,
                                   errorTileCallback: (tile, error, stackTrace) {
                                     if (kDebugMode) {
@@ -2278,7 +2356,7 @@ class _MapScreenState extends State<MapScreen> {
                                 valueListenable: AppPreferencesStore.instance,
                                 builder: (context, prefs, _) {
                                   return Positioned(
-                                    top: 80,
+                                    top: 126,
                                     left: 12,
                                     right: 80,
                                     child: SingleChildScrollView(
@@ -2565,6 +2643,26 @@ class _MapScreenState extends State<MapScreen> {
 
                             // ── Bandeau d'isolement critique ──────────────────────────
                             _ConnectivityBanner(strings: s),
+
+                            // ── Bouton « Partager ma position » (haut de carte) ──
+                            StreetMedicSharingToggle(
+                              userPosition: _userPosition != null
+                                  ? LatLng(
+                                      _userPosition!.latitude,
+                                      _userPosition!.longitude,
+                                    )
+                                  : null,
+                            ),
+
+                            // ── Overlay street-medic (mission + appel) ─────
+                            StreetMedicOverlay(
+                              userPosition: _userPosition != null
+                                  ? LatLng(
+                                      _userPosition!.latitude,
+                                      _userPosition!.longitude,
+                                    )
+                                  : null,
+                            ),
                           ],
                         ), // Stack
                       ), // SafeArea

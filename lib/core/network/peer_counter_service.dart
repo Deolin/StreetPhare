@@ -287,10 +287,11 @@ class PeerCounterService extends ValueNotifier<int> {
     final kept = _prune(now);
     final filtered = _excludeLocal(kept);
     final count = filtered.length;
+    // Ne notifier que si le compteur CHANGE réellement. Notifier à chaque
+    // tick (1 s) déclenchait un flush/sync-push en boucle côté SyncService
+    // (cf. _onPeersChanged → _pushAndPull).
     if (count != value) {
       value = count;
-    } else {
-      notifyListeners();
     }
   }
 

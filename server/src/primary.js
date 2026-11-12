@@ -32,6 +32,7 @@ const apiRoutes = require('./routes/api');
 const { userKeyGenerator } = apiRoutes;
 const adminRoutes = require('./routes/admin');
 const adminEventRoutes = require('./routes/adminEvents');
+const streetmedicRoutes = require('./routes/streetmedic');
 const simulationRoutes = require('./routes/simulation');
 const { verifyWsToken } = require('./middleware/auth');
 const { setAdminBroadcaster, setMeshBroadcaster, broadcast, broadcastToAll } = require('./services/broadcast');
@@ -210,6 +211,7 @@ app.get('/tiles/:z/:x/:y.png', tileLimiter, async (req, res) => {
 app.use('/api', apiRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/events', adminEventRoutes);
+app.use('/api/streetmedic', streetmedicRoutes);
 app.use('/api/admin/simulation', simulationRoutes);
 
 // ── Route publique de partage d'invitation / Deep Link (/invite) ────────

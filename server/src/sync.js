@@ -24,9 +24,12 @@ const http = require('http');
 //     attempts: number, nextRetry: number }
 const outbox = [];
 let outboxTimer = null;
+let retryTimer = null;
+let _flushing = false;
 const OUTBOX_FLUSH_INTERVAL_MS = 30000; // flush toutes les 30s
-const OUTBOX_MAX_ATTEMPTS = 3;
-const OUTBOX_BACKOFF_BASE_MS = 1000; // 1s → 2s → 4s
+const OUTBOX_MAX_ATTEMPTS = 8;          // tolère ~4 min d'indisponibilité du Backup
+const OUTBOX_BACKOFF_BASE_MS = 5000;    // 5s → 10s → 20s → 40s → 60s (plafonné)
+const OUTBOX_BACKOFF_MAX_MS = 60000;
 
 // ── Log helper formaté [HH:MM:SS - DD/MM] ──────────────────────────────
 const log = (category, message) => {
@@ -187,6 +190,7 @@ async function _processOutboxItem(item) {
 
 /// Flush périodique de l'outbox : traite chaque entrée éligible.
 async function flushOutbox() {
+  if (_flushing) return; // évite les flush concurrents (tick 30s + retry timer)
   if (outbox.length === 0) return;
 
   const now = Date.now();
@@ -194,37 +198,59 @@ async function flushOutbox() {
 
   if (toProcess.length === 0) {
     log('OUTBOX', `${outbox.length} en attente, prochain retry dans ${Math.round((outbox[0].nextRetry - now) / 1000)}s`);
+    _scheduleRetry();
     return;
   }
 
-  log('OUTBOX', `Flush — ${toProcess.length}/${outbox.length} éléments à traiter`);
+  _flushing = true;
+  try {
+    log('OUTBOX', `Flush — ${toProcess.length}/${outbox.length} éléments à traiter`);
 
-  for (const item of toProcess) {
-    const success = await _processOutboxItem(item);
+    for (const item of toProcess) {
+      const success = await _processOutboxItem(item);
 
-    if (success) {
-      // Retirer de l'outbox
-      const idx = outbox.indexOf(item);
-      if (idx !== -1) outbox.splice(idx, 1);
-    } else {
-      item.attempts++;
-      if (item.attempts >= OUTBOX_MAX_ATTEMPTS) {
-        // Abandon après N tentatives
-        log('OUTBOX', `🚫 ${item.type} ${item.id} abandonné après ${OUTBOX_MAX_ATTEMPTS} tentatives`);
+      if (success) {
+        // Retirer de l'outbox
         const idx = outbox.indexOf(item);
         if (idx !== -1) outbox.splice(idx, 1);
       } else {
-        // Backoff exponentiel : 1s, 2s, 4s
-        const delay = OUTBOX_BACKOFF_BASE_MS * Math.pow(2, item.attempts - 1);
-        item.nextRetry = Date.now() + delay;
-        log('OUTBOX', `⏳ ${item.type} ${item.id} — retry dans ${delay / 1000}s (tentative ${item.attempts}/${OUTBOX_MAX_ATTEMPTS})`);
+        item.attempts++;
+        if (item.attempts >= OUTBOX_MAX_ATTEMPTS) {
+          // Abandon après N tentatives (le hash polling réconciliera via full sync)
+          log('OUTBOX', `🚫 ${item.type} ${item.id} abandonné après ${OUTBOX_MAX_ATTEMPTS} tentatives`);
+          const idx = outbox.indexOf(item);
+          if (idx !== -1) outbox.splice(idx, 1);
+        } else {
+          // Backoff exponentiel plafonné : 5s → 10s → 20s → 40s → 60s
+          const delay = Math.min(OUTBOX_BACKOFF_BASE_MS * Math.pow(2, item.attempts - 1), OUTBOX_BACKOFF_MAX_MS);
+          item.nextRetry = Date.now() + delay;
+          log('OUTBOX', `⏳ ${item.type} ${item.id} — retry dans ${delay / 1000}s (tentative ${item.attempts}/${OUTBOX_MAX_ATTEMPTS})`);
+        }
       }
     }
-  }
 
-  if (outbox.length > 0) {
-    log('OUTBOX', `Flush terminé — ${outbox.length} restants dans l'outbox`);
+    if (outbox.length > 0) {
+      log('OUTBOX', `Flush terminé — ${outbox.length} restants dans l'outbox`);
+      _scheduleRetry();
+    }
+  } finally {
+    _flushing = false;
   }
+}
+
+/// Programme le prochain flush à la date du prochain retry éligible,
+/// afin de respecter réellement le backoff exponentiel (au lieu d'attendre
+/// systématiquement le tick de 30s qui rendait le backoff inopérant).
+function _scheduleRetry() {
+  if (retryTimer) clearTimeout(retryTimer);
+  const now = Date.now();
+  let next = Infinity;
+  for (const item of outbox) {
+    if (item.nextRetry < next) next = item.nextRetry;
+  }
+  if (!isFinite(next)) return;
+  const delay = Math.max(0, Math.min(next - now, OUTBOX_FLUSH_INTERVAL_MS));
+  retryTimer = setTimeout(() => { flushOutbox(); }, delay);
 }
 
 /// Démarre le timer de flush périodique de l'outbox.
@@ -239,8 +265,12 @@ function stopOutbox() {
   if (outboxTimer) {
     clearInterval(outboxTimer);
     outboxTimer = null;
-    log('OUTBOX', 'Arrêté');
   }
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  log('OUTBOX', 'Arrêté');
 }
 
 /// Taille actuelle de l'outbox (pour monitoring).

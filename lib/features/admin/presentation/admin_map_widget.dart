@@ -70,9 +70,13 @@ class AdminMapWidget extends StatefulWidget {
 
 class _AdminMapWidgetState extends State<AdminMapWidget> {
   final MapController _mapController = MapController();
+  late final LocalFirstTileProvider _tileProvider = LocalFirstTileProvider(
+    headers: kStreetPhareTileHeaders,
+  );
 
   @override
   void dispose() {
+    _tileProvider.dispose();
     _mapController.dispose();
     super.dispose();
   }
@@ -221,9 +225,7 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
                 urlTemplate: tileUrl,
                 fallbackUrl: kStreetPhareOsmTileUrlTemplate,
                 userAgentPackageName: 'com.streetphare.admin',
-                tileProvider: LocalFirstTileProvider(
-                  headers: kStreetPhareTileHeaders,
-                ),
+                tileProvider: _tileProvider,
                 maxNativeZoom: 19,
                 tileBuilder: widget.darkMode ? darkModeTileBuilder : null,
                 tileDisplay: const TileDisplay.fadeIn(

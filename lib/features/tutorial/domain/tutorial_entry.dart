@@ -232,3 +232,39 @@ const List<TutorialEntry> kTutorialEntries = [
         'dangers proches, ou uniquement les changements de parcours.',
   ),
 ];
+
+// ============================================================================
+// Section spéciale — STREET-MEDIC (masquée par défaut)
+//
+// Ces entrées NE sont PAS affichées par défaut. Elles sont injectées dans le
+// tutoriel uniquement lorsque l'application a reçu le statut street-medic
+// (voir `StreetMedicService.isAuthorized`). Elles expliquent le fonctionnement
+// d'une application déclarée street-medic.
+// ============================================================================
+
+const List<TutorialEntry> kStreetMedicTutorialEntries = [
+  TutorialEntry(
+    category: TutorialCategory.securite,
+    feature: 'Mode Street-medic',
+    description:
+        'Votre appareil est déclaré poste de secours. Les autres participants '
+        'vous voient sur la carte avec une croix blanche sur fond rouge.',
+  ),
+  TutorialEntry(
+    category: TutorialCategory.securite,
+    feature: 'Partage de position',
+    description:
+        'Tant que le partage est actif, votre position est transmise au réseau. '
+        'Un indicateur "tracé" est affiché sur l\'écran d\'accueil. Vous pouvez '
+        'désactiver le partage à tout moment. Il s\'arrête aussi automatiquement '
+        'à la fin de l\'événement.',
+  ),
+  TutorialEntry(
+    category: TutorialCategory.coordination,
+    feature: 'Missions d\'intervention',
+    description:
+        'Quand un participant appelle à l\'aide, le street-medic le plus proche '
+        'est alerté. Si vous acceptez, vous suivez la position du blessé jusqu\'à '
+        'marcher l\'intervention comme terminée.',
+  ),
+];

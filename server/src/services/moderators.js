@@ -22,6 +22,7 @@ const PERMISSIONS = [
   'manageEvents',      // gérer les événements et leurs points (trajet, POI, soins…)
   'manageModerators',  // gérer les comptes modérateurs (réservé main admin)
   'simulateAccess',    // accès au panneau de test & simulation
+  'manageStreetmedic', // autoriser / révoquer les street-medics
 ];
 
 const log = (category, message) => {

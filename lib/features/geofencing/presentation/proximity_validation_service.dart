@@ -28,17 +28,21 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import '../../../core/services/report_service.dart';
 import '../../../database/hive_alert_database.dart';
+import '../../../network/failover_manager.dart';
+import '../../../network/network_config.dart';
 import '../../../network/network_coordinator.dart';
 import '../../../services/notification_service.dart';
 import '../domain/models/geofence_event.dart';
 import 'geofencing_service.dart';
 
-const String _validationApiBase = String.fromEnvironment(
-  'STREETPHARE_API_BASE',
-  defaultValue: 'http://10.0.2.2:3000',
-);
+/// URL de base du serveur actif, résolue par le FailoverManager
+/// (production HTTPS ou fallback local), au lieu d'une adresse codée en dur.
+String get _validationApiBase {
+  final address = FailoverManager.instance.currentAddress;
+  if (address.isNotEmpty) return address;
+  return NetworkConfig.baseUrl;
+}
 
 /// Service singleton de validation de proximité.
 class ProximityValidationService {
@@ -146,7 +150,7 @@ class ProximityValidationService {
     required bool confirmed,
   }) async {
     try {
-      final uid = currentUserId ?? 'anon_peer';
+      final uid = NetworkCoordinator.instance.ephemeralUserId;
       final uri = Uri.parse('$_validationApiBase/api/alerts/$alertId/verify');
       await http
           .post(

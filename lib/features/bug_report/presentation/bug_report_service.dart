@@ -132,7 +132,7 @@ class BugReportService {
   static const Duration _kFlushInterval = Duration(minutes: 5);
   static const Duration _kRequestTimeout = Duration(seconds: 10);
   static const int _kMaxAttemptsBeforeAbandon = 8;
-  static const Duration _kMaxRateLimitBackoff = Duration(minutes: 5);
+  static const Duration _kMaxRateLimitBackoff = Duration(minutes: 15);
 
   /// Démarre le service de bug report.
   ///

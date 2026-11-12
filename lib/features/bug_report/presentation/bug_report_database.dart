@@ -12,6 +12,8 @@
 //      (backoff exponentiel géré par BugReportService).
 
 import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
@@ -266,12 +268,21 @@ class BugReportDatabase {
   }
 
   static String _encode(BugReportEntry entry) {
-    // Utilise un encodage simple (pas de chiffrement) car les rapports
-    // de bug ne contiennent pas de données sensibles.
-    return '${entry.id}\n${entry.title}\n${entry.description}\n${entry.platform}\n${entry.appVersion}\n${entry.category}\n${entry.submittedAt ?? ''}\n${entry.attempts}\n${entry.lastError ?? ''}\n${entry.lastAttemptAt ?? ''}\n${entry.extraLogs ?? ''}';
+    // Encodage JSON : la description (et la stack trace) contiennent des
+    // retours à la ligne — l'ancien format délimité par `\n` corrompait
+    // les champs (description tronquée, platform/appVersion décalés).
+    return jsonEncode(entry.toJson());
   }
 
   static BugReportEntry _decode(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        return BugReportEntry.fromJson(decoded);
+      }
+    } catch (_) {
+      // Ancien format délimité par `\n` (rétrocompatibilité).
+    }
     final parts = raw.split('\n');
     return BugReportEntry(
       id: parts.isNotEmpty ? parts[0] : '',

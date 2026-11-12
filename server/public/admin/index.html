@@ -183,6 +183,12 @@
         <button onclick="createModerator()">➕ Créer modérateur</button>
         <div class="list" id="mods-list">Chargement…</div>
       </div>
+
+      <div class="card" style="display:none" id="streetmedics-card">
+        <h3>🩺 Street-medics &amp; autorisations</h3>
+        <div class="list" id="streetmedics-list">Chargement…</div>
+        <a href="tel:112" style="display:block;margin-top:10px;text-align:center;background:#e53935;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:600">📞 Appeler les secours (112)</a>
+      </div>
     </div>
 
     <!-- ── CONSOLE ── -->
@@ -303,6 +309,8 @@
       layerGroups[k] = L.layerGroup().addTo(map);
     });
     const botsLayer = L.layerGroup().addTo(map);
+    const streetmedicsLayer = L.layerGroup().addTo(map);
+    const medicMissionsLayer = L.layerGroup().addTo(map);
     const LAYER_KEYS = ['police', 'fire_truck', 'filter', 'danger', 'collective', 'panic', 'safe', 'events'];
     let simMode = null;
     let selectedAlertId = null;
@@ -365,6 +373,9 @@
           renderEvents(d.events || []);
           updateStatus(d.syncState);
           loadZones();
+          loadModerators();
+          loadStreetMedics();
+          loadMedicMissions();
         } else if (d.type === 'new_alert') {
           addAlertMarker(d.alert);
           refreshSnapshot();
@@ -391,13 +402,22 @@
           refreshSnapshot(); loadZones();
         } else if (d.type === 'panic') {
           notify('🚨 PANIC ' + (d.collective ? 'collectif' : 'individuel') + ' (' + d.count + ' ping)');
+        } else if (d.type === 'streetmedic_request') {
+          loadStreetMedics();
+          const reqMsg = (d.streetmedic && d.streetmedic.contactMessage) || '';
+          notify('🩺 Demande street-medic reçue (' + ((d.streetmedic && d.streetmedic.userId) || '?') + ')' +
+            (reqMsg ? ' — message : ' + reqMsg : ''));
+        } else if (d.type === 'streetmedic_authorized' || d.type === 'streetmedic_revoked' || d.type === 'streetmedics_changed') {
+          loadStreetMedics();
+        } else if (d.type === 'medic_mission_update') {
+          loadMedicMissions();
         } else if (d.type === 'metrics') {
           updateLoadChart(d);
         }
       };
       ws.onopen = () => {
         document.getElementById('sync-status').innerHTML = '<span class="ok">● Connecté (Live)</span>';
-        loadZones(); loadModerators(); loadSimTypes();
+        loadZones(); loadModerators(); loadSimTypes(); loadStreetMedics(); loadMedicMissions();
       };
       ws.onclose = async () => {
         document.getElementById('sync-status').innerHTML = '<span class="ko">● Déconnecté — reconnexion…</span>';
@@ -447,11 +467,15 @@
         default: return 'danger'; // mobile_danger, danger, casseurs, density, autre
       }
     }
+    function netVotes(a) {
+      return (a.votes || []).length - (a.downvotes || []).length;
+    }
+
     function addAlertMarker(a) {
       const key = layerKeyFor(a.type);
       const color = key === 'police' ? '#79c0ff' : key === 'fire_truck' ? '#ff7b72' : key === 'filter' ? '#ffa657' : key === 'collective' ? '#bc8cff' : key === 'panic' ? '#f85149' : '#d29922';
       const marker = L.circleMarker([a.lat, a.lng], { radius: 8, color, fillOpacity: 0.7 })
-        .bindPopup(`<b>${escapeHtml(a.type)}</b><br>${escapeHtml(a.description || '')}<br><small>${a.id}</small><br><small>votes=${(a.votes || []).length} statut=${a.status}</small><br><button onclick="copyText('${a.id}')">📋 UUID</button> <button onclick="copyText('${a.lat}, ${a.lng}')">📍 GPS</button>`);
+        .bindPopup(`<b>${escapeHtml(a.type)}</b><br>${escapeHtml(a.description || '')}<br><small>${a.id}</small><br><small>votes=${netVotes(a)} (▲${(a.votes || []).length}/▼${(a.downvotes || []).length}) statut=${a.status}</small><br><button onclick="copyText('${a.id}')">📋 UUID</button> <button onclick="copyText('${a.lat}, ${a.lng}')">📍 GPS</button>`);
       marker.addTo(layerGroups[key]);
       markersById[a.id] = marker;
     }
@@ -462,7 +486,7 @@
       if (!alerts.length) { list.innerHTML = 'Aucun signalement'; return; }
       list.innerHTML = alerts.map(a => `
         <div class="item ${selectedAlertId === a.id ? 'selected' : ''}" data-alert="${a.id}" onclick="selectAlert('${a.id}')">
-          <b>${escapeHtml(a.type)}</b> <span class="meta">(${a.status}) votes=${(a.votes||[]).length}</span>
+          <b>${escapeHtml(a.type)}</b> <span class="meta">(${a.status}) net=${netVotes(a)} (▲${(a.votes||[]).length}/▼${(a.downvotes||[]).length})</span>
           ${a.simulated ? '<span class="meta" style="color:#bc8cff"> [SIM]</span>' : ''}<br>
           <button class="ok" onclick="event.stopPropagation();validateReport('${a.id}')">Valider</button>
           <button onclick="event.stopPropagation();rejectReport('${a.id}')">Rejeter</button>
@@ -611,7 +635,7 @@
 
     /* ── MODÉRATEURS ─────────────────────────────────────────────────── */
     async function loadModerators() {
-      if (currentRole !== 'admin') return;
+      if (currentRole !== 'admin' && currentRole !== 'superadmin') return;
       const r = await fetch('/api/admin/moderators', { headers: { 'Authorization': `Bearer ${adminToken}` } });
       if (!r.ok) return;
       const d = await r.json();
@@ -634,6 +658,123 @@
       await fetch(`/api/admin/moderators/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } });
       loadModerators();
     }
+
+    /* ── STREET-MEDICS ───────────────────────────────────────────────── */
+    function canManageStreetMedic() {
+      return currentRole === 'admin' || currentRole === 'superadmin' ||
+        currentPermissions.includes('manageStreetmedic');
+    }
+    async function loadStreetMedics() {
+      const card = document.getElementById('streetmedics-card');
+      if (!canManageStreetMedic()) {
+        card.style.display = 'none';
+        return;
+      }
+      const r = await fetch('/api/admin/streetmedics', { headers: { 'Authorization': `Bearer ${adminToken}` } });
+      if (!r.ok) return;
+      const d = await r.json();
+      card.style.display = 'block';
+      renderStreetMedics(d.streetmedics || []);
+    }
+    function renderStreetMedics(sms) {
+      const list = document.getElementById('streetmedics-list');
+      streetmedicsLayer.clearLayers();
+      if (!sms.length) { list.innerHTML = 'Aucune demande street-medic.'; return; }
+      const statusLabel = {
+        pending: '⏳ en attente',
+        authorized: '✅ autorisé (partage coupé)',
+        active: '🟢 actif (position partagée)',
+        disabled: '⛔ révoqué',
+      };
+      list.innerHTML = sms.map(s => {
+        const label = statusLabel[s.status] || s.status;
+        const pos = (s.lat != null && s.lng != null)
+          ? ` <span class="meta">(${Number(s.lat).toFixed(5)}, ${Number(s.lng).toFixed(5)})</span>`
+          : '';
+        const by = s.authorizedBy ? `<br><span class="meta">autorisé par ${escapeHtml(s.authorizedBy)}</span>` : '';
+        const msg = s.contactMessage ? `<br><span class="meta">💬 ${escapeHtml(s.contactMessage)}</span>` : '';
+        let actions = '';
+        if (s.status === 'pending') {
+          actions += `<button class="ok" onclick="authorizeStreetMedic('${s.userId}')">Autoriser</button> `;
+        }
+        if (s.status === 'pending' || s.status === 'authorized' || s.status === 'active') {
+          actions += `<button class="danger" onclick="revokeStreetMedic('${s.userId}')">Révoquer</button> `;
+        }
+        actions += `<button onclick="deleteStreetMedic('${s.userId}')">Supprimer</button>`;
+        return `<div class="item">
+          <b>${label}</b>${pos}<br>
+          <span class="meta">${escapeHtml(s.userId)}</span>${by}${msg}
+          <div style="margin-top:4px">${actions}</div>
+        </div>`;
+      }).join('');
+
+      // ── Marqueurs carte : positions des street-medics ──
+      sms.forEach(s => {
+        if (s.lat == null || s.lng == null) return;
+        if (s.status === 'disabled') return;
+        const isActive = s.status === 'active' && s.sharing;
+        const color = isActive ? '#d32f2f' : '#f59e0b';
+        const label = statusLabel[s.status] || s.status;
+        const icon = L.divIcon({
+          className: '',
+          html: '<div style="width:22px;height:22px;background:' + color +
+              ';border:2px solid #fff;border-radius:50%;display:flex;align-items:center;' +
+              'justify-content:center;color:#fff;font-weight:bold;font-size:15px">+</div>',
+          iconSize: [22, 22],
+          iconAnchor: [11, 11],
+        });
+        const popup = '<b>🩺 Street-medic</b><br><small>' + escapeHtml(s.userId) +
+            '</small><br><small>' + label +
+            (s.contactMessage ? '<br>💬 ' + escapeHtml(s.contactMessage) : '') + '</small>';
+        L.marker([Number(s.lat), Number(s.lng)], { icon }).addTo(streetmedicsLayer).bindPopup(popup);
+      });
+    }
+    async function authorizeStreetMedic(userId) {
+      await fetch(`/api/admin/streetmedics/${encodeURIComponent(userId)}/authorize`, { method: 'POST', headers: { 'Authorization': `Bearer ${adminToken}` } });
+      loadStreetMedics();
+    }
+    async function revokeStreetMedic(userId) {
+      await fetch(`/api/admin/streetmedics/${encodeURIComponent(userId)}/revoke`, { method: 'POST', headers: { 'Authorization': `Bearer ${adminToken}` } });
+      loadStreetMedics();
+    }
+    async function deleteStreetMedic(userId) {
+      await fetch(`/api/admin/streetmedics/${encodeURIComponent(userId)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } });
+      loadStreetMedics();
+    }
+
+    /* ── BLESSÉS (missions d'intervention) ──────────────────────────── */
+    async function loadMedicMissions() {
+      if (!canManageStreetMedic()) { medicMissionsLayer.clearLayers(); return; }
+      try {
+        const r = await fetch('/api/admin/streetmedic-missions', { headers: { 'Authorization': `Bearer ${adminToken}` } });
+        if (!r.ok) return;
+        const d = await r.json();
+        renderMedicMissions(d.missions || []);
+      } catch (_) {}
+    }
+    function renderMedicMissions(missions) {
+      medicMissionsLayer.clearLayers();
+      missions.forEach(m => {
+        if (m.injuredLat == null || m.injuredLng == null) return;
+        const pending = m.status === 'pending';
+        const color = pending ? '#e53935' : '#ff7043';
+        const icon = L.divIcon({
+          className: '',
+          html: '<div style="width:24px;height:24px;background:' + color +
+            ';border:2px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:16px">✚</div>',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
+        });
+        const status = pending ? '⏳ en attente de medic' : '🩺 intervention en cours';
+        const popup = '<b>🚨 Blessé</b><br><small>' + status + '</small>' +
+          '<br><small>📍 ' + Number(m.injuredLat).toFixed(5) + ', ' + Number(m.injuredLng).toFixed(5) + '</small>' +
+          (m.medicId ? '<br><small>🩺 Medic : ' + escapeHtml(m.medicId) + '</small>' : '') +
+          (m.note ? '<br><small>💬 ' + escapeHtml(m.note) + '</small>' : '') +
+          '<br><a href="tel:112" style="color:#fff;background:#e53935;padding:3px 10px;border-radius:6px;display:inline-block;margin-top:6px;text-decoration:none">📞 Appeler les secours (112)</a>';
+        L.marker([Number(m.injuredLat), Number(m.injuredLng)], { icon }).addTo(medicMissionsLayer).bindPopup(popup);
+      });
+    }
+    setInterval(loadMedicMissions, 30000);
 
     /* ── CONSOLE ─────────────────────────────────────────────────────── */
     function runConsole() {

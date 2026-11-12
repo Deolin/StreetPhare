@@ -253,5 +253,43 @@ router.delete('/geofencing/:id', authenticateToken, requirePermission('manageGeo
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 6. STREET-MEDICS — autorisations (réservé administrateurs)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// GET /api/admin/streetmedics — Liste des demandes et street-medics.
+router.get('/streetmedics', authenticateToken, requirePermission('manageStreetmedic'), (req, res) => {
+  res.json({ streetmedics: store.getAllStreetMedics() });
+});
+
+/// POST /api/admin/streetmedics/:userId/authorize — Autoriser un street-medic.
+router.post('/streetmedics/:userId/authorize', authenticateToken, requirePermission('manageStreetmedic'), (req, res) => {
+  const sm = store.authorizeStreetMedic(req.params.userId, req.user.username || req.user.role);
+  if (!sm) return res.status(404).json({ error: 'Demande street-medic non trouvée' });
+  broadcast('streetmedic_authorized', { streetmedic: sm });
+  res.json({ success: true, streetmedic: sm });
+});
+
+/// POST /api/admin/streetmedics/:userId/revoke — Révoquer un street-medic.
+router.post('/streetmedics/:userId/revoke', authenticateToken, requirePermission('manageStreetmedic'), (req, res) => {
+  const sm = store.revokeStreetMedic(req.params.userId);
+  if (!sm) return res.status(404).json({ error: 'Street-medic non trouvé' });
+  broadcast('streetmedic_revoked', { streetmedic: sm });
+  res.json({ success: true, streetmedic: sm });
+});
+
+/// DELETE /api/admin/streetmedics/:userId — Supprimer un street-medic (purge).
+router.delete('/streetmedics/:userId', authenticateToken, requirePermission('manageStreetmedic'), (req, res) => {
+  const ok = store.removeStreetMedic(req.params.userId);
+  if (!ok) return res.status(404).json({ error: 'Street-medic non trouvé' });
+  broadcast('streetmedics_changed', {});
+  res.json({ success: true });
+});
+
+/// GET /api/admin/streetmedic-missions — Missions d'intervention actives (blessés).
+router.get('/streetmedic-missions', authenticateToken, requirePermission('manageStreetmedic'), (req, res) => {
+  res.json({ missions: store.getActiveMedicMissions() });
+});
+
 module.exports = router;
 

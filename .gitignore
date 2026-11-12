@@ -69,3 +69,5 @@ belgium-latest.osm.pbf
 server_dart/assets/osm/belgium-260623.osm.pbf
 android/app/src/main/assets/osm/fleurus.osm.pbf
 server/assets/osm/belgium-260623.osm.pbf
+# Widget Preview related
+.widget_preview/

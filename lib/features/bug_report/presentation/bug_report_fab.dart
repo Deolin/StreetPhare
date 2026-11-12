@@ -21,12 +21,12 @@ import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../debug/client_debug_logger.dart';
 import '../../../main.dart' show navigatorKey;
 import '../../../network/failover_manager.dart';
+import 'bug_report_service.dart';
 
 // ============================================================================
 // BugReportFab — Bouton global unique (remplace les 2 anciens boutons)
@@ -39,7 +39,7 @@ class BugReportFab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Positioned(
       left: 16,
-      top: 100,
+      top: 160,
       child: SafeArea(
         child: Semantics(
           label: 'Signaler un bug',
@@ -188,30 +188,25 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
       body.writeln('Version app : 2.2.0');
       body.writeln('Plateforme  : $_platformLabel');
 
-      // ── Génération mailto ─────────────────────────────────────────
-      final subject = 'Rapport de Bug Technique - StreetPhare - $dateStr';
-      final encodedBody = Uri.encodeComponent(body.toString());
-
-      final uri = Uri(
-        scheme: 'mailto',
-        path: 'supportbug@streetphare.be',
-        query: 'subject=${Uri.encodeComponent(subject)}&body=$encodedBody',
+      // ── Envoi via le serveur (offline-first, zéro perte) ──────────
+      final report = BugReport(
+        title: 'Rapport de Bug Technique - StreetPhare',
+        description: body.toString(),
+        platform: _platformLabel,
+        appVersion: '2.2.0',
       );
 
       if (!mounted) return;
 
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      } else {
-        if (mounted && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('❌ Impossible d\'ouvrir le client mail. '
-                  'Veuillez envoyer manuellement à supportbug@streetphare.be'),
-              duration: Duration(seconds: 6),
-            ),
-          );
-        }
+      final result = await BugReportService.instance.submit(report);
+
+      if (mounted && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message),
+            duration: const Duration(seconds: 6),
+          ),
+        );
       }
     } catch (e) {
       if (kDebugMode) {

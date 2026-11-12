@@ -37,6 +37,7 @@ import '../../events/presentation/events_screen.dart';
 import '../../messaging/data/hive_block_service.dart';
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/domain/models/avoidance_filters.dart';
+import '../../streetmedic/presentation/streetmedic_authorization_section.dart';
 import '../../tutorial/presentation/tutorial_screen.dart';
 import '../data/app_preferences_store.dart';
 import '../data/panic_contact.dart';
@@ -101,6 +102,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _AndroidNotificationSection(strings: s),
                     _AvoidanceFiltersSection(strings: s),
                     _MapCacheSection(strings: s),
+                    const _StreetMedicSection(),
                     _BackgroundServiceSection(strings: s),
                     _PanicContactsSection(strings: s),
                     _ShareApkSection(strings: s),
@@ -819,6 +821,28 @@ class _AvoidanceTile extends StatelessWidget {
       activeThumbColor: StreetPhareTheme.primary,
       contentPadding: EdgeInsets.zero,
       dense: true,
+    );
+  }
+}
+
+class _StreetMedicSection extends StatelessWidget {
+  const _StreetMedicSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(
+            icon: Icons.medical_services,
+            title: 'Street-medic',
+            color: Color(0xFFD32F2F),
+          ),
+          SizedBox(height: 4),
+          StreetMedicAuthorizationSection(),
+        ],
+      ),
     );
   }
 }

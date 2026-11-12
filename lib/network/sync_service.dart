@@ -395,9 +395,16 @@ class SyncService {
   /// Fusionne les deltas (liste JSON) dans la base Hive locale.
   Future<void> _mergeDeltas(List<dynamic> items) async {
     int merged = 0;
+    // Les deltas proviennent DU serveur : on les marque comme « déjà
+    // uploadés » pour éviter que NetworkCoordinator._uploadValidatedAlerts
+    // ne les renvoie au serveur (aller-retour inutile).
+    final server = _failover.currentAddress.isNotEmpty
+        ? _failover.currentAddress
+        : 'server';
     for (final item in items) {
       try {
         final remoteAlert = Alert.fromJson(item as Map<String, dynamic>);
+        remoteAlert.uploadedTo = server;
         final localAlert = _db.getById(remoteAlert.id);
 
         if (localAlert == null) {
