@@ -97,7 +97,7 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   hive_ce_generator: ^1.11.2
-  build_runner: ^2.15.0
+  build_runner: ^2.16.2
   build_test: ^3.5.16
   build_web_compilers: ^4.0.0
   mocktail: ^1.0.5
