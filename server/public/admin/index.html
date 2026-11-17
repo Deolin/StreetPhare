@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StreetPhare — Admin Dashboard</title>
+  <!--SP_ENV-->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -101,6 +102,12 @@
 
     <!-- ── ÉDITION ── -->
     <div id="tab-edition" class="tab-content" style="display:none">
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#8b949e">
+        <b style="color:#e6edf3">Comment créer un événement :</b><br>
+        1. Renseignez le <b>code</b> et le <b>titre</b> puis cliquez « ➕ Créer l'événement ».<br>
+        2. Choisissez un <b>type de point</b>, cliquez « 🖱 Placer sur la carte », cliquez sur la carte, puis « ➕ Enregistrer le point ».<br>
+        3. Tracez le <b>trajet</b> (cortège) et définissez la <b>destination</b> 🏁 si nécessaire.
+      </div>
       <div class="card">
         <h3>🎪 Événements</h3>
         <div class="list" id="events-list">Aucun événement</div>
@@ -110,7 +117,7 @@
         <input id="ev-title" placeholder="ex: Manifestation du 1er mai">
         <label>Début</label>
         <input id="ev-start" type="datetime-local">
-        <button onclick="createEvent()">➕ Créer l'événement</button>
+        <button type="button" onclick="createAdminEvent()">➕ Créer l'événement</button>
         <button class="danger" onclick="deleteSelectedEvent()">🗑 Supprimer l'événement</button>
         <div id="ev-status" style="font-size:10px;color:#8b949e;margin-top:4px"></div>
       </div>
@@ -187,6 +194,10 @@
       <div class="card" style="display:none" id="streetmedics-card">
         <h3>🩺 Street-medics &amp; autorisations</h3>
         <div class="list" id="streetmedics-list">Chargement…</div>
+
+        <h3 style="margin-top:14px;border-top:1px solid #30363d;padding-top:10px">🚑 Missions d'intervention (suivi)</h3>
+        <div class="list" id="medic-missions-list">Aucune mission active</div>
+
         <a href="tel:112" style="display:block;margin-top:10px;text-align:center;background:#e53935;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:600">📞 Appeler les secours (112)</a>
       </div>
     </div>
@@ -292,6 +303,15 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/admin/events-editor.js"></script>
   <script>
+    /* ── Environnement (flag injecté côté serveur) ──────────────────── */
+    // En production, l'onglet « Simulation » (fonction de test) est masqué.
+    if (window.SP_PRODUCTION) {
+      const simBtn = document.getElementById('tab-btn-simulation');
+      const simTab = document.getElementById('tab-simulation');
+      if (simBtn) simBtn.style.display = 'none';
+      if (simTab) simTab.style.display = 'none';
+    }
+
     /* ── État global ─────────────────────────────────────────────────── */
     let ws, adminToken = '';
     const map = L.map('map').setView([50.4762, 4.5422], 14);
@@ -311,9 +331,11 @@
     const botsLayer = L.layerGroup().addTo(map);
     const streetmedicsLayer = L.layerGroup().addTo(map);
     const medicMissionsLayer = L.layerGroup().addTo(map);
+    const medicEmergenciesLayer = L.layerGroup().addTo(map);
     const LAYER_KEYS = ['police', 'fire_truck', 'filter', 'danger', 'collective', 'panic', 'safe', 'events'];
     let simMode = null;
     let selectedAlertId = null;
+    let editionTabActive = false;
     const loadHistory = [];
 
     adminToken = sessionStorage.getItem('sp_admin_token') || '';
@@ -376,6 +398,7 @@
           loadModerators();
           loadStreetMedics();
           loadMedicMissions();
+          loadMedicEmergencies();
         } else if (d.type === 'new_alert') {
           addAlertMarker(d.alert);
           refreshSnapshot();
@@ -411,13 +434,18 @@
           loadStreetMedics();
         } else if (d.type === 'medic_mission_update') {
           loadMedicMissions();
+        } else if (d.type === 'medic_emergency') {
+          loadMedicEmergencies();
+          const em = d.mission || {};
+          notify('🚨 URGENCE 112 — victime non soignable (' +
+            Number(em.injuredLat).toFixed(4) + ', ' + Number(em.injuredLng).toFixed(4) + ')');
         } else if (d.type === 'metrics') {
           updateLoadChart(d);
         }
       };
       ws.onopen = () => {
         document.getElementById('sync-status').innerHTML = '<span class="ok">● Connecté (Live)</span>';
-        loadZones(); loadModerators(); loadSimTypes(); loadStreetMedics(); loadMedicMissions();
+        loadZones(); loadModerators(); loadSimTypes(); loadStreetMedics(); loadMedicMissions(); loadMedicEmergencies();
       };
       ws.onclose = async () => {
         document.getElementById('sync-status').innerHTML = '<span class="ko">● Déconnecté — reconnexion…</span>';
@@ -450,10 +478,14 @@
       });
       if (name === 'simulation') loadSimTypes();
       if (name === 'bugs') loadBugReports();
+      // En mode édition d'événement, on masque les points des autres événements
+      // (couche de surveillance) pour ne voir que ceux de l'événement sélectionné.
+      editionTabActive = (name === 'edition');
       if (name === 'edition' && typeof initEventsEditor === 'function') initEventsEditor();
       // En quittant l'onglet Édition, on annule tout mode de placement actif
       // afin de ne pas intercepter les clics destinés à la simulation.
       if (name !== 'edition' && typeof cancelPlacement === 'function') cancelPlacement();
+      toggleLayers();
     }
 
     /* ── CARTE ───────────────────────────────────────────────────────── */
@@ -550,6 +582,13 @@
     function toggleLayer(key, cb) { filters[key] = cb.checked; toggleLayers(); }
     function toggleLayers() {
       Object.keys(layerGroups).forEach(k => {
+        // En mode édition d'événement, on masque la couche contenant tous les
+        // événements pour n'afficher que les points de l'événement sélectionné,
+        // afin de ne pas prêter à confusion avec les autres événements.
+        if (k === 'events' && editionTabActive) {
+          if (map.hasLayer(layerGroups[k])) map.removeLayer(layerGroups[k]);
+          return;
+        }
         if (filters[k]) { if (!map.hasLayer(layerGroups[k])) layerGroups[k].addTo(map); }
         else { if (map.hasLayer(layerGroups[k])) map.removeLayer(layerGroups[k]); }
       });
@@ -694,13 +733,22 @@
         const by = s.authorizedBy ? `<br><span class="meta">autorisé par ${escapeHtml(s.authorizedBy)}</span>` : '';
         const msg = s.contactMessage ? `<br><span class="meta">💬 ${escapeHtml(s.contactMessage)}</span>` : '';
         let actions = '';
-        if (s.status === 'pending') {
-          actions += `<button class="ok" onclick="authorizeStreetMedic('${s.userId}')">Autoriser</button> `;
+        if (s.simulated) {
+          actions += `<button class="ok" onclick="simSetMedicBusy('${s.userId}', true)">Occuper</button> `;
+          actions += `<button onclick="simSetMedicBusy('${s.userId}', false)">Libérer</button> `;
+          actions += `<button onclick="simCreateMission('${s.userId}', true)">Mission (blessé)</button> `;
+          actions += `<button onclick="simCreateMission('${s.userId}', false)">Mission (attente)</button> `;
+          actions += `<button onclick="simToggleMedicSharing('${s.userId}', ${!s.sharing})">${s.sharing ? 'Couper partage' : 'Activer partage'}</button> `;
+          actions += `<button onclick="deleteStreetMedic('${s.userId}')">Supprimer</button>`;
+        } else {
+          if (s.status === 'pending') {
+            actions += `<button class="ok" onclick="authorizeStreetMedic('${s.userId}')">Autoriser</button> `;
+          }
+          if (s.status === 'pending' || s.status === 'authorized' || s.status === 'active') {
+            actions += `<button class="danger" onclick="revokeStreetMedic('${s.userId}')">Révoquer</button> `;
+          }
+          actions += `<button onclick="deleteStreetMedic('${s.userId}')">Supprimer</button>`;
         }
-        if (s.status === 'pending' || s.status === 'authorized' || s.status === 'active') {
-          actions += `<button class="danger" onclick="revokeStreetMedic('${s.userId}')">Révoquer</button> `;
-        }
-        actions += `<button onclick="deleteStreetMedic('${s.userId}')">Supprimer</button>`;
         return `<div class="item">
           <b>${label}</b>${pos}<br>
           <span class="meta">${escapeHtml(s.userId)}</span>${by}${msg}
@@ -739,7 +787,23 @@
     }
     async function deleteStreetMedic(userId) {
       await fetch(`/api/admin/streetmedics/${encodeURIComponent(userId)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } });
+      loadStreetMedics(); loadMedicMissions(); loadMedicEmergencies();
+    }
+    async function simSetMedicBusy(userId, busy) {
+      await fetch(`/api/admin/simulation/streetmedics/${encodeURIComponent(userId)}/state`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ busy }) });
       loadStreetMedics();
+    }
+    async function simToggleMedicSharing(userId, sharing) {
+      await fetch(`/api/admin/simulation/streetmedics/${encodeURIComponent(userId)}/state`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ sharing }) });
+      loadStreetMedics();
+    }
+    async function simCreateMission(medicId, accept) {
+      await fetch('/api/admin/simulation/missions', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ medicId, accept }) });
+      loadStreetMedics(); loadMedicMissions(); loadMedicEmergencies();
+    }
+    async function simSetMissionState(missionId, status) {
+      await fetch(`/api/admin/simulation/missions/${encodeURIComponent(missionId)}/state`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ status }) });
+      loadStreetMedics(); loadMedicMissions(); loadMedicEmergencies();
     }
 
     /* ── BLESSÉS (missions d'intervention) ──────────────────────────── */
@@ -754,6 +818,24 @@
     }
     function renderMedicMissions(missions) {
       medicMissionsLayer.clearLayers();
+      // ── Suivi des missions (liste dans le panneau Contrôle) ──
+      const missionList = document.getElementById('medic-missions-list');
+      if (missionList) {
+        if (!missions.length) {
+          missionList.innerHTML = 'Aucune mission active';
+        } else {
+          missionList.innerHTML = missions.map(m => {
+            const st = m.status === 'pending' ? '⏳ en attente'
+              : (m.status === 'accepted' ? '🩺 en cours' : m.status);
+            return '<div class="item">' +
+              '<b>🚨 Blessé</b> <span class="meta">(' + escapeHtml(st) + ')</span>' +
+              (m.medicId ? '<br><span class="meta">🩺 ' + escapeHtml(m.medicId) + '</span>' : '') +
+              '<br><span class="meta">📍 ' + Number(m.injuredLat).toFixed(5) + ', ' + Number(m.injuredLng).toFixed(5) + '</span>' +
+              '<br><button onclick="deleteMedicMission(\'' + m.id + '\')">🗑 Supprimer</button>' +
+              '</div>';
+          }).join('');
+        }
+      }
       missions.forEach(m => {
         if (m.injuredLat == null || m.injuredLng == null) return;
         const pending = m.status === 'pending';
@@ -770,11 +852,62 @@
           '<br><small>📍 ' + Number(m.injuredLat).toFixed(5) + ', ' + Number(m.injuredLng).toFixed(5) + '</small>' +
           (m.medicId ? '<br><small>🩺 Medic : ' + escapeHtml(m.medicId) + '</small>' : '') +
           (m.note ? '<br><small>💬 ' + escapeHtml(m.note) + '</small>' : '') +
+          (m.simulated
+            ? '<br><button onclick="simSetMissionState(\'' + m.id + '\', \'completed\')">✔ Soignée</button> ' +
+              '<button onclick="simSetMissionState(\'' + m.id + '\', \'emergency\')">🚨 Urgence 112</button> ' +
+              '<button onclick="simSetMissionState(\'' + m.id + '\', \'cancelled\')">✖ Annuler</button>'
+            : '') +
+          '<br><button onclick="deleteMedicMission(\'' + m.id + '\')">🗑 Supprimer la mission</button>' +
           '<br><a href="tel:112" style="color:#fff;background:#e53935;padding:3px 10px;border-radius:6px;display:inline-block;margin-top:6px;text-decoration:none">📞 Appeler les secours (112)</a>';
         L.marker([Number(m.injuredLat), Number(m.injuredLng)], { icon }).addTo(medicMissionsLayer).bindPopup(popup);
       });
     }
     setInterval(loadMedicMissions, 30000);
+
+    /* ── ALERTES 112 (victimes non soignables sur place) ──────────────── */
+    async function loadMedicEmergencies() {
+      if (!canManageStreetMedic()) { medicEmergenciesLayer.clearLayers(); return; }
+      try {
+        const r = await fetch('/api/admin/streetmedic-emergencies', { headers: { 'Authorization': `Bearer ${adminToken}` } });
+        if (!r.ok) return;
+        const d = await r.json();
+        renderMedicEmergencies(d.emergencies || []);
+      } catch (_) {}
+    }
+    function renderMedicEmergencies(emergencies) {
+      medicEmergenciesLayer.clearLayers();
+      emergencies.forEach(m => {
+        if (m.emergencyAcknowledged) return; // n'affiche que les alertes non acquittées
+        if (m.injuredLat == null || m.injuredLng == null) return;
+        const icon = L.divIcon({
+          className: '',
+          html: '<div style="width:30px;height:30px;background:#b71c1c;border:2px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:11px;box-shadow:0 0 8px rgba(183,28,28,0.9)">112</div>',
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+        });
+        const popup = '<b>🚨 URGENCE 112</b><br><small>Victime non soignable sur place</small>' +
+          '<br><small>📍 ' + Number(m.injuredLat).toFixed(5) + ', ' + Number(m.injuredLng).toFixed(5) + '</small>' +
+          (m.medicId ? '<br><small>🩺 Medic : ' + escapeHtml(m.medicId) + '</small>' : '') +
+          (m.note ? '<br><small>💬 ' + escapeHtml(m.note) + '</small>' : '') +
+          '<br><button onclick="ackMedicEmergency(\'' + m.id + '\')">✔ Acquitter</button> ' +
+          '<button onclick="deleteMedicEmergency(\'' + m.id + '\')">🗑 Supprimer</button>' +
+          '<br><a href="tel:112" style="color:#fff;background:#b71c1c;padding:3px 10px;border-radius:6px;display:inline-block;margin-top:6px;text-decoration:none">📞 Appeler le 112</a>';
+        L.marker([Number(m.injuredLat), Number(m.injuredLng)], { icon }).addTo(medicEmergenciesLayer).bindPopup(popup);
+      });
+    }
+    setInterval(loadMedicEmergencies, 30000);
+    async function ackMedicEmergency(id) {
+      await fetch(`/api/admin/streetmedic-emergencies/${encodeURIComponent(id)}/acknowledge`, { method: 'POST', headers: authHeaders() });
+      loadMedicEmergencies();
+    }
+    async function deleteMedicEmergency(id) {
+      await fetch(`/api/admin/streetmedic-emergencies/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
+      loadMedicEmergencies();
+    }
+    async function deleteMedicMission(id) {
+      await fetch(`/api/admin/streetmedic-missions/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
+      loadMedicMissions(); loadMedicEmergencies();
+    }
 
     /* ── CONSOLE ─────────────────────────────────────────────────────── */
     function runConsole() {
@@ -841,6 +974,7 @@
       if (typeId === 'panic' || typeId === 'panic_collective') { endpoint = '/api/admin/simulation/panic'; body = { lat, lng, collective: typeId === 'panic_collective' }; }
       else if (typeId === 'safe_zone' || typeId === 'zone') { endpoint = '/api/admin/simulation/zone'; body = { lat, lng, type: typeId === 'safe_zone' ? 'safe' : 'custom', name: typeId === 'safe_zone' ? 'Safe Zone SIM' : 'Zone SIM', radiusMeters: 120 }; }
       else if (typeId === 'waypoint') { endpoint = '/api/admin/simulation/waypoint'; body = { lat, lng, name: 'Point SIM' }; }
+      else if (typeId === 'streetmedic') { endpoint = '/api/admin/simulation/streetmedics'; body = { lat, lng, sharing: true }; }
       try { await fetch(endpoint, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) }); } catch (_) {}
     }
     async function injectScenario(name) {

@@ -24,12 +24,16 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
@@ -66,9 +70,11 @@ import '../../routing/presentation/route_result_sheet.dart';
 import '../../settings/data/app_preferences_store.dart';
 import '../../settings/data/panic_contact_store.dart';
 import '../../settings/presentation/settings_screen.dart';
+import '../../streetmedic/domain/models/streetmedic_models.dart';
 import '../../streetmedic/presentation/streetmedic_overlay.dart';
 import '../../streetmedic/presentation/streetmedic_service.dart';
 import '../local_first_tile_provider.dart';
+import 'heading_fusion.dart';
 import 'widgets/long_press_detector.dart';
 import 'widgets/restricted_segment_layer.dart';
 import 'widgets/safe_route_layer.dart';
@@ -101,7 +107,7 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
 
   /// Fournisseur de tuiles réutilisé (identité stable) pour éviter de
@@ -113,13 +119,14 @@ class _MapScreenState extends State<MapScreen> {
   static const LatLng _defaultCenter = LatLng(48.8566, 2.3522);
   static const double _defaultZoom = 13.0;
 
-  /// Zoom "recentrage précis" ≈ 100 m au sol (rue adjacente visible).
-  static const double _kRecenterZoom = 16.0;
-
   /// Distance maximale autorisée entre l'utilisateur et son signalement
   /// (en mètres). Anti-spam : l'utilisateur doit être proche de la zone
   /// signalée pour garantir qu'il en a réellement une vue.
   static const double _kMaxReportDistanceMeters = 50.0;
+
+  /// Seuil d'écart à la Route Safe (mètres) au-delà duquel on propose de
+  /// recalculer l'itinéraire pendant le tracking.
+  static const double _kOffRouteThresholdMeters = 10.0;
 
   Position? _userPosition;
   String? _positionError;
@@ -134,6 +141,10 @@ class _MapScreenState extends State<MapScreen> {
   /// déplace la carte manuellement.
   bool _followUser = false;
 
+  /// Mode « orientation selon le cap » : la carte pivote pour que la flèche
+  /// de l'utilisateur pointe vers le haut (heading-up), comme en navigation.
+  bool _followHeading = false;
+
   StreamSubscription<CollectivePanicEvent>? _collectivePanicSub;
 
   /// `true` une fois que FlutterMap est prêt (tuiles initialisées).
@@ -145,8 +156,32 @@ class _MapScreenState extends State<MapScreen> {
   /// Cap de déplacement de l'utilisateur en degrés (0 = Nord, sens horaire).
   double _userHeading = 0.0;
 
+  /// Abonnement au compas/gyroscope du téléphone (orientation physique).
+  StreamSubscription<CompassEvent>? _compassSub;
+
+  /// Cap boussole du téléphone en degrés (0..360, 0 = Nord), ou -1 si le
+  /// capteur est indisponible. Utilisé en priorité sur le cap GPS pour que la
+  /// carte et la flèche suivent l'orientation physique du téléphone.
+  double _compassHeading = -1;
+
   /// Vitesse GPS en m/s (pour valider l'affichage de la flèche directionnelle).
   double _userSpeed = 0.0;
+
+  /// Fusion des capteurs (gyroscope + accéléromètre + références absolues
+  /// compas / cap GPS) pour un cap fluide et corrigé.
+  final HeadingFusion _headingFusion = HeadingFusion();
+
+  /// Cap GPS réel calculé depuis les positions satellites (degrés, -1 si absent).
+  double _gpsBearing = -1;
+
+  /// Abonnements aux capteurs inertiels bruts (gyroscope / accéléromètre).
+  StreamSubscription<GyroscopeEvent>? _gyroSub;
+  StreamSubscription<AccelerometerEvent>? _accelSub;
+  StreamSubscription<UserAccelerometerEvent>? _userAccelSub;
+
+  /// Ticker de lissage : interpole la rotation et le centrage de la carte.
+  Ticker? _smoothTicker;
+  Duration? _lastSmoothTick;
 
   /// Position précédente pour calculer le déplacement effectif (seuil 5 m).
   Position? _previousPosition;
@@ -159,6 +194,20 @@ class _MapScreenState extends State<MapScreen> {
 
   /// Points de la Route Safe active.
   List<LatLng>? _safeRoutePoints;
+
+  /// Portion de la Route Safe déjà parcourue (affichée en gris).
+  List<LatLng>? _passedRoutePoints;
+
+  /// Destination mémorisée du dernier itinéraire (pour le recalcul).
+  LatLng? _routeDestination;
+  String _routeDestinationLabel = '';
+
+  /// Détection d'écart : `true` quand on attend un retour sur le tracé avant
+  /// de pouvoir re-déclencher un avertissement « hors itinéraire ».
+  bool _offRouteArmed = true;
+
+  /// `true` pendant l'affichage du dialogue « hors itinéraire ».
+  bool _offRoutePromptActive = false;
 
   /// Portions restreintes (sens interdit / barrage…) du dernier itinéraire
   /// voiture/urgence, à surligner en rouge sur la carte.
@@ -203,6 +252,8 @@ class _MapScreenState extends State<MapScreen> {
     GeofencingService.instance.start();
     ProximityValidationService.instance.start();
     _initUserLocation();
+    _startCompassListener();
+    _startInertialSensors();
     _collectivePanicSub =
         CollectivePanicService.instance.collectivePanicEvents.listen(
       _onCollectivePanicAlert,
@@ -251,6 +302,13 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void dispose() {
     _positionSub?.cancel();
+    _desktopPollingTimer?.cancel();
+    _compassSub?.cancel();
+    _gyroSub?.cancel();
+    _accelSub?.cancel();
+    _userAccelSub?.cancel();
+    _smoothTicker?.dispose();
+    unawaited(WakelockPlus.disable());
     _collectivePanicSub?.cancel();
     _proximityValidationSub?.cancel();
     _alertsSub?.cancel();
@@ -314,60 +372,21 @@ class _MapScreenState extends State<MapScreen> {
       _animateToUser();
       unawaited(_positionSub?.cancel());
       _isTracking = true;
-      _positionSub = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 2, // Ecoute fine pour détecter les micro-mouvements
-        ),
-      ).listen((p) {
-        // [Tâche 3] Stabilisation Geolocator Thread :
-        // Le callback natif du plugin peut s'exécuter sur un thread
-        // non-UI (ex. thread Android Binder).
-        // On diffère TOUJOURS le setState au prochain frame via
-        // addPostFrameCallback pour garantir l'exécution sur le
-        // thread principal Flutter (UI Thread).
-        if (!mounted) return;
-
-        // [2] Seuil GPS 5 m : calcule le déplacement effectif depuis la
-        // dernière position connue. Si < 5 m → cache la flèche directionnelle.
-        final prev = _previousPosition;
-        if (prev != null) {
-          final dist = Geolocator.distanceBetween(
-            prev.latitude,
-            prev.longitude,
-            p.latitude,
-            p.longitude,
-          );
-          _movementAccumulator += dist;
-          if (_movementAccumulator >= 5.0) {
-            _hasMovedBeyondThreshold = true;
-          }
-        } else {
-          // Première position — réinitialise l'accumulateur
-          _movementAccumulator = 0.0;
-          _hasMovedBeyondThreshold = false;
-        }
-
-        // Réinitialise l'accumulateur si l'appareil s'est arrêté (speed ≈ 0)
-        if (p.speed < 0.3) {
-          _movementAccumulator = 0.0;
-          _hasMovedBeyondThreshold = false;
-        }
-
-        _previousPosition = p;
-        StreetMedicService.instance.updatePosition(p.latitude, p.longitude);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          setState(() {
-            _userPosition = p;
-            _userSpeed = p.speed < 0 ? 0 : p.speed;
-            if (p.heading >= 0) _userHeading = p.heading;
-          });
-          // Mode « suivre l'utilisateur » : on recentre la carte sur la
-          // nouvelle position GPS (zoom conservé).
-          if (_followUser) _followToUser(p);
-        });
-      });
+      // Suit l'utilisateur par défaut : la carte reste centrée sur la position
+      // GPS pendant les déplacements (comme Google Maps).
+      _followUser = true;
+      if (_isDesktop) {
+        // Desktop : polling thread-safe (getCurrentPosition). Évite le crash
+        // "non-platform thread" du flux getPositionStream (geolocator_windows).
+        _startDesktopPolling();
+      } else {
+        _positionSub = Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 2, // Ecoute fine pour détecter les micro-mouvements
+          ),
+        ).listen(_onPositionUpdate);
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -378,14 +397,115 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  /// Recentre la carte sur la position GPS with zoom ≈ 100 m.
+  /// Traite une nouvelle position GPS (appelé par le flux natif sur
+  /// mobile/web ET par le polling thread-safe sur Desktop).
+  void _onPositionUpdate(Position p) {
+    if (!mounted) return;
+
+    // [2] Seuil GPS 5 m : calcule le déplacement effectif depuis la
+    // dernière position connue. Si < 5 m → cache la flèche directionnelle.
+    final prev = _previousPosition;
+    if (prev != null) {
+      final dist = Geolocator.distanceBetween(
+        prev.latitude,
+        prev.longitude,
+        p.latitude,
+        p.longitude,
+      );
+      _movementAccumulator += dist;
+      if (_movementAccumulator >= 5.0) {
+        _hasMovedBeyondThreshold = true;
+      }
+      // Cap GPS réel (valeurs satellites) : corrige en douceur le cap
+      // fusionné dès que l'utilisateur avance suffisamment vite.
+      final currentSpeed = p.speed < 0 ? 0 : p.speed;
+      if (dist > 2.0 && currentSpeed > 1.0) {
+        _gpsBearing = _computeBearingDeg(prev, p);
+        _headingFusion.feedAbsolute(_gpsBearing, 0.35);
+      }
+    } else {
+      // Première position — réinitialise l'accumulateur.
+      _movementAccumulator = 0.0;
+      _hasMovedBeyondThreshold = false;
+    }
+
+    // Réinitialise l'accumulateur si l'appareil s'est arrêté (speed ≈ 0).
+    if (p.speed < 0.3) {
+      _movementAccumulator = 0.0;
+      _hasMovedBeyondThreshold = false;
+    }
+
+    _previousPosition = p;
+    StreetMedicService.instance.updatePosition(p.latitude, p.longitude);
+    // On diffère le setState au prochain frame pour garantir l'exécution
+    // sur le thread principal Flutter (UI Thread).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Tracking Route Safe : progression grisée + détection d'écart.
+      _updateRouteTracking(p);
+      setState(() {
+        _userPosition = p;
+        _userSpeed = p.speed < 0 ? 0 : p.speed;
+        // Fallback : cap GPS si aucun compas/mag disponible.
+        if (p.heading >= 0 && _compassHeading < 0) {
+          _headingFusion.feedAbsolute(p.heading, 0.5);
+        }
+        _userHeading = _headingFusion.heading;
+      });
+      // Suivi fluide : la rotation et le centrage sont interpolés par le
+      // ticker (chemin angulaire le plus court + corrections GPS).
+      if (_followUser || _followHeading) _ensureSmoothTicker();
+    });
+  }
+
+  /// `true` sur un OS Desktop (Windows / macOS / Linux).
+  bool get _isDesktop {
+    try {
+      return Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+    } catch (_) {
+      return false; // web : dart:io indisponible
+    }
+  }
+
+  Timer? _desktopPollingTimer;
+
+  /// Polling GPS thread-safe sur Desktop : appelle `getCurrentPosition` toutes
+  /// les 5 s au lieu du flux `getPositionStream` (crash « non-platform thread »
+  /// du plugin geolocator_windows).
+  void _startDesktopPolling() {
+    _desktopPollingTimer?.cancel();
+    _desktopPollingTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _pollDesktopPosition(),
+    );
+    _pollDesktopPosition(); // premier appel immédiat
+    if (kDebugMode) {
+      debugPrint('[MapScreen] Mode Desktop — polling GPS 5 s (thread-safe)');
+    }
+  }
+
+  Future<void> _pollDesktopPosition() async {
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      if (mounted) _onPositionUpdate(pos);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[MapScreen] erreur polling GPS : $e');
+    }
+  }
+
+  /// Recentre la carte sur la position GPS en CONSERVANT le zoom courant.
+  /// Le niveau de zoom reste libre : on recentre simplement sans l'écraser.
   void _animateToUser() {
     final pos = _userPosition;
     if (pos == null) return;
     void doMove() {
       try {
-        _mapController.move(
-            LatLng(pos.latitude, pos.longitude), _kRecenterZoom);
+        final zoom = _mapController.camera.zoom;
+        _mapController.move(LatLng(pos.latitude, pos.longitude), zoom);
       } catch (e) {
         debugPrint('[MapScreen] Échec recentrage caméra: $e');
       }
@@ -398,14 +518,135 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  /// Centre la carte sur la position GPS en CONSERVANT le zoom courant
-  /// (mode « suivre l'utilisateur »).
-  void _followToUser(Position pos) {
+  /// Oriente la carte selon le cap (mode « heading-up »). La rotation est
+  /// interpolée en douceur par le ticker de suivi (_onSmoothTick), qui utilise
+  /// le chemin angulaire le plus court et les corrections GPS.
+  void _rotateMapToHeading() {
+    _ensureSmoothTicker();
+  }
+
+  /// Écoute le compas (gyroscope + magnétomètre) du téléphone et oriente la
+  /// carte en conséquence. Le cap boussole devient prioritaire sur le cap GPS
+  /// de déplacement, afin que la flèche et la carte suivent l'orientation
+  /// physique du téléphone, même à l'arrêt.
+  void _startCompassListener() {
+    // flutter_compass n'a d'implémentation native que sur Android/iOS. Sur les
+    // autres plateformes (Windows, web…), on ne tente pas d'ouvrir le flux du
+    // compas (sinon MissingPluginException) ; on s'appuie sur le cap GPS seul.
+    if (!kIsWeb && !(Platform.isAndroid || Platform.isIOS)) return;
+    final events = FlutterCompass.events;
+    if (events == null) return;
+    _compassSub = events.listen((event) {
+      final h = event.heading;
+      if (h == null || !mounted) return;
+      // Le compas est fusionné avec le cap GPS, puis la carte est orientée de
+      // façon fluide par le ticker (plus aucune rotation brutale).
+      double trust = 0.18;
+      if (!_headingFusion.level) trust *= 0.5;
+      if (_headingFusion.turnRateDegPerSec.abs() > 20.0) {
+        trust = math.min(trust * 1.8, 0.9);
+      }
+      _headingFusion.feedAbsolute(h, trust);
+      setState(() {
+        _compassHeading = h;
+        _userHeading = _headingFusion.heading;
+      });
+      if (_followHeading) _ensureSmoothTicker();
+    }, onError: (_) {
+      // Capteur indisponible : on conserve le cap GPS (heading de déplacement).
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // Capteurs inertiels & fusion de cap
+  // --------------------------------------------------------------------------
+
+  /// Démarre l'écoute brute du gyroscope et de l'accéléromètre (sensors_plus),
+  /// en complément du compas `flutter_compass`. Ces capteurs permettent de
+  /// lisser l'orientation sans dépendre uniquement du magnétomètre, qui peut
+  /// sembler « bloqué » dans certaines directions.
+  void _startInertialSensors() {
+    // sensors_plus ne prend pas en charge Windows/Linux/macOS.
+    if (!kIsWeb && !(Platform.isAndroid || Platform.isIOS)) return;
     try {
-      final zoom = _mapController.camera.zoom;
-      _mapController.move(LatLng(pos.latitude, pos.longitude), zoom);
-    } catch (e) {
-      if (kDebugMode) debugPrint('[MapScreen] échec suivi utilisateur: $e');
+      _gyroSub = gyroscopeEventStream().listen((e) {
+        if (!mounted) return;
+        _headingFusion.onGyroscope(e.x, e.y, e.z, DateTime.now());
+      }, onError: (_) {});
+    } catch (_) {}
+    try {
+      _accelSub = accelerometerEventStream().listen((e) {
+        if (!mounted) return;
+        _headingFusion.onAccelerometer(e.x, e.y, e.z);
+      }, onError: (_) {});
+    } catch (_) {}
+    try {
+      _userAccelSub = userAccelerometerEventStream().listen((e) {
+        if (!mounted) return;
+        _headingFusion.onUserAccelerometer(e.x, e.y, e.z);
+      }, onError: (_) {});
+    } catch (_) {}
+  }
+
+  /// Cap GPS (boussole réelle calculée depuis les positions satellites),
+  /// en degrés [0, 360), 0 = Nord.
+  double _computeBearingDeg(Position from, Position to) {
+    final lat1 = from.latitude * math.pi / 180.0;
+    final lat2 = to.latitude * math.pi / 180.0;
+    final dLng = (to.longitude - from.longitude) * math.pi / 180.0;
+    final y = math.sin(dLng) * math.cos(lat2);
+    final x = math.cos(lat1) * math.sin(lat2) -
+        math.sin(lat1) * math.cos(lat2) * math.cos(dLng);
+    return normalizeDeg360(math.atan2(y, x) * 180.0 / math.pi);
+  }
+
+  /// Démarre le ticker de lissage (rotation + centrage interpolés par frame).
+  void _ensureSmoothTicker() {
+    _smoothTicker ??= createTicker(_onSmoothTick);
+    if (!_smoothTicker!.isActive) {
+      _lastSmoothTick = null;
+      _smoothTicker!.start();
+    }
+  }
+
+  /// Arrête le ticker dès qu'aucun suivi n'est plus nécessaire.
+  void _stopSmoothTickerIfIdle() {
+    if (_followUser || _followHeading) return;
+    _smoothTicker?.stop();
+  }
+
+  /// Interpole, à chaque frame, la rotation et le centrage de la carte vers
+  /// leurs cibles courantes (rotation fluide + suivi GPS fluide).
+  void _onSmoothTick(Duration elapsed) {
+    if (!mounted || !_mapReady) return;
+    final dt = _lastSmoothTick == null
+        ? 0.016
+        : (elapsed - _lastSmoothTick!).inMicroseconds / 1e6;
+    _lastSmoothTick = elapsed;
+
+    if (_followHeading) {
+      final target = -_headingFusion.heading;
+      try {
+        final current = _mapController.camera.rotation;
+        final delta = shortestAngleDelta(current, target);
+        final t = 1.0 - math.exp(-dt * 14.0);
+        final next = delta.abs() < 0.05 ? target : current + delta * t;
+        _mapController.rotate(next);
+      } catch (_) {}
+    }
+
+    if (_followUser && _userPosition != null) {
+      try {
+        final c = _mapController.camera.center;
+        final target = LatLng(
+          _userPosition!.latitude,
+          _userPosition!.longitude,
+        );
+        final t = 1.0 - math.exp(-dt * 8.0);
+        final lat = c.latitude + (target.latitude - c.latitude) * t;
+        final lng = c.longitude + (target.longitude - c.longitude) * t;
+        _mapController.move(LatLng(lat, lng), _mapController.camera.zoom);
+      } catch (_) {}
     }
   }
 
@@ -415,8 +656,13 @@ class _MapScreenState extends State<MapScreen> {
 
   /// [2] Affiche la flèche directionnelle uniquement si l'appareil a
   /// effectivement bougé de plus de 5 m (seuil effectif anti-oscillations GPS).
-  bool get _shouldShowArrow =>
-      _hasMovedBeyondThreshold && _userHeading >= 0 && _userSpeed > 0.5;
+  /// Avec la boussole (gyroscope) active, on l'affiche aussi à l'arrêt car
+  /// l'orientation physique du téléphone est connue.
+  bool get _shouldShowArrow {
+    if (_compassHeading >= 0) return true;
+    if (_headingFusion.isMoving) return true;
+    return _hasMovedBeyondThreshold && _userHeading >= 0 && _userSpeed > 0.5;
+  }
 
   Marker _buildUserMarker() {
     final pos = _userPosition!;
@@ -798,6 +1044,157 @@ class _MapScreenState extends State<MapScreen> {
       );
   }
 
+  /// Met à jour le suivi de la Route Safe à partir d'une position GPS :
+  ///   - grise la portion déjà parcourue (pour éviter de rebrousser chemin),
+  ///   - détecte un écart > [_kOffRouteThresholdMeters] et le signale.
+  void _updateRouteTracking(Position p) {
+    final route = _safeRoutePoints;
+    if (!_isTracking || route == null || route.length < 2) {
+      _passedRoutePoints = null;
+      _offRouteArmed = true;
+      return;
+    }
+
+    final user = LatLng(p.latitude, p.longitude);
+    final split = _splitRouteAtUser(user, route);
+    _passedRoutePoints = split.passed;
+
+    if (split.distanceMeters > _kOffRouteThresholdMeters) {
+      if (_offRouteArmed && !_offRoutePromptActive) {
+        _offRouteArmed = false;
+        unawaited(_promptOffRoute());
+      }
+    } else {
+      // Retour sur l'itinéraire : on réarme la détection.
+      _offRouteArmed = true;
+    }
+  }
+
+  /// Projette [user] sur la polyline [route] et renvoie :
+  ///   - [passed] : sous-polyline déjà parcourue (départ → point projeté) ;
+  ///   - [distanceMeters] : distance de l'utilisateur au tracé.
+  ({List<LatLng> passed, double distanceMeters}) _splitRouteAtUser(
+    LatLng user,
+    List<LatLng> route,
+  ) {
+    // Projection équirectangulaire locale (plan XY en mètres autour du point).
+    final refLat = user.latitude;
+    const mPerDegLat = 111132.0;
+    final mPerDegLng = 111320.0 * math.cos(refLat * math.pi / 180.0);
+    final px = user.longitude * mPerDegLng;
+    final py = user.latitude * mPerDegLat;
+
+    int bestSeg = 0;
+    double bestT = 0.0;
+    double bestDist = double.infinity;
+
+    for (var i = 0; i < route.length - 1; i++) {
+      final a = route[i];
+      final b = route[i + 1];
+      final ax = a.longitude * mPerDegLng;
+      final ay = a.latitude * mPerDegLat;
+      final bx = b.longitude * mPerDegLng;
+      final by = b.latitude * mPerDegLat;
+
+      final dx = bx - ax;
+      final dy = by - ay;
+      double t;
+      if (dx == 0.0 && dy == 0.0) {
+        t = 0.0;
+      } else {
+        t = (((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy))
+            .clamp(0.0, 1.0);
+      }
+      final cx = ax + t * dx;
+      final cy = ay + t * dy;
+      final d = math.sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
+      if (d < bestDist) {
+        bestDist = d;
+        bestSeg = i;
+        bestT = t;
+      }
+    }
+
+    // Point projeté (position utilisateur ramenée sur le tracé).
+    final a = route[bestSeg];
+    final b = route[bestSeg + 1];
+    final proj = LatLng(
+      a.latitude + (b.latitude - a.latitude) * bestT,
+      a.longitude + (b.longitude - a.longitude) * bestT,
+    );
+
+    // Sous-polyline « déjà parcourue » : départ → … → point projeté.
+    final passed = <LatLng>[route.first];
+    for (var i = 1; i <= bestSeg; i++) {
+      passed.add(route[i]);
+    }
+    passed.add(proj);
+
+    return (passed: passed, distanceMeters: bestDist);
+  }
+
+  /// Active/désactive le maintien d'écran allumé selon qu'une Route Safe est
+  /// en cours de suivi.
+  void _applyWakelock() {
+    final keepAwake = _isTracking && _safeRoutePoints != null;
+    if (keepAwake) {
+      unawaited(WakelockPlus.enable());
+    } else {
+      unawaited(WakelockPlus.disable());
+    }
+  }
+
+  /// Affiche la confirmation « hors itinéraire » et, le cas échéant,
+  /// recalcule un nouvel itinéraire depuis la position actuelle.
+  Future<void> _promptOffRoute() async {
+    if (_offRoutePromptActive || !mounted) return;
+    _offRoutePromptActive = true;
+
+    final bool? recalc = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hors itinéraire'),
+        content: const Text(
+          'Vous êtes sorti(e) de la route (écart supérieur à 10 m). '
+          'Souhaitez-vous calculer un nouvel itinéraire ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Non'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Recalculer'),
+          ),
+        ],
+      ),
+    );
+
+    _offRoutePromptActive = false;
+    if (recalc == true && mounted) {
+      await _recalculateRouteFromCurrentPosition();
+    }
+  }
+
+  /// Relance un calcul d'itinéraire vers la dernière destination mémorisée,
+  /// depuis la position GPS actuelle.
+  Future<void> _recalculateRouteFromCurrentPosition() async {
+    final dest = _routeDestination;
+    if (dest == null) {
+      await _triggerRouteSafe();
+      return;
+    }
+    final mode =
+        AppPreferencesStore.instance.value.defaultTransportMode ?? 'pedestrian';
+    _offRouteArmed = true;
+    await _computeAndShowRoute(
+      dest,
+      _routeDestinationLabel,
+      transportMode: mode,
+    );
+  }
+
   // --------------------------------------------------------------------------
   // Calcul de route et affichage du résultat
   // --------------------------------------------------------------------------
@@ -817,6 +1214,10 @@ class _MapScreenState extends State<MapScreen> {
       _showNoDestinationError();
       return;
     }
+
+    // Mémorise la destination pour permettre un recalcul « hors itinéraire ».
+    _routeDestination = destination;
+    _routeDestinationLabel = destinationLabel;
 
     // Popup bloquant AVANT chaque calcul de route. L'utilisateur
     // doit confirmer son mode de transport. Le choix est pré-rempli
@@ -887,7 +1288,9 @@ class _MapScreenState extends State<MapScreen> {
       // Le trace est maintenant visible sur la carte.
       setState(() {
         _safeRoutePoints = selected.points;
+        _passedRoutePoints = null;
       });
+      _applyWakelock();
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _fitRouteBounds(selected.points);
       _applyRoadRestrictions(selected, routingProfile);
@@ -1863,7 +2266,8 @@ class _MapScreenState extends State<MapScreen> {
     final activeMission = service.activeMission;
     if (activeMission != null && activeMission.isActive) {
       markers.add(Marker(
-        point: LatLng(activeMission.injuredLatitude, activeMission.injuredLongitude),
+        point: LatLng(
+            activeMission.injuredLatitude, activeMission.injuredLongitude),
         width: 40,
         height: 40,
         child: Tooltip(
@@ -2080,7 +2484,7 @@ class _MapScreenState extends State<MapScreen> {
 
     // Marqueurs des alertes réseau (signalements validés / simulés).
     markers.addAll(_buildAlertMarkers());
-      markers.addAll(_buildStreetMedicMarkers());
+    markers.addAll(_buildStreetMedicMarkers());
 
     return _EventLayers(polylines: polylines, markers: markers);
   }
@@ -2134,15 +2538,20 @@ class _MapScreenState extends State<MapScreen> {
                                 interactionOptions: InteractionOptions(
                                   flags: _draggingPlacement
                                       ? InteractiveFlag.none
-                                      : (InteractiveFlag.all &
-                                          ~InteractiveFlag.rotate),
+                                      : InteractiveFlag.all,
                                 ),
                                 onLongPress: _onMapLongPress,
                                 onPositionChanged: (camera, hasGesture) {
-                                  // Désactive le suivi auto dès que
-                                  // l'utilisateur déplace la carte à la main.
-                                  if (hasGesture && _followUser) {
-                                    setState(() => _followUser = false);
+                                  // Désactive le suivi auto ET l'orientation
+                                  // dès que l'utilisateur déplace la carte
+                                  // à la main.
+                                  if (hasGesture &&
+                                      (_followUser || _followHeading)) {
+                                    setState(() {
+                                      _followUser = false;
+                                      _followHeading = false;
+                                    });
+                                    _stopSmoothTickerIfIdle();
                                   }
                                 },
                                 onMapReady: () {
@@ -2176,7 +2585,8 @@ class _MapScreenState extends State<MapScreen> {
                                 if (_safeRoutePoints != null &&
                                     _safeRoutePoints!.length >= 2)
                                   SafeRouteLayer(
-                                      routePoints: _safeRoutePoints!),
+                                      routePoints: _safeRoutePoints!,
+                                      passedPoints: _passedRoutePoints),
                                 if (_restrictedSegments.isNotEmpty)
                                   RestrictedSegmentLayer(
                                       segments: _restrictedSegments),
@@ -2441,12 +2851,66 @@ class _MapScreenState extends State<MapScreen> {
                               ),
 
                             // ── Bouton GPS Recentrer + Stop Tracking + effacer Route Safe
-                            Positioned(
-                              left: 16,
-                              bottom: 120,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
+                            // Remontés aussi lors d'une intervention street-medic
+                            // pour ne pas être masqués par le panneau « En intervention ».
+                            ValueListenableBuilder<MedicMission?>(
+                              valueListenable:
+                                  StreetMedicService.instance.medicMission,
+                              builder: (context, mission, _) => Positioned(
+                                left: 16,
+                                bottom: (mission != null &&
+                                        (mission.status ==
+                                                MedicMissionStatus.pending ||
+                                            mission.status ==
+                                                MedicMissionStatus.accepted))
+                                    ? 300.0
+                                    : 120.0,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                  // Orientation auto selon le cap (heading-up)
+                                  Material(
+                                    elevation: 4,
+                                    shape: const CircleBorder(),
+                                    color: _followHeading
+                                        ? StreetPhareTheme.primary
+                                        : StreetPhareTheme.surface
+                                            .withValues(alpha: 0.9),
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      onTap: () {
+                                        setState(() =>
+                                            _followHeading = !_followHeading);
+                                        if (_followHeading) {
+                                          // Oriente immédiatement + active le
+                                          // suivi pour rester centré.
+                                          _rotateMapToHeading();
+                                          if (!_followUser) {
+                                            setState(() => _followUser = true);
+                                            _animateToUser();
+                                          }
+                                        } else {
+                                          // Rétablit le nord vers le haut.
+                                          try {
+                                            _mapController.rotate(0);
+                                          } catch (_) {}
+                                        }
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Icon(
+                                          _followHeading
+                                              ? Icons.navigation
+                                              : Icons.explore_outlined,
+                                          color: _followHeading
+                                              ? Colors.white
+                                              : StreetPhareTheme.textSecondary,
+                                          size: 24,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
                                   // Recentrer / suivre la position GPS
                                   Material(
                                     elevation: 4,
@@ -2493,8 +2957,13 @@ class _MapScreenState extends State<MapScreen> {
                                           .withValues(alpha: 0.9),
                                       child: InkWell(
                                         customBorder: const CircleBorder(),
-                                        onTap: () => setState(
-                                            () => _safeRoutePoints = null),
+                                        onTap: () {
+                                          setState(() {
+                                            _safeRoutePoints = null;
+                                            _passedRoutePoints = null;
+                                          });
+                                          _applyWakelock();
+                                        },
                                         child: Padding(
                                           padding: const EdgeInsets.all(12),
                                           child: Icon(
@@ -2507,6 +2976,7 @@ class _MapScreenState extends State<MapScreen> {
                                     ),
                                   ],
                                 ],
+                              ),
                               ),
                             ),
 
@@ -2563,49 +3033,70 @@ class _MapScreenState extends State<MapScreen> {
                             ),
 
                             // ── FABs actions ────────────────────────────────────────
-                            Positioned(
-                              right: 16,
-                              bottom: 32,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  _ActionFab(
-                                    icon: Icons.add_alert,
-                                    label: s
-                                        .eventsMyEvents, // Example, should probably have its own key
-                                    backgroundColor: StreetPhareTheme.primary,
-                                    foregroundColor: Colors.black,
-                                    onPressed: _openReportSheet,
+                            ValueListenableBuilder<MedicMission?>(
+                              valueListenable:
+                                  StreetMedicService.instance.medicMission,
+                              builder: (context, mission, _) {
+                                // Remonte les FABs quand le panneau
+                                // « En intervention » (pleine largeur, en bas)
+                                // masquerait la colonne de boutons.
+                                final interventionActive = mission != null &&
+                                    (mission.status ==
+                                            MedicMissionStatus.pending ||
+                                        mission.status ==
+                                            MedicMissionStatus.accepted);
+                                return Positioned(
+                                  right: 16,
+                                  bottom: interventionActive ? 300.0 : 32.0,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.end,
+                                    children: [
+                                      _ActionFab(
+                                        icon: Icons.add_alert,
+                                        label: s
+                                            .eventsMyEvents, // Example, should probably have its own key
+                                        backgroundColor:
+                                            StreetPhareTheme.primary,
+                                        foregroundColor: Colors.black,
+                                        onPressed: _openReportSheet,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _ActionFab(
+                                        icon: Icons.shield_outlined,
+                                        label: s.routeTitle,
+                                        backgroundColor:
+                                            StreetPhareTheme.surface,
+                                        foregroundColor:
+                                            StreetPhareTheme.primary,
+                                        borderColor: StreetPhareTheme.primary,
+                                        onPressed: () => _triggerRouteSafe(),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _ActionFab(
+                                        icon: Icons.forum_outlined,
+                                        label: s.messagingTitle,
+                                        backgroundColor:
+                                            StreetPhareTheme.surface,
+                                        foregroundColor:
+                                            StreetPhareTheme.primary,
+                                        borderColor: StreetPhareTheme.primary,
+                                        onPressed: _openMessaging,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _ActionFab(
+                                        icon: Icons.emergency,
+                                        label: s.panicButton,
+                                        backgroundColor:
+                                            StreetPhareTheme.danger,
+                                        foregroundColor: Colors.white,
+                                        isExtended: true,
+                                        onPressed: _triggerPanic,
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 12),
-                                  _ActionFab(
-                                    icon: Icons.shield_outlined,
-                                    label: s.routeTitle,
-                                    backgroundColor: StreetPhareTheme.surface,
-                                    foregroundColor: StreetPhareTheme.primary,
-                                    borderColor: StreetPhareTheme.primary,
-                                    onPressed: () => _triggerRouteSafe(),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _ActionFab(
-                                    icon: Icons.forum_outlined,
-                                    label: s.messagingTitle,
-                                    backgroundColor: StreetPhareTheme.surface,
-                                    foregroundColor: StreetPhareTheme.primary,
-                                    borderColor: StreetPhareTheme.primary,
-                                    onPressed: _openMessaging,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _ActionFab(
-                                    icon: Icons.emergency,
-                                    label: s.panicButton,
-                                    backgroundColor: StreetPhareTheme.danger,
-                                    foregroundColor: Colors.white,
-                                    isExtended: true,
-                                    onPressed: _triggerPanic,
-                                  ),
-                                ],
-                              ),
+                                );
+                              },
                             ),
 
                             // ── Mode placement de signalement ─────────────────

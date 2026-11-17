@@ -28,6 +28,7 @@ const simulationRoutes = require('./routes/simulation');
 const { verifyWsToken } = require('./middleware/auth');
 const { setAdminBroadcaster, setMeshBroadcaster, broadcast, broadcastToAll } = require('./services/broadcast');
 const { executeCommand } = require('./console');
+const adminDashboard = require('./services/adminDashboard');
 
 const app = express();
 
@@ -110,9 +111,7 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html'));
-});
+app.get(['/admin', '/admin/', '/admin/index.html'], adminDashboard.handler);
 app.use('/admin', express.static(path.join(__dirname, '..', 'public', 'admin')));
 app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 app.use('/api', apiRoutes);

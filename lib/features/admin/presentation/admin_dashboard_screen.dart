@@ -36,7 +36,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final TextEditingController _evCodeCtrl = TextEditingController();
   final TextEditingController _evTitleCtrl = TextEditingController();
   final TextEditingController _evZoneCtrl = TextEditingController();
-  final DateTime _evStartAt = DateTime.now().add(const Duration(hours: 1));
+  DateTime _evStartAt = DateTime.now().add(const Duration(hours: 1));
 
   bool _loggingIn = false;
   bool _loadingDashboard = false;
@@ -45,6 +45,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   AdminServerStats? _stats;
   List<AdminEventSummary> _events = const [];
   List<ModeratorAccount> _moderators = const [];
+  List<MedicEmergency> _emergencies = const [];
+  List<SimulatedStreetMedic> _simMedics = const [];
+  List<SimulatedMedicMission> _simMissions = const [];
 
   @override
   void initState() {
@@ -136,8 +139,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final statsFuture = _service.fetchServerStats();
       final eventsFuture = _service.listEvents();
       List<ModeratorAccount> mods = const [];
+      List<MedicEmergency> emergencies = const [];
+      List<SimulatedStreetMedic> simMedics = const [];
+      List<SimulatedMedicMission> simMissions = const [];
       try {
         mods = await _service.listModerators();
+      } catch (_) {}
+      try {
+        emergencies = await _service.listMedicEmergencies();
+      } catch (_) {}
+      try {
+        final sim = await _service.loadSimulatedStreetMedics();
+        simMedics = ((sim['medics'] as List<dynamic>?) ?? const [])
+            .whereType<SimulatedStreetMedic>()
+            .toList();
+        simMissions = ((sim['missions'] as List<dynamic>?) ?? const [])
+            .whereType<SimulatedMedicMission>()
+            .toList();
       } catch (_) {}
       final results = await Future.wait([statsFuture, eventsFuture]);
       if (!mounted) return;
@@ -145,12 +163,72 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _stats = results[0] as AdminServerStats;
         _events = results[1] as List<AdminEventSummary>;
         _moderators = mods;
+        _emergencies = emergencies;
+        _simMedics = simMedics;
+        _simMissions = simMissions;
       });
     } catch (e) {
       _showErrorSnackBar(e.toString());
     } finally {
       if (mounted) setState(() => _loadingDashboard = false);
     }
+  }
+
+  Future<void> _handleAcknowledgeEmergency(MedicEmergency e) async {
+    setState(() => _loadingDashboard = true);
+    try {
+      await _service.acknowledgeMedicEmergency(e.id);
+      _showSuccessSnackBar('Alerte 112 acquittée.');
+      await _refreshAllAdminData();
+    } catch (err) {
+      _showErrorSnackBar(err.toString());
+    } finally {
+      if (mounted) setState(() => _loadingDashboard = false);
+    }
+  }
+
+  Future<void> _handleDeleteEmergency(MedicEmergency e) async {
+    setState(() => _loadingDashboard = true);
+    try {
+      await _service.deleteMedicEmergency(e.id);
+      _showSuccessSnackBar('Alerte 112 supprimée.');
+      await _refreshAllAdminData();
+    } catch (err) {
+      _showErrorSnackBar(err.toString());
+    } finally {
+      if (mounted) setState(() => _loadingDashboard = false);
+    }
+  }
+
+  /// Ouvre un sélecteur de date + heure pour définir le début de l'événement.
+  Future<void> _pickEventStart() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _evStartAt,
+      firstDate: now.subtract(const Duration(days: 1)),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_evStartAt),
+    );
+    if (!mounted) return;
+    setState(() {
+      _evStartAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time?.hour ?? _evStartAt.hour,
+        time?.minute ?? _evStartAt.minute,
+      );
+    });
+  }
+
+  String _formatDateTime(DateTime d) {
+    String pad(int n) => n.toString().padLeft(2, '0');
+    return '${d.day}/${pad(d.month)}/${d.year} ${pad(d.hour)}:${pad(d.minute)}';
   }
 
   Future<void> _handleCreateEvent() async {
@@ -273,11 +351,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 const SizedBox(height: 16),
                 _buildStatsSectionCard(),
                 const SizedBox(height: 16),
+                _buildMedicEmergencySectionCard(),
+                const SizedBox(height: 16),
                 _buildEventSectionCard(),
                 const SizedBox(height: 12),
                 _buildModeratorsSectionCard(),
                 const SizedBox(height: 12),
                 _buildSandboxSectionCard(),
+                const SizedBox(height: 12),
+                _buildSimulatedStreetMedicsCard(),
               ],
             ),
           ),
@@ -438,6 +520,114 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  Widget _buildMedicEmergencySectionCard() {
+    if (!_service.isAuthenticated) return const SizedBox.shrink();
+    final pending =
+        _emergencies.where((e) => !e.emergencyAcknowledged).toList();
+    final acknowledged =
+        _emergencies.where((e) => e.emergencyAcknowledged).toList();
+    return Card(
+      color: StreetPhareTheme.darkSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.emergency, color: Color(0xFFD32F2F)),
+                const SizedBox(width: 8),
+                const Text(
+                  'Alertes street-medic (112)',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: StreetPhareTheme.darkTextPrimary),
+                ),
+                const SizedBox(width: 8),
+                if (pending.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD32F2F),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${pending.length}',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_emergencies.isEmpty)
+              const Text(
+                'Aucune alerte de détresse en cours.',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: StreetPhareTheme.darkTextSecondary),
+              )
+            else ...[
+              ...pending.map(_buildEmergencyTile),
+              ...acknowledged.map(_buildEmergencyTile),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmergencyTile(MedicEmergency e) {
+    final ack = e.emergencyAcknowledged;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        Icons.local_hospital,
+        color: ack ? Colors.grey : const Color(0xFFD32F2F),
+      ),
+      title: Text(
+        'Victime non soignable sur place',
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: ack
+              ? StreetPhareTheme.darkTextSecondary
+              : StreetPhareTheme.darkTextPrimary,
+        ),
+      ),
+      subtitle: Text(
+        '📍 ${e.injuredLatitude.toStringAsFixed(5)}, '
+        '${e.injuredLongitude.toStringAsFixed(5)}'
+        '${e.note.isNotEmpty ? ' — ${e.note}' : ''}',
+        style: const TextStyle(
+            fontSize: 12, color: StreetPhareTheme.darkTextSecondary),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (ack)
+            const Text('Acquittée',
+                style: TextStyle(fontSize: 12, color: Colors.grey))
+          else
+            TextButton(
+              onPressed: () => _handleAcknowledgeEmergency(e),
+              child: const Text('Acquitter'),
+            ),
+          TextButton(
+            onPressed: () => _handleDeleteEmergency(e),
+            child: const Text('Supprimer',
+                style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatTile(
       {required String label,
       required String value,
@@ -532,6 +722,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           validator: (v) => (v == null || v.trim().isEmpty)
                               ? 'Titre requis'
                               : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pickEventStart,
+                          icon: const Icon(Icons.schedule, size: 18),
+                          label: Text(
+                            'Début : ${_formatDateTime(_evStartAt)}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
                         ),
                       ),
                     ],
@@ -660,6 +865,279 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _refreshSimMedics() async {
+    try {
+      final sim = await _service.loadSimulatedStreetMedics();
+      if (!mounted) return;
+      setState(() {
+        _simMedics = ((sim['medics'] as List<dynamic>?) ?? const [])
+            .whereType<SimulatedStreetMedic>()
+            .toList();
+        _simMissions = ((sim['missions'] as List<dynamic>?) ?? const [])
+            .whereType<SimulatedMedicMission>()
+            .toList();
+      });
+    } catch (e) {
+      _showErrorSnackBar(e.toString());
+    }
+  }
+
+  Future<void> _handleCreateFakeMedic({bool busy = false}) async {
+    try {
+      await _service.createFakeStreetMedic(busy: busy);
+      _showSuccessSnackBar(
+          busy ? 'Faux medic « occupé » créé.' : 'Faux medic créé.');
+      await _refreshSimMedics();
+    } catch (e) {
+      _showErrorSnackBar(e.toString());
+    }
+  }
+
+  Future<void> _handleSimMedicAction(SimulatedStreetMedic m,
+      {String? status, bool? sharing, bool? busy}) async {
+    try {
+      await _service.setFakeStreetMedicState(m.userId,
+          status: status, sharing: sharing, busy: busy);
+      await _refreshSimMedics();
+    } catch (e) {
+      _showErrorSnackBar(e.toString());
+    }
+  }
+
+  Future<void> _handleDeleteFakeMedic(String userId) async {
+    try {
+      await _service.deleteFakeStreetMedic(userId);
+      _showSuccessSnackBar('Faux medic supprimé.');
+      await _refreshSimMedics();
+    } catch (e) {
+      _showErrorSnackBar(e.toString());
+    }
+  }
+
+  Future<void> _handleCreateFakeMission(String medicId,
+      {bool accept = false}) async {
+    try {
+      await _service.createFakeMission(medicId: medicId, accept: accept);
+      await _refreshSimMedics();
+    } catch (e) {
+      _showErrorSnackBar(e.toString());
+    }
+  }
+
+  Future<void> _handleFakeMissionState(String missionId, String status) async {
+    try {
+      await _service.setFakeMissionState(missionId, status);
+      await _refreshSimMedics();
+    } catch (e) {
+      _showErrorSnackBar(e.toString());
+    }
+  }
+
+  bool _isMedicBusy(String userId) =>
+      _simMissions.any((m) => m.medicId == userId && m.status == 'accepted');
+
+  Widget _buildSimulatedStreetMedicsCard() {
+    if (!_service.isAuthenticated) return const SizedBox.shrink();
+    return Card(
+      color: StreetPhareTheme.darkSurface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.medical_services, color: Color(0xFF26A69A)),
+                const SizedBox(width: 8),
+                const Text(
+                  'Street-medics simulés',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: StreetPhareTheme.darkTextPrimary),
+                ),
+                const Spacer(),
+                OutlinedButton.icon(
+                  onPressed: () => _handleCreateFakeMedic(),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Disponible'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _handleCreateFakeMedic(busy: true),
+                  icon: const Icon(Icons.local_hospital, size: 16),
+                  label: const Text('Occupé'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_simMedics.isEmpty)
+              const Text(
+                'Aucun faux medic. Ajoutez-en un pour tester le flux '
+                'd\'intervention complet.',
+                style: TextStyle(
+                    fontSize: 13,
+                    color: StreetPhareTheme.darkTextSecondary),
+              )
+            else
+              ..._simMedics.map(_buildSimMedicTile),
+            if (_simMissions.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Text('Missions simulées',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: StreetPhareTheme.darkTextSecondary)),
+              const SizedBox(height: 4),
+              ..._simMissions.map(_buildSimMissionTile),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimMedicTile(SimulatedStreetMedic m) {
+    final busy = _isMedicBusy(m.userId);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                busy ? Icons.local_hospital : Icons.person_pin,
+                color:
+                    busy ? const Color(0xFFFFB300) : const Color(0xFF26A69A),
+                size: 18,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${m.userId} — ${busy ? 'occupé' : 'disponible'} '
+                  '${m.sharing ? '(partage actif)' : '(partage coupé)'}',
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: m.sharing
+                          ? StreetPhareTheme.darkTextPrimary
+                          : StreetPhareTheme.darkTextSecondary),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Supprimer',
+                icon: const Icon(Icons.delete_outline, size: 18),
+                color: StreetPhareTheme.danger,
+                onPressed: () => _handleDeleteFakeMedic(m.userId),
+              ),
+            ],
+          ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              if (busy)
+                ActionChip(
+                  label: const Text('Libérer'),
+                  onPressed: () => _handleSimMedicAction(m, busy: false),
+                )
+              else
+                ActionChip(
+                  label: const Text('Occuper'),
+                  onPressed: () => _handleSimMedicAction(m, busy: true),
+                ),
+              ActionChip(
+                label: Text(m.sharing ? 'Couper partage' : 'Activer partage'),
+                onPressed: () => _handleSimMedicAction(m, sharing: !m.sharing),
+              ),
+              ActionChip(
+                label: const Text('Mission (blessé)'),
+                onPressed: () => _handleCreateFakeMission(m.userId),
+              ),
+              ActionChip(
+                label: const Text('Mission + accept.'),
+                onPressed: () => _handleCreateFakeMission(m.userId, accept: true),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimMissionTile(SimulatedMedicMission m) {
+    final label = m.status == 'accepted'
+        ? 'en intervention'
+        : m.status == 'completed'
+            ? (m.outcome == 'emergency' ? 'urg. 112' : 'terminée')
+            : m.status;
+    final pending = m.status == 'pending';
+    final accepted = m.status == 'accepted';
+    final finished = m.status == 'completed' || m.status == 'cancelled';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.emergency, size: 16, color: Color(0xFFD32F2F)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${m.id.substring(0, m.id.length > 8 ? 8 : m.id.length)} '
+                  '→ medic ${m.medicId.substring(0, m.medicId.length > 10 ? 10 : m.medicId.length)} '
+                  '[$label]',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      color: StreetPhareTheme.darkTextSecondary),
+                ),
+              ),
+            ],
+          ),
+          if (!finished)
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (pending)
+                  ActionChip(
+                    label: const Text('Accepter'),
+                    onPressed: () =>
+                        _handleFakeMissionState(m.id, 'accepted'),
+                  ),
+                if (pending)
+                  ActionChip(
+                    label: const Text('Refuser'),
+                    onPressed: () =>
+                        _handleFakeMissionState(m.id, 'refused'),
+                  ),
+                if (accepted)
+                  ActionChip(
+                    label: const Text('Terminer (soignée)'),
+                    onPressed: () =>
+                        _handleFakeMissionState(m.id, 'completed'),
+                  ),
+                if (accepted)
+                  ActionChip(
+                    label: const Text('Urgence 112'),
+                    onPressed: () =>
+                        _handleFakeMissionState(m.id, 'emergency'),
+                  ),
+                if (pending || accepted)
+                  ActionChip(
+                    label: const Text('Annuler'),
+                    onPressed: () =>
+                        _handleFakeMissionState(m.id, 'cancelled'),
+                  ),
+              ],
+            ),
+        ],
       ),
     );
   }

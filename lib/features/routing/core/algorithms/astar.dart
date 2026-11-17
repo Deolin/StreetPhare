@@ -94,9 +94,6 @@ class Astar {
     bDist[endNode] = 0;
     bHeuristic[endNode] = _haversineHeuristic(graph, endNode, startNode);
 
-    final walkSpeed = profile.walkSpeedMs > 0 ? profile.walkSpeedMs : 1.4;
-    final diagPenalty = profile.penaltyFactorDiagonal;
-
     int nodesExplored = 0;
     double bestPathWeight = double.infinity;
     int meetingNode = -1;
@@ -106,7 +103,7 @@ class Astar {
       // Phase forward : choisir le nœud forward non visité avec la meilleure
       // valeur f = g + h.
       final fU =
-          _selectNode(fDist, fHeuristic, fVisited, bestPathWeight, walkSpeed);
+          _selectNode(fDist, fHeuristic, fVisited, bestPathWeight);
       if (fU != -1) {
         fVisited[fU] = true;
         nodesExplored++;
@@ -123,10 +120,8 @@ class Astar {
         // Relaxation des arêtes sortantes depuis fU.
         graph.forEachEdge(fU, (to, weightMeters, flags, speedKmh) {
           if (fVisited[to]) return;
-          // Applique la pénalité diagonale pour les piétons.
-          final w = (walkSpeed > 0 && speedKmh < 30)
-              ? weightMeters / walkSpeed
-              : weightMeters * diagPenalty;
+          if (!_edgeAllowed(flags, profile)) return;
+          final w = _edgeCost(weightMeters, speedKmh, profile);
           final alt = fDist[fU] + w + _avoidPenalty(graph, to, avoidPoints);
           if (alt < fDist[to]) {
             fDist[to] = alt;
@@ -141,7 +136,7 @@ class Astar {
       // Phase backward : choisir le nœud backward non visité avec la meilleure
       // valeur f = g + h.
       final bU =
-          _selectNode(bDist, bHeuristic, bVisited, bestPathWeight, walkSpeed);
+          _selectNode(bDist, bHeuristic, bVisited, bestPathWeight);
       if (bU != -1) {
         bVisited[bU] = true;
         nodesExplored++;
@@ -159,9 +154,8 @@ class Astar {
           if (bVisited[v]) continue;
           graph.forEachEdge(v, (to, weightMeters, flags, speedKmh) {
             if (to != bU) return;
-            final w = (walkSpeed > 0 && speedKmh < 30)
-                ? weightMeters / walkSpeed
-                : weightMeters * diagPenalty;
+            if (!_edgeAllowed(flags, profile)) return;
+            final w = _edgeCost(weightMeters, speedKmh, profile);
             final alt = bDist[bU] + w + _avoidPenalty(graph, v, avoidPoints);
             if (alt < bDist[v]) {
               bDist[v] = alt;
@@ -245,13 +239,62 @@ class Astar {
     );
   }
 
+  /// Indique si une arête (décrite par ses [flags]) est traversable pour un
+  /// [profile] donné. Différencie piéton/vélo et véhicule/urgence :
+  ///   - Piéton/vélo : autorise escaliers, pistes cyclables et chemins, et
+  ///     IGNORE les sens interdits (marche à contre-sens autorisée) ;
+  ///     refuse seulement les autoroutes/voies rapides.
+  ///   - Véhicule/urgence : refuse escaliers, pistes cyclables et chemins,
+  ///     et RESPECTE les sens interdits.
+  static bool _edgeAllowed(int flags, ProfileSettings profile) {
+    final isMotorized = profile.walkSpeedMs <= 0;
+    if (EdgeFlags.has(flags, EdgeFlags.stairs)) {
+      if (isMotorized || profile.avoidStairs) return false;
+    }
+    if (EdgeFlags.has(flags, EdgeFlags.cycleway)) {
+      if (isMotorized) return false;
+    }
+    if (EdgeFlags.has(flags, EdgeFlags.highway)) {
+      if (!isMotorized) return false;
+    }
+    if (EdgeFlags.has(flags, EdgeFlags.oneway)) {
+      if (isMotorized) return false;
+    }
+    if (EdgeFlags.has(flags, EdgeFlags.unpaved)) {
+      if (profile.avoidUnpaved) return false;
+    }
+    return true;
+  }
+
+  /// Coût de franchissement d'une arête pour un [profile] donné.
+  ///
+  /// - Piéton / vélo : temps de parcours (distance / vitesse de marche), avec
+  ///   une forte pénalité sur les voies rapides (≥ 30 km/h) pour éviter les
+  ///   grands axes.
+  /// - Véhicule / urgence : temps de conduite (distance / vitesse réelle de la
+  ///   voie), plafonné à [ProfileSettings.maxSpeedKmh].
+  static double _edgeCost(
+    double weightMeters,
+    int speedKmh,
+    ProfileSettings profile,
+  ) {
+    if (profile.walkSpeedMs > 0) {
+      double cost = weightMeters / profile.walkSpeedMs;
+      if (speedKmh >= 30) cost *= profile.penaltyFactorDiagonal;
+      return cost;
+    }
+    final effectiveKmh = speedKmh > 0
+        ? math.min(speedKmh.toDouble(), profile.maxSpeedKmh)
+        : 30.0;
+    return weightMeters / (effectiveKmh / 3.6);
+  }
+
   /// Sélectionne le nœud non visité avec la meilleure valeur f = g + h.
   static int _selectNode(
     List<double> dist,
     List<double> heuristic,
     List<bool> visited,
     double bestPathWeight,
-    double walkSpeed,
   ) {
     int best = -1;
     double bestVal = double.infinity;

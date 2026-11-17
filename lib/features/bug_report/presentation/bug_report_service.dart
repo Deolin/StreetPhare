@@ -121,6 +121,7 @@ class BugReportService {
   Timer? _flushTimer;
   StreamSubscription? _connectivitySub;
   bool _started = false;
+  bool _flushing = false;
 
   /// Backoff exponentiel pour le flush périodique.
   /// Réinitialisé dès qu'un envoi réussit.
@@ -264,7 +265,12 @@ class BugReportService {
   ///   - Si le serveur répond 429 (rate-limit), le flush est suspendu
   ///     avec un backoff exponentiel pour éviter les boucles de retry.
   Future<void> _flushQueue() async {
-    if (!_started) return;
+    // Garde anti-concurrence : `submit()` déclenche un flush à chaque rapport
+    // (boucle de crash) — sans verrou, plusieurs flushes traitaient les MÊMES
+    // rapports en parallèle (doublons d'envoi + suppressions répétées).
+    if (!_started || _flushing) return;
+    _flushing = true;
+    try {
 
     // Vérifie si on est en backoff rate-limit.
     if (_isRateLimited()) {
@@ -364,6 +370,9 @@ class BugReportService {
     // (backoff déjà maximal atteint).
     if (_consecutiveFlushFailures > 6) {
       _consecutiveFlushFailures = 6; // Plafonne à 6 (backoff max ~64s).
+    }
+    } finally {
+      _flushing = false;
     }
   }
 

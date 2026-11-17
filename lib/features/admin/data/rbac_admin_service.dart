@@ -183,6 +183,99 @@ class AdminServerStats {
   final String serverType;
 }
 
+/// Alerte « 112 » remontée par un street-medic (victime non soignable sur place).
+class MedicEmergency {
+  const MedicEmergency({
+    required this.id,
+    required this.medicId,
+    required this.injuredLatitude,
+    required this.injuredLongitude,
+    this.note = '',
+    this.emergencyAt,
+    this.emergencyAcknowledged = false,
+  });
+
+  factory MedicEmergency.fromJson(Map<String, dynamic> json) => MedicEmergency(
+        id: (json['id'] ?? '').toString(),
+        medicId: (json['medicId'] ?? '').toString(),
+        injuredLatitude: (json['injuredLat'] as num?)?.toDouble() ?? 0,
+        injuredLongitude: (json['injuredLng'] as num?)?.toDouble() ?? 0,
+        note: (json['note'] ?? '').toString(),
+        emergencyAt: json['emergencyAt'] as String?,
+        emergencyAcknowledged:
+            (json['emergencyAcknowledged'] as bool?) ?? false,
+      );
+
+  final String id;
+  final String medicId;
+  final double injuredLatitude;
+  final double injuredLongitude;
+  final String note;
+  final String? emergencyAt;
+  final bool emergencyAcknowledged;
+}
+
+/// Faux street-medic piloté par le mode simulation (dashboard admin).
+class SimulatedStreetMedic {
+  const SimulatedStreetMedic({
+    required this.id,
+    required this.userId,
+    required this.status,
+    required this.sharing,
+    this.latitude,
+    this.longitude,
+  });
+
+  factory SimulatedStreetMedic.fromJson(Map<String, dynamic> json) =>
+      SimulatedStreetMedic(
+        id: (json['id'] ?? '').toString(),
+        userId: (json['userId'] ?? '').toString(),
+        status: (json['status'] ?? '').toString(),
+        sharing: (json['sharing'] as bool?) ?? false,
+        latitude: (json['lat'] as num?)?.toDouble(),
+        longitude: (json['lng'] as num?)?.toDouble(),
+      );
+
+  final String id;
+  final String userId;
+  final String status;
+  final bool sharing;
+  final double? latitude;
+  final double? longitude;
+}
+
+/// Mission d'intervention simulée (mode simulation).
+class SimulatedMedicMission {
+  const SimulatedMedicMission({
+    required this.id,
+    required this.medicId,
+    required this.status,
+    this.injuredLatitude,
+    this.injuredLongitude,
+    this.note = '',
+    this.outcome,
+  });
+
+  factory SimulatedMedicMission.fromJson(Map<String, dynamic> json) =>
+      SimulatedMedicMission(
+        id: (json['id'] ?? '').toString(),
+        medicId: (json['medicId'] ?? '').toString(),
+        status: (json['status'] ?? '').toString(),
+        injuredLatitude: (json['injuredLat'] as num?)?.toDouble(),
+        injuredLongitude: (json['injuredLng'] as num?)?.toDouble(),
+        note: (json['note'] ?? '').toString(),
+        outcome: json['outcome'] as String?,
+      );
+
+  final String id;
+  final String medicId;
+  final String status;
+  final double? injuredLatitude;
+  final double? injuredLongitude;
+  final String note;
+  final String? outcome;
+}
+
 /// Service d'administration des comptes RBAC (Superadmin).
 class RbacAdminService {
   RbacAdminService({String? baseUrl}) : _baseUrl = baseUrl ?? _defaultApiBase;
@@ -550,6 +643,166 @@ class RbacAdminService {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       throw Exception(
           data['error'] ?? 'Erreur lors de la suppression du modérateur');
+    }
+  }
+
+  // ── ALERTES STREET-MEDIC « 112 » ─────────────────────────────────────────
+
+  Future<List<MedicEmergency>> listMedicEmergencies() async {
+    final uri = Uri.parse('$_baseUrl/api/admin/streetmedic-emergencies');
+    final res = await http
+        .get(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 200) {
+      throw Exception(
+          data['error'] ?? 'Erreur lors du chargement des alertes 112');
+    }
+    final list = (data['emergencies'] as List<dynamic>?) ?? const [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(MedicEmergency.fromJson)
+        .toList();
+  }
+
+  Future<void> acknowledgeMedicEmergency(String id) async {
+    final uri =
+        Uri.parse('$_baseUrl/api/admin/streetmedic-emergencies/$id/acknowledge');
+    final res = await http
+        .post(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(
+          data['error'] ?? 'Erreur lors de l\'acquittement de l\'alerte');
+    }
+  }
+
+  Future<void> deleteMedicEmergency(String id) async {
+    final uri =
+        Uri.parse('$_baseUrl/api/admin/streetmedic-emergencies/$id');
+    final res = await http
+        .delete(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(
+          data['error'] ?? 'Erreur lors de la suppression de l\'alerte');
+    }
+  }
+
+  // ── MODE SIMULATION — street-medics (tests E2E) ───────────────────────────
+
+  Future<Map<String, dynamic>> loadSimulatedStreetMedics() async {
+    final uri = Uri.parse('$_baseUrl/api/admin/simulation/streetmedics');
+    final res = await http
+        .get(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 200) {
+      throw Exception(
+          data['error'] ?? 'Erreur lors du chargement des medics simulés');
+    }
+    final medics = (data['streetmedics'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(SimulatedStreetMedic.fromJson)
+        .toList();
+    final missions = (data['missions'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(SimulatedMedicMission.fromJson)
+        .toList();
+    return {'medics': medics, 'missions': missions};
+  }
+
+  Future<SimulatedStreetMedic> createFakeStreetMedic({
+    double? lat,
+    double? lng,
+    bool sharing = true,
+    bool busy = false,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/api/admin/simulation/streetmedics');
+    final res = await http
+        .post(
+          uri,
+          headers: _authHeaders,
+          body: jsonEncode({'lat': lat, 'lng': lng, 'sharing': sharing, 'busy': busy}),
+        )
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 201 && res.statusCode != 200) {
+      throw Exception(
+          data['error'] ?? 'Erreur lors de la création du medic simulé');
+    }
+    return SimulatedStreetMedic.fromJson(data['streetmedic'] as Map<String, dynamic>);
+  }
+
+  Future<void> setFakeStreetMedicState(String userId,
+      {String? status, bool? sharing, bool? busy}) async {
+    final uri =
+        Uri.parse('$_baseUrl/api/admin/simulation/streetmedics/$userId/state');
+    final res = await http
+        .post(
+          uri,
+          headers: _authHeaders,
+          body: jsonEncode(
+              {'status': status, 'sharing': sharing, 'busy': busy}),
+        )
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(
+          data['error'] ?? 'Erreur lors du changement d\'état du medic');
+    }
+  }
+
+  Future<void> deleteFakeStreetMedic(String userId) async {
+    final uri =
+        Uri.parse('$_baseUrl/api/admin/simulation/streetmedics/$userId');
+    final res = await http
+        .delete(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(
+          data['error'] ?? 'Erreur lors de la suppression du medic simulé');
+    }
+  }
+
+  Future<SimulatedMedicMission> createFakeMission({
+    required String medicId,
+    bool accept = false,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/api/admin/simulation/missions');
+    final res = await http
+        .post(
+          uri,
+          headers: _authHeaders,
+          body: jsonEncode({'medicId': medicId, 'accept': accept}),
+        )
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 201 && res.statusCode != 200) {
+      throw Exception(
+          data['error'] ?? 'Erreur lors de la création de la mission simulée');
+    }
+    return SimulatedMedicMission.fromJson(
+        data['mission'] as Map<String, dynamic>);
+  }
+
+  Future<void> setFakeMissionState(String missionId, String status) async {
+    final uri =
+        Uri.parse('$_baseUrl/api/admin/simulation/missions/$missionId/state');
+    final res = await http
+        .post(
+          uri,
+          headers: _authHeaders,
+          body: jsonEncode({'status': status}),
+        )
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(
+          data['error'] ?? 'Erreur lors du changement de statut de la mission');
     }
   }
 

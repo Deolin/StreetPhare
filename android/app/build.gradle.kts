@@ -76,6 +76,18 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+
+        // ── Désactive les lambdas `invokedynamic` (mode `indy` par défaut) ────
+        // Kotlin 2.4 génère alors des classes de lambdas explicites au lieu de
+        // laisser D8/R8 produire des « global synthetics » ($$InternalSyntheticLambda).
+        // Bug AGP 9.1.0 + D8 9.1.31 : ce traitement « global synthetics » fait
+        // DISPARAÎTRE la classe principale OsmAndBridgePlugin du dex final →
+        // NoClassDefFoundError au démarrage (crash). `class` est le schéma
+        // historique (< Kotlin 1.5), stable et bien testé.
+        freeCompilerArgs.addAll(
+            "-Xlambdas=class",
+            "-Xsam-conversions=class",
+        )
     }
 }
 
@@ -89,6 +101,11 @@ dependencies {
     // pour les appareils Android < API 26.
     // Version 2.1.4 compatible AGP 9.x + flutter_local_notifications 18.
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // ── RxJava2 — requis côté app pour intercepter les erreurs « non
+    // livrables » de flutter_reactive_ble (déconnexion BLE) et éviter les
+    // FATAL EXCEPTION sur RxBleThread.
+    implementation("io.reactivex.rxjava2:rxjava:2.2.21")
 
     // ── GraphHopper Core — Moteur de routage piéton embarqué ─────────────
     // Licence Apache 2.0 · https://github.com/graphhopper/graphhopper

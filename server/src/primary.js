@@ -38,6 +38,7 @@ const { verifyWsToken } = require('./middleware/auth');
 const { setAdminBroadcaster, setMeshBroadcaster, broadcast, broadcastToAll } = require('./services/broadcast');
 const { routingEngine } = require('./services/routing');
 const { executeCommand } = require('./console');
+const adminDashboard = require('./services/adminDashboard');
 
 const app = express();
 
@@ -146,14 +147,9 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // ── Route GET /admin — DÉCLARÉE AVANT express.static pour éviter le conflit ──
-app.get('/admin', (req, res) => {
-  // Désactive le cache navigateur pour que les mises à jour du dashboard
-  // soient visibles immédiatement après un `npm run dev:primary`.
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, '..', 'public', 'admin', 'index.html'));
-});
+// Le flag d'environnement est injecté côté serveur : l'onglet « Simulation »
+// n'apparaît pas lorsque NODE_ENV=production.
+app.get(['/admin', '/admin/', '/admin/index.html'], adminDashboard.handler);
 
 // ── Fichiers statiques (interface admin + assets) ────────────────────────
 app.use('/admin', express.static(path.join(__dirname, '..', 'public', 'admin')));

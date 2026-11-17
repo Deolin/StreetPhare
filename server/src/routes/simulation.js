@@ -10,6 +10,15 @@ const { authenticateToken, requirePermission } = require('../middleware/auth');
 
 const router = express.Router();
 
+// En production, le panneau de simulation est désactivé (outil de test et de
+// développement uniquement). Toutes les sous-routes renvoient 404.
+router.use((req, res, next) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Simulation indisponible en production' });
+  }
+  next();
+});
+
 // Toutes les routes de simulation exigent la permission `simulateAccess`.
 router.use(authenticateToken, requirePermission('simulateAccess'));
 
@@ -102,6 +111,60 @@ router.post('/chat', (req, res) => {
 router.post('/purge', (req, res) => {
   const removed = simulation.purge();
   res.json({ success: true, removed });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// STREET-MEDICS SIMULÉS — tester le flux complet (appel → acceptation →
+// clôture → urgence 112) depuis le dashboard admin.
+// ═══════════════════════════════════════════════════════════════════════
+
+/// GET /api/admin/simulation/streetmedics — Faux medics + missions simulées.
+router.get('/streetmedics', (req, res) => {
+  res.json({
+    streetmedics: simulation.listFakeMedics(),
+    missions: simulation.listFakeMissions(),
+  });
+});
+
+/// POST /api/admin/simulation/streetmedics — Crée un faux medic.
+/// Body: { lat?, lng?, sharing?, status?, busy? }
+router.post('/streetmedics', (req, res) => {
+  const { lat, lng, sharing, status, busy } = req.body || {};
+  const sm = simulation.createFakeMedic({ lat, lng, sharing, status, busy });
+  res.status(201).json({ success: true, streetmedic: sm });
+});
+
+/// POST /api/admin/simulation/streetmedics/:userId/state — Pilote l'état.
+/// Body: { status?, sharing?, lat?, lng?, busy? }
+router.post('/streetmedics/:userId/state', (req, res) => {
+  const { status, sharing, lat, lng, busy } = req.body || {};
+  const sm = simulation.setFakeMedicState(req.params.userId, { status, sharing, lat, lng, busy });
+  if (!sm) return res.status(404).json({ error: 'Medic simulé non trouvé' });
+  res.json({ success: true, streetmedic: sm });
+});
+
+/// DELETE /api/admin/simulation/streetmedics/:userId — Supprime un faux medic.
+router.delete('/streetmedics/:userId', (req, res) => {
+  res.json({ success: true, ...simulation.removeFakeMedic(req.params.userId) });
+});
+
+/// POST /api/admin/simulation/missions — Crée une mission assignée à un medic.
+/// Body: { medicId, lat?, lng?, note?, accept? }
+router.post('/missions', (req, res) => {
+  const { medicId, lat, lng, note, accept } = req.body || {};
+  if (!medicId) return res.status(400).json({ error: 'medicId requis' });
+  const m = simulation.createFakeMission({ medicId, lat, lng, note, accept });
+  if (!m) return res.status(404).json({ error: 'Medic simulé non trouvé' });
+  res.status(201).json({ success: true, mission: m });
+});
+
+/// POST /api/admin/simulation/missions/:id/state — Fait évoluer une mission.
+/// Body: { status: 'accepted'|'refused'|'completed'|'emergency'|'cancelled' }
+router.post('/missions/:id/state', (req, res) => {
+  const { status } = req.body || {};
+  const m = simulation.setFakeMissionState(req.params.id, { status });
+  if (!m) return res.status(404).json({ error: 'Mission non trouvée' });
+  res.json({ success: true, mission: m });
 });
 
 module.exports = router;

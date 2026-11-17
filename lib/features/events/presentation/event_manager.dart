@@ -15,9 +15,13 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../../../debug/client_debug_logger.dart';
+import '../../../network/failover_manager.dart';
+import '../../../network/network_config.dart';
 import '../domain/models/event_model.dart';
 import '../fixtures_fleurus.dart';
 
@@ -55,7 +59,13 @@ class EventManager extends ValueNotifier<List<EventModel>> {
   void start() {
     if (_ticker != null) return;
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (value.isNotEmpty) notifyListeners();
+      if (value.isNotEmpty) {
+        // Différé après le frame : `notifyListeners()` déclenchait une
+        // reconstruction COMPLÈTE de la carte chaque seconde (le Stack + ses
+        // enfants positionnés) → crash « RenderBox was not laid out /
+        // !_debugDoingThisLayout » (layout réentrant).
+        SchedulerBinding.instance.addPostFrameCallback((_) => notifyListeners());
+      }
     });
   }
 
@@ -81,7 +91,19 @@ class EventManager extends ValueNotifier<List<EventModel>> {
     // Limite de 3 événements.
     if (value.length >= maxEvents) return false;
 
-    final event = _decodeEvent(upper);
+    // 1) Tentative serveur : les événements créés via l'éditeur admin
+    //    sont stockés côté serveur et récupérés via POST /api/events/join.
+    EventModel? event;
+    try {
+      event = await _fetchFromServer(upper);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[EventManager] recherche serveur échouée : $e');
+      event = null;
+    }
+
+    // 2) Repli sur les fixtures locales (événements de démo).
+    event ??= _decodeEvent(upper);
+
     if (event == null) {
       if (kDebugMode) debugPrint('[EventManager] code inconnu : $upper');
       return false;
@@ -95,6 +117,29 @@ class EventManager extends ValueNotifier<List<EventModel>> {
       );
     }
     return true;
+  }
+
+  /// URL de base du serveur actif (résolution failover + repli config).
+  String get _apiBase {
+    final address = FailoverManager.instance.currentAddress;
+    if (address.isNotEmpty) return address;
+    return NetworkConfig.baseUrl;
+  }
+
+  /// Interroge le serveur pour récupérer un événement par son code.
+  Future<EventModel?> _fetchFromServer(String code) async {
+    final res = await http
+        .post(
+          Uri.parse('$_apiBase/api/events/join'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'code': code}),
+        )
+        .timeout(const Duration(seconds: 10));
+    if (res.statusCode != 200) return null;
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final eventJson = data['event'] as Map<String, dynamic>?;
+    if (eventJson == null) return null;
+    return EventModel.fromJson(eventJson);
   }
 
   /// Ajoute un événement décodé depuis un QR Code (JSON brut ou Map).

@@ -88,8 +88,7 @@ class LocalFirstTileProvider extends TileProvider {
 
   void _notifyRateLimit(Duration? waitFor) {
     final DateTime now = DateTime.now();
-    if (_lastNotify != null &&
-        now.difference(_lastNotify!) < _notifyThrottle) {
+    if (_lastNotify != null && now.difference(_lastNotify!) < _notifyThrottle) {
       return;
     }
     _lastNotify = now;

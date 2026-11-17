@@ -43,12 +43,17 @@ import 'services/apk_backup_service.dart';
 import 'services/app_share_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/notification_service.dart';
+import 'services/streetphare_foreground_task.dart';
 import 'services/version_check_service.dart';
 
 /// Point d'entrée principal de l'application StreetPhare
 void main() async {
   configureUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Ouvre le canal de communication avec le service avant-plan et enregistre
+  // ses options (nécessaire au service d'arrière-plan « surveillance »).
+  StreetPhareForegroundTask.initCommunication();
 
   // ═══════════════════════════════════════════════════════════════════
   // Catcher de crash global — StreetPhare Offline-First Bug Report
@@ -212,7 +217,7 @@ void main() async {
     unawaited(AppShareService.instance.initDeepLinks());
     HiveMessagingService.instance.start();
     unawaited(NotificationService.instance.showPersistentNotification());
-unawaited(StreetMedicService.instance.init());
+    unawaited(StreetMedicService.instance.init());
 
     networkInitOk = true;
 

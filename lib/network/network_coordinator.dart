@@ -921,12 +921,12 @@ class NetworkCoordinator with WidgetsBindingObserver {
     final local = _db.getById(alert.id);
     if (local == null) return;
     if (local.isExpired()) return;
-    if (local.confirmations.contains(_ephemeralUserId)) return;
-    local.addConfirmation(_ephemeralUserId);
-    _db.upsert(local);
 
-    // Déclenche une notification native immédiate pour
-    // l'utilisateur, même si l'application est en arrière-plan.
+    // Déclenche une notification native immédiate pour l'utilisateur, même
+    // si l'application est en arrière-plan.
+    // NOTE : on n'ajoute PAS de vote/confirmation automatique ici — la simple
+    // réception d'une alerte (ex. quand un pair se connecte et la réémet) ne
+    // doit pas incrémenter le compteur de votes.
     NotificationService.instance.showAlertNotification(
       title: 'Alerte StreetPhare',
       body: '${_describeAlertType(alert.type)} signalé à proximité.',

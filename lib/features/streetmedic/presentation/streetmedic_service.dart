@@ -16,6 +16,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../database/crypto_utils.dart';
 import '../../../network/failover_manager.dart';
@@ -55,7 +56,9 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
   MedicMission? _activeMission;
 
   /// Dernière mission déclenchée par cet utilisateur (vue blessé).
-  MedicMission? _myCall;
+  /// Exposé en [ValueNotifier] pour que le bouton « Appeler / Annuler
+  /// l'appel » réagisse immédiatement sur la carte.
+  final ValueNotifier<MedicMission?> myCallNotifier = ValueNotifier(null);
 
   /// Street-medics actifs (partage de position) — pour la carte publique.
   final ValueNotifier<List<StreetMedic>> activeStreetmedics =
@@ -69,7 +72,17 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
   bool get isAuthorized => value?.isAuthorized ?? false;
   bool get isSharing => _sharing;
   MedicMission? get activeMission => _activeMission;
-  MedicMission? get myCall => _myCall;
+  MedicMission? get myCall => myCallNotifier.value;
+
+  /// `true` si cet utilisateur a un appel au street-medic en cours
+  /// (en attente ou en intervention) : le bouton doit alors basculer
+  /// en « Annuler l'appel » pour éviter les faux signalements.
+  bool get hasActiveCall {
+    final m = myCallNotifier.value;
+    return m != null &&
+        (m.status == MedicMissionStatus.pending ||
+            m.status == MedicMissionStatus.accepted);
+  }
 
   /// Définit le code d'événement courant (secret de dérivation de la clé
   /// du message de contact destiné aux administrateurs).
@@ -285,12 +298,35 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
           .timeout(const Duration(seconds: 10));
       if (res.statusCode != 201) return null;
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      _myCall = MedicMission.fromJson(data['mission'] as Map<String, dynamic>);
+      myCallNotifier.value =
+          MedicMission.fromJson(data['mission'] as Map<String, dynamic>);
       _startCallerTracking();
-      return _myCall;
+      return myCallNotifier.value;
     } catch (_) {
       return null;
     }
+  }
+
+  /// Annule l'appel au street-medic déclenché par cet utilisateur (blessé)
+  /// afin d'éviter qu'un faux signalement ne mobilise un medic pour rien.
+  Future<bool> cancelMyCall() async {
+    final m = myCallNotifier.value;
+    if (m == null) return true;
+    try {
+      final res = await http
+          .post(
+            Uri.parse('$_apiBase/api/streetmedic/missions/${m.id}/cancel'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'userId': userId}),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return false;
+    } catch (_) {
+      return false;
+    }
+    _myCallTrackTimer?.cancel();
+    myCallNotifier.value = null;
+    return true;
   }
 
   Future<MedicMission?> acceptMission(
@@ -330,20 +366,42 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
     } catch (_) {}
   }
 
-  /// Marque l'intervention terminée → le medic redevient disponible.
-  Future<void> completeMission(String missionId) async {
+  /// Marque l'intervention terminée et notifie l'administration du résultat.
+  ///
+  /// [outcome] peut être :
+  ///   * `treated`   → victime soignée sur place (clôture normale) ;
+  ///   * `emergency` → victime non soignable sur place : une alerte « 112 »
+  ///                   est remontée dans la section administration.
+  Future<void> completeMission(String missionId, {String outcome = 'treated'}) async {
     try {
       await http
           .post(
             Uri.parse('$_apiBase/api/streetmedic/missions/$missionId/complete'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'userId': userId}),
+            body: jsonEncode({'userId': userId, 'outcome': outcome}),
           )
           .timeout(const Duration(seconds: 10));
     } catch (_) {}
     _activeMission = null;
     _defer(() => medicMission.value = null);
     _stopVibrationTimer();
+  }
+
+  /// Lance l'appel de détresse au 112 (numéro unique des urgences en Europe).
+  ///
+  /// L'appel est déclenché côté victime non soignable sur place. On l'exécute
+  /// APRÈS [completeMission] pour que l'alerte d'administration soit partie.
+  /// En cas d'échec de l'appel (émulateur, pas de SIM…), on informe l'appelant.
+  Future<bool> launchEmergencyCall() async {
+    final uri = Uri.parse('tel:112');
+    try {
+      if (await canLaunchUrl(uri)) {
+        return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      // `canLaunchUrl`/`launchUrl` peut lever sur certaines plateformes.
+    }
+    return false;
   }
 
   Future<void> pollMissions() async {
@@ -367,8 +425,7 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
         unawaited(
           NotificationService.instance.showAlertNotification(
             title: '🚑 Mission street-medic',
-            body:
-                'Un blessé à ${m.injuredLatitude.toStringAsFixed(4)}, '
+            body: 'Un blessé à ${m.injuredLatitude.toStringAsFixed(4)}, '
                 '${m.injuredLongitude.toStringAsFixed(4)} vous attend.',
           ),
         );
@@ -382,7 +439,7 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
 
       // Mise à jour de la mission côté blessé (appelant).
       final myCalls = all.where((m) => m.callerUserId == userId).toList();
-      if (myCalls.isNotEmpty) _myCall = myCalls.first;
+      myCallNotifier.value = myCalls.isNotEmpty ? myCalls.first : null;
     } catch (_) {}
   }
 
@@ -406,11 +463,15 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
   void _startCallerTracking() {
     _myCallTrackTimer?.cancel();
     _myCallTrackTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      final m = _myCall;
-      if (m == null ||
-          m.status == MedicMissionStatus.completed ||
+      final m = myCallNotifier.value;
+      if (m == null) {
+        _myCallTrackTimer?.cancel();
+        return;
+      }
+      if (m.status == MedicMissionStatus.completed ||
           m.status == MedicMissionStatus.cancelled) {
         _myCallTrackTimer?.cancel();
+        myCallNotifier.value = null;
         return;
       }
       trackMyCallPosition(m.id);

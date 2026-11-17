@@ -95,11 +95,26 @@ router.post('/missions/:id/refuse', (req, res) => {
 });
 
 /// POST /api/streetmedic/missions/:id/complete — Intervention terminée.
-/// Body: { userId }
+/// Body: { userId, outcome? } où outcome = 'treated' | 'emergency'.
+///   'emergency' → victime non soignable : l'alerte remonte à l'administration.
 router.post('/missions/:id/complete', (req, res) => {
+  const { userId, outcome } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'userId requis' });
+  const m = store.completeMedicMission(req.params.id, String(userId), outcome || 'treated');
+  if (!m) return res.status(404).json({ error: 'Mission non trouvée' });
+  broadcastToAll('medic_mission_update', { mission: m });
+  if (m.outcome === 'emergency') {
+    broadcastToAll('medic_emergency', { mission: m });
+  }
+  res.json({ success: true, mission: m });
+});
+
+/// POST /api/streetmedic/missions/:id/cancel — Le blessé annule son appel.
+/// Body: { userId (appelant = blessé) } → status 'cancelled'.
+router.post('/missions/:id/cancel', (req, res) => {
   const { userId } = req.body || {};
   if (!userId) return res.status(400).json({ error: 'userId requis' });
-  const m = store.completeMedicMission(req.params.id, String(userId));
+  const m = store.cancelMedicMissionByCaller(req.params.id, String(userId));
   if (!m) return res.status(404).json({ error: 'Mission non trouvée' });
   broadcastToAll('medic_mission_update', { mission: m });
   res.json({ success: true, mission: m });

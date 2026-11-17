@@ -50,6 +50,7 @@ class SafeRouteLayer extends StatelessWidget {
   const SafeRouteLayer({
     super.key,
     required this.routePoints,
+    this.passedPoints,
     this.arrowStepCount = 6,
     this.routeColor, // null = auto-détection selon le thème
     this.strokeWidth, // null = auto selon le thème
@@ -58,6 +59,9 @@ class SafeRouteLayer extends StatelessWidget {
 
   /// Liste ordonnée des coordonnées de la Route Safe.
   final List<LatLng> routePoints;
+
+  /// Portion déjà parcourue (affichée en gris), ou `null` si aucune.
+  final List<LatLng>? passedPoints;
 
   /// Nombre de points entre chaque flèche directionnelle.
   final int arrowStepCount;
@@ -180,28 +184,37 @@ class SafeRouteLayer extends StatelessWidget {
         ? <Marker>[..._buildArrowMarkers(), ..._buildEndpointMarkers()]
         : <Marker>[];
 
+    final passedPolyline = (passedPoints != null && passedPoints!.length >= 2)
+        ? Polyline(
+            points: passedPoints!,
+            color: const Color(0xFF9E9E9E), // gris « déjà parcouru »
+            strokeWidth: _effectiveStroke + 2.0,
+          )
+        : null;
+
     return Stack(
       children: [
         // ── Trait de la Route Safe ────────────────────────────────
         PolylineLayer(
-          polylines: hasRoute
-              ? [
-                  // Halo contrasté : noir en clair, blanc en sombre pour isolation
-                  Polyline(
-                    points: routePoints,
-                    color: isDarkMap
-                        ? Colors.black.withValues(alpha: 0.70)
-                        : Colors.black.withValues(alpha: 0.20),
-                    strokeWidth: _effectiveStroke + 4.0,
-                  ),
-                  // Trait principal haute-visibilité
-                  Polyline(
-                    points: routePoints,
-                    color: _effectiveColor,
-                    strokeWidth: _effectiveStroke,
-                  ),
-                ]
-              : const <Polyline>[],
+          polylines: [
+            if (hasRoute) ...[
+              // Halo contrasté : noir en clair, blanc en sombre pour isolation
+              Polyline(
+                points: routePoints,
+                color: isDarkMap
+                    ? Colors.black.withValues(alpha: 0.70)
+                    : Colors.black.withValues(alpha: 0.20),
+                strokeWidth: _effectiveStroke + 4.0,
+              ),
+              // Trait principal haute-visibilité
+              Polyline(
+                points: routePoints,
+                color: _effectiveColor,
+                strokeWidth: _effectiveStroke,
+              ),
+            ],
+            if (passedPolyline != null) passedPolyline,
+          ],
         ),
 
         // ── Flèches directionnelles + marqueurs de bornes ─────────

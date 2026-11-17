@@ -35,11 +35,14 @@ import 'package:latlong2/latlong.dart';
 /// Dès qu'une étape est passée, la suivante est automatiquement révélée.
 class EventWaypoint {
   factory EventWaypoint.fromJson(Map<String, dynamic> json) {
+    final scheduledRaw = json['scheduledAt'];
     return EventWaypoint(
-      label: json['label'] as String,
-      latitude: (json['lat'] as num).toDouble(),
-      longitude: (json['lng'] as num).toDouble(),
-      scheduledAt: DateTime.parse(json['scheduledAt'] as String).toUtc(),
+      label: (json['label'] as String?) ?? '',
+      latitude: (json['lat'] as num?)?.toDouble() ?? 0,
+      longitude: (json['lng'] as num?)?.toDouble() ?? 0,
+      scheduledAt: (scheduledRaw is String && scheduledRaw.isNotEmpty)
+          ? (DateTime.tryParse(scheduledRaw)?.toUtc() ?? DateTime.now().toUtc())
+          : DateTime.now().toUtc(),
     );
   }
   const EventWaypoint({
@@ -269,7 +272,9 @@ class EventModel {
       visibleAt: json['visibleAt'] != null
           ? DateTime.parse(json['visibleAt'] as String).toUtc()
           : DateTime.now().toUtc(),
-      routeGeoJson: (json['route'] as String?) ?? '[]',
+      routeGeoJson: (json['routeGeoJson'] as String?) ??
+          (json['route'] as String?) ??
+          '[]',
       waypoints: ((json['waypoints'] as List?) ?? const [])
           .map((w) => EventWaypoint.fromJson(w as Map<String, dynamic>))
           .toList(),
@@ -285,8 +290,14 @@ class EventModel {
       safeZones: ((json['safeZones'] as List?) ?? const [])
           .map((z) => EventSafeZone.fromJson(z as Map<String, dynamic>))
           .toList(),
-      destinationLatitude: (json['destLat'] as num).toDouble(),
-      destinationLongitude: (json['destLng'] as num).toDouble(),
+      destinationLatitude: ((json['destinationLatitude'] ?? json['destLat'])
+                  as num?)
+              ?.toDouble() ??
+          0.0,
+      destinationLongitude: ((json['destinationLongitude'] ?? json['destLng'])
+                  as num?)
+              ?.toDouble() ??
+          0.0,
       generalZone: json['generalZone'] as String?,
     );
   }

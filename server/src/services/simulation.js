@@ -25,6 +25,7 @@ const ENTITY_TYPES = [
   { id: 'safe_zone', label: 'Safe Zone', kind: 'zone' },
   { id: 'waypoint', label: 'Point de passage', kind: 'event' },
   { id: 'zone', label: 'Zone géorepérage', kind: 'zone' },
+  { id: 'streetmedic', label: '🩺 Street-medic virtuel', kind: 'streetmedic' },
 ];
 
 // ── Scénarios batch préconfigurés ──────────────────────────────────────
@@ -250,6 +251,108 @@ function _tickBots() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// STREET-MEDICS — Faux medics + missions pour tester le flux complet
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Crée un faux street-medic (autorisé + partage actif par défaut).
+function createFakeMedic({ lat, lng, sharing = true, status = 'active', busy = false } = {}) {
+  const sm = store.createStreetMedic({
+    lat: lat != null ? lat : state.center.lat + rand(-0.01, 0.01),
+    lng: lng != null ? lng : state.center.lng + rand(-0.01, 0.01),
+    sharing,
+    status,
+    simulated: true,
+  });
+  if (busy) _setMedicBusy(sm.userId, true);
+  state.totalInjected++;
+  broadcast('streetmedics_changed', { streetmedics: store.getActiveStreetMedics() });
+  broadcast('simulation_changed', { kind: 'streetmedic', userId: sm.userId });
+  log('MEDIC', `Faux medic créé : ${sm.userId}`);
+  return sm;
+}
+
+function listFakeMedics() {
+  return store.getAllStreetMedics().filter(s => s && s.simulated);
+}
+
+/// Fait passer un medic en « occupé » (mission acceptée) ou le libère.
+function _setMedicBusy(userId, busy) {
+  if (busy) {
+    const sm = store.getStreetMedicByUser(userId);
+    const m = store.assignMissionToMedic({
+      medicUserId: userId,
+      lat: sm && sm.lat != null ? sm.lat : state.center.lat,
+      lng: sm && sm.lng != null ? sm.lng : state.center.lng,
+      note: '[SIM] Intervention simulée',
+    });
+    return m ? store.acceptMedicMission(m.id, userId, m.injuredLat, m.injuredLng) : null;
+  }
+  const active = store.getActiveMissionForMedic(userId);
+  if (active) return store.completeMedicMission(active.id, userId, 'treated');
+  return store.getStreetMedicByUser(userId);
+}
+
+/// Modifie l'état d'un faux medic : statut, partage, position, occupation.
+function setFakeMedicState(userId, { status, sharing, lat, lng, busy } = {}) {
+  store.setStreetMedicState(userId, { status, sharing, lat, lng });
+  if (busy === true) _setMedicBusy(userId, true);
+  else if (busy === false) _setMedicBusy(userId, false);
+  const sm = store.getStreetMedicByUser(userId);
+  const busyNow = !!store.getActiveMissionForMedic(userId);
+  broadcast('streetmedics_changed', { streetmedics: store.getActiveStreetMedics() });
+  broadcast('medic_mission_update', {});
+  if (sm) log('MEDIC', `État ${userId} → status=${sm.status} sharing=${sm.sharing} busy=${busyNow}`);
+  return sm;
+}
+
+/// Crée une mission d'intervention assignée à un medic précis.
+function createFakeMission({ medicId, lat, lng, note, accept = false } = {}) {
+  const sm = store.getStreetMedicByUser(medicId);
+  const m = store.assignMissionToMedic({
+    medicUserId: medicId,
+    lat: lat != null ? lat : (sm && sm.lat != null ? sm.lat : state.center.lat),
+    lng: lng != null ? lng : (sm && sm.lng != null ? sm.lng : state.center.lng),
+    note: note || '[SIM] Blessé simulé',
+  });
+  if (!m) return null;
+  let final = m;
+  if (accept) final = store.acceptMedicMission(m.id, medicId, m.injuredLat, m.injuredLng) || m;
+  state.totalInjected++;
+  broadcast('medic_mission_update', { mission: final });
+  log('MEDIC', `Mission ${m.id} → medic ${medicId} (accept=${accept})`);
+  return final;
+}
+
+/// Fait évoluer une mission simulée : accepter / refuser / terminer /
+/// urgence 112 / annuler.
+function setFakeMissionState(missionId, { status } = {}) {
+  const m = store.getMissionById(missionId);
+  if (!m) return null;
+  if (status === 'accepted') store.acceptMedicMission(missionId, m.medicId, m.injuredLat, m.injuredLng);
+  else if (status === 'refused') store.refuseMedicMission(missionId, m.medicId);
+  else if (status === 'completed') store.completeMedicMission(missionId, m.medicId, 'treated');
+  else if (status === 'emergency') store.completeMedicMission(missionId, m.medicId, 'emergency');
+  else if (status === 'cancelled') store.cancelMedicMissionByCaller(missionId, m.callerUserId);
+  const updated = store.getMissionById(missionId);
+  broadcast('medic_mission_update', { mission: updated });
+  return updated;
+}
+
+function listFakeMissions() {
+  return store.medicMissions.filter(m => m && m.simulated);
+}
+
+function removeFakeMedic(userId) {
+  const removed = store.removeStreetMedic(userId);
+  broadcast('streetmedics_changed', { streetmedics: store.getActiveStreetMedics() });
+  // Rafraîchit la carte / le suivi des missions (missions orphelines du medic
+  // supprimé désormais nettoyées côté store).
+  broadcast('medic_mission_update', {});
+  if (removed) log('MEDIC', `Faux medic supprimé : ${userId}`);
+  return { removed: !!removed };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // VOTES — Simulation du consensus
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -331,6 +434,8 @@ function getStats() {
     simulatedZones: store.geofencingZones.filter(z => z.simulated).length,
     simulatedEvents: store.events.filter(e => e.simulated).length,
     simulatedMessages: store.meshMessages.filter(m => m.simulated).length,
+    simulatedStreetMedics: store.streetmedics.filter(s => s && s.simulated).length,
+    simulatedMedicMissions: store.medicMissions.filter(m => m && m.simulated).length,
     totalInjected: state.totalInjected,
     metrics: store.getMetrics(),
   };
@@ -349,6 +454,13 @@ module.exports = {
   simulateVotes,
   autoVoteAll,
   injectChat,
+  createFakeMedic,
+  listFakeMedics,
+  setFakeMedicState,
+  createFakeMission,
+  setFakeMissionState,
+  listFakeMissions,
+  removeFakeMedic,
   purge,
   getStats,
 };

@@ -31,6 +31,7 @@ import '../../../services/apk_downloader_service.dart';
 import '../../../services/app_share_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/permission_service.dart';
+import '../../../services/streetphare_foreground_task.dart';
 import '../../../services/version_check_service.dart';
 import '../../bug_report/presentation/bug_report_fab.dart';
 import '../../events/presentation/events_screen.dart';
@@ -979,23 +980,26 @@ class _BackgroundServiceSection extends StatefulWidget {
 class _BackgroundServiceSectionState extends State<_BackgroundServiceSection> {
   bool _serviceActive = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Reflète l'état réel du service (ex: service relancé au boot).
+    _syncServiceState();
+  }
+
+  Future<void> _syncServiceState() async {
+    final running = await StreetPhareForegroundTask.isRunning;
+    if (mounted && running != _serviceActive) {
+      setState(() => _serviceActive = running);
+    }
+  }
+
   Future<void> _toggleService() async {
     if (_serviceActive) {
       // Désactiver
       try {
+        await StreetPhareForegroundTask.stop();
         await NotificationService.instance.dismissPersistentNotification();
-        if (defaultTargetPlatform == TargetPlatform.android) {
-          try {
-            await const MethodChannel('com.streetphare.app/system')
-                .invokeMethod('stopBackgroundService');
-          } catch (_) {
-            // Le canal natif n'est pas encore implémenté → non bloquant.
-            if (kDebugMode) {
-              debugPrint(
-                  '[BackgroundService] stopBackgroundService non supporté (canal natif absent)');
-            }
-          }
-        }
         setState(() => _serviceActive = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1042,22 +1046,7 @@ class _BackgroundServiceSectionState extends State<_BackgroundServiceSection> {
   /// après validation de la permission par [PermissionService.guard]).
   Future<void> _activateBackgroundService() async {
     try {
-      await NotificationService.instance.showPersistentNotification();
-
-      // 2. Tente le service natif (non bloquant si absent).
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        try {
-          await const MethodChannel('com.streetphare.app/system')
-              .invokeMethod('startBackgroundService');
-        } catch (_) {
-          if (kDebugMode) {
-            debugPrint(
-                '[BackgroundService] startBackgroundService non supporté '
-                '(canal natif absent). La notification persistante seule '
-                'est active.');
-          }
-        }
-      }
+      await StreetPhareForegroundTask.start();
 
       if (!mounted) return;
       setState(() => _serviceActive = true);

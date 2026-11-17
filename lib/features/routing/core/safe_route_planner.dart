@@ -61,6 +61,14 @@ class SafeRoutePlanner {
 
     var routes = List<RouteResult>.from(result.routes);
 
+    // Attache une durée réaliste selon le profil : seuls les moteurs TC (OTP)
+    // fournissent une durée réelle ; sinon on estime à partir d'une vitesse
+    // moyenne par mode (voiture ≈ 40 km/h, piéton ≈ 4.5 km/h, …). Sans cela,
+    // un trajet voiture affichait un temps calculé comme à pied.
+    routes = routes
+        .map((r) => _withEstimatedDuration(r, profile))
+        .toList();
+
     // Trie + déduplique, puis tronque à [maxRoutes].
     routes = _dedupeAndSort(routes);
     if (routes.length > maxRoutes) {
@@ -72,6 +80,30 @@ class SafeRoutePlanner {
       source: result.source,
       errorMessage: result.errorMessage,
     );
+  }
+
+  /// Retourne une copie de [r] avec une durée estimée selon [profile],
+  /// sauf si le moteur a déjà fourni une durée réelle (ex: OTP/OSRM).
+  RouteResult _withEstimatedDuration(RouteResult r, RoutingProfile profile) {
+    if (r.duration != null) return r;
+    final seconds =
+        (r.totalDistanceMeters / _averageSpeedMps(profile)).round();
+    return r.copyWith(duration: Duration(seconds: seconds));
+  }
+
+  /// Vitesse moyenne (m/s) utilisée pour l'estimation de la durée de trajet.
+  double _averageSpeedMps(RoutingProfile profile) {
+    switch (profile) {
+      case RoutingProfile.bicycle:
+        return 4.17; // ~15 km/h
+      case RoutingProfile.vehicle:
+        return 11.11; // ~40 km/h urbain
+      case RoutingProfile.emergency:
+        return 13.89; // ~50 km/h
+      case RoutingProfile.transit:
+      case RoutingProfile.pedestrian:
+        return 1.25; // ~4.5 km/h
+    }
   }
 
   /// Détecte les segments de [points] qui franchissent une zone bloquée

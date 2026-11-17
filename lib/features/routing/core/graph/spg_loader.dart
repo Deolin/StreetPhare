@@ -134,16 +134,125 @@ class SpgLoader {
     // 5) Parse les données CH (si présentes)
     // Pour le MVP, on ignore les CH (chOffset == 0 signifie pas de CH)
 
+    // 3b) Expansion « sens interdits » pour le piéton/vélo (contre-sens).
+    //
+    // Le graphe .spg est ORIENTÉ : une arête marquée `oneway` (A→B) n'existe
+    // que dans le sens légal. Pour permettre au piéton/vélo de franchir les
+    // sens uniques à contre-sens, on ajoute une arête inverse (B→A) portant le
+    // flag `oneway` (= contre-sens : interdite aux véhicules, autorisée aux
+    // modes doux), et on retire ce flag de l'arête aller (sens légal, ouverte
+    // à tous).
+    //
+    // Protection « anti-duplication » : si l'arête inverse (B→A) existe DÉJÀ
+    // (convention bidirectionnelle), on considère que `oneway` marque déjà le
+    // contre-sens et on ne touche à rien — on évite de dupliquer l'arête ou
+    // d'autoriser les véhicules à contre-sens.
+    bool hasEdge(int from, int to) {
+      for (int e = edgeStarts[from];
+          e < edgeStarts[from] + edgeCounts[from];
+          e++) {
+        if (edgeTo[e] == to) return true;
+      }
+      return false;
+    }
+
+    var outEdgeStarts = edgeStarts;
+    var outEdgeCounts = edgeCounts;
+    var outEdgeTo = edgeTo;
+    var outEdgeWeights = edgeWeights;
+    var outEdgeSpeeds = edgeSpeeds;
+    var outEdgeFlags = edgeFlags;
+
+    final n = header.nodeCount;
+    final expandEdge = Uint8List(totalEdges); // 1 = arête à dédoubler
+    int onewayCount = 0;
+    for (int s = 0; s < n; s++) {
+      for (int e = edgeStarts[s]; e < edgeStarts[s] + edgeCounts[s]; e++) {
+        if (!EdgeFlags.has(edgeFlags[e], EdgeFlags.oneway)) continue;
+        if (hasEdge(edgeTo[e], s)) continue; // arête inverse déjà présente
+        expandEdge[e] = 1;
+        onewayCount++;
+      }
+    }
+
+    if (onewayCount > 0) {
+      // Pour chaque nœud destination, collecte les arêtes oneway à dédoubler
+      // (source, index arête d'origine).
+      final incomingOneway =
+          List<List<(int, int)>>.generate(n, (_) => <(int, int)>[]);
+      for (int s = 0; s < n; s++) {
+        for (int e = edgeStarts[s]; e < edgeStarts[s] + edgeCounts[s]; e++) {
+          if (expandEdge[e] == 1) {
+            incomingOneway[edgeTo[e]].add((s, e));
+          }
+        }
+      }
+
+      // Nouveaux comptes d'arêtes sortantes par nœud.
+      final newEdgeCounts = Uint8List(n);
+      for (int s = 0; s < n; s++) {
+        newEdgeCounts[s] =
+            (edgeCounts[s] + incomingOneway[s].length).clamp(0, 255);
+      }
+
+      // Nouveaux offsets (somme préfixe).
+      final newEdgeStarts = Uint32List(n);
+      int cursor = 0;
+      for (int s = 0; s < n; s++) {
+        newEdgeStarts[s] = cursor;
+        cursor += newEdgeCounts[s];
+      }
+
+      final newTotal = cursor;
+      final newEdgeTo = Uint32List(newTotal);
+      final newEdgeWeights = Uint16List(newTotal);
+      final newEdgeSpeeds = Uint8List(newTotal);
+      final newEdgeFlags = Uint8List(newTotal);
+      final fillPos = Uint32List.fromList(newEdgeStarts);
+
+      // Arêtes aller : copie ; on retire le flag oneway des arêtes dédoublées
+      // (sens légal), on le conserve sur les autres (contre-sens déjà présent).
+      for (int s = 0; s < n; s++) {
+        for (int e = edgeStarts[s]; e < edgeStarts[s] + edgeCounts[s]; e++) {
+          final pos = fillPos[s]++;
+          newEdgeTo[pos] = edgeTo[e];
+          newEdgeWeights[pos] = edgeWeights[e];
+          newEdgeSpeeds[pos] = edgeSpeeds[e];
+          newEdgeFlags[pos] = (expandEdge[e] == 1)
+              ? (edgeFlags[e] & ~EdgeFlags.oneway)
+              : edgeFlags[e];
+        }
+      }
+
+      // Arêtes inverses (contre-sens) : flag oneway (modes doux uniquement).
+      for (int s = 0; s < n; s++) {
+        for (final (src, edgeIdx) in incomingOneway[s]) {
+          final pos = fillPos[s]++;
+          newEdgeTo[pos] = src;
+          newEdgeWeights[pos] = edgeWeights[edgeIdx];
+          newEdgeSpeeds[pos] = edgeSpeeds[edgeIdx];
+          newEdgeFlags[pos] = EdgeFlags.oneway;
+        }
+      }
+
+      outEdgeStarts = newEdgeStarts;
+      outEdgeCounts = newEdgeCounts;
+      outEdgeTo = newEdgeTo;
+      outEdgeWeights = newEdgeWeights;
+      outEdgeSpeeds = newEdgeSpeeds;
+      outEdgeFlags = newEdgeFlags;
+    }
+
     return SpgGraph(
       header: header,
       nodeLats: nodeLats,
       nodeLons: nodeLons,
-      edgeStarts: edgeStarts,
-      edgeCounts: edgeCounts,
-      edgeTo: edgeTo,
-      edgeWeights: edgeWeights,
-      edgeSpeeds: edgeSpeeds,
-      edgeFlags: edgeFlags,
+      edgeStarts: outEdgeStarts,
+      edgeCounts: outEdgeCounts,
+      edgeTo: outEdgeTo,
+      edgeWeights: outEdgeWeights,
+      edgeSpeeds: outEdgeSpeeds,
+      edgeFlags: outEdgeFlags,
       spatialCells: spatialCells,
       spatialNodeIds: spatialNodeIds,
       cellSizeDeg: cellSizeDeg,

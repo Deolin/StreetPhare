@@ -395,7 +395,8 @@ class OsmAndRoutingService {
       // (poids quasi-infini) deviennent infranchissables côté serveur, les
       // autres dangers (poids ~1e6) sont fortement évités mais franchissables.
       params['avoid'] = avoidPoints
-          .map((p) => '${p.lat},${p.lon},${p.radiusMeters.round()},${p.weight.round()}')
+          .map((p) =>
+              '${p.lat},${p.lon},${p.radiusMeters.round()},${p.weight.round()}')
           .join('|');
     }
     final uri = Uri.parse('${NetworkConfig.apiUrl}/route').replace(
@@ -432,7 +433,7 @@ class OsmAndRoutingService {
     final routes = json['routes'] as List<dynamic>? ?? [];
     if (routes.isEmpty) return [];
 
-    final isVehicle = profile == RoutingProfile.vehicle;
+    final isVehicle = profile == RoutingProfile.vehicle || profile == RoutingProfile.emergency;
     final results = <RouteResult>[];
     for (int i = 0; i < routes.length; i++) {
       final r = routes[i] as Map<String, dynamic>;
@@ -469,26 +470,20 @@ class OsmAndRoutingService {
 
   /// Appel HTTP vers OSRM public.
   ///
-  /// IMPORTANT : router.project-osrm.org ne supporte QUE le profil
-  /// 'driving'. L'instance routing.openstreetmap.de/routed-foot/ supporte
-  /// le profil 'foot' (piéton). On choisit le serveur selon le profil.
-  ///
-  /// Endpoint voiture : GET https://router.project-osrm.org/route/v1/driving/...
-  /// Endpoint piéton  : GET https://routing.openstreetmap.de/routed-foot/route/v1/foot/...
+  /// Endpoint OSRM public : GET https://router.project-osrm.org/route/v1/{profile}/...
+  /// Le démo public Project OSRM expose un graphe européen pour les profils
+  /// 'driving' **et** 'foot'. L'ancienne instance
+  /// `routing.openstreetmap.de/routed-foot` est fermée depuis 2020.
   Future<List<RouteResult>> _computeViaOsrmPublic({
     required LatLng start,
     required LatLng end,
     RoutingProfile profile = RoutingProfile.pedestrian,
   }) async {
-    final isVehicle = profile == RoutingProfile.vehicle;
+    final isVehicle = profile == RoutingProfile.vehicle || profile == RoutingProfile.emergency;
     final osrmProfile = isVehicle ? 'driving' : 'foot';
 
-    // Base URL différente selon le profil :
-    // - router.project-osrm.org → driving uniquement
-    // - routing.openstreetmap.de/routed-foot → foot uniquement
-    final baseUrl = isVehicle
-        ? 'https://router.project-osrm.org/route/v1'
-        : 'https://routing.openstreetmap.de/routed-foot/route/v1';
+    // router.project-osrm.org sert les deux profils (driving + foot).
+    const baseUrl = 'https://router.project-osrm.org/route/v1';
 
     final uri = Uri.parse(
       '$baseUrl/$osrmProfile/'
@@ -565,7 +560,7 @@ class OsmAndRoutingService {
             totalRiskScore: 0,
             pois: const [],
             label: i == 0
-                ? '🌍 Itinéraire ${profile == RoutingProfile.vehicle ? 'voiture' : 'piéton'} OSM (OSRM)'
+                ? '🌍 Itinéraire ${profile == RoutingProfile.vehicle || profile == RoutingProfile.emergency ? 'voiture' : 'piéton'} OSM (OSRM)'
                 : '🛤 Alternative OSRM $i',
           ));
         } catch (e) {

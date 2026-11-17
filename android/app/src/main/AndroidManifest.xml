@@ -119,6 +119,15 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
+        <!-- Service avant-plan StreetPhare (flutter_foreground_task) :
+             maintient le processus/mesh vivant en arrière-plan pour que les
+             notifications d'alerte continuent d'arriver une fois l'app fermée. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <!-- Flutter Engine — Flutter 3.27+ gère automatiquement AOT,
              assets dir, et Impeller en interne. Aucune métadonnée
              explicite nécessaire. Les anciennes clés FlutterLoader

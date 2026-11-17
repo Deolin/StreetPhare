@@ -283,12 +283,46 @@ router.delete('/streetmedics/:userId', authenticateToken, requirePermission('man
   const ok = store.removeStreetMedic(req.params.userId);
   if (!ok) return res.status(404).json({ error: 'Street-medic non trouvé' });
   broadcast('streetmedics_changed', {});
+  broadcast('medic_mission_update', {});
   res.json({ success: true });
 });
 
 /// GET /api/admin/streetmedic-missions — Missions d'intervention actives (blessés).
 router.get('/streetmedic-missions', authenticateToken, requirePermission('manageStreetmedic'), (req, res) => {
   res.json({ missions: store.getActiveMedicMissions() });
+});
+
+/// DELETE /api/admin/streetmedic-missions/:id — Supprime une mission
+/// d'intervention (elle disparaît de la carte ET du suivi d'administration).
+router.delete('/streetmedic-missions/:id', authenticateToken, requirePermission('manageStreetmedic'), (req, res) => {
+  const ok = store.removeMedicMission(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Mission non trouvée' });
+  broadcast('medic_mission_update', {});
+  res.json({ success: true });
+});
+
+/// GET /api/admin/streetmedic-emergencies — Alertes « 112 » (victimes non
+/// soignables sur place signalées par un street-medic).
+router.get('/streetmedic-emergencies', authenticateToken, requirePermission('manageStreetmedic'), (req, res) => {
+  res.json({ emergencies: store.getEmergencyMedicMissions() });
+});
+
+/// POST /api/admin/streetmedic-emergencies/:id/acknowledge — Acquitte une alerte.
+router.post('/streetmedic-emergencies/:id/acknowledge', authenticateToken, requirePermission('manageStreetmedic'), (req, res) => {
+  const m = store.acknowledgeMedicEmergency(req.params.id);
+  if (!m) return res.status(404).json({ error: 'Alerte non trouvée' });
+  broadcast('medic_emergency_acknowledged', { missionId: m.id });
+  res.json({ success: true, mission: m });
+});
+
+/// DELETE /api/admin/streetmedic-emergencies/:id — Supprime définitivement
+/// l'alerte « 112 » (acquittée ou non) : elle disparaît de la carte ET de la
+/// liste d'administration.
+router.delete('/streetmedic-emergencies/:id', authenticateToken, requirePermission('manageStreetmedic'), (req, res) => {
+  const ok = store.removeMedicMission(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Alerte non trouvée' });
+  broadcast('medic_emergency_removed', { missionId: req.params.id });
+  res.json({ success: true });
 });
 
 module.exports = router;

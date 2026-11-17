@@ -80,6 +80,10 @@ dependencies:
   url_launcher: ^6.3.2
   cryptography: ^2.9.0
   flutter_reactive_ble: ^5.5.0
+  flutter_compass: ^0.8.0
+  flutter_foreground_task: ^10.0.0
+  sensors_plus: ^7.1.1
+  wakelock_plus: ^1.8.0
   package_info_plus: ^10.0.0
   share_plus: ^13.1.0
   flutter_local_notifications: ^23.0.0
@@ -129,3 +133,14 @@ flutter_launcher_icons:
     generate: true
     image_path: "assets/mars/launcher_icon.png"
     icon_size: 256
+
+# ════════════════════════════════════════════════════════════════════════════
+# Épinglage de compatibilité
+# ──────────────────────────────────────────────────────────────────────────────
+# shared_preferences_android 2.5.x migre vers « Pigeon JNI » (paquet jni +
+# jnigen) dont l'API générée est incompatible avec notre build Android
+# (AGP 9, KGP 2.4.0, R8) → NoSuchMethodError au démarrage :
+#   SharedPreferencesApiRegistrar.getInstance(String)
+# On force donc la dernière version utilisant le Pigeon classique (2.4.27).
+dependency_overrides:
+  shared_preferences_android: 2.4.27

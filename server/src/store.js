@@ -817,6 +817,12 @@ class Store {
     const idx = this.streetmedics.findIndex(s => s.userId === userId);
     if (idx === -1) return false;
     this.streetmedics.splice(idx, 1);
+    // Nettoie les missions actives (en attente / en cours) assignées à ce
+    // medic : elles ne doivent pas rester « bloquées » sur la carte après la
+    // suppression du street-medic.
+    this.medicMissions = this.medicMissions.filter(m =>
+      !(m && m.medicId === userId && (m.status === 'pending' || m.status === 'accepted'))
+    );
     this._scheduleSave();
     return true;
   }
@@ -832,6 +838,70 @@ class Store {
   getStreetMedicByUser(userId) { return this.streetmedics.find(s => s.userId === userId) || null; }
 
   getAllStreetMedics() { return this.streetmedics; }
+
+  /// Crée un street-medic directement (utilisé par le mode simulation).
+  /// Les faux medics sont marqués `simulated: true` pour être purgés en un clic.
+  createStreetMedic({ userId, status = 'active', lat, lng, sharing = true, simulated = true } = {}) {
+    const nowIso = new Date().toISOString();
+    const sm = {
+      id: require('uuid').v4(),
+      userId: userId || ('sim_medic_' + require('uuid').v4().slice(0, 8)),
+      status,
+      eventId: null,
+      lat: lat != null ? Number(lat) : null,
+      lng: lng != null ? Number(lng) : null,
+      sharing: !!sharing,
+      authorizedBy: simulated ? 'simulation' : null,
+      requestedAt: nowIso,
+      authorizedAt: nowIso,
+      updatedAt: nowIso,
+      simulated: !!simulated,
+    };
+    this.streetmedics.push(sm);
+    this._scheduleSave();
+    return sm;
+  }
+
+  /// Modifie l'état d'un street-medic (statut / partage / position).
+  setStreetMedicState(userId, { status, sharing, lat, lng } = {}) {
+    const sm = this.streetmedics.find(s => s.userId === userId);
+    if (!sm) return null;
+    if (typeof sharing === 'boolean') {
+      sm.sharing = sharing;
+      sm.status = sharing ? 'active' : 'authorized';
+    } else if (status) {
+      sm.status = status;
+      if (status === 'authorized') sm.sharing = false;
+      if (status === 'active') sm.sharing = true;
+    }
+    if (lat != null) sm.lat = Number(lat);
+    if (lng != null) sm.lng = Number(lng);
+    sm.updatedAt = new Date().toISOString();
+    this._scheduleSave();
+    return sm;
+  }
+
+  /// Assigne directement une mission à un medic donné (simulation).
+  assignMissionToMedic({ medicUserId, callerUserId, lat, lng, note } = {}) {
+    if (!medicUserId) return null;
+    const mission = {
+      id: require('uuid').v4(),
+      callerUserId: callerUserId || ('sim_caller_' + require('uuid').v4().slice(0, 8)),
+      medicId: medicUserId,
+      status: 'pending',
+      injuredLat: Number(lat),
+      injuredLng: Number(lng),
+      note: note || '',
+      refusedBy: [],
+      acceptedAt: null,
+      completedAt: null,
+      createdAt: new Date().toISOString(),
+      simulated: true,
+    };
+    this.medicMissions.push(mission);
+    this._scheduleSave();
+    return mission;
+  }
 
   createMedicMission({ callerUserId, lat, lng, note } = {}) {
     if (!callerUserId) return null;
@@ -856,6 +926,15 @@ class Store {
   }
 
   getMissionById(id) { return this.medicMissions.find(m => m.id === id) || null; }
+
+  /// Supprime définitivement une mission (y compris une urgence « 112 »).
+  removeMedicMission(id) {
+    const idx = this.medicMissions.findIndex(m => m.id === id);
+    if (idx === -1) return false;
+    this.medicMissions.splice(idx, 1);
+    this._scheduleSave();
+    return true;
+  }
 
   getAllMissionsForUser(userId) { return this.medicMissions.filter(m => m.callerUserId === userId || m.medicId === userId); }
 
@@ -902,6 +981,17 @@ class Store {
     return m;
   }
 
+  /// Le blessé annule son appel au street-medic (évite les faux signalements).
+  cancelMedicMissionByCaller(id, callerUserId) {
+    const m = this.getMissionById(id);
+    if (!m || m.callerUserId !== callerUserId) return null;
+    m.status = 'cancelled';
+    m.cancelledAt = new Date().toISOString();
+    m.completedAt = new Date().toISOString();
+    this._scheduleSave();
+    return m;
+  }
+
   trackMedicMissionInjured(id, userId, lat, lng) {
     const m = this.getMissionById(id);
     if (!m || m.callerUserId !== userId) return null;
@@ -912,11 +1002,31 @@ class Store {
     return m;
   }
 
-  completeMedicMission(id, medicUserId) {
+  completeMedicMission(id, medicUserId, outcome = 'treated') {
     const m = this.getMissionById(id);
     if (!m || m.medicId !== medicUserId) return null;
     m.status = 'completed';
+    m.outcome = outcome; // 'treated' | 'emergency'
     m.completedAt = new Date().toISOString();
+    if (outcome === 'emergency') {
+      m.emergencyAt = new Date().toISOString();
+      m.emergencyAcknowledged = false;
+    }
+    this._scheduleSave();
+    return m;
+  }
+
+  /// Missions clôturées en urgence vitale (victime non soignable → 112).
+  getEmergencyMedicMissions() {
+    return this.medicMissions.filter((m) => m && m.outcome === 'emergency');
+  }
+
+  /// Acquitte une alerte « 112 » côté administration.
+  acknowledgeMedicEmergency(id) {
+    const m = this.getMissionById(id);
+    if (!m || m.outcome !== 'emergency') return null;
+    m.emergencyAcknowledged = true;
+    m.emergencyAcknowledgedAt = new Date().toISOString();
     this._scheduleSave();
     return m;
   }
@@ -1055,12 +1165,16 @@ class Store {
       zones: this.geofencingZones.filter(z => z.simulated).length,
       messages: this.meshMessages.filter(m => m.simulated).length,
       panics: this.panicPings.filter(p => p.simulated).length,
+      streetmedics: this.streetmedics.filter(s => s && s.simulated).length,
+      medicMissions: this.medicMissions.filter(m => m && m.simulated).length,
     };
     this.alerts = this.alerts.filter(a => !a.simulated);
     this.events = this.events.filter(e => !e.simulated);
     this.geofencingZones = this.geofencingZones.filter(z => !z.simulated);
     this.meshMessages = this.meshMessages.filter(m => !m.simulated);
     this.panicPings = this.panicPings.filter(p => !p.simulated);
+    this.streetmedics = this.streetmedics.filter(s => !s.simulated);
+    this.medicMissions = this.medicMissions.filter(m => !m.simulated);
     this._scheduleSave();
     return removed;
   }

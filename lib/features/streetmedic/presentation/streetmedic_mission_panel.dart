@@ -88,7 +88,9 @@ class StreetMedicMissionPanel extends StatelessWidget {
   Widget _activeBody(
       BuildContext context, StreetMedicService service, MedicMission m) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      // `stretch` + bouton sans `width: double.infinity` : évite le crash
+      // « BoxConstraints forces an infinite width » (ConstrainedBox → Semantics).
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         const Row(
@@ -117,22 +119,27 @@ class StreetMedicMissionPanel extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Nouvelles sollicitations refusées automatiquement.',
+          'Clôturer l\'intervention :',
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.55),
             fontSize: 11,
           ),
         ),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () => _complete(context, service, m.id),
-            icon: const Icon(Icons.check_circle_outline, size: 18),
-            label: const Text('Terminer (je suis à nouveau disponible)'),
-            style:
-                ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32)),
-          ),
+        const SizedBox(height: 8),
+        ElevatedButton.icon(
+          onPressed: () => _complete(context, service, m.id, 'treated'),
+          icon: const Icon(Icons.check_circle_outline, size: 18),
+          label: const Text('Victime soignée sur place'),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E7D32)),
+        ),
+        const SizedBox(height: 8),
+        ElevatedButton.icon(
+          onPressed: () => _emergency(context, service, m),
+          icon: const Icon(Icons.emergency, size: 18),
+          label: const Text('Non soignable — Appeler le 112'),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFD32F2F)),
         ),
       ],
     );
@@ -145,7 +152,8 @@ class StreetMedicMissionPanel extends StatelessWidget {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        const SnackBar(content: Text('Mission acceptée — suivi du blessé activé.')),
+        const SnackBar(
+            content: Text('Mission acceptée — suivi du blessé activé.')),
       );
   }
 
@@ -155,14 +163,59 @@ class StreetMedicMissionPanel extends StatelessWidget {
   }
 
   Future<void> _complete(
-      BuildContext context, StreetMedicService service, String id) async {
-    await service.completeMission(id);
+      BuildContext context, StreetMedicService service, String id,
+      [String outcome = 'treated']) async {
+    await service.completeMission(id, outcome: outcome);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
-            content: Text('Intervention terminée. Vous êtes à nouveau disponible.')),
+            content:
+                Text('Intervention terminée. Vous êtes à nouveau disponible.')),
+      );
+  }
+
+  /// Victime non soignable sur place : demande de confirmation, clôture la
+  /// mission en « urgence » (alerte transmise à l'administration) puis
+  /// déclenche l'appel de détresse 112.
+  Future<void> _emergency(
+      BuildContext context, StreetMedicService service, MedicMission m) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Appeler le 112 ?'),
+        content: const Text(
+            'La victime n\'est pas soignable sur place. Un appel de détresse '
+            'sera lancé et l\'alerte transmise à l\'administration.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Lancer le 112'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    // Clôture d'abord la mission (l'alerte admin part immédiatement), puis
+    // déclenche l'appel téléphonique.
+    await service.completeMission(m.id, outcome: 'emergency');
+    final launched = await service.launchEmergencyCall();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            launched
+                ? 'Alerte transmise à l\'administration. Appel du 112 lancé.'
+                : 'Alerte transmise. Composez le 112 manuellement.',
+          ),
+        ),
       );
   }
 }

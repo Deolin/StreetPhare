@@ -82,6 +82,19 @@ class MainActivity : FlutterActivity() {
             UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
         private const val TAG = "StreetPhareBLE"
+
+        // Gère globalement les erreurs RxJava (flutter_reactive_ble / RxAndroidBle)
+        // afin qu'une déconnexion BLE « non livrable » (UndeliverableException
+        // sur RxBleThread) ne provoque plus de FATAL EXCEPTION qui crashe l'app.
+        init {
+            io.reactivex.plugins.RxJavaPlugins.setErrorHandler { throwable ->
+                if (throwable is io.reactivex.exceptions.UndeliverableException) {
+                    // Déconnexion BLE attendue — ignorée silencieusement.
+                } else {
+                    Log.w(TAG, "Erreur RxJava non livrée", throwable)
+                }
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════

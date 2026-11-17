@@ -234,22 +234,6 @@ class SpgGraph {
           : double.infinity,
     );
   }
-
-  // ── Utilitaires (profils) ──────────────────────────────────────────────
-
-  /// Calcule le poids d'une arête selon un profil.
-  double edgeWeightForProfile(
-      int edgeIdx, double walkSpeedMs, double penaltyFactorDiagonal) {
-    final weight = edgeWeights[edgeIdx] / 1000.0; // mètres
-    final speed = edgeSpeeds[edgeIdx] * 2; // km/h
-
-    // Si la vitesse de marche est définie, on utilise le temps comme poids.
-    if (walkSpeedMs > 0 && speed < 30) {
-      return weight / walkSpeedMs; // temps en secondes
-    }
-
-    return weight * penaltyFactorDiagonal;
-  }
 }
 
 // ── Classe utilitaire interne ─────────────────────────────────────────────

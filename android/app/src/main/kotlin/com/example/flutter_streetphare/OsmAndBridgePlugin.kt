@@ -308,11 +308,11 @@ class OsmAndBridgePlugin(
             }
 
             // ── Dossier de cache du graphe ───────────────────────────
-            // v3 : profils en weighting "custom" (CustomProfile) pour
-            // activer l'évitement dynamique des zones de danger via
-            // custom_model. Le passage fastest -> custom invalide le
-            // cache v2 (simple foot/car fastest).
-            val graphDir = File(context.filesDir, "graphhopper_cache_v3")
+            // v4 : force la ré-importation de l'OSM pour garantir que les
+            // profils foot/car sont bien reconstruits (chemins piétons + sens
+            // uniques pris en compte pour le piéton, respectés pour la voiture).
+            // Le cache v3 pouvait conserver un graphe piéton/voiture identique.
+            val graphDir = File(context.filesDir, "graphhopper_cache_v4")
 
             // ── Configurer et initialiser GraphHopper ────────────────
             val gh = GraphHopper()

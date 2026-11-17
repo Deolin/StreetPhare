@@ -99,9 +99,12 @@ class MedicMission {
     required this.injuredLongitude,
     this.note = '',
     this.refusedBy = const [],
+    this.outcome,
     this.acceptedAt,
     this.completedAt,
     this.createdAt,
+    this.emergencyAt,
+    this.emergencyAcknowledged = false,
   });
 
   factory MedicMission.fromJson(Map<String, dynamic> json) => MedicMission(
@@ -116,9 +119,12 @@ class MedicMission {
                 ?.map((e) => e.toString())
                 .toList() ??
             const [],
+        outcome: json['outcome'] as String?,
         acceptedAt: json['acceptedAt'] as String?,
         completedAt: json['completedAt'] as String?,
         createdAt: json['createdAt'] as String?,
+        emergencyAt: json['emergencyAt'] as String?,
+        emergencyAcknowledged: (json['emergencyAcknowledged'] as bool?) ?? false,
       );
 
   final String id;
@@ -129,10 +135,19 @@ class MedicMission {
   final double injuredLongitude;
   final String note;
   final List<String> refusedBy;
+
+  /// Issue de l'intervention : `treated` (victime soignée sur place) ou
+  /// `emergency` (victime non soignable → appel de détresse 112 requis).
+  final String? outcome;
   final String? acceptedAt;
   final String? completedAt;
   final String? createdAt;
+  final String? emergencyAt;
+  final bool emergencyAcknowledged;
 
   bool get isActive => status == MedicMissionStatus.accepted;
   bool get isPending => status == MedicMissionStatus.pending;
+
+  /// `true` si le street-medic a signalé une urgence vitale (112).
+  bool get isEmergency => outcome == 'emergency';
 }

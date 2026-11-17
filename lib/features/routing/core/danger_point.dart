@@ -62,6 +62,5 @@ class DangerPoint {
   bool get isBlocking => weight >= kBlockingDangerWeight;
 
   @override
-  String toString() =>
-      'DangerPoint($lat, $lon, r=${radiusMeters}m, w=$weight)';
+  String toString() => 'DangerPoint($lat, $lon, r=${radiusMeters}m, w=$weight)';
 }

@@ -75,9 +75,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
     ];
     final entries = _selectedCategory == null
         ? allEntries
-        : allEntries
-            .where((e) => e.category == _selectedCategory)
-            .toList();
+        : allEntries.where((e) => e.category == _selectedCategory).toList();
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,

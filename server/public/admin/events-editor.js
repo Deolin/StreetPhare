@@ -91,16 +91,25 @@ async function evApi(method, path, body) {
   if (res.status === 401 || res.status === 403) {
     throw new Error(data.error || 'Session admin expirée ou permissions insuffisantes');
   }
-  if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
+  if (!res.ok) {
+    console.error(`[events-editor] ${method} ${path} → HTTP ${res.status}:`, data);
+    throw new Error(data.error || `Erreur ${res.status}`);
+  }
   return data;
 }
 
 /// Met a jour le message de statut de l editeur.
 function evStatus(message, isError = false) {
   const el = document.getElementById('ev-status');
-  if (!el) return;
-  el.textContent = message;
-  el.style.color = isError ? '#f85149' : '#8b949e';
+  if (el) {
+    el.textContent = message;
+    el.style.color = isError ? '#f85149' : '#8b949e';
+  }
+  // Rend les erreurs bien visibles (toast) pour diagnostiquer facilement.
+  if (isError) {
+    console.error('[events-editor] ' + message);
+    if (typeof notify === 'function') notify('⚠ ' + message);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +257,7 @@ function countRouteVertices(routeGeoJson) {
 // ---------------------------------------------------------------------------
 
 /// Cree un nouvel evenement a partir du formulaire.
-async function createEvent() {
+async function createAdminEvent() {
   const code = document.getElementById('ev-code').value.trim().toUpperCase();
   const title = document.getElementById('ev-title').value.trim();
   const startLocal = document.getElementById('ev-start').value;
@@ -259,7 +268,11 @@ async function createEvent() {
     selectedEventCode = data.event.code;
     document.getElementById('ev-code').value = '';
     document.getElementById('ev-title').value = '';
+    document.getElementById('ev-start').value = '';
     await loadEvents();
+    renderEventDetails();
+    renderPointList();
+    drawSelectedEvent();
     evStatus(`Evenement ${data.event.code} cree`);
   } catch (e) {
     evStatus(e.message, true);

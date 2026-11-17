@@ -48,8 +48,13 @@ class StreetMedicOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // `right` est nécessaire pour borner la largeur du panneau de mission :
+    // sans lui, le `Positioned` laisse une largeur non bornée et le
+    // `CrossAxisAlignment.stretch` de `StreetMedicMissionPanel` provoque un
+    // crash de layout (« RenderBox was not laid out »).
     return Positioned(
       left: 12,
+      right: 12,
       bottom: 32,
       child: ValueListenableBuilder<StreetMedic?>(
         valueListenable: StreetMedicService.instance,
@@ -72,44 +77,63 @@ class StreetMedicOverlay extends StatelessWidget {
   }
 
   Widget _callButton(BuildContext context, StreetMedicService service) {
-    return Material(
-      color: const Color(0xFFD32F2F),
-      borderRadius: BorderRadius.circular(24),
-      elevation: 4,
-      child: InkWell(
-        onTap: () => _callMedic(context, service),
-        borderRadius: BorderRadius.circular(24),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.local_hospital, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Text(
-                'Appeler un street-medic',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+    return ValueListenableBuilder<MedicMission?>(
+      valueListenable: service.myCallNotifier,
+      builder: (context, call, _) {
+        final active = service.hasActiveCall;
+        return Material(
+          color: active ? const Color(0xFF546E7A) : const Color(0xFFD32F2F),
+          borderRadius: BorderRadius.circular(24),
+          elevation: 4,
+          child: InkWell(
+            onTap: () => active
+                ? _cancelCall(context, service)
+                : _callMedic(context, service),
+            borderRadius: BorderRadius.circular(24),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    active ? Icons.close : Icons.local_hospital,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    active ? 'Annuler l\'appel' : 'Appeler un street-medic',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Future<void> _callMedic(BuildContext context, StreetMedicService service) async {
+  Future<void> _callMedic(
+      BuildContext context, StreetMedicService service) async {
     if (userPosition == null) {
       _snack(context, 'Position indisponible. Activez le GPS.');
       return;
     }
-    final ok = await _confirm(context,
-        title: 'Appeler un street-medic',
-        message:
-            'Votre position sera signalée au street-medic le plus proche.');
+    final ok = await _confirm(
+      context,
+      title: 'Appeler un street-medic',
+      message:
+          '⚠️ À n\'utiliser qu\'en cas de réel besoin de secours.\n\n'
+          'Un faux signalement mobilise un street-medic pour rien et peut '
+          'retarder une vraie intervention.\n\n'
+          'Votre position sera signalée au street-medic le plus proche.',
+    );
     if (ok != true || !context.mounted) return;
     final mission = await service.callNearestMedic(
       lat: userPosition!.latitude,
@@ -121,6 +145,27 @@ class StreetMedicOverlay extends StatelessWidget {
       mission == null
           ? 'Aucun street-medic disponible à proximité.'
           : 'Street-medic alerté. Gardez votre téléphone à portée.',
+    );
+  }
+
+  /// Annule l'appel en cours afin d'éviter de mobiliser un medic pour rien.
+  Future<void> _cancelCall(
+      BuildContext context, StreetMedicService service) async {
+    final ok = await _confirm(
+      context,
+      title: 'Annuler l\'appel au street-medic',
+      message:
+          'Le street-medic sera informé que vous n\'avez plus besoin d\'aide. '
+          'Annuler l\'appel évite de mobiliser un secouriste inutilement.',
+    );
+    if (ok != true || !context.mounted) return;
+    final success = await service.cancelMyCall();
+    if (!context.mounted) return;
+    _snack(
+      context,
+      success
+          ? 'Appel annulé.'
+          : 'Impossible d\'annuler l\'appel (hors-ligne ?).',
     );
   }
 
@@ -164,8 +209,13 @@ class StreetMedicSharingToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Positionné SOUS la barre supérieure (titre + compteur de pairs) dont la
+    // hauteur dépend de la SafeArea (encoche / barre de statut Android 15+).
+    // On décale donc le bouton de la hauteur de l'encoche + une marge fixe,
+    // au lieu d'un `top: 72` qui chevauchait le titre sur certains appareils.
+    final topInset = MediaQuery.of(context).padding.top;
     return Positioned(
-      top: 72,
+      top: topInset + 68,
       left: 12,
       child: ValueListenableBuilder<StreetMedic?>(
         valueListenable: StreetMedicService.instance,

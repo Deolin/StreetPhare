@@ -39,6 +39,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 
 // ============================================================================
 // Constantes de signature BLE StreetPhare
@@ -74,6 +75,13 @@ class PeerCounterService extends ValueNotifier<int> {
 
   /// Largeur de la fenêtre glissante (5 minutes).
   static const Duration windowSize = Duration(minutes: 5);
+
+  /// Diffère l'émission après le frame courant, pour éviter tout rebuild de
+  /// l'UI (badge « pairs à proximité » dans la barre de titre) pendant la
+  /// phase de layout → crash « RenderBox was not laid out / !_debugDoingThisLayout ».
+  void _defer(void Function() fn) {
+    SchedulerBinding.instance.addPostFrameCallback((_) => fn());
+  }
 
   /// Période du timer de purge (1 s).
   static const Duration tickInterval = Duration(seconds: 1);
@@ -215,7 +223,7 @@ class PeerCounterService extends ValueNotifier<int> {
     if (previous == null) {
       // Nouveau pair StreetPhare valide.
       final kept = _excludeLocal(_prune(now));
-      value = kept.length;
+      _defer(() => value = kept.length);
       // Notifie les abonnés (TransportFailoverService, UI, etc.)
       // qu'un nouveau pair StreetPhare vient d'être détecté.
       _peerObservedController.add(peerId);
@@ -249,14 +257,14 @@ class PeerCounterService extends ValueNotifier<int> {
       if (prev == null) added = true;
     }
     if (added) {
-      value = _prune(now).length;
+      _defer(() => value = _prune(now).length);
     }
   }
 
   /// Purge manuelle.
   void reset() {
     _lastSeen.clear();
-    value = 0;
+    _defer(() => value = 0);
   }
 
   /// Libère les ressources du service.
@@ -291,7 +299,7 @@ class PeerCounterService extends ValueNotifier<int> {
     // tick (1 s) déclenchait un flush/sync-push en boucle côté SyncService
     // (cf. _onPeersChanged → _pushAndPull).
     if (count != value) {
-      value = count;
+      _defer(() => value = count);
     }
   }
 
@@ -301,7 +309,7 @@ class PeerCounterService extends ValueNotifier<int> {
     final now = DateTime.now().toUtc();
     final kept = _prune(now);
     final filtered = _excludeLocal(kept);
-    value = filtered.length;
+    _defer(() => value = filtered.length);
   }
 
   /// Retire l'identifiant local de la liste s'il est présent.
@@ -317,6 +325,6 @@ class PeerCounterService extends ValueNotifier<int> {
     _ticker = null;
     _started = false;
     _lastSeen.clear();
-    value = 0;
+    _defer(() => value = 0);
   }
 }

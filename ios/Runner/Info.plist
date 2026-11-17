@@ -66,5 +66,14 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>StreetPhare utilise votre position pour vous alerter des dangers à proximité, même en arrière-plan.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>StreetPhare utilise votre position pour vous alerter des dangers à proximité.</string>
 </dict>
 </plist>
