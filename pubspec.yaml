@@ -94,7 +94,7 @@ dependencies:
   intl: ^0.20.2 # Ajouté pour l'internationalisation
   flutter_secure_storage: ^11.2.0
   qr_flutter: ^4.1.0
-  flutter_svg: ^2.0.10
+  flutter_svg: ^2.4.0
 
 dev_dependencies:
   flutter_test:
