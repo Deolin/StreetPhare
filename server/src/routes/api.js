@@ -367,9 +367,11 @@ router.post('/alerts/:id/reject', authenticateToken, requireRole(['admin', 'supe
       return res.status(403).json({ error: 'Ce signalement n\'appartient pas à vos événements gérés' });
     }
   }
-  alert.status = 'rejected';
-  alert.updatedAt = new Date().toISOString();
-  sync.enqueueAlert(alert);
+  if (!store.rejectAlert(req.params.id)) {
+    return res.status(404).json({ error: 'Alerte non trouvée' });
+  }
+  sync.enqueueTombstone(req.params.id, 'rejected'); // tombstone → Backup
+  sync.enqueueAlert(alert); // réplication état rejeté → Backup
   // Diffusion temps réel du rejet aux clients mobiles.
   broadcastToAll('report_rejected', { alert: { ...alert, votes: alert.votes || [] } });
   res.json({ success: true, message: 'Signalement révoqué' });
@@ -387,6 +389,7 @@ router.post('/alerts/:id/void', authenticateToken, requireScout, (req, res) => {
   if (!voided) return res.status(404).json({ error: 'Alerte non trouvée' });
 
   const updated = store.alerts.find(a => a.id === req.params.id);
+  sync.enqueueTombstone(req.params.id, 'voided'); // tombstone → Backup
   sync.enqueueAlert(updated);
   broadcastToAll('report_voided', { alert: { ...updated, votes: updated.votes || [] } });
   res.json({ success: true, message: 'Signalement annulé (faux signalement)', alert: updated });

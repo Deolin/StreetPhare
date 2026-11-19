@@ -32,6 +32,7 @@ const log = (category, message) => {
 const STORE_PATH = config.storePath || path.join(__dirname, '..', 'data', 'store.json');
 const STORE_TMP_PATH = STORE_PATH + '.tmp';
 const SAVE_DEBOUNCE_MS = 2000; // throttle d'écriture disque
+const MEDIC_MISSION_TIMEOUT_MS = 30 * 1000; // délai de réponse street-medic
 
 class Store {
   constructor() {
@@ -41,6 +42,7 @@ class Store {
     this.bugReports = [];
     this.streetmedics = [];          // Street-medics autorisés + position temps réel
     this.medicMissions = [];         // Missions d'intervention (appel → soin)
+    this.medicMissionTimers = new Map(); // Timers de réponse (30 s) par mission
     this.meshMessages = [];      // Backlog de messages mesh (store-and-forward)
     this.meshClients = new Set();
     this.adminClients = new Set();
@@ -893,6 +895,7 @@ class Store {
       injuredLng: Number(lng),
       note: note || '',
       refusedBy: [],
+      timedOutBy: [],
       acceptedAt: null,
       completedAt: null,
       createdAt: new Date().toISOString(),
@@ -916,12 +919,14 @@ class Store {
       injuredLng: Number(lng),
       note: note || '',
       refusedBy: [],
+      timedOutBy: [],
       acceptedAt: null,
       completedAt: null,
       createdAt: new Date().toISOString(),
     };
     this.medicMissions.push(mission);
     this._scheduleSave();
+    this._scheduleMissionTimeout(mission.id);
     return mission;
   }
 
@@ -932,6 +937,7 @@ class Store {
     const idx = this.medicMissions.findIndex(m => m.id === id);
     if (idx === -1) return false;
     this.medicMissions.splice(idx, 1);
+    this._clearMissionTimeout(id);
     this._scheduleSave();
     return true;
   }
@@ -949,6 +955,7 @@ class Store {
   acceptMedicMission(id, medicUserId, lat, lng) {
     const m = this.getMissionById(id);
     if (!m || m.medicId !== medicUserId || m.status !== 'pending') return null;
+    this._clearMissionTimeout(id);
     for (const other of this.medicMissions) {
       if (other.id !== id && other.medicId === medicUserId &&
           (other.status === 'pending' || other.status === 'accepted')) {
@@ -967,15 +974,19 @@ class Store {
   refuseMedicMission(id, medicUserId) {
     const m = this.getMissionById(id);
     if (!m || m.medicId !== medicUserId || m.status !== 'pending') return null;
+    this._clearMissionTimeout(id);
     const refused = new Set(m.refusedBy || []);
     refused.add(medicUserId);
     m.refusedBy = [...refused];
-    const next = this.findNearestStreetMedic(m.injuredLat, m.injuredLng, m.refusedBy);
+    const exclude = [...(m.refusedBy || []), ...(m.timedOutBy || [])];
+    const next = this.findNearestStreetMedic(m.injuredLat, m.injuredLng, exclude);
     if (!next || next.userId === medicUserId) {
       m.status = 'cancelled';
       m.completedAt = new Date().toISOString();
     } else {
       m.medicId = next.userId;
+      m.acceptedAt = null;
+      this._scheduleMissionTimeout(m.id);
     }
     this._scheduleSave();
     return m;
@@ -985,6 +996,7 @@ class Store {
   cancelMedicMissionByCaller(id, callerUserId) {
     const m = this.getMissionById(id);
     if (!m || m.callerUserId !== callerUserId) return null;
+    this._clearMissionTimeout(id);
     m.status = 'cancelled';
     m.cancelledAt = new Date().toISOString();
     m.completedAt = new Date().toISOString();
@@ -1005,6 +1017,7 @@ class Store {
   completeMedicMission(id, medicUserId, outcome = 'treated') {
     const m = this.getMissionById(id);
     if (!m || m.medicId !== medicUserId) return null;
+    this._clearMissionTimeout(id);
     m.status = 'completed';
     m.outcome = outcome; // 'treated' | 'emergency'
     m.completedAt = new Date().toISOString();
@@ -1045,6 +1058,54 @@ class Store {
       if (d < bestD) { bestD = d; best = sm; }
     }
     return best ? { ...best, distanceMeters: Math.round(bestD) } : null;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // Missions — Timeout de réponse (30 s) : réaffectation automatique
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /// Planifie le timeout de réponse d'une mission. Si le street-medic n'a ni
+  /// accepté ni refusé à l'échéance, il est considéré « occupé » (ajouté à
+  /// `timedOutBy`) et la mission est réaffectée au medic suivant le plus
+  /// proche du blessé, jusqu'à acceptation.
+  _scheduleMissionTimeout(missionId) {
+    this._clearMissionTimeout(missionId);
+    const timer = setTimeout(() => {
+      this.medicMissionTimers.delete(missionId);
+      this._handleMissionTimeout(missionId);
+    }, MEDIC_MISSION_TIMEOUT_MS);
+    this.medicMissionTimers.set(missionId, timer);
+  }
+
+  _clearMissionTimeout(missionId) {
+    const timer = this.medicMissionTimers.get(missionId);
+    if (timer) {
+      clearTimeout(timer);
+      this.medicMissionTimers.delete(missionId);
+    }
+  }
+
+  /// Réaffecte la mission en attente au medic suivant (timeout sans réponse).
+  _handleMissionTimeout(missionId) {
+    const m = this.getMissionById(missionId);
+    if (!m || m.status !== 'pending') return;
+    const timedOutMedicId = m.medicId;
+    const timedOut = new Set(m.timedOutBy || []);
+    timedOut.add(timedOutMedicId);
+    m.timedOutBy = [...timedOut];
+    const exclude = [...(m.refusedBy || []), ...timedOut];
+    const next = this.findNearestStreetMedic(m.injuredLat, m.injuredLng, exclude);
+    if (!next || next.userId === timedOutMedicId) {
+      m.status = 'cancelled';
+      m.completedAt = new Date().toISOString();
+    } else {
+      m.medicId = next.userId;
+      m.acceptedAt = null;
+      this._scheduleMissionTimeout(m.id);
+    }
+    this._scheduleSave();
+    this.emit('medic_mission_timeout', { mission: m, timedOutMedicId });
+    return m;
   }
 
   // ═══════════════════════════════════════════════════════════════════════

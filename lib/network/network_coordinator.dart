@@ -658,14 +658,19 @@ class NetworkCoordinator with WidgetsBindingObserver {
   }
 
   /// Traite un signalement rejeté/supprimé reçu du serveur → retrait local.
-  /// Le danger disparaît immédiatement de la base (et donc des itinéraires).
+  /// Le danger disparaît immédiatement de la base (et donc des itinéraires),
+  /// puis le tombstone est propagé aux pairs P2P (BLE / Wi-Fi) pour que les
+  /// apps hors-ligne suppriment aussi le signalement.
   void _onServerAlertRemoved(Map<String, dynamic> json) {
     final alertJson = json['alert'] as Map<String, dynamic>?;
     final id = (alertJson?['id'] as String?) ?? (json['id'] as String?);
     if (id == null) return;
+    final reason = (json['reason'] as String?) ?? 'deleted';
     unawaited(_db.delete(id));
+    _mesh?.broadcastTombstone(id, reason: reason);
     if (kDebugMode) {
-      debugPrint('[NetworkCoordinator] 🗑 signalement retiré (serveur) : $id');
+      debugPrint(
+          '[NetworkCoordinator] 🗑 signalement retiré (serveur) : $id ($reason)');
     }
   }
 

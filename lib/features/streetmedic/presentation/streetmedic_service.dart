@@ -56,6 +56,10 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
   /// Mission acceptée (vue medic en intervention).
   MedicMission? _activeMission;
 
+  /// Dernière mission en attente vue par ce medic — permet de détecter une
+  /// réaffectation (timeout de réponse de 30 s) au prochain polling.
+  String? _lastPendingMissionId;
+
   /// Dernière mission déclenchée par cet utilisateur (vue blessé).
   /// Exposé en [ValueNotifier] pour que le bouton « Appeler / Annuler
   /// l'appel » réagisse immédiatement sur la carte.
@@ -346,6 +350,7 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
     }
     _myCallTrackTimer?.cancel();
     myCallNotifier.value = null;
+    _lastPendingMissionId = null;
     return true;
   }
 
@@ -368,6 +373,7 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
           MedicMission.fromJson(data['mission'] as Map<String, dynamic>);
       _defer(() => medicMission.value = _activeMission);
       _startVibrationTimer();
+      _lastPendingMissionId = null;
       // Demande automatiquement une « route safe » vers le blessé.
       final accepted = _activeMission;
       if (accepted != null) {
@@ -381,6 +387,7 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
   }
 
   Future<void> refuseMission(String missionId) async {
+    _lastPendingMissionId = null;
     try {
       await http
           .post(
@@ -409,6 +416,7 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
           .timeout(const Duration(seconds: 10));
     } catch (_) {}
     _activeMission = null;
+    _lastPendingMissionId = null;
     _defer(() => medicMission.value = null);
     _stopVibrationTimer();
   }
@@ -447,17 +455,36 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
           .whereType<Map<String, dynamic>>()
           .map(MedicMission.fromJson)
           .toList();
-      for (final m in all.where((m) => m.isPending && m.medicId == userId)) {
-        unawaited(
-          NotificationService.instance.showAlertNotification(
-            title: '🚑 Mission street-medic',
-            body: 'Un blessé à ${m.injuredLatitude.toStringAsFixed(4)}, '
-                '${m.injuredLongitude.toStringAsFixed(4)} vous attend.',
-          ),
-        );
-      }
+
       final pending =
           all.where((m) => m.medicId == userId && m.isPending).toList();
+      final newPending = pending.isNotEmpty ? pending.first : null;
+
+      // ── Réception d'une nouvelle mission → vibration du téléphone ──────
+      if (newPending != null) {
+        if (_lastPendingMissionId != newPending.id) {
+          _lastPendingMissionId = newPending.id;
+          unawaited(_vibrateAlert());
+          unawaited(
+            NotificationService.instance.showAlertNotification(
+              title: '🚑 Mission street-medic',
+              body: 'Un blessé à ${newPending.injuredLatitude.toStringAsFixed(4)}, '
+                  '${newPending.injuredLongitude.toStringAsFixed(4)} vous attend. '
+                  'Répondez dans les 30 secondes.',
+            ),
+          );
+        }
+      } else if (_lastPendingMissionId != null) {
+        // Plus de mission en attente : si elle a disparu de notre liste
+        // (réaffectée après timeout), on prévient le medic silencieux.
+        final stillMine = all.any((m) =>
+            m.id == _lastPendingMissionId && m.medicId == userId);
+        if (!stillMine) {
+          unawaited(_notifyMissionTimeout());
+        }
+        _lastPendingMissionId = null;
+      }
+
       _defer(() {
         medicMission.value =
             _activeMission ?? (pending.isNotEmpty ? pending.first : null);
@@ -518,6 +545,32 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
             }),
           )
           .timeout(const Duration(seconds: 8));
+    } catch (_) {}
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Alertes vibratoires & notification de timeout
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// Fait vibrer le téléphone à la réception d'une nouvelle mission.
+  Future<void> _vibrateAlert() async {
+    try {
+      for (var i = 0; i < 3; i++) {
+        await HapticFeedback.vibrate();
+        await Future<void>.delayed(const Duration(milliseconds: 350));
+      }
+    } catch (_) {}
+  }
+
+  /// Message local : la mission a expiré sans réponse — le medic est
+  /// considéré « occupé » et la mission est passée au street-medic suivant.
+  Future<void> _notifyMissionTimeout() async {
+    try {
+      await NotificationService.instance.showAlertNotification(
+        title: '🕒 Mission refusée',
+        body: 'Vous n\'avez pas répondu à temps. '
+            'La mission a été transmise à un autre street-medic.',
+      );
     } catch (_) {}
   }
 

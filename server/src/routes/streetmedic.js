@@ -133,4 +133,12 @@ router.post('/missions/:id/track', (req, res) => {
   res.json({ success: true, mission: m });
 });
 
+// ── Timeout de réponse (30 s) : réaffectation + notification du medic ───
+// Le store émet cet événement quand un street-medic ne répond pas à temps :
+// on propage la mission réaffectée ET on prévient le medic silencieux.
+store.on('medic_mission_timeout', ({ mission, timedOutMedicId }) => {
+  broadcastToAll('medic_mission_update', { mission });
+  broadcastToAll('medic_mission_timeout', { mission, timedOutMedicId });
+});
+
 module.exports = router;

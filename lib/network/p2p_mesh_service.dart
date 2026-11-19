@@ -166,6 +166,12 @@ class P2PMeshService {
   /// Taille maximale du cache anti-dédoublement.
   static const int _maxRecentAlertCache = 100;
 
+  /// Cache anti-dédoublement des tombstones (suppressions/rejets) re-propagés.
+  final Set<String> _recentlyTombstonedIds = {};
+
+  /// Taille maximale du cache des tombstones.
+  static const int _maxTombstoneCache = 100;
+
   /// Outbox persistée (Hive) : messages locaux non broadcastés
   /// faute de transport disponible. Flushée automatiquement
   /// quand un transport redevient actif.
@@ -243,6 +249,22 @@ class P2PMeshService {
         }
       })),
     );
+  }
+
+  /// Diffuse un tombstone (signalement supprimé/rejeté) aux pairs locaux.
+  ///
+  /// Contrairement à une alerte, un tombstone est léger (`{ id, reason }`) et
+  /// déclenche la SUPPRESSION locale chez les pairs, puis sa re-propagation
+  /// sur le maillage hors-ligne. On cible les transports LOCAUX (BLE / Wi-Fi)
+  /// uniquement : les clients déjà reliés au serveur ont reçu le signal
+  /// directement via WebSocket.
+  void broadcastTombstone(String id, {String reason = 'deleted'}) {
+    unawaited(broadcastRawJsonLocal({
+      'kind': 'tombstone',
+      'id': id,
+      'reason': reason,
+      'ts': DateTime.now().toUtc().toIso8601String(),
+    }));
   }
 
   /// Diffuse un payload JSON brut (ex : signal panic) sur tous les transports.
@@ -342,6 +364,7 @@ class P2PMeshService {
     }
     _pendingMicrotasks = 0;
     _recentlyReceivedAlertIds.clear();
+    _recentlyTombstonedIds.clear();
     _started = false;
   }
 
@@ -466,16 +489,23 @@ class P2PMeshService {
       }
 
       // Cas 5 : signalement reçu du serveur central (diffusion temps réel).
-      // `new_alert` (création), `report_validated` (validation) ou
-      // `report_rejected` (rejet) — payload `{ alert }` au format REST.
+      // `new_alert` (création) ou `report_validated` (validation) —
+      // payload `{ alert }` au format REST. Le rejet (`report_rejected`) est
+      // traité par le NetworkCoordinator (suppression + tombstone P2P) pour
+      // éviter le conflit upsert/delete.
       if (json['kind'] == 'report_validated' ||
-          json['kind'] == 'report_rejected' ||
           json['kind'] == 'new_alert') {
         final alertJson = json['alert'];
         if (alertJson is Map<String, dynamic>) {
           final alert = Alert.fromJson(alertJson);
           _onServerAlertReceived(alert);
         }
+        return;
+      }
+
+      // Cas 6 : tombstone (suppression/rejet) propagé entre pairs P2P.
+      if (json['kind'] == 'tombstone' && json['id'] is String) {
+        _onTombstoneReceived(json);
         return;
       }
     } catch (e) {
@@ -545,6 +575,25 @@ class P2PMeshService {
           '(${alert.type.name}, status=${alert.status.name})',
         );
       }
+    }));
+  }
+
+  /// Reçoit un tombstone (signalement supprimé/rejeté) d'un pair : supprime
+  /// l'alerte localement puis RE-PROPAGE aux autres pairs (flooding contrôlé
+  /// par un cache anti-dédoublement).
+  void _onTombstoneReceived(Map<String, dynamic> json) {
+    final id = json['id'] as String;
+    final reason = json['reason'] as String? ?? 'deleted';
+    if (_recentlyTombstonedIds.contains(id)) return;
+    _recentlyTombstonedIds.add(id);
+    if (_recentlyTombstonedIds.length > _maxTombstoneCache) {
+      _recentlyTombstonedIds.remove(_recentlyTombstonedIds.first);
+    }
+    unawaited(database.delete(id).then((_) {
+      if (kDebugMode) {
+        debugPrint('[P2PMeshService] tombstone reçu : $id ($reason)');
+      }
+      broadcastTombstone(id, reason: reason);
     }));
   }
 
