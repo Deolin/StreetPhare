@@ -15,11 +15,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/theme/skins/mars_background.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../settings/data/app_preferences_store.dart';
+import '../../trust_group/presentation/trust_group_service.dart';
 import '../data/hive_block_service.dart';
 import '../domain/models/hive_message.dart';
 import '../domain/models/temp_thread.dart';
@@ -120,10 +122,8 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
   // --------------------------------------------------------------------------
 
   void _onLongPressBubble(BuildContext ctx, HiveMessage message) {
-    if (message.senderEphemeralId ==
-        HiveMessagingService.instance.localEphemeralId) {
-      return; // Pas de menu sur ses propres messages.
-    }
+    final isOwn = message.senderEphemeralId ==
+        HiveMessagingService.instance.localEphemeralId;
 
     final blockSvc = HiveBlockService.instance;
     final isAlreadyBlocked = blockSvc.isBlocked(message.senderEphemeralId);
@@ -135,12 +135,43 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
       backgroundColor: Colors.transparent,
       builder: (_) => _MessageContextMenu(
         message: message,
+        isOwn: isOwn,
         isBlocked: isAlreadyBlocked,
         isInThread: isInThread,
         hasActiveThread: hasActiveThread,
+        onCopy: () => _copyMessage(message),
         onBlock: () => _blockUser(message.senderEphemeralId),
         onCreateThread: () => _createTempThread(message.senderEphemeralId),
         onAddToThread: () => _addToThread(message.senderEphemeralId),
+        onAddToTrustGroup: () => _addToTrustGroup(message),
+      ),
+    );
+  }
+
+  Future<void> _copyMessage(HiveMessage message) async {
+    await Clipboard.setData(ClipboardData(text: message.content));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Message copié dans le presse-papiers.'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  /// Envoie une demande de suivi à l'utilisateur (groupe de confiance).
+  Future<void> _addToTrustGroup(HiveMessage message) async {
+    await TrustGroupService.instance.sendFollowRequest(
+      toEphemeralId: message.senderEphemeralId,
+      fromEphemeralId: HiveMessagingService.instance.localEphemeralId,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Demande de suivi envoyée — l\'utilisateur devra l\'accepter.'),
+        duration: Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -683,21 +714,27 @@ class _ActiveThreadChip extends StatelessWidget {
 class _MessageContextMenu extends StatelessWidget {
   const _MessageContextMenu({
     required this.message,
+    required this.isOwn,
     required this.isBlocked,
     required this.isInThread,
     required this.hasActiveThread,
+    required this.onCopy,
     required this.onBlock,
     required this.onCreateThread,
     required this.onAddToThread,
+    required this.onAddToTrustGroup,
   });
 
   final HiveMessage message;
+  final bool isOwn;
   final bool isBlocked;
   final bool isInThread;
   final bool hasActiveThread;
+  final VoidCallback onCopy;
   final VoidCallback onBlock;
   final VoidCallback onCreateThread;
   final VoidCallback onAddToThread;
+  final VoidCallback onAddToTrustGroup;
 
   @override
   Widget build(BuildContext context) {
@@ -747,7 +784,7 @@ class _MessageContextMenu extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Utilisateur ${message.senderAlias}',
+                        isOwn ? 'Moi' : 'Utilisateur ${message.senderAlias}',
                         style: TextStyle(
                           color: onSurface,
                           fontWeight: FontWeight.w600,
@@ -768,8 +805,32 @@ class _MessageContextMenu extends StatelessWidget {
             ),
             const Divider(height: 24),
 
-            // Action 1 : Bloquer
+            // Action 0 : Copier le message
             ListTile(
+              leading: Icon(Icons.copy, color: StreetPhareTheme.primary),
+              title: Text(
+                'Copier le message',
+                style: TextStyle(
+                  color: StreetPhareTheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              subtitle: Text(
+                'Copie le contenu du message dans le presse-papiers',
+                style: TextStyle(
+                  color: onSurface.withValues(alpha: 0.6),
+                  fontSize: 12,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                onCopy();
+              },
+            ),
+
+            if (!isOwn) ...[
+              // Action 1 : Bloquer
+              ListTile(
               leading: Icon(
                 isBlocked ? Icons.block_flipped : Icons.block,
                 color: StreetPhareTheme.danger,
@@ -867,6 +928,30 @@ class _MessageContextMenu extends StatelessWidget {
                       onAddToThread();
                     },
             ),
+
+            // Action 4 : Ajouter au groupe de confiance
+            ListTile(
+              leading: Icon(Icons.group, color: StreetPhareTheme.primary),
+              title: Text(
+                'Ajouter au groupe de confiance',
+                style: TextStyle(
+                  color: StreetPhareTheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              subtitle: Text(
+                'Envoie une demande de suivi (l\'utilisateur devra accepter)',
+                style: TextStyle(
+                  color: onSurface.withValues(alpha: 0.6),
+                  fontSize: 12,
+                ),
+              ),
+              onTap: () {
+                Navigator.of(context).pop();
+                onAddToTrustGroup();
+              },
+            ),
+            ],
 
             const SizedBox(height: 8),
           ],

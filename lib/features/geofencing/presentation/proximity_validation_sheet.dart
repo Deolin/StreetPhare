@@ -50,6 +50,8 @@ class ProximityValidationSheet extends StatelessWidget {
         return 'un contrôle de police';
       case AlertType.autopompes:
         return 'des autopompes';
+      case AlertType.gazLacrymogenes:
+        return 'des gaz lacrymogènes';
       case AlertType.filtre:
         return 'un filtre';
       case AlertType.panic:
@@ -75,6 +77,8 @@ class ProximityValidationSheet extends StatelessWidget {
         return Icons.local_police;
       case AlertType.autopompes:
         return Icons.fire_truck;
+      case AlertType.gazLacrymogenes:
+        return Icons.air;
       case AlertType.filtre:
         return Icons.filter_alt;
       case AlertType.panic:
@@ -100,6 +104,8 @@ class ProximityValidationSheet extends StatelessWidget {
         return const Color(0xFF3F51B5);
       case AlertType.autopompes:
         return const Color(0xFFE65100);
+      case AlertType.gazLacrymogenes:
+        return const Color(0xFFCDDC39);
       case AlertType.filtre:
         return const Color(0xFF00695C);
       case AlertType.panic:

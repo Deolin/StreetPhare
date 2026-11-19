@@ -42,9 +42,20 @@ class StreetMedicMarkerIcon extends StatelessWidget {
 
 /// Overlay placé sur la carte : indicateur « tracé » + partage + appel.
 class StreetMedicOverlay extends StatelessWidget {
-  const StreetMedicOverlay({super.key, this.userPosition});
+  const StreetMedicOverlay({
+    super.key,
+    this.userPosition,
+    this.onPanic,
+    this.panicLabel,
+  });
 
   final LatLng? userPosition;
+
+  /// Déclenche le mode PANIC (fourni par l'écran carte).
+  final VoidCallback? onPanic;
+
+  /// Libellé localisé du bouton PANIC.
+  final String? panicLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +79,15 @@ class StreetMedicOverlay extends StatelessWidget {
                 const StreetMedicMissionPanel(),
                 const SizedBox(height: 8),
               ],
-              _callButton(context, service),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _callButton(context, service),
+                  if (onPanic != null) _panicButton(),
+                ],
+              ),
             ],
           );
         },
@@ -116,6 +135,37 @@ class StreetMedicOverlay extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  /// Bouton PANIC, placé à droite du bouton « Appeler un street-medic ».
+  Widget _panicButton() {
+    return Material(
+      color: StreetPhareTheme.danger,
+      borderRadius: BorderRadius.circular(24),
+      elevation: 4,
+      child: InkWell(
+        onTap: onPanic,
+        borderRadius: BorderRadius.circular(24),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.emergency, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                panicLabel ?? 'PANIC',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

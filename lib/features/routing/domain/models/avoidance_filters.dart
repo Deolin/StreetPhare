@@ -113,6 +113,8 @@ class AvoidanceFilters {
         return avoidControles;
       case AlertType.autopompes:
         return avoidAccidents;
+      case AlertType.gazLacrymogenes:
+        return avoidControles;
       case AlertType.filtre:
         return avoidNasses;
       case AlertType.panic:

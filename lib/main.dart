@@ -34,6 +34,8 @@ import 'features/settings/data/settings_store.dart';
 import 'features/splash/presentation/splash_screen.dart';
 import 'features/start_screen/data/start_screen_store.dart';
 import 'features/streetmedic/presentation/streetmedic_service.dart';
+import 'features/trust_group/presentation/follow_request_dialog.dart';
+import 'features/trust_group/presentation/trust_group_service.dart';
 import 'features/tutorial/data/tutorial_store.dart';
 import 'network/bootstrap.dart';
 import 'network/network_config.dart';
@@ -42,6 +44,7 @@ import 'network/server_heartbeat_service.dart';
 import 'services/apk_backup_service.dart';
 import 'services/app_share_service.dart';
 import 'services/connectivity_service.dart';
+import 'services/github_update_service.dart';
 import 'services/notification_service.dart';
 import 'services/streetphare_foreground_task.dart';
 import 'services/version_check_service.dart';
@@ -102,11 +105,19 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Style de la barre de statut
+  // ── Edge-to-edge (bord à bord) ─────────────────────────────────────────
+  // L'interface s'étend sous les barres système (statut + navigation).
+  // Les insets système sont ensuite appliqués dans le conteneur racine
+  // (StreetPhareApp.builder) via SafeArea pour que le contenu ne passe
+  // jamais derrière la barre de navigation (les 3 boutons en bas).
+  unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarContrastEnforced: false,
     ),
   );
 
@@ -120,6 +131,8 @@ void main() async {
       ClientDebugLogger.instance.init(),
       NotificationService.instance.init(),
       VersionCheckService.instance.init(),
+      GithubUpdateService.instance.init(),
+      TrustGroupService.instance.init(),
       AppLocale.instance.load(),
       ThemeController.instance.load(),
       SkinController.instance.load(),
@@ -261,6 +274,18 @@ void main() async {
       });
     });
   }
+
+  // === Étape 7 : Vérification des mises à jour GitHub (non bloquante) ===
+  // Lancée après le premier rendu, avec un délai pour ne pas gêner le
+  // démarrage. Si une nouvelle release est détectée, une boîte de dialogue
+  // informe l'utilisateur (via la clé globale du navigateur).
+  unawaited(_checkGithubUpdate());
+
+  // Écoute les demandes de suivi de position (groupe de confiance) : affiche
+  // une boîte de dialogue de consentement (accepter / refuser / suivre en retour)
+  // quand l'application est au premier plan.
+  TrustGroupService.instance.lastIncomingRequest
+      .addListener(_onIncomingFollowRequest);
 }
 
 Future<List<String>> _seedSingleBackup(
@@ -282,6 +307,39 @@ Future<List<String>> _seedSingleBackup(
       emoji: '🔑',
     );
     return const [];
+  }
+}
+
+/// Vérifie silencieusement les mises à jour GitHub et affiche un dialogue
+/// si une nouvelle release est disponible. Ne fait rien en cas d'échec
+/// réseau ou si la version a déjà été signalée.
+Future<void> _checkGithubUpdate() async {
+  // Délai : laisse le temps à l'UI de se stabiliser après le splash.
+  await Future.delayed(const Duration(seconds: 10));
+  try {
+    final release = await GithubUpdateService.instance.checkAndRemember();
+    if (release == null) return;
+    final context = navigatorKey.currentContext;
+    if (context != null && context.mounted) {
+      await GithubUpdateService.instance.showUpdateDialog(context, release);
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('[main] ⚠ Erreur vérification GitHub : $e');
+    }
+  }
+}
+
+/// Affiche la boîte de dialogue de consentement lorsqu'une demande de suivi
+/// de position est reçue (groupe de confiance).
+void _onIncomingFollowRequest() {
+  final request = TrustGroupService.instance.lastIncomingRequest.value;
+  if (request == null) return;
+  // One-shot : consomme la demande pour ne pas rejouer le dialogue.
+  TrustGroupService.instance.lastIncomingRequest.value = null;
+  final context = navigatorKey.currentContext;
+  if (context != null && context.mounted) {
+    unawaited(showFollowRequestDialog(context, request));
   }
 }
 
@@ -348,11 +406,18 @@ class StreetPhareApp extends StatelessWidget {
                               data: MediaQuery.of(context).copyWith(
                                 textScaler: TextScaler.linear(factor),
                               ),
-                              child: Stack(
-                                children: [
-                                  if (child != null) child,
-                                  const BugReportFab(),
-                                ],
+                              child: SafeArea(
+                                // Applique les insets système (barre de
+                                // navigation en bas + encoches latérales) au
+                                // conteneur principal. `top: false` : la barre
+                                // de statut est gérée par chaque écran.
+                                top: false,
+                                child: Stack(
+                                  children: [
+                                    if (child != null) child,
+                                    const BugReportFab(),
+                                  ],
+                                ),
                               ),
                             );
                           },

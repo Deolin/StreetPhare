@@ -36,6 +36,9 @@ enum AlertType {
   dangerCollectif,
   density,
   autre,
+
+  /// Gaz lacrymogènes (aérosol irritant).
+  gazLacrymogenes,
 }
 
 /// Modèle immuable d'une alerte. La sérialisation est volontairement
@@ -147,6 +150,10 @@ class Alert {
         return AlertType.dangerCollectif;
       case 'density':
         return AlertType.density;
+      case 'tear_gas':
+      case 'gaz_lacrymogenes':
+      case 'gazLacrymogenes':
+        return AlertType.gazLacrymogenes;
       default:
         return AlertType.autre;
     }

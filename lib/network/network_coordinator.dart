@@ -40,6 +40,8 @@ import '../database/crypto_utils.dart';
 import '../database/hive_alert_database.dart';
 import '../features/geofencing/presentation/geofencing_service.dart';
 import '../features/messaging/presentation/hive_messaging_service.dart';
+import '../features/streetmedic/presentation/streetmedic_service.dart';
+import '../features/trust_group/presentation/trust_group_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/notification_service.dart';
 import 'collective_panic_service.dart';
@@ -456,6 +458,10 @@ class NetworkCoordinator with WidgetsBindingObserver {
     if (kDebugMode) {
       debugPrint('[NetworkCoordinator] App détachée — nettoyage…');
     }
+    // Vie privée : arrête tout traçage de position à la fermeture
+    // (partage street-medic vers le serveur + groupe de confiance P2P).
+    unawaited(StreetMedicService.instance.stopAllTracking());
+    TrustGroupService.instance.stopSharing();
     unawaited(dispose());
   }
 
@@ -621,6 +627,12 @@ class NetworkCoordinator with WidgetsBindingObserver {
           }
         }
       }
+
+      // ── Groupe de confiance (positions privées + rotation d'ID) ──────────
+      if (kind == 'trust_position' || kind == 'trust_rotate') {
+        TrustGroupService.instance.handleIncoming(json);
+        return;
+      }
     } catch (e) {
       // Silence les payloads non-JSON (pings, etc.)
     }
@@ -713,6 +725,30 @@ class NetworkCoordinator with WidgetsBindingObserver {
     if (kDebugMode) {
       debugPrint('[NetworkCoordinator] Message Hive P2P broadcasté '
           '(local_only=$localPriorityOnly)');
+    }
+  }
+
+  /// Diffuse un signal du groupe de confiance sur le maillage P2P LOCAL
+  /// (BLE / Wi-Fi Direct), sans passer par un serveur — les positions
+  /// privées des amis restent ainsi hors de tout relais distant.
+  Future<void> broadcastTrustSignal(
+    Map<String, dynamic> payload, {
+    required String kind,
+  }) async {
+    if (_mesh == null) return;
+    final wrapper = <String, dynamic>{
+      'kind': kind,
+      'payload': payload,
+      'ts': DateTime.now().toUtc().toIso8601String(),
+      'sender_id': _ephemeralUserId,
+    };
+    try {
+      await _mesh!.broadcastRawJsonLocal(wrapper);
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[NetworkCoordinator] échec broadcast trust $kind : '
+            '$e\n$st');
+      }
     }
   }
 
@@ -947,6 +983,8 @@ class NetworkCoordinator with WidgetsBindingObserver {
         return 'Police';
       case AlertType.autopompes:
         return 'Autopompes';
+      case AlertType.gazLacrymogenes:
+        return 'Gaz lacrymogènes';
       case AlertType.filtre:
         return 'Filtre';
       case AlertType.panic:

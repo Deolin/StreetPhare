@@ -121,13 +121,20 @@ class _LocalFirstTileImageProvider
     _LocalFirstTileImageProvider key,
     ImageDecoderCallback decode,
   ) {
-    return OneFrameImageStreamCompleter(_loadImageInfo(decode));
+    // MultiFrameImageStreamCompleter (et non OneFrameImageStreamCompleter) :
+    // ce dernier appelait setImage() sur un stream déjà disposé quand la tuile
+    // sortait de l'écran avant la fin du décodage → StateError
+    // « Stream has been disposed ». MultiFrame gère ce cas proprement.
+    return MultiFrameImageStreamCompleter(
+      codec: _loadCodec(decode),
+      scale: 1.0,
+    );
   }
 
   /// Résout la source réelle de la tuile dans l'ordre
   /// mémoire → cache local → serveur → OSM, et PERSISTE tout téléchargement
   /// réseau dans le cache local pour soulager le serveur.
-  Future<ImageInfo> _loadImageInfo(ImageDecoderCallback decode) async {
+  Future<ui.Codec> _loadCodec(ImageDecoderCallback decode) async {
     // 1) Cache mémoire (session courante).
     final Uint8List? cached = owner._memoryGet(coordinates);
     if (cached != null) return _decode(cached, decode);
@@ -226,15 +233,13 @@ class _LocalFirstTileImageProvider
     }
   }
 
-  Future<ImageInfo> _decode(
+  Future<ui.Codec> _decode(
     Uint8List bytes,
     ImageDecoderCallback decode,
   ) async {
     final ui.ImmutableBuffer buffer =
         await ui.ImmutableBuffer.fromUint8List(bytes);
-    final ui.Codec codec = await decode(buffer);
-    final ui.FrameInfo frame = await codec.getNextFrame();
-    return ImageInfo(image: frame.image);
+    return decode(buffer);
   }
 }
 

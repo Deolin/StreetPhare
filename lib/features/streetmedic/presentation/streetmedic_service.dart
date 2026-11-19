@@ -15,6 +15,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -66,6 +67,10 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
 
   /// Mission à traiter par le medic (active en priorité, sinon en attente).
   final ValueNotifier<MedicMission?> medicMission = ValueNotifier(null);
+
+  /// Cible de navigation (position du blessé) déclenchée à l'acceptation
+  /// d'une mission : la carte calcule automatiquement une « route safe ».
+  final ValueNotifier<LatLng?> medicNavigationTarget = ValueNotifier(null);
 
   String get userId => _userId ??= generateEphemeralUserId();
   StreetMedic? get streetMedic => value;
@@ -205,6 +210,21 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
     await _setSharing(false);
     _stopPositionTimer();
     return ok;
+  }
+
+  /// Arrête tout traçage de position (partage street-medic + suivi d'appel)
+  /// — appelé à la fermeture de l'application pour préserver la vie privée.
+  Future<void> stopAllTracking() async {
+    if (_sharing) {
+      // Envoie `sharing:false` au serveur (le medic disparaît de la carte
+      // publique), stoppe le timer et persiste `sharing=false` localement.
+      await stopSharing();
+    } else {
+      _stopPositionTimer();
+    }
+    // Cesse de transmettre la position du blessé (suivi d'appel en cours).
+    _myCallTrackTimer?.cancel();
+    _myCallTrackTimer = null;
   }
 
   /// Met à jour la position connue (appelée par le GPS / geofencing).
@@ -348,6 +368,12 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
           MedicMission.fromJson(data['mission'] as Map<String, dynamic>);
       _defer(() => medicMission.value = _activeMission);
       _startVibrationTimer();
+      // Demande automatiquement une « route safe » vers le blessé.
+      final accepted = _activeMission;
+      if (accepted != null) {
+        _defer(() => medicNavigationTarget.value =
+            LatLng(accepted.injuredLatitude, accepted.injuredLongitude));
+      }
       return _activeMission;
     } catch (_) {
       return null;

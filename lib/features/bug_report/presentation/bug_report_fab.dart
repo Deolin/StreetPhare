@@ -21,6 +21,7 @@ import 'dart:io' as io;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../debug/client_debug_logger.dart';
@@ -32,45 +33,109 @@ import 'bug_report_service.dart';
 // BugReportFab — Bouton global unique (remplace les 2 anciens boutons)
 // ============================================================================
 
-class BugReportFab extends StatelessWidget {
+class BugReportFab extends StatefulWidget {
   const BugReportFab({super.key});
 
   @override
+  State<BugReportFab> createState() => _BugReportFabState();
+}
+
+class _BugReportFabState extends State<BugReportFab> {
+  static const String _kPosKey = 'bug_fab_position';
+
+  /// Position courante (haut-gauche) du bouton. Chargée depuis les
+  /// préférences au démarrage, puis mise à jour au glisser-déposer.
+  Offset _position = const Offset(16, 160);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPosition();
+  }
+
+  Future<void> _loadPosition() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dx = prefs.getDouble('${_kPosKey}_x');
+      final dy = prefs.getDouble('${_kPosKey}_y');
+      if (dx != null && dy != null && mounted) {
+        setState(() => _position = Offset(dx, dy));
+      }
+    } catch (_) {
+      // Position par défaut conservée.
+    }
+  }
+
+  Future<void> _savePosition() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('${_kPosKey}_x', _position.dx);
+      await prefs.setDouble('${_kPosKey}_y', _position.dy);
+    } catch (_) {
+      // Persistance best-effort.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
+    // Dimensions approximatives du bouton (pour le maintien à l'écran).
+    const buttonW = 92.0;
+    const buttonH = 44.0;
+
+    final maxDx = (size.width - buttonW - 8).clamp(8.0, double.infinity);
+    final maxDy =
+        (size.height - bottomInset - buttonH - 8).clamp(8.0, double.infinity);
+
     return Positioned(
-      left: 16,
-      top: 160,
-      child: SafeArea(
-        child: Semantics(
-          label: 'Signaler un bug',
-          button: true,
-          child: Material(
-            elevation: 8,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            color: StreetPhareTheme.surface.withValues(alpha: 0.92),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => _openUnifiedDialog(),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.bug_report_outlined,
-                        color: StreetPhareTheme.primary, size: 20),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Bug',
-                      style: TextStyle(
-                        color: StreetPhareTheme.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+      left: _position.dx.clamp(8.0, maxDx),
+      top: _position.dy.clamp(8.0, maxDy),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        // Glisser-déposer : le bouton suit le doigt.
+        onPanUpdate: (details) {
+          setState(() {
+            _position = Offset(
+              _position.dx + details.delta.dx,
+              _position.dy + details.delta.dy,
+            );
+          });
+        },
+        onPanEnd: (_) => _savePosition(),
+        child: SafeArea(
+          child: Semantics(
+            label: 'Signaler un bug',
+            button: true,
+            child: Material(
+              elevation: 8,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              color: StreetPhareTheme.surface.withValues(alpha: 0.92),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => _openUnifiedDialog(),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.bug_report_outlined,
+                          color: StreetPhareTheme.primary, size: 20),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Bug',
+                        style: TextStyle(
+                          color: StreetPhareTheme.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

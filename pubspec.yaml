@@ -79,14 +79,14 @@ dependencies:
   http: ^1.2.1
   url_launcher: ^6.3.2
   cryptography: ^2.9.0
-  flutter_reactive_ble: ^5.5.0
+  flutter_reactive_ble: 5.5.0
   flutter_compass: ^0.8.0
   flutter_foreground_task: ^10.0.0
   sensors_plus: ^7.1.1
   wakelock_plus: ^1.8.0
   package_info_plus: ^10.0.0
   share_plus: ^13.1.0
-  flutter_local_notifications: ^23.0.0
+  flutter_local_notifications: ^22.2.0
   mobile_scanner: ^7.2.0
   hive_ce: ^2.19.3
   hive_ce_flutter: ^2.3.4
@@ -102,8 +102,6 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   hive_ce_generator: ^1.12.0
   build_runner: ^2.15.0
-  build_test: ^3.5.21
-  build_web_compilers: ^4.0.0
   mocktail: ^1.0.5
   flutter_launcher_icons: ^0.14.3
 
@@ -144,3 +142,5 @@ flutter_launcher_icons:
 # On force donc la dernière version utilisant le Pigeon classique (2.4.27).
 dependency_overrides:
   shared_preferences_android: 2.4.27
+  permission_handler_android: 13.0.1
+  reactive_ble_mobile: 5.5.0

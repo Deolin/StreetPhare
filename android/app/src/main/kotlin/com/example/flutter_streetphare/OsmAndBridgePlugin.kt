@@ -308,11 +308,13 @@ class OsmAndBridgePlugin(
             }
 
             // ── Dossier de cache du graphe ───────────────────────────
-            // v4 : force la ré-importation de l'OSM pour garantir que les
-            // profils foot/car sont bien reconstruits (chemins piétons + sens
-            // uniques pris en compte pour le piéton, respectés pour la voiture).
-            // Le cache v3 pouvait conserver un graphe piéton/voiture identique.
-            val graphDir = File(context.filesDir, "graphhopper_cache_v4")
+            // v5 : force la ré-importation de l'OSM pour garantir que les
+            // profils foot/car sont bien reconstruits.
+            //   - foot : chemins piétons inclus, sens uniques IGNORÉS.
+            //   - car  : routes carrossables, sens uniques RESPECTÉS.
+            // Un ancien cache (v3/v4) pouvait conserver un graphe piéton
+            // identique au graphe voiture → itinéraire piéton = trajet voiture.
+            val graphDir = File(context.filesDir, "graphhopper_cache_v5")
 
             // ── Configurer et initialiser GraphHopper ────────────────
             val gh = GraphHopper()

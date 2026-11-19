@@ -257,9 +257,11 @@ class Astar {
     if (EdgeFlags.has(flags, EdgeFlags.highway)) {
       if (!isMotorized) return false;
     }
-    if (EdgeFlags.has(flags, EdgeFlags.oneway)) {
-      if (isMotorized) return false;
-    }
+    // Le flag `oneway` n'interdit PAS la traversée de l'arête : le sens
+    // unique est déjà encodé par l'orientation du graphe .spg (une rue à
+    // sens unique A→B ne possède PAS d'arête inverse B→A). Refuser
+    // l'arête ici (comme avant) empêcherait les véhicules d'emprunter
+    // toute rue à sens unique, même dans le bon sens.
     if (EdgeFlags.has(flags, EdgeFlags.unpaved)) {
       if (profile.avoidUnpaved) return false;
     }

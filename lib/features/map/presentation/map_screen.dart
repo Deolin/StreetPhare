@@ -73,6 +73,7 @@ import '../../settings/presentation/settings_screen.dart';
 import '../../streetmedic/domain/models/streetmedic_models.dart';
 import '../../streetmedic/presentation/streetmedic_overlay.dart';
 import '../../streetmedic/presentation/streetmedic_service.dart';
+import '../../trust_group/presentation/trust_group_service.dart';
 import '../local_first_tile_provider.dart';
 import 'heading_fusion.dart';
 import 'widgets/long_press_detector.dart';
@@ -146,6 +147,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
   bool _followHeading = false;
 
   StreamSubscription<CollectivePanicEvent>? _collectivePanicSub;
+  VoidCallback? _trustPositionsListener;
 
   /// `true` une fois que FlutterMap est prêt (tuiles initialisées).
   bool _mapReady = false;
@@ -287,6 +289,35 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     StreetMedicService.instance.activeStreetmedics
         .addListener(_streetMedicListener!);
     unawaited(StreetMedicService.instance.refreshActiveStreetMedics());
+
+    // Groupe de confiance : rafraîchit les marqueurs amis à chaque position.
+    _trustPositionsListener = () {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    };
+    TrustGroupService.instance.positions.addListener(_trustPositionsListener!);
+
+    // Street-medic : calcul automatique d'une « route safe » vers le blessé
+    // lorsque le medic accepte une mission d'intervention.
+    StreetMedicService.instance.medicNavigationTarget
+        .addListener(_onMedicNavigationTarget);
+  }
+
+  /// Réagit à la demande de navigation émise à l'acceptation d'une mission
+  /// street-medic : calcule et affiche une « route safe » vers le blessé.
+  void _onMedicNavigationTarget() {
+    final target = StreetMedicService.instance.medicNavigationTarget.value;
+    if (target == null) return;
+    // Consomme l'événement (one-shot) pour ne pas le rejouer.
+    StreetMedicService.instance.medicNavigationTarget.value = null;
+    if (!mounted) return;
+    unawaited(_computeAndShowRoute(
+      target,
+      'Blessé',
+      transportMode: 'pedestrian',
+    ));
   }
 
   Future<void> _onProximityValidationRequested(GeofenceEvent event) async {
@@ -316,6 +347,12 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
       StreetMedicService.instance.activeStreetmedics
           .removeListener(_streetMedicListener!);
     }
+    if (_trustPositionsListener != null) {
+      TrustGroupService.instance.positions
+          .removeListener(_trustPositionsListener!);
+    }
+    StreetMedicService.instance.medicNavigationTarget
+        .removeListener(_onMedicNavigationTarget);
     _tileProvider.dispose();
     _mapController.dispose();
     super.dispose();
@@ -1996,6 +2033,10 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
 
     if (confirmed != true || !mounted) return;
 
+    // Dissolution du groupe de confiance : efface les positions des autres
+    // et ordonne à chaque ami de faire tourner son ID fixe (protection).
+    unawaited(TrustGroupService.instance.panicWipe());
+
     final position = await _getCurrentPositionSafe();
 
     if (position != null) {
@@ -2129,6 +2170,8 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
         return Colors.blue;
       case AlertType.autopompes:
         return Colors.orange;
+      case AlertType.gazLacrymogenes:
+        return Colors.lime;
       case AlertType.filtre:
         return Colors.teal;
       case AlertType.panic:
@@ -2155,6 +2198,8 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
         return Icons.local_police;
       case AlertType.autopompes:
         return Icons.local_fire_department;
+      case AlertType.gazLacrymogenes:
+        return Icons.air;
       case AlertType.filtre:
         return Icons.filter_alt;
       case AlertType.panic:
@@ -2181,6 +2226,8 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
         return 'Police';
       case AlertType.autopompes:
         return 'Autopompes';
+      case AlertType.gazLacrymogenes:
+        return 'Gaz lacrymogènes';
       case AlertType.filtre:
         return 'Filtre';
       case AlertType.panic:
@@ -2233,6 +2280,49 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
             child: marsAsset != null
                 ? SvgPicture.asset(marsAsset, width: 22, height: 22)
                 : Icon(icon, color: Colors.white, size: 20),
+          ),
+        ),
+      ));
+    }
+    return markers;
+  }
+
+  /// Construit les marqueurs des amis de confiance (cercle vert « personne »).
+  /// Seules les positions des IDs présents dans la liste de confiance sont
+  /// affichées — aucune autre carte ne reçoit ces positions.
+  List<Marker> _buildTrustFriendMarkers() {
+    final markers = <Marker>[];
+    final positions = TrustGroupService.instance.positions.value;
+    if (positions.isEmpty) return markers;
+
+    final aliasByFid = <String, String>{};
+    for (final m in TrustGroupService.instance.members.value) {
+      aliasByFid[m.fixedId] = m.alias;
+    }
+
+    for (final p in positions.values) {
+      if (p.isStale) continue;
+      final alias = aliasByFid[p.fixedId] ?? 'Ami';
+      markers.add(Marker(
+        point: p.point,
+        width: 36,
+        height: 36,
+        child: Tooltip(
+          message: alias,
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF4CAF50),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4CAF50).withValues(alpha: 0.5),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.person, color: Colors.white, size: 18),
           ),
         ),
       ));
@@ -2485,6 +2575,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     // Marqueurs des alertes réseau (signalements validés / simulés).
     markers.addAll(_buildAlertMarkers());
     markers.addAll(_buildStreetMedicMarkers());
+    markers.addAll(_buildTrustFriendMarkers());
 
     return _EventLayers(polylines: polylines, markers: markers);
   }
@@ -3054,8 +3145,6 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                                     children: [
                                       _ActionFab(
                                         icon: Icons.add_alert,
-                                        label: s
-                                            .eventsMyEvents, // Example, should probably have its own key
                                         backgroundColor:
                                             StreetPhareTheme.primary,
                                         foregroundColor: Colors.black,
@@ -3064,7 +3153,6 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                                       const SizedBox(height: 12),
                                       _ActionFab(
                                         icon: Icons.shield_outlined,
-                                        label: s.routeTitle,
                                         backgroundColor:
                                             StreetPhareTheme.surface,
                                         foregroundColor:
@@ -3075,23 +3163,12 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                                       const SizedBox(height: 12),
                                       _ActionFab(
                                         icon: Icons.forum_outlined,
-                                        label: s.messagingTitle,
                                         backgroundColor:
                                             StreetPhareTheme.surface,
                                         foregroundColor:
                                             StreetPhareTheme.primary,
                                         borderColor: StreetPhareTheme.primary,
                                         onPressed: _openMessaging,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _ActionFab(
-                                        icon: Icons.emergency,
-                                        label: s.panicButton,
-                                        backgroundColor:
-                                            StreetPhareTheme.danger,
-                                        foregroundColor: Colors.white,
-                                        isExtended: true,
-                                        onPressed: _triggerPanic,
                                       ),
                                     ],
                                   ),
@@ -3153,6 +3230,8 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                                       _userPosition!.longitude,
                                     )
                                   : null,
+                              onPanic: _triggerPanic,
+                              panicLabel: s.panicButton,
                             ),
                           ],
                         ), // Stack
@@ -3640,62 +3719,37 @@ class _PlacementBanner extends StatelessWidget {
 class _ActionFab extends StatelessWidget {
   const _ActionFab({
     required this.icon,
-    required this.label,
     required this.backgroundColor,
     required this.foregroundColor,
     required this.onPressed,
     this.borderColor,
-    this.isExtended = false,
   });
 
   final IconData icon;
-  final String label;
   final Color backgroundColor;
   final Color foregroundColor;
   final Color? borderColor;
-  final bool isExtended;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final content = isExtended
-        ? Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: foregroundColor, size: 22),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: foregroundColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                  letterSpacing: 0.8,
-                ),
-              ),
-            ],
-          )
-        : Icon(icon, color: foregroundColor, size: 24);
     return Material(
       elevation: 6,
       shadowColor: backgroundColor.withValues(alpha: 0.4),
-      borderRadius: BorderRadius.circular(isExtended ? 28 : 16),
+      borderRadius: BorderRadius.circular(16),
       color: backgroundColor,
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(isExtended ? 28 : 16),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: isExtended ? 20 : 16,
-            vertical: isExtended ? 14 : 16,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(isExtended ? 28 : 16),
+            borderRadius: BorderRadius.circular(16),
             border: borderColor != null
                 ? Border.all(color: borderColor!, width: 1.5)
                 : null,
           ),
-          child: content,
+          child: Icon(icon, color: foregroundColor, size: 24),
         ),
       ),
     );

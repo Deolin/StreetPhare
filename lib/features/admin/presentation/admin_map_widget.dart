@@ -94,6 +94,8 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
         return Colors.blue;
       case AlertType.autopompes:
         return Colors.orange;
+      case AlertType.gazLacrymogenes:
+        return Colors.lime;
       case AlertType.filtre:
         return Colors.teal;
       case AlertType.panic:
@@ -120,6 +122,8 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
         return Icons.local_police;
       case AlertType.autopompes:
         return Icons.fire_truck;
+      case AlertType.gazLacrymogenes:
+        return Icons.air;
       case AlertType.filtre:
         return Icons.filter_alt;
       case AlertType.panic:
@@ -183,6 +187,8 @@ class _AdminMapWidgetState extends State<AdminMapWidget> {
         return 'Police';
       case AlertType.autopompes:
         return 'Autopompes';
+      case AlertType.gazLacrymogenes:
+        return 'Gaz lacrymogènes';
       case AlertType.filtre:
         return 'Filtre';
       case AlertType.panic:

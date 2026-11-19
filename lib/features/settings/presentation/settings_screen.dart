@@ -29,6 +29,7 @@ import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../services/apk_downloader_service.dart';
 import '../../../services/app_share_service.dart';
+import '../../../services/github_update_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../services/permission_service.dart';
 import '../../../services/streetphare_foreground_task.dart';
@@ -39,6 +40,7 @@ import '../../messaging/data/hive_block_service.dart';
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/domain/models/avoidance_filters.dart';
 import '../../streetmedic/presentation/streetmedic_authorization_section.dart';
+import '../../trust_group/presentation/trust_group_screen.dart';
 import '../../tutorial/presentation/tutorial_screen.dart';
 import '../data/app_preferences_store.dart';
 import '../data/panic_contact.dart';
@@ -106,6 +108,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const _StreetMedicSection(),
                     _BackgroundServiceSection(strings: s),
                     _PanicContactsSection(strings: s),
+                    const _TrustGroupSection(),
                     _ShareApkSection(strings: s),
                     _TutorialSection(strings: s),
                     _AboutSection(strings: s),
@@ -1466,6 +1469,41 @@ class _TutorialSection extends StatelessWidget {
 }
 
 // ============================================================================
+// [10b] Section GROUPE DE CONFIANCE
+// ============================================================================
+
+class _TrustGroupSection extends StatelessWidget {
+  const _TrustGroupSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return _Card(
+      child: ListTile(
+        leading:
+            Icon(Icons.group, color: StreetPhareTheme.primary, size: 26),
+        title: Text(
+          'Groupe de confiance',
+          style: TextStyle(color: onSurface, fontWeight: FontWeight.w500),
+        ),
+        subtitle: Text(
+          'Repérez vos amis dans la foule (positions privées)',
+          style: TextStyle(
+            color: onSurface.withValues(alpha: 0.65),
+            fontSize: 12,
+          ),
+        ),
+        trailing:
+            Icon(Icons.chevron_right, color: onSurface.withValues(alpha: 0.4)),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const TrustGroupScreen()),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
 // [11] Section À PROPOS
 // ============================================================================
 
@@ -1566,12 +1604,29 @@ class _AboutSection extends StatelessWidget {
         ),
         actions: [
           TextButton(
+            onPressed: () => _checkForUpdates(ctx),
+            child: const Text('Vérifier les mises à jour'),
+          ),
+          TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
             child: Text(strings.close),
           ),
         ],
       ),
     );
+  }
+
+  /// Vérifie manuellement les mises à jour GitHub et affiche le résultat.
+  Future<void> _checkForUpdates(BuildContext context) async {
+    final release = await GithubUpdateService.instance.checkForUpdate();
+    if (!context.mounted) return;
+    if (release != null) {
+      await GithubUpdateService.instance.showUpdateDialog(context, release);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vous êtes à jour.')),
+      );
+    }
   }
 }
 

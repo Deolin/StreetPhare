@@ -19,9 +19,9 @@ plugins {
 // (BaseAppModuleExtension toujours fonctionnel en attendant AGP 10.0)
 android {
     namespace = "com.example.flutter_streetphare"
-    // compileSdk 37 requis par flutter_local_notifications,
-    // permission_handler_android et reactive_ble_mobile.
-    compileSdk = 37
+    // compileSdk 36 = défaut Flutter 3.47 (plugins épinglés sur des versions
+    // stables compatibles compileSdk 36).
+    compileSdk = 36
     ndkVersion = "28.2.13676358"
 
     compileOptions {
@@ -76,18 +76,6 @@ android {
 kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
-
-        // ── Désactive les lambdas `invokedynamic` (mode `indy` par défaut) ────
-        // Kotlin 2.4 génère alors des classes de lambdas explicites au lieu de
-        // laisser D8/R8 produire des « global synthetics » ($$InternalSyntheticLambda).
-        // Bug AGP 9.1.0 + D8 9.1.31 : ce traitement « global synthetics » fait
-        // DISPARAÎTRE la classe principale OsmAndBridgePlugin du dex final →
-        // NoClassDefFoundError au démarrage (crash). `class` est le schéma
-        // historique (< Kotlin 1.5), stable et bien testé.
-        freeCompilerArgs.addAll(
-            "-Xlambdas=class",
-            "-Xsam-conversions=class",
-        )
     }
 }
 

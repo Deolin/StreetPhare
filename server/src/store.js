@@ -411,7 +411,7 @@ class Store {
       }
       const ageMinutes = (now - new Date(a.createdAt)) / 60000;
       if (ageMinutes > config.ttls.absoluteRgpd) return false;
-      const ttls = { mobile_danger: config.ttls.mobileDanger, police: config.ttls.staticDanger, fire_truck: config.ttls.staticDanger, filter: config.ttls.staticDanger, panic: config.ttls.panic, collective_danger: config.ttls.collectiveDanger };
+      const ttls = { mobile_danger: config.ttls.mobileDanger, police: config.ttls.staticDanger, fire_truck: config.ttls.staticDanger, filter: config.ttls.staticDanger, panic: config.ttls.panic, collective_danger: config.ttls.collectiveDanger, tear_gas: config.ttls.mobileDanger };
       const maxAge = ttls[a.type] || config.ttls.mobileDanger;
       if (ageMinutes > maxAge) return false;
       if (a.scoutValidated || a.status === 'validated') return true;

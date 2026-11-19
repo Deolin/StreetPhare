@@ -95,7 +95,7 @@ router.post('/alerts', reportLimiter, (req, res) => {
     return res.status(400).json({ error: 'JSON invalide' });
   }
 
-  const validTypes = ['mobile_danger', 'police', 'fire_truck', 'filter', 'panic', 'collective_danger'];
+  const validTypes = ['mobile_danger', 'police', 'fire_truck', 'filter', 'panic', 'collective_danger', 'tear_gas'];
   if (!validTypes.includes(type)) {
     return res.status(400).json({ error: `type invalide. Valides: ${validTypes.join(', ')}` });
   }

@@ -34,6 +34,12 @@ enum ReportType {
     icon: Icons.local_fire_department,
     color: Color(0xFF1976D2),
   ),
+  gazLacrymogenes(
+    id: 'gaz_lacrymogenes',
+    label: 'Gaz lacrymogènes',
+    icon: Icons.air,
+    color: Color(0xFFCDDC39),
+  ),
   policiers(
     id: 'policiers',
     label: 'Policiers',
@@ -84,6 +90,8 @@ extension ReportTypeAlertMapping on ReportType {
         return AlertType.filtre;
       case ReportType.autopompes:
         return AlertType.autopompes;
+      case ReportType.gazLacrymogenes:
+        return AlertType.gazLacrymogenes;
       case ReportType.policiers:
         return AlertType.policiers;
       case ReportType.dangers:

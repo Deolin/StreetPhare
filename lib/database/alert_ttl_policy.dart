@@ -45,6 +45,7 @@ class AlertTtlPolicy {
       case 'barrages':
       case 'groupes_casseurs':
       case 'dangers':
+      case 'gaz_lacrymogenes':
         return true;
       case 'zones_filtrees':
       case 'autopompes':
@@ -63,6 +64,7 @@ class AlertTtlPolicy {
       case AlertType.barrage:
       case AlertType.casseurs:
       case AlertType.danger:
+      case AlertType.gazLacrymogenes:
         return true;
       case AlertType.policiers:
       case AlertType.autopompes:
