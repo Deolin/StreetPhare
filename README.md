@@ -26,13 +26,15 @@ Le client suit une architecture **feature-first**, organisée en couches :
 
 ```text
 lib/
+├── constants/     # constantes applicatives partagées
 ├── core/          # auth, cache, config, di, i18n, models, network, router,
 │                  #   security, services, theme, utils
 ├── features/      # splash, start_screen, tutorial, map, reports, alerts,
 │                  #   panic, events, geofencing, messaging, routing, admin,
-│                  #   bug_report, settings, sandbox
+│                  #   bug_report, settings, sandbox, streetmedic, trust_group
 ├── network/       # P2P (BLE, WebSocket, Wi-Fi Direct, relay), failover, sync
-├── services/      # notifications, APK, version, tuiles, permissions
+├── services/      # notifications, APK, version, tuiles, permissions,
+│                  #   tâche de premier plan
 ├── database/      # Hive + crypto (AES/HMAC) + politiques TTL/visibilité
 ├── debug/         # ClientDebugLogger (observabilité locale)
 └── l10n/          # fr, en, nl, de (fichiers ARB générés)
@@ -50,7 +52,7 @@ lib/
 | **Sécurité client** | `cryptography` (AES-256-CBC, Ed25519), `flutter_secure_storage` (Keystore/Keychain OS) |
 | **Notifications** | `flutter_local_notifications`, `flutter_foreground_task` |
 | **Scan QR** | `mobile_scanner` (MLKit) |
-| **Serveur** | Node.js + Express 4 (primary/backup, JWT, rate-limiting) |
+| **Serveur** | Node.js + Express 5 (primary/backup, JWT, rate-limiting) |
 | **Reverse proxy** | Caddy (TLS Let's Encrypt, HSTS) |
 | **Packaging serveur** | `esbuild` + Node SEA (exécutable autonome) |
 | **CI/CD** | GitHub Actions (analyse, tests, builds Android/iOS/Windows/server) |
@@ -77,10 +79,12 @@ lib/
 |---|---|
 | **Onboarding** | Splash + cache 24 h, écran d'accueil, tutoriel pas-à-pas |
 | **Carte** | Carte OSM interactive, couche « safe route », marqueur de cap, tuiles hors-ligne |
-| **Signalements** | 7 types de dangers, alertes avec TTL, validation par consensus (anti-spam) |
+| **Signalements** | 9 types (barrages, gaz lacrymogènes, policiers, Zone Safe…), alertes avec TTL, validation par consensus (anti-spam) |
 | **Panic** | Alerte PANIC individuelle & collective (agrégation par proximité), contacts d'urgence |
+| **Street-Medic** | Appel du street-medic le plus proche, missions d'intervention, suivi du blessé, alerte 112, partage de position |
 | **Événements** | Catalogue d'événements, scan QR d'entrée, géorepérage |
 | **Messagerie** | Messagerie P2P (Hive), fils de discussion, blocage d'utilisateurs |
+| **Groupe de confiance** | Suivi de position entre amis avec consentement, demandes en attente, effacement d'urgence |
 | **Routage** | A*/Dijkstra, graphe SPG, map matching, GraphHopper embarqué, OsmAnd, zones d'évitement |
 | **Admin** | Dashboard + carte administrateur (validation des signalements) |
 | **Divers** | Rapport de crash offline-first, paramètres, thème clair/sombre, accessibilité, 4 langues |

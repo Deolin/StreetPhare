@@ -86,7 +86,7 @@ StreetPhare/
 | **Sécurité client** | `cryptography` (AES-256-CBC, Ed25519), `flutter_secure_storage` | Clé maîtresse dans Keystore/Keychain OS |
 | **Notifications** | `flutter_local_notifications`, `flutter_foreground_task` | Notifications + tâche de fond |
 | **Scan QR** | `mobile_scanner` (MLKit) | Lecture QR événement |
-| **Serveur** | Node.js + Express 4 | v3.0.0, ~2 300 lignes |
+| **Serveur** | Node.js + Express 5 | v3.0.0, ~2 300 lignes |
 | **Auth serveur** | JWT (`jsonwebtoken`) + `bcryptjs` + RBAC | Dashboard admin |
 | **Sécurité serveur** | `helmet`, `express-rate-limit`, `cors` | Durcissement HTTP + rate limiting |
 | **Temps réel** | `ws` (WebSocket) | `/mesh` (propagation alertes), `/admin` |
@@ -137,18 +137,24 @@ StreetPhare/
 | **Carte** | Carte interactive OpenStreetMap | ✅ | `map_screen.dart`, `flutter_map` |
 | | Couche « safe route » + marqueur de cap | ✅ | `safe_route_layer.dart`, `user_heading_marker.dart` |
 | | Cache de tuiles hors-ligne | ✅ | `map_tile_download_service.dart` |
-| **Signalements** | Feuille de signalement (7 types de dangers) | ✅ | `report_bottom_sheet.dart`, `report_type.dart` |
+| **Signalements** | Feuille de signalement (9 types de signalements, dont Zone Safe) | ✅ | `report_bottom_sheet.dart`, `report_type.dart` |
 | | Alertes avec TTL + politiques de visibilité | ✅ | `alert_ttl_policy.dart`, `alert_visibility_policy.dart` |
 | | Consensus multi-votes (anti-spam) | ✅ | Seuil de validation serveur (`CONSENSUS_THRESHOLD`) |
 | **Panic** | Alerte PANIC individuelle | ✅ | `features/panic/` + `collective_panic_service.dart` |
 | | PANIC collectif (agrégation proximité) | ✅ | Serveur : 5 pings < 50 m en 2 min |
 | | Contacts d'urgence (panic contacts) | ✅ | `panic_contact_store.dart` |
+| **Street-Medic** | Appel du street-medic le plus proche | ✅ | `streetmedic_service.dart` (`callNearestMedic`) |
+| | Missions d'intervention + suivi du blessé | ✅ | `streetmedic_mission_panel.dart`, `streetmedic_service.dart` |
+| | Partage de position du medic (« Tracé ») | ✅ | `streetmedic_overlay.dart` (`startSharing`/`stopSharing`) |
 | **Événements** | Gestion + catalogue d'événements | 🟡 | `event_manager.dart`, `events_screen.dart` (13 TODO dans le modèle) |
 | | Scan QR d'entrée d'événement | ✅ | `qr_scanner_screen.dart`, `mobile_scanner` |
 | | Fixtures (zone de Fleurus) | ✅ | `fixtures_fleurus.dart` |
 | **Géorepérage** | Zones + validation de proximité | ✅ | `geofencing_service.dart`, `proximity_validation_service.dart` |
 | **Messagerie** | Messagerie P2P (Hive) + fils | ✅ | `hive_messaging_service.dart`, `hive_messaging_screen.dart` |
 | | Blocage d'utilisateurs | ✅ | `hive_block_service.dart` |
+| **Groupe de confiance** | Suivi de position entre amis | ✅ | `trust_group_service.dart`, `friend_position.dart` |
+| | Consentement + demandes en attente | ✅ | `follow_request.dart`, `follow_request_dialog.dart` |
+| | Effacement d'urgence (panic wipe) | ✅ | `trust_group_service.dart` (`panicWipe`) |
 | **Routage** | Moteur A*/Dijkstra + graphe SPG | ✅ | `astar.dart`, `dijkstra.dart`, `spg_graph.dart` |
 | | Map matching | ✅ | `map_matcher.dart` |
 | | Routage OsmAnd (AIDL) | 🟡 | `osmand_routing_service.dart` (8 TODO, fichier dupliqué) |
@@ -167,7 +173,7 @@ StreetPhare/
 | **MCP** | Serveur MCP (intégration IA) | 🟡 | `mcp-server/src/server.ts` (135 lignes, minimal) |
 | **Sandbox** | Contrôleur de test/playground | ✅ | `sandbox_controller.dart` |
 | **Tests** | Tests unitaires | 🟡 | 7 fichiers (~1 900 lignes) — couverture faible vs ~37 kLOC |
-| **Documentation** | README racine | 🟡 | Obsolète (décrit une app basique antérieure) |
+| **Documentation** | README racine | ✅ | À jour (architecture, stack, fonctionnalités v2.2) |
 
 ## 4. Points de Vigilance & Dette Technique
 
