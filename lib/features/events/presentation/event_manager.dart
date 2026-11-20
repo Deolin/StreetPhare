@@ -98,8 +98,9 @@ class EventManager extends ValueNotifier<List<EventModel>> {
     try {
       event = await _fetchFromServer(upper);
     } catch (e) {
-      if (kDebugMode)
+      if (kDebugMode) {
         debugPrint('[EventManager] recherche serveur échouée : $e');
+      }
       event = null;
     }
 
