@@ -48,7 +48,8 @@ class TrustGroupService {
   static const String _kMyFixedId = 'trust_group_my_fixed_id';
   static const String _kMembers = 'trust_group_members';
   static const String _kMyAlias = 'trust_group_my_alias';
-  static const String _kPendingFollowRequests = 'trust_group_pending_follow_requests';
+  static const String _kPendingFollowRequests =
+      'trust_group_pending_follow_requests';
 
   /// Intervalle de diffusion de la position locale.
   static const Duration broadcastInterval = Duration(seconds: 15);
@@ -259,9 +260,11 @@ class TrustGroupService {
   }
 
   /// Diffuse un signal du groupe de confiance sur le maillage P2P local.
-  Future<void> _broadcastSignal(String kind, Map<String, dynamic> payload) async {
+  Future<void> _broadcastSignal(
+      String kind, Map<String, dynamic> payload) async {
     try {
-      await NetworkCoordinator.instance.broadcastTrustSignal(payload, kind: kind);
+      await NetworkCoordinator.instance
+          .broadcastTrustSignal(payload, kind: kind);
     } catch (e) {
       debugPrint('[TrustGroup] échec diffusion $kind : $e');
     }
@@ -381,8 +384,8 @@ class TrustGroupService {
   Future<void> _persistPending() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw =
-          jsonEncode(pendingFollowRequests.value.map((r) => r.toJson()).toList());
+      final raw = jsonEncode(
+          pendingFollowRequests.value.map((r) => r.toJson()).toList());
       await prefs.setString(_kPendingFollowRequests, raw);
     } catch (e) {
       debugPrint('[TrustGroup] échec persistance demandes : $e');
@@ -452,4 +455,3 @@ class TrustGroupService {
     stopSharing();
   }
 }
-

@@ -75,8 +75,7 @@ class StreetPhareTaskHandler extends TaskHandler {
     }
   }
 
-  static String _hhmm(DateTime t) =>
-      '${t.hour.toString().padLeft(2, '0')}:'
+  static String _hhmm(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:'
       '${t.minute.toString().padLeft(2, '0')}';
 }
 
@@ -158,8 +157,9 @@ class StreetPhareForegroundTask {
   }
 
   /// `true` si le service avant-plan tourne actuellement.
-  static Future<bool> get isRunning =>
-      _isSupported ? FlutterForegroundTask.isRunningService : Future.value(false);
+  static Future<bool> get isRunning => _isSupported
+      ? FlutterForegroundTask.isRunningService
+      : Future.value(false);
 
   static Future<void> _ensureNotificationPermission() async {
     final permission =

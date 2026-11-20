@@ -169,7 +169,8 @@ class _HiveMessagingScreenState extends State<HiveMessagingScreen>
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Demande de suivi envoyée — l\'utilisateur devra l\'accepter.'),
+        content: Text(
+            'Demande de suivi envoyée — l\'utilisateur devra l\'accepter.'),
         duration: Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
       ),
@@ -831,126 +832,127 @@ class _MessageContextMenu extends StatelessWidget {
             if (!isOwn) ...[
               // Action 1 : Bloquer
               ListTile(
-              leading: Icon(
-                isBlocked ? Icons.block_flipped : Icons.block,
-                color: StreetPhareTheme.danger,
-              ),
-              title: Text(
-                isBlocked
-                    ? 'Débloquer cet utilisateur'
-                    : 'Bloquer cet utilisateur',
-                style: TextStyle(
+                leading: Icon(
+                  isBlocked ? Icons.block_flipped : Icons.block,
                   color: StreetPhareTheme.danger,
-                  fontWeight: FontWeight.w500,
                 ),
-              ),
-              subtitle: Text(
-                isBlocked
-                    ? 'Rend ses messages à nouveau visibles'
-                    : 'Rend tous ses messages passés et futurs invisibles '
-                        'sur cet appareil (UUID éphémère local)',
-                style: TextStyle(
-                  color: onSurface.withValues(alpha: 0.6),
-                  fontSize: 12,
+                title: Text(
+                  isBlocked
+                      ? 'Débloquer cet utilisateur'
+                      : 'Bloquer cet utilisateur',
+                  style: TextStyle(
+                    color: StreetPhareTheme.danger,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
+                subtitle: Text(
+                  isBlocked
+                      ? 'Rend ses messages à nouveau visibles'
+                      : 'Rend tous ses messages passés et futurs invisibles '
+                          'sur cet appareil (UUID éphémère local)',
+                  style: TextStyle(
+                    color: onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  if (isBlocked) {
+                    HiveBlockService.instance
+                        .unblockUser(message.senderEphemeralId);
+                  } else {
+                    onBlock();
+                  }
+                },
               ),
-              onTap: () {
-                Navigator.of(context).pop();
-                if (isBlocked) {
-                  HiveBlockService.instance
-                      .unblockUser(message.senderEphemeralId);
-                } else {
-                  onBlock();
-                }
-              },
-            ),
 
-            // Action 2 : Créer une discussion temporaire
-            ListTile(
-              leading: const Icon(Icons.add_comment, color: Color(0xFF9C27B0)),
-              title: const Text(
-                'Créer une discussion temporaire',
-                style: TextStyle(
-                  color: Color(0xFF9C27B0),
-                  fontWeight: FontWeight.w500,
+              // Action 2 : Créer une discussion temporaire
+              ListTile(
+                leading:
+                    const Icon(Icons.add_comment, color: Color(0xFF9C27B0)),
+                title: const Text(
+                  'Créer une discussion temporaire',
+                  style: TextStyle(
+                    color: Color(0xFF9C27B0),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-              subtitle: Text(
-                'Initialise un fil parallèle de '
-                '${HiveBlockService.instance.threadDurationMinutes} min '
-                '(configurable dans les options)',
-                style: TextStyle(
-                  color: onSurface.withValues(alpha: 0.6),
-                  fontSize: 12,
+                subtitle: Text(
+                  'Initialise un fil parallèle de '
+                  '${HiveBlockService.instance.threadDurationMinutes} min '
+                  '(configurable dans les options)',
+                  style: TextStyle(
+                    color: onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
                 ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onCreateThread();
+                },
               ),
-              onTap: () {
-                Navigator.of(context).pop();
-                onCreateThread();
-              },
-            ),
 
-            // Action 3 : Ajouter / indicateur de fil actif
-            ListTile(
-              leading: Icon(
-                isInThread ? Icons.group : Icons.group_add,
-                color: isInThread
-                    ? const Color(0xFF388E3C)
-                    : const Color(0xFF1976D2),
-              ),
-              title: Text(
-                isInThread
-                    ? 'Messages copiés dans ce fil (déjà ajouté)'
-                    : hasActiveThread
-                        ? 'Ajouter à la discussion active'
-                        : 'Créer un fil et y ajouter',
-                style: TextStyle(
+              // Action 3 : Ajouter / indicateur de fil actif
+              ListTile(
+                leading: Icon(
+                  isInThread ? Icons.group : Icons.group_add,
                   color: isInThread
                       ? const Color(0xFF388E3C)
                       : const Color(0xFF1976D2),
-                  fontWeight: FontWeight.w500,
                 ),
-              ),
-              subtitle: Text(
-                isInThread
-                    ? 'La bulle de cet utilisateur est colorée '
-                        'pour indiquer que ses messages sont dans le fil actif'
-                    : 'Ajoute l\'utilisateur au fil temporaire en cours',
-                style: TextStyle(
-                  color: onSurface.withValues(alpha: 0.6),
-                  fontSize: 12,
+                title: Text(
+                  isInThread
+                      ? 'Messages copiés dans ce fil (déjà ajouté)'
+                      : hasActiveThread
+                          ? 'Ajouter à la discussion active'
+                          : 'Créer un fil et y ajouter',
+                  style: TextStyle(
+                    color: isInThread
+                        ? const Color(0xFF388E3C)
+                        : const Color(0xFF1976D2),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
+                subtitle: Text(
+                  isInThread
+                      ? 'La bulle de cet utilisateur est colorée '
+                          'pour indiquer que ses messages sont dans le fil actif'
+                      : 'Ajoute l\'utilisateur au fil temporaire en cours',
+                  style: TextStyle(
+                    color: onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
+                onTap: isInThread
+                    ? null
+                    : () {
+                        Navigator.of(context).pop();
+                        onAddToThread();
+                      },
               ),
-              onTap: isInThread
-                  ? null
-                  : () {
-                      Navigator.of(context).pop();
-                      onAddToThread();
-                    },
-            ),
 
-            // Action 4 : Ajouter au groupe de confiance
-            ListTile(
-              leading: Icon(Icons.group, color: StreetPhareTheme.primary),
-              title: Text(
-                'Ajouter au groupe de confiance',
-                style: TextStyle(
-                  color: StreetPhareTheme.primary,
-                  fontWeight: FontWeight.w500,
+              // Action 4 : Ajouter au groupe de confiance
+              ListTile(
+                leading: Icon(Icons.group, color: StreetPhareTheme.primary),
+                title: Text(
+                  'Ajouter au groupe de confiance',
+                  style: TextStyle(
+                    color: StreetPhareTheme.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-              subtitle: Text(
-                'Envoie une demande de suivi (l\'utilisateur devra accepter)',
-                style: TextStyle(
-                  color: onSurface.withValues(alpha: 0.6),
-                  fontSize: 12,
+                subtitle: Text(
+                  'Envoie une demande de suivi (l\'utilisateur devra accepter)',
+                  style: TextStyle(
+                    color: onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
                 ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  onAddToTrustGroup();
+                },
               ),
-              onTap: () {
-                Navigator.of(context).pop();
-                onAddToTrustGroup();
-              },
-            ),
             ],
 
             const SizedBox(height: 8),

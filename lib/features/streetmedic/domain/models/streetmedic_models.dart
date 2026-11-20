@@ -124,7 +124,8 @@ class MedicMission {
         completedAt: json['completedAt'] as String?,
         createdAt: json['createdAt'] as String?,
         emergencyAt: json['emergencyAt'] as String?,
-        emergencyAcknowledged: (json['emergencyAcknowledged'] as bool?) ?? false,
+        emergencyAcknowledged:
+            (json['emergencyAcknowledged'] as bool?) ?? false,
       );
 
   final String id;

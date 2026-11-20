@@ -548,8 +548,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 const SizedBox(width: 8),
                 if (pending.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: const Color(0xFFD32F2F),
                       borderRadius: BorderRadius.circular(10),
@@ -569,8 +569,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               const Text(
                 'Aucune alerte de détresse en cours.',
                 style: TextStyle(
-                    fontSize: 13,
-                    color: StreetPhareTheme.darkTextSecondary),
+                    fontSize: 13, color: StreetPhareTheme.darkTextSecondary),
               )
             else ...[
               ...pending.map(_buildEmergencyTile),
@@ -981,8 +980,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 'Aucun faux medic. Ajoutez-en un pour tester le flux '
                 'd\'intervention complet.',
                 style: TextStyle(
-                    fontSize: 13,
-                    color: StreetPhareTheme.darkTextSecondary),
+                    fontSize: 13, color: StreetPhareTheme.darkTextSecondary),
               )
             else
               ..._simMedics.map(_buildSimMedicTile),
@@ -1013,8 +1011,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             children: [
               Icon(
                 busy ? Icons.local_hospital : Icons.person_pin,
-                color:
-                    busy ? const Color(0xFFFFB300) : const Color(0xFF26A69A),
+                color: busy ? const Color(0xFFFFB300) : const Color(0xFF26A69A),
                 size: 18,
               ),
               const SizedBox(width: 6),
@@ -1061,7 +1058,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               ),
               ActionChip(
                 label: const Text('Mission + accept.'),
-                onPressed: () => _handleCreateFakeMission(m.userId, accept: true),
+                onPressed: () =>
+                    _handleCreateFakeMission(m.userId, accept: true),
               ),
             ],
           ),
@@ -1094,8 +1092,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   '→ medic ${m.medicId.substring(0, m.medicId.length > 10 ? 10 : m.medicId.length)} '
                   '[$label]',
                   style: const TextStyle(
-                      fontSize: 12,
-                      color: StreetPhareTheme.darkTextSecondary),
+                      fontSize: 12, color: StreetPhareTheme.darkTextSecondary),
                 ),
               ),
             ],
@@ -1108,32 +1105,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 if (pending)
                   ActionChip(
                     label: const Text('Accepter'),
-                    onPressed: () =>
-                        _handleFakeMissionState(m.id, 'accepted'),
+                    onPressed: () => _handleFakeMissionState(m.id, 'accepted'),
                   ),
                 if (pending)
                   ActionChip(
                     label: const Text('Refuser'),
-                    onPressed: () =>
-                        _handleFakeMissionState(m.id, 'refused'),
+                    onPressed: () => _handleFakeMissionState(m.id, 'refused'),
                   ),
                 if (accepted)
                   ActionChip(
                     label: const Text('Terminer (soignée)'),
-                    onPressed: () =>
-                        _handleFakeMissionState(m.id, 'completed'),
+                    onPressed: () => _handleFakeMissionState(m.id, 'completed'),
                   ),
                 if (accepted)
                   ActionChip(
                     label: const Text('Urgence 112'),
-                    onPressed: () =>
-                        _handleFakeMissionState(m.id, 'emergency'),
+                    onPressed: () => _handleFakeMissionState(m.id, 'emergency'),
                   ),
                 if (pending || accepted)
                   ActionChip(
                     label: const Text('Annuler'),
-                    onPressed: () =>
-                        _handleFakeMissionState(m.id, 'cancelled'),
+                    onPressed: () => _handleFakeMissionState(m.id, 'cancelled'),
                   ),
               ],
             ),

@@ -666,8 +666,8 @@ class RbacAdminService {
   }
 
   Future<void> acknowledgeMedicEmergency(String id) async {
-    final uri =
-        Uri.parse('$_baseUrl/api/admin/streetmedic-emergencies/$id/acknowledge');
+    final uri = Uri.parse(
+        '$_baseUrl/api/admin/streetmedic-emergencies/$id/acknowledge');
     final res = await http
         .post(uri, headers: _authHeaders)
         .timeout(const Duration(seconds: 15));
@@ -679,8 +679,7 @@ class RbacAdminService {
   }
 
   Future<void> deleteMedicEmergency(String id) async {
-    final uri =
-        Uri.parse('$_baseUrl/api/admin/streetmedic-emergencies/$id');
+    final uri = Uri.parse('$_baseUrl/api/admin/streetmedic-emergencies/$id');
     final res = await http
         .delete(uri, headers: _authHeaders)
         .timeout(const Duration(seconds: 15));
@@ -725,7 +724,8 @@ class RbacAdminService {
         .post(
           uri,
           headers: _authHeaders,
-          body: jsonEncode({'lat': lat, 'lng': lng, 'sharing': sharing, 'busy': busy}),
+          body: jsonEncode(
+              {'lat': lat, 'lng': lng, 'sharing': sharing, 'busy': busy}),
         )
         .timeout(const Duration(seconds: 15));
     final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -733,7 +733,8 @@ class RbacAdminService {
       throw Exception(
           data['error'] ?? 'Erreur lors de la création du medic simulé');
     }
-    return SimulatedStreetMedic.fromJson(data['streetmedic'] as Map<String, dynamic>);
+    return SimulatedStreetMedic.fromJson(
+        data['streetmedic'] as Map<String, dynamic>);
   }
 
   Future<void> setFakeStreetMedicState(String userId,
@@ -744,8 +745,8 @@ class RbacAdminService {
         .post(
           uri,
           headers: _authHeaders,
-          body: jsonEncode(
-              {'status': status, 'sharing': sharing, 'busy': busy}),
+          body:
+              jsonEncode({'status': status, 'sharing': sharing, 'busy': busy}),
         )
         .timeout(const Duration(seconds: 15));
     if (res.statusCode != 200) {

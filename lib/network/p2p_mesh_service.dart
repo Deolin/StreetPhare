@@ -493,8 +493,7 @@ class P2PMeshService {
       // payload `{ alert }` au format REST. Le rejet (`report_rejected`) est
       // traité par le NetworkCoordinator (suppression + tombstone P2P) pour
       // éviter le conflit upsert/delete.
-      if (json['kind'] == 'report_validated' ||
-          json['kind'] == 'new_alert') {
+      if (json['kind'] == 'report_validated' || json['kind'] == 'new_alert') {
         final alertJson = json['alert'];
         if (alertJson is Map<String, dynamic>) {
           final alert = Alert.fromJson(alertJson);

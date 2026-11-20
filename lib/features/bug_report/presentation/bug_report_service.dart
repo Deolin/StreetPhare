@@ -271,106 +271,105 @@ class BugReportService {
     if (!_started || _flushing) return;
     _flushing = true;
     try {
-
-    // Vérifie si on est en backoff rate-limit.
-    if (_isRateLimited()) {
-      if (kDebugMode) {
-        debugPrint('[BugReport] ⏸ Flush suspendu (backoff rate-limit)');
-      }
-      return;
-    }
-
-    final pending = _db.getAllPending();
-    if (pending.isEmpty) return;
-
-    if (kDebugMode) {
-      debugPrint(
-          '[BugReport] 📤 Flush — ${pending.length} rapport(s) à envoyer');
-    }
-
-    bool anySuccess = false;
-
-    for (final entry in pending) {
-      // Double-check après chaque envoi : le 429 peut arriver en cours de flush.
+      // Vérifie si on est en backoff rate-limit.
       if (_isRateLimited()) {
         if (kDebugMode) {
-          debugPrint(
-              '[BugReport] ⏸ Flush interrompu (rate-limit reçu en cours)');
+          debugPrint('[BugReport] ⏸ Flush suspendu (backoff rate-limit)');
         }
-        break;
+        return;
       }
 
-      try {
-        final payload = _buildPayload(entry);
-        final statusCode = await _trySend(payload);
+      final pending = _db.getAllPending();
+      if (pending.isEmpty) return;
 
-        if (statusCode == 200) {
-          // ✅ SUCCÈS : suppression du stockage local UNIQUEMENT maintenant.
-          await _db.remove(entry.id);
-          anySuccess = true;
+      if (kDebugMode) {
+        debugPrint(
+            '[BugReport] 📤 Flush — ${pending.length} rapport(s) à envoyer');
+      }
+
+      bool anySuccess = false;
+
+      for (final entry in pending) {
+        // Double-check après chaque envoi : le 429 peut arriver en cours de flush.
+        if (_isRateLimited()) {
           if (kDebugMode) {
             debugPrint(
-                '[BugReport] ✅ Rapport "${entry.title}" envoyé et supprimé');
-          }
-        } else if (statusCode == 429) {
-          // ⛔ RATE-LIMIT : on arrête tout le flush.
-          // Le backoff a déjà été configuré dans _trySend.
-          // On met à jour le compteur mais on ne réessaie pas.
-          await _db.updateAttempt(
-            entry.id,
-            attempts: entry.attempts + 1,
-            lastError: 'Rate-limit serveur (429)',
-          );
-          if (kDebugMode) {
-            debugPrint(
-                '[BugReport] ⛔ Rate-limit — flush suspendu, ${pending.length - 1} rapport(s) restant(s)');
+                '[BugReport] ⏸ Flush interrompu (rate-limit reçu en cours)');
           }
           break;
-        } else {
-          // ❌ ÉCHEC : mise à jour du compteur de tentatives.
-          await _db.updateAttempt(
-            entry.id,
-            attempts: entry.attempts + 1,
-            lastError: 'Échec envoi (tentative ${entry.attempts + 1})',
-          );
+        }
+
+        try {
+          final payload = _buildPayload(entry);
+          final statusCode = await _trySend(payload);
+
+          if (statusCode == 200) {
+            // ✅ SUCCÈS : suppression du stockage local UNIQUEMENT maintenant.
+            await _db.remove(entry.id);
+            anySuccess = true;
+            if (kDebugMode) {
+              debugPrint(
+                  '[BugReport] ✅ Rapport "${entry.title}" envoyé et supprimé');
+            }
+          } else if (statusCode == 429) {
+            // ⛔ RATE-LIMIT : on arrête tout le flush.
+            // Le backoff a déjà été configuré dans _trySend.
+            // On met à jour le compteur mais on ne réessaie pas.
+            await _db.updateAttempt(
+              entry.id,
+              attempts: entry.attempts + 1,
+              lastError: 'Rate-limit serveur (429)',
+            );
+            if (kDebugMode) {
+              debugPrint(
+                  '[BugReport] ⛔ Rate-limit — flush suspendu, ${pending.length - 1} rapport(s) restant(s)');
+            }
+            break;
+          } else {
+            // ❌ ÉCHEC : mise à jour du compteur de tentatives.
+            await _db.updateAttempt(
+              entry.id,
+              attempts: entry.attempts + 1,
+              lastError: 'Échec envoi (tentative ${entry.attempts + 1})',
+            );
+            if (kDebugMode) {
+              debugPrint(
+                  '[BugReport] ❌ Rapport "${entry.title}" — échec (${entry.attempts + 1}/$_kMaxAttemptsBeforeAbandon)');
+            }
+          }
+        } catch (e) {
+          // Blindage : l'échec d'un rapport ne bloque pas les autres.
           if (kDebugMode) {
             debugPrint(
-                '[BugReport] ❌ Rapport "${entry.title}" — échec (${entry.attempts + 1}/$_kMaxAttemptsBeforeAbandon)');
+                '[BugReport] ⚠ Exception flush rapport "${entry.title}": $e');
           }
+          try {
+            await _db.updateAttempt(
+              entry.id,
+              attempts: entry.attempts + 1,
+              lastError: e.toString(),
+            );
+          } catch (_) {}
         }
-      } catch (e) {
-        // Blindage : l'échec d'un rapport ne bloque pas les autres.
-        if (kDebugMode) {
-          debugPrint(
-              '[BugReport] ⚠ Exception flush rapport "${entry.title}": $e');
-        }
-        try {
-          await _db.updateAttempt(
-            entry.id,
-            attempts: entry.attempts + 1,
-            lastError: e.toString(),
-          );
-        } catch (_) {}
       }
-    }
 
-    // Nettoie les rapports abandonnés (> 8 tentatives).
-    if (anySuccess ||
-        pending.any((e) => e.attempts >= _kMaxAttemptsBeforeAbandon)) {
-      await _db.purgeAbandoned(maxAttempts: _kMaxAttemptsBeforeAbandon);
-    }
+      // Nettoie les rapports abandonnés (> 8 tentatives).
+      if (anySuccess ||
+          pending.any((e) => e.attempts >= _kMaxAttemptsBeforeAbandon)) {
+        await _db.purgeAbandoned(maxAttempts: _kMaxAttemptsBeforeAbandon);
+      }
 
-    // Ajuste le backoff exponentiel du flush périodique.
-    if (anySuccess) {
-      _consecutiveFlushFailures = 0;
-    } else if (pending.isNotEmpty) {
-      _consecutiveFlushFailures++;
-    }
-    // Remet à zéro si on dépasse 6 échecs consécutifs
-    // (backoff déjà maximal atteint).
-    if (_consecutiveFlushFailures > 6) {
-      _consecutiveFlushFailures = 6; // Plafonne à 6 (backoff max ~64s).
-    }
+      // Ajuste le backoff exponentiel du flush périodique.
+      if (anySuccess) {
+        _consecutiveFlushFailures = 0;
+      } else if (pending.isNotEmpty) {
+        _consecutiveFlushFailures++;
+      }
+      // Remet à zéro si on dépasse 6 échecs consécutifs
+      // (backoff déjà maximal atteint).
+      if (_consecutiveFlushFailures > 6) {
+        _consecutiveFlushFailures = 6; // Plafonne à 6 (backoff max ~64s).
+      }
     } finally {
       _flushing = false;
     }

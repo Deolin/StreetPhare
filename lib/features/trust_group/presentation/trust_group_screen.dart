@@ -54,7 +54,8 @@ class _TrustGroupScreenState extends State<TrustGroupScreen> {
               children: [
                 Text(
                   'Mon identifiant de groupe',
-                  style: TextStyle(color: onSurface, fontWeight: FontWeight.w600),
+                  style:
+                      TextStyle(color: onSurface, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -201,8 +202,8 @@ class _TrustGroupScreenState extends State<TrustGroupScreen> {
                     _Card(
                       child: ListTile(
                         contentPadding: EdgeInsets.zero,
-                        leading: Icon(Icons.person,
-                            color: StreetPhareTheme.primary),
+                        leading:
+                            Icon(Icons.person, color: StreetPhareTheme.primary),
                         title: Text(
                           m.alias,
                           style: TextStyle(

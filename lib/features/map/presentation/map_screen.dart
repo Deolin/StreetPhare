@@ -108,7 +108,8 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixin {
+class _MapScreenState extends State<MapScreen>
+    with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
 
   /// Fournisseur de tuiles réutilisé (identité stable) pour éviter de
@@ -2959,88 +2960,52 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                  // Orientation auto selon le cap (heading-up)
-                                  Material(
-                                    elevation: 4,
-                                    shape: const CircleBorder(),
-                                    color: _followHeading
-                                        ? StreetPhareTheme.primary
-                                        : StreetPhareTheme.surface
-                                            .withValues(alpha: 0.9),
-                                    child: InkWell(
-                                      customBorder: const CircleBorder(),
-                                      onTap: () {
-                                        setState(() =>
-                                            _followHeading = !_followHeading);
-                                        if (_followHeading) {
-                                          // Oriente immédiatement + active le
-                                          // suivi pour rester centré.
-                                          _rotateMapToHeading();
-                                          if (!_followUser) {
-                                            setState(() => _followUser = true);
-                                            _animateToUser();
+                                    // Orientation auto selon le cap (heading-up)
+                                    Material(
+                                      elevation: 4,
+                                      shape: const CircleBorder(),
+                                      color: _followHeading
+                                          ? StreetPhareTheme.primary
+                                          : StreetPhareTheme.surface
+                                              .withValues(alpha: 0.9),
+                                      child: InkWell(
+                                        customBorder: const CircleBorder(),
+                                        onTap: () {
+                                          setState(() =>
+                                              _followHeading = !_followHeading);
+                                          if (_followHeading) {
+                                            // Oriente immédiatement + active le
+                                            // suivi pour rester centré.
+                                            _rotateMapToHeading();
+                                            if (!_followUser) {
+                                              setState(
+                                                  () => _followUser = true);
+                                              _animateToUser();
+                                            }
+                                          } else {
+                                            // Rétablit le nord vers le haut.
+                                            try {
+                                              _mapController.rotate(0);
+                                            } catch (_) {}
                                           }
-                                        } else {
-                                          // Rétablit le nord vers le haut.
-                                          try {
-                                            _mapController.rotate(0);
-                                          } catch (_) {}
-                                        }
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(12),
-                                        child: Icon(
-                                          _followHeading
-                                              ? Icons.navigation
-                                              : Icons.explore_outlined,
-                                          color: _followHeading
-                                              ? Colors.white
-                                              : StreetPhareTheme.textSecondary,
-                                          size: 24,
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: Icon(
+                                            _followHeading
+                                                ? Icons.navigation
+                                                : Icons.explore_outlined,
+                                            color: _followHeading
+                                                ? Colors.white
+                                                : StreetPhareTheme
+                                                    .textSecondary,
+                                            size: 24,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  // Recentrer / suivre la position GPS
-                                  Material(
-                                    elevation: 4,
-                                    shape: const CircleBorder(),
-                                    color: StreetPhareTheme.surface
-                                        .withValues(alpha: 0.9),
-                                    child: InkWell(
-                                      customBorder: const CircleBorder(),
-                                      onTap: () {
-                                        if (!_isTracking) {
-                                          _initUserLocation();
-                                          return;
-                                        }
-                                        // Bascule le mode « suivre » et
-                                        // recentre immédiatement si activé.
-                                        setState(() {
-                                          _followUser = !_followUser;
-                                        });
-                                        if (_followUser) _animateToUser();
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(12),
-                                        child: Icon(
-                                          !_isTracking
-                                              ? Icons.gps_not_fixed
-                                              : _followUser
-                                                  ? Icons.my_location
-                                                  : Icons.gps_fixed,
-                                          color: _followUser
-                                              ? StreetPhareTheme.primary
-                                              : StreetPhareTheme.textSecondary,
-                                          size: 24,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  // Effacer la Route Safe
-                                  if (_safeRoutePoints != null) ...[
                                     const SizedBox(height: 8),
+                                    // Recentrer / suivre la position GPS
                                     Material(
                                       elevation: 4,
                                       shape: const CircleBorder(),
@@ -3049,25 +3014,64 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                                       child: InkWell(
                                         customBorder: const CircleBorder(),
                                         onTap: () {
+                                          if (!_isTracking) {
+                                            _initUserLocation();
+                                            return;
+                                          }
+                                          // Bascule le mode « suivre » et
+                                          // recentre immédiatement si activé.
                                           setState(() {
-                                            _safeRoutePoints = null;
-                                            _passedRoutePoints = null;
+                                            _followUser = !_followUser;
                                           });
-                                          _applyWakelock();
+                                          if (_followUser) _animateToUser();
                                         },
                                         child: Padding(
                                           padding: const EdgeInsets.all(12),
                                           child: Icon(
-                                            Icons.clear,
-                                            color: StreetPhareTheme.danger,
+                                            !_isTracking
+                                                ? Icons.gps_not_fixed
+                                                : _followUser
+                                                    ? Icons.my_location
+                                                    : Icons.gps_fixed,
+                                            color: _followUser
+                                                ? StreetPhareTheme.primary
+                                                : StreetPhareTheme
+                                                    .textSecondary,
                                             size: 24,
                                           ),
                                         ),
                                       ),
                                     ),
+                                    // Effacer la Route Safe
+                                    if (_safeRoutePoints != null) ...[
+                                      const SizedBox(height: 8),
+                                      Material(
+                                        elevation: 4,
+                                        shape: const CircleBorder(),
+                                        color: StreetPhareTheme.surface
+                                            .withValues(alpha: 0.9),
+                                        child: InkWell(
+                                          customBorder: const CircleBorder(),
+                                          onTap: () {
+                                            setState(() {
+                                              _safeRoutePoints = null;
+                                              _passedRoutePoints = null;
+                                            });
+                                            _applyWakelock();
+                                          },
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(12),
+                                            child: Icon(
+                                              Icons.clear,
+                                              color: StreetPhareTheme.danger,
+                                              size: 24,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                ],
-                              ),
+                                ),
                               ),
                             ),
 
@@ -3140,8 +3144,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                                   right: 16,
                                   bottom: interventionActive ? 300.0 : 32.0,
                                   child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.end,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
                                       _ActionFab(
                                         icon: Icons.add_alert,

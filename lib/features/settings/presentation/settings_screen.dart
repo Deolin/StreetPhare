@@ -1480,8 +1480,7 @@ class _TrustGroupSection extends StatelessWidget {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     return _Card(
       child: ListTile(
-        leading:
-            Icon(Icons.group, color: StreetPhareTheme.primary, size: 26),
+        leading: Icon(Icons.group, color: StreetPhareTheme.primary, size: 26),
         title: Text(
           'Groupe de confiance',
           style: TextStyle(color: onSurface, fontWeight: FontWeight.w500),

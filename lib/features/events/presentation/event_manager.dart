@@ -64,7 +64,8 @@ class EventManager extends ValueNotifier<List<EventModel>> {
         // reconstruction COMPLÈTE de la carte chaque seconde (le Stack + ses
         // enfants positionnés) → crash « RenderBox was not laid out /
         // !_debugDoingThisLayout » (layout réentrant).
-        SchedulerBinding.instance.addPostFrameCallback((_) => notifyListeners());
+        SchedulerBinding.instance
+            .addPostFrameCallback((_) => notifyListeners());
       }
     });
   }
@@ -97,7 +98,8 @@ class EventManager extends ValueNotifier<List<EventModel>> {
     try {
       event = await _fetchFromServer(upper);
     } catch (e) {
-      if (kDebugMode) debugPrint('[EventManager] recherche serveur échouée : $e');
+      if (kDebugMode)
+        debugPrint('[EventManager] recherche serveur échouée : $e');
       event = null;
     }
 

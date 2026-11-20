@@ -102,8 +102,7 @@ class Astar {
     for (int iter = 0; iter < maxNodes && iter < n; iter++) {
       // Phase forward : choisir le nœud forward non visité avec la meilleure
       // valeur f = g + h.
-      final fU =
-          _selectNode(fDist, fHeuristic, fVisited, bestPathWeight);
+      final fU = _selectNode(fDist, fHeuristic, fVisited, bestPathWeight);
       if (fU != -1) {
         fVisited[fU] = true;
         nodesExplored++;
@@ -135,8 +134,7 @@ class Astar {
 
       // Phase backward : choisir le nœud backward non visité avec la meilleure
       // valeur f = g + h.
-      final bU =
-          _selectNode(bDist, bHeuristic, bVisited, bestPathWeight);
+      final bU = _selectNode(bDist, bHeuristic, bVisited, bestPathWeight);
       if (bU != -1) {
         bVisited[bU] = true;
         nodesExplored++;

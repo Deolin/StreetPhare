@@ -110,8 +110,7 @@ class StreetMedicOverlay extends StatelessWidget {
                 : _callMedic(context, service),
             borderRadius: BorderRadius.circular(24),
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -178,8 +177,7 @@ class StreetMedicOverlay extends StatelessWidget {
     final ok = await _confirm(
       context,
       title: 'Appeler un street-medic',
-      message:
-          '⚠️ À n\'utiliser qu\'en cas de réel besoin de secours.\n\n'
+      message: '⚠️ À n\'utiliser qu\'en cas de réel besoin de secours.\n\n'
           'Un faux signalement mobilise un street-medic pour rien et peut '
           'retarder une vraie intervention.\n\n'
           'Votre position sera signalée au street-medic le plus proche.',

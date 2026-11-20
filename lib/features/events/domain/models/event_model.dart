@@ -290,14 +290,14 @@ class EventModel {
       safeZones: ((json['safeZones'] as List?) ?? const [])
           .map((z) => EventSafeZone.fromJson(z as Map<String, dynamic>))
           .toList(),
-      destinationLatitude: ((json['destinationLatitude'] ?? json['destLat'])
-                  as num?)
-              ?.toDouble() ??
-          0.0,
-      destinationLongitude: ((json['destinationLongitude'] ?? json['destLng'])
-                  as num?)
-              ?.toDouble() ??
-          0.0,
+      destinationLatitude:
+          ((json['destinationLatitude'] ?? json['destLat']) as num?)
+                  ?.toDouble() ??
+              0.0,
+      destinationLongitude:
+          ((json['destinationLongitude'] ?? json['destLng']) as num?)
+                  ?.toDouble() ??
+              0.0,
       generalZone: json['generalZone'] as String?,
     );
   }

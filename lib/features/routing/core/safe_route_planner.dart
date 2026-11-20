@@ -65,9 +65,7 @@ class SafeRoutePlanner {
     // fournissent une durée réelle ; sinon on estime à partir d'une vitesse
     // moyenne par mode (voiture ≈ 40 km/h, piéton ≈ 4.5 km/h, …). Sans cela,
     // un trajet voiture affichait un temps calculé comme à pied.
-    routes = routes
-        .map((r) => _withEstimatedDuration(r, profile))
-        .toList();
+    routes = routes.map((r) => _withEstimatedDuration(r, profile)).toList();
 
     // Trie + déduplique, puis tronque à [maxRoutes].
     routes = _dedupeAndSort(routes);
@@ -86,8 +84,7 @@ class SafeRoutePlanner {
   /// sauf si le moteur a déjà fourni une durée réelle (ex: OTP/OSRM).
   RouteResult _withEstimatedDuration(RouteResult r, RoutingProfile profile) {
     if (r.duration != null) return r;
-    final seconds =
-        (r.totalDistanceMeters / _averageSpeedMps(profile)).round();
+    final seconds = (r.totalDistanceMeters / _averageSpeedMps(profile)).round();
     return r.copyWith(duration: Duration(seconds: seconds));
   }
 

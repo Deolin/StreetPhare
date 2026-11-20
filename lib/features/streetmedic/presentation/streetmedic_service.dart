@@ -405,7 +405,8 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
   ///   * `treated`   → victime soignée sur place (clôture normale) ;
   ///   * `emergency` → victime non soignable sur place : une alerte « 112 »
   ///                   est remontée dans la section administration.
-  Future<void> completeMission(String missionId, {String outcome = 'treated'}) async {
+  Future<void> completeMission(String missionId,
+      {String outcome = 'treated'}) async {
     try {
       await http
           .post(
@@ -468,7 +469,8 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
           unawaited(
             NotificationService.instance.showAlertNotification(
               title: '🚑 Mission street-medic',
-              body: 'Un blessé à ${newPending.injuredLatitude.toStringAsFixed(4)}, '
+              body:
+                  'Un blessé à ${newPending.injuredLatitude.toStringAsFixed(4)}, '
                   '${newPending.injuredLongitude.toStringAsFixed(4)} vous attend. '
                   'Répondez dans les 30 secondes.',
             ),
@@ -477,8 +479,8 @@ class StreetMedicService extends ValueNotifier<StreetMedic?> {
       } else if (_lastPendingMissionId != null) {
         // Plus de mission en attente : si elle a disparu de notre liste
         // (réaffectée après timeout), on prévient le medic silencieux.
-        final stillMine = all.any((m) =>
-            m.id == _lastPendingMissionId && m.medicId == userId);
+        final stillMine = all
+            .any((m) => m.id == _lastPendingMissionId && m.medicId == userId);
         if (!stillMine) {
           unawaited(_notifyMissionTimeout());
         }

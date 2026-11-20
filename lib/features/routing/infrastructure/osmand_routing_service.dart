@@ -433,7 +433,8 @@ class OsmAndRoutingService {
     final routes = json['routes'] as List<dynamic>? ?? [];
     if (routes.isEmpty) return [];
 
-    final isVehicle = profile == RoutingProfile.vehicle || profile == RoutingProfile.emergency;
+    final isVehicle = profile == RoutingProfile.vehicle ||
+        profile == RoutingProfile.emergency;
     final results = <RouteResult>[];
     for (int i = 0; i < routes.length; i++) {
       final r = routes[i] as Map<String, dynamic>;
@@ -479,7 +480,8 @@ class OsmAndRoutingService {
     required LatLng end,
     RoutingProfile profile = RoutingProfile.pedestrian,
   }) async {
-    final isVehicle = profile == RoutingProfile.vehicle || profile == RoutingProfile.emergency;
+    final isVehicle = profile == RoutingProfile.vehicle ||
+        profile == RoutingProfile.emergency;
     final osrmProfile = isVehicle ? 'driving' : 'foot';
 
     // router.project-osrm.org sert les deux profils (driving + foot).
