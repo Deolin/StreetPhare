@@ -7,7 +7,7 @@
 //        « placement » avec une icône glissable/déposable que l'utilisateur
 //        déplace jusqu'au lieu exact du signalement.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
 import '../../settings/data/app_preferences_store.dart';

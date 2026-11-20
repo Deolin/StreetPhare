@@ -9,7 +9,7 @@
 //   * `lightTheme()` : nouveau thème clair, utilisé quand l'utilisateur
 //     force le mode clair ou quand le système est en mode clair.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'skin_controller.dart';
 import 'theme_palette.dart';

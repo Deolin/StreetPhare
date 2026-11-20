@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 // Déclarations des locales.
 // Ne pas modifier manuellement. Généré par `flutter gen-l10n`.
 import 'package:flutter_streetphare/l10n/app_localizations.dart';
+import 'package:material_ui/material_ui.dart';
 
 export 'package:flutter_streetphare/l10n/app_localizations.dart';
 

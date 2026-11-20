@@ -7,7 +7,7 @@
 // (getters dynamiques) ou le `ColorScheme` du `ThemeData` s'adaptent
 // automatiquement au skin courant.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Couleurs sémantiques d'un skin.
 @immutable

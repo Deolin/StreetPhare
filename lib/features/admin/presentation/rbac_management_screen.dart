@@ -5,7 +5,7 @@
 //   - Création, édition et suppression des Éclaireurs (Scouts)
 //   - Création, édition et suppression des Administrateurs d'Événements (Event Admins)
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
 import '../data/rbac_admin_service.dart';

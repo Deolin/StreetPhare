@@ -17,7 +17,7 @@
 //   n'apparaît dans l'interface. Le code source, lui, reste documenté
 //   et limpide pour tout auditeur technique.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
 import '../../streetmedic/presentation/streetmedic_service.dart';

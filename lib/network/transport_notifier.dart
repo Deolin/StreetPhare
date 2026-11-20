@@ -7,7 +7,7 @@
 // afficher automatiquement les notifications de basculement réseau
 // sans bloquer l'interface utilisateur.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'network_manager.dart';
 

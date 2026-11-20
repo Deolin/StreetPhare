@@ -7,7 +7,7 @@
 // le skin courant, et les getters dynamiques de `StreetPhareTheme`
 // (primary, danger, surface…) reflètent la palette active.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../i18n/app_locale.dart';
 import 'skins/mars_attacks_theme.dart';

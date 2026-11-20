@@ -12,7 +12,7 @@
 // Cette feuille est affichée par `MapScreen` à chaque `GeofenceEvent`
 // filtré (anti-spam 5 min géré par `ProximityValidationService`).
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../core/models/alert_model.dart';
 import '../../../core/theme/streetphare_theme.dart';

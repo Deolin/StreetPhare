@@ -6,8 +6,8 @@
 // En mode voiture/urgence, ces portions sont tracées en rouge pointillé
 // au-dessus de la route pour avertir visuellement le conducteur.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/streetphare_theme.dart';
 import '../../../routing/domain/models/route_result.dart';

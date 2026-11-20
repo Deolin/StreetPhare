@@ -9,7 +9,7 @@
 //   2. « Ouvrir les paramètres » — redirige vers les paramètres Android
 //      de l'application (utile pour les permissions permanentlyDenied).
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'permission_guard_service.dart';

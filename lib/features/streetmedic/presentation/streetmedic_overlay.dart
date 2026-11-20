@@ -1,6 +1,6 @@
 // lib/features/streetmedic/presentation/streetmedic_overlay.dart
-import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
 import '../domain/models/streetmedic_models.dart';

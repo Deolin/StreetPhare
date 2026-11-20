@@ -121,6 +121,37 @@ cd server
 npm run build:all             # produit streetphare-primary.exe / -backup.exe
 ```
 
+### Publier une release (mise à jour automatique des clients)
+
+Quand un tag de release `vX.Y.Z` est poussé, le workflow
+`.github/workflows/release.yml` construit automatiquement les exécutables
+(Windows EXE, Linux tar.gz, Android APK + AAB) et les publie en tant que
+**release GitHub** (non-draft, non-prerelease).
+
+Le gestionnaire de mises à jour embarqué
+(`lib/services/github_update_service.dart`) interroge
+`GET /repos/Deolin/StreetPhare/releases/latest` au démarrage et, si une version
+plus récente existe, prévient l'utilisateur (dialogue + redirection vers la page
+de la release GitHub).
+
+Pour déclencher une release depuis un poste de travail :
+
+```powershell
+# 1. Bumper la version (patch par défaut conseillé) et pousser le tag
+powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Bump patch
+
+# … ou forcer une version précise
+powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Version 2.3.0
+```
+
+Le script met à jour `pubspec.yaml` (version + numéro de build), commit, crée le
+tag `vX.Y.Z` et le pousse. Le build et la création de la release se font ensuite
+sur GitHub Actions :
+<https://github.com/Deolin/StreetPhare/actions/workflows/release.yml>.
+
+> ⚠️ Utilisez toujours des tags au format `vX.Y.Z` (ex : `v2.3.0`) : c'est le
+> format attendu par le gestionnaire de mises à jour de l'application.
+
 ---
 
 ## 🔒 Sécurité & vie privée

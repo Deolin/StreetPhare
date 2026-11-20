@@ -5,8 +5,8 @@
 //   - Active/désactive le partage de position.
 //   - Ajoute/retire des amis de confiance (alias + ID fixe).
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
 import '../domain/models/follow_request.dart';

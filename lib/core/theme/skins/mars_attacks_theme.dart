@@ -13,7 +13,7 @@
 // dédiée (slab/pulp). En attendant, on évoque l'esprit via FontWeight.w900
 // et letterSpacing.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../theme_palette.dart';
 

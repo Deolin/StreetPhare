@@ -14,9 +14,9 @@
 //   - Zoom/pan standard (rotation désactivée)
 //   - Marqueurs colorés par type d'alerte
 
-import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../core/models/alert_model.dart';
 import '../../../core/network/osm_tile_headers.dart';

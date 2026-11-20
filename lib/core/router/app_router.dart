@@ -9,7 +9,7 @@
 //
 // Référence : docs/STREETPHARE_AUDIT_COMPLET_v2.2.0.md — Anomalie M9
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../features/bug_report/presentation/bug_report_screen.dart';
 import '../../features/events/presentation/events_screen.dart';

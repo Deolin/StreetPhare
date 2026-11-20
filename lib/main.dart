@@ -6,10 +6,12 @@
 import 'dart:async';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalCupertinoLocalizations, GlobalMaterialLocalizations;
+import 'package:material_ui/material_ui.dart';
 
 import 'core/i18n/app_locale.dart';
 import 'core/network/url_strategy_noop.dart'

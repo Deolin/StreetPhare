@@ -14,9 +14,9 @@
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/skins/mars_background.dart';
 import '../../../core/theme/streetphare_theme.dart';

@@ -1,5 +1,5 @@
 // lib/features/streetmedic/presentation/streetmedic_authorization_section.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../domain/models/streetmedic_models.dart';
 import 'streetmedic_service.dart';

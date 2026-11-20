@@ -8,7 +8,7 @@
 //   5. Section Contrôles Sandbox & Simulation
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../database/alert_visibility_policy.dart';
