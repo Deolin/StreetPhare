@@ -22,11 +22,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # ── Job 1 : préparation et upload de l'artefact ─────────────────────────────
+  # (séparé du deploy via `needs` pour éviter la course actions/deploy-pages#451 :
+  #  deploy-pages ne « voit » pas toujours l'artefact uploadé juste avant dans le
+  #  même job — listArtifacts() est scoped au run et peut revenir vide).
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,6 +38,15 @@ jobs:
         with:
           # Déploie le site vitrine statique (HTML/CSS/JS vanilla, 4 langues)
           path: "web_vitrine"
+
+  # ── Job 2 : déploiement ─────────────────────────────────────────────────────
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
