@@ -53,6 +53,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Patch reactive_ble_mobile compileSdk (33 -> 36)
+        run: bash scripts/patch_reactive_blemobile.sh
+
       - name: Build APK (release)
         run: flutter build apk --release --split-per-abi
 
