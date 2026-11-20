@@ -198,17 +198,24 @@ jobs:
 
       - name: Aplatir les artefacts
         run: |
-          mkdir -p assets
-          find dist -type f -exec mv {} assets/ \;
+          mkdir -p release-assets
+          find dist -type f -exec mv {} release-assets/ \;
           echo "Assets à publier :"
-          ls -la assets
+          ls -la release-assets
 
       - name: Créer la release et uploader les exécutables
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --repo "${{ github.repository }}" \
-            --title "StreetPhare ${{ steps.version.outputs.tag }}" \
-            --generate-notes \
-            assets/*
+          TAG="${{ steps.version.outputs.tag }}"
+          REPO="${{ github.repository }}"
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "Release $TAG déjà existante → upload des assets."
+            gh release upload "$TAG" release-assets/* --repo "$REPO" --clobber
+          else
+            gh release create "$TAG" \
+              --repo "$REPO" \
+              --title "StreetPhare $TAG" \
+              --generate-notes \
+              release-assets/*
+          fi
