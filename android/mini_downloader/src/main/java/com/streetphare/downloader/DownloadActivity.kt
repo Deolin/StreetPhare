@@ -45,7 +45,7 @@ class DownloadActivity : Activity() {
 
         // Fallback vers une URL en dur si le redirect latest/download échoue.
         private const val GITHUB_FALLBACK_URL =
-            "https://github.com/Deolin/StreetPhare/releases/download/v2.2.0/streetphare.apk"
+            "https://github.com/Deolin/StreetPhare/releases/download/v0.4.0-alpha/streetphare.apk"
 
         // Nom du fichier APK téléchargé.
         private const val APK_FILENAME = "streetphare.apk"

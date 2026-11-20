@@ -2,7 +2,7 @@
 //
 // Service d'extraction et de partage de l'APK de StreetPhare via la feuille
 // de partage système (Bluetooth, Proximité, etc.) sans dépendance aux stores.
-// v2.2.0 — Compatible Android 15+
+// v0.4.0-alpha — Compatible Android 15+
 
 import 'dart:async';
 import 'dart:convert';
@@ -418,7 +418,7 @@ class AppShareService {
       final info = await PackageInfo.fromPlatform();
       return '${info.version}+${info.buildNumber}';
     } catch (_) {
-      return '2.2.0';
+      return '0.4.0-alpha';
     }
   }
 

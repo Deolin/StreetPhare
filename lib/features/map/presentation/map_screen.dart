@@ -44,6 +44,7 @@ import '../../../core/theme/app_skin.dart';
 import '../../../core/theme/skin_controller.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../../core/utils/app_version.dart';
 import '../../../database/alert_visibility_policy.dart';
 import '../../../database/hive_alert_database.dart';
 import '../../../debug/client_debug_logger.dart';
@@ -731,6 +732,8 @@ class _MapScreenState extends State<MapScreen>
             : StreetPhareTheme.primary;
     return Marker(
       point: pos,
+      // Garde l'icône droite quand la carte tourne (garde le nord).
+      rotate: true,
       width: 44,
       height: 44,
       child: Container(
@@ -758,6 +761,8 @@ class _MapScreenState extends State<MapScreen>
     if (type == null || point == null) return null;
     return Marker(
       point: point,
+      // Garde l'icône droite quand la carte tourne (garde le nord).
+      rotate: true,
       width: 64,
       height: 64,
       child: Listener(
@@ -1794,13 +1799,13 @@ class _MapScreenState extends State<MapScreen>
     });
   }
 
-  /// Label de version dynamique (ex: v2.2.0+42).
+  /// Label de version dynamique (ex: v0.4.0-alpha (Alpha)).
   String _buildVersionLabel() {
     final vc = VersionCheckService.instance;
     if (vc.isInitialized) {
-      return 'v${vc.currentVersion}+${vc.buildNumber}';
+      return AppVersion.parse('${vc.currentVersion}+${vc.buildNumber}').label;
     }
-    return 'v2.2.0';
+    return 'v0.4.0-alpha (Alpha)';
   }
 
   // --------------------------------------------------------------------------
@@ -2261,6 +2266,9 @@ class _MapScreenState extends State<MapScreen>
           : label;
       markers.add(Marker(
         point: alert.position,
+        // Garde le « haut » de l'icône vers le haut de l'écran quand la carte
+        // tourne (contre-rotation = on garde le nord).
+        rotate: true,
         width: 40,
         height: 40,
         child: Tooltip(

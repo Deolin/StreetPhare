@@ -33,6 +33,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/models/alert_model.dart';
 import '../../../database/alert_visibility_policy.dart';
 import '../../../database/hive_alert_database.dart';
+import '../../../network/network_coordinator.dart';
 import '../domain/models/geofence_event.dart';
 
 /// Service singleton de géofencing.
@@ -58,6 +59,12 @@ class GeofencingService extends WidgetsBindingObserver {
 
   final _eventsController = StreamController<GeofenceEvent>.broadcast();
   Stream<GeofenceEvent> get events => _eventsController.stream;
+
+  /// Vrai si l'alerte a été créée par l'utilisateur courant : on ne doit
+  /// jamais le solliciter pour confirmer son propre signalement.
+  bool _isOwnAlert(Alert alert) =>
+      alert.ephemeralUserId.isNotEmpty &&
+      alert.ephemeralUserId == NetworkCoordinator.instance.ephemeralUserId;
 
   Position? _lastPosition;
   Position? get lastPosition => _lastPosition;
@@ -311,6 +318,8 @@ class GeofencingService extends WidgetsBindingObserver {
     final now = DateTime.now().toUtc();
 
     for (final alert in visible) {
+      // Ne sollicite jamais l'auteur du signalement pour le confirmer.
+      if (_isOwnAlert(alert)) continue;
       final dist = _distanceMeters(user, alert.position);
       if (dist > _radiusMeters) continue;
 
@@ -390,6 +399,7 @@ class GeofencingService extends WidgetsBindingObserver {
       if (item is! Map<String, dynamic>) continue;
       try {
         final alert = Alert.fromJson(item);
+        if (_isOwnAlert(alert)) continue;
         final dist = _distanceMeters(user, alert.position);
         if (dist <= maxRadius) {
           _eventsController.add(

@@ -1,6 +1,6 @@
 # Security Policy
 
-> **Version** : 2.2.0+1  
+> **Version** : 0.4.0-alpha  
 > **Date** : 22/06/2026  
 > **Licence** : GPLv3  
 

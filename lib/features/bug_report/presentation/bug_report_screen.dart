@@ -45,7 +45,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
         title: 'Rapport manuel',
         description: message,
         platform: BugReportService.currentPlatform,
-        appVersion: '2.2.0',
+        appVersion: '0.4.0-alpha',
         category: BugCategory.bug,
       );
       final result = await BugReportService.instance.submit(report);

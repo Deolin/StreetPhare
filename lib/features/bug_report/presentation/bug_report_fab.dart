@@ -250,7 +250,7 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
 
       // ── Pied de page ──────────────────────────────────────────────
       body.writeln('── TRANSMIS AUTOMATIQUEMENT PAR L\'APPLICATION ──');
-      body.writeln('Version app : 2.2.0');
+      body.writeln('Version app : 0.4.0-alpha');
       body.writeln('Plateforme  : $_platformLabel');
 
       // ── Envoi via le serveur (offline-first, zéro perte) ──────────
@@ -258,7 +258,7 @@ class _UnifiedBugReportDialogState extends State<UnifiedBugReportDialog> {
         title: 'Rapport de Bug Technique - StreetPhare',
         description: body.toString(),
         platform: _platformLabel,
-        appVersion: '2.2.0',
+        appVersion: '0.4.0-alpha',
       );
 
       if (!mounted) return;

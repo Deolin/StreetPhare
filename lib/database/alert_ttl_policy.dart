@@ -29,11 +29,11 @@ class AlertTtlPolicy {
   static const Duration defaultTtl = Duration(minutes: 10);
 
   /// TTL pour les dangers MOBILES (barrages, casseurs, dangers).
-  static const Duration mobileTtl = Duration(minutes: 10);
+  static Duration mobileTtl = const Duration(minutes: 10);
 
   /// TTL pour les dangers STATIQUES (policiers, autopompes, zones
   /// filtrées).
-  static const Duration staticTtl = Duration(minutes: 1);
+  static Duration staticTtl = const Duration(minutes: 1);
 
   /// Indique si un `ReportType` (UI) correspond à un danger MOBILE.
   ///

@@ -22,7 +22,7 @@ class AlertVisibilityPolicy {
 
   /// Nombre minimum de confirmations distinctes pour qu'une alerte
   /// apparaisse sur la carte générale.
-  static const int minConfirmationsToShow = 3;
+  static int minConfirmationsToShow = 3;
 
   /// Seuil minimum d'utilisateurs proches requis pour déclencher et afficher
   /// une alerte de densité de foule (par défaut 25 utilisateurs, configurable).

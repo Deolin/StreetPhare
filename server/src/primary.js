@@ -26,6 +26,8 @@ const fs = require('fs');
 const cron = require('node-cron');
 
 const config = require('./config');
+const runtimeConfig = require('./runtimeConfig');
+runtimeConfig.load();
 const store = require('./store');
 const sync = require('./sync');
 const apiRoutes = require('./routes/api');

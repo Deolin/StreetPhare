@@ -607,7 +607,7 @@ class BugReportService {
 
   /// Version de l'application lue depuis [PackageInfo] au démarrage.
   /// Fallback sur la version du pubspec.yaml si package_info_plus échoue.
-  static String _cachedAppVersion = '2.2.0';
+  static String _cachedAppVersion = '0.4.0-alpha';
 
   static String get _appVersion => _cachedAppVersion;
 
@@ -617,7 +617,7 @@ class BugReportService {
       final packageInfo = await PackageInfo.fromPlatform();
       _cachedAppVersion = packageInfo.version;
     } catch (_) {
-      // Fallback sur la valeur par défaut '2.2.0'.
+      // Fallback sur la valeur par défaut '0.4.0-alpha'.
     }
   }
 }

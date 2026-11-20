@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StreetPhare — Configuration</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:-apple-system,Segoe UI,Roboto,sans-serif; background:#0d1117; color:#e6edf3; padding:24px; }
+    h1 { font-size:20px; margin:0 0 4px; }
+    .sub { color:#8b949e; font-size:13px; margin-bottom:20px; }
+    a { color:#58a6ff; }
+    .card { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:16px; margin-bottom:16px; }
+    .card h2 { font-size:14px; margin:0 0 12px; color:#ffb300; text-transform:uppercase; letter-spacing:.5px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
+    label { display:block; font-size:12px; color:#8b949e; margin-bottom:4px; }
+    input { width:100%; background:#0d1117; color:#e6edf3; border:1px solid #30363d; border-radius:6px; padding:8px 10px; font-size:14px; }
+    input:focus { outline:none; border-color:#ffb300; }
+    .actions { display:flex; gap:10px; align-items:center; margin-top:8px; }
+    button { background:#ffb300; color:#0d1117; border:0; border-radius:6px; padding:10px 18px; font-size:14px; font-weight:600; cursor:pointer; }
+    button:hover { filter:brightness(1.1); }
+    #status { font-size:13px; color:#8b949e; }
+    #status.ok { color:#3fb950; }
+    #status.err { color:#f85149; }
+    .login-note { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:16px; }
+  </style>
+</head>
+<body>
+  <h1>⚙️ Configuration du serveur</h1>
+  <div class="sub">Paramètres métier synchronisés avec les apps mobiles — <a href="/admin/index.html">← retour au dashboard</a></div>
+
+  <div id="loginNote" class="login-note" style="display:none">
+    Aucune session administrateur active. <a href="/admin/index.html">Connectez-vous d'abord</a> puis revenez ici.
+  </div>
+
+  <div id="content" style="display:none">
+    <div class="card">
+      <h2>Consensus</h2>
+      <div class="grid">
+        <div><label>Votes pour valider (consensusThreshold)</label><input type="number" id="consensusThreshold" min="1" max="10"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Fusion & proximité</h2>
+      <div class="grid">
+        <div><label>Rayon de fusion « rapproché » (m)</label><input type="number" id="mergeRadiusMeters" min="2" max="500"></div>
+        <div><label>Rayon de comptage densité (m)</label><input type="number" id="crowdDensityRadiusMeters" min="5" max="500"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Densité de foule</h2>
+      <div class="grid">
+        <div><label>Seuil d'utilisateurs proches</label><input type="number" id="crowdDensityThreshold" min="5" max="1000"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>TTL par type (minutes)</h2>
+      <div class="grid">
+        <div><label>Danger mobile</label><input type="number" id="ttlMobileDanger" min="1" max="1440"></div>
+        <div><label>Danger statique</label><input type="number" id="ttlStaticDanger" min="1" max="1440"></div>
+        <div><label>Panic individuel</label><input type="number" id="ttlPanic" min="1" max="1440"></div>
+        <div><label>Danger collectif</label><input type="number" id="ttlCollectiveDanger" min="1" max="1440"></div>
+        <div><label>Limite RGPD absolue</label><input type="number" id="ttlAbsoluteRgpd" min="60" max="4320"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Panic collectif</h2>
+      <div class="grid">
+        <div><label>Proximité (m)</label><input type="number" id="panicProximityMeters" min="5" max="500"></div>
+        <div><label>Fenêtre (minutes)</label><input type="number" id="panicTimeWindowMinutes" min="1" max="60"></div>
+        <div><label>Seuil de pings</label><input type="number" id="panicThreshold" min="2" max="50"></div>
+        <div><label>Rayon zone auto (m)</label><input type="number" id="panicAutoZoneRadius" min="10" max="1000"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button onclick="saveConfig()">💾 Enregistrer</button>
+      <span id="status">Chargement…</span>
+  <script>
+    let adminToken = sessionStorage.getItem('sp_admin_token') || '';
+
+    function setStatus(msg, cls) {
+      const s = document.getElementById('status');
+      s.textContent = msg; s.className = cls || '';
+    }
+
+    function fillForm(c) {
+      const set = (id, v) => { document.getElementById(id).value = v; };
+      set('consensusThreshold', c.consensusThreshold);
+      set('mergeRadiusMeters', c.mergeRadiusMeters);
+      set('crowdDensityRadiusMeters', c.crowdDensityRadiusMeters);
+      set('crowdDensityThreshold', c.crowdDensityThreshold);
+      const t = c.ttls || {};
+      set('ttlMobileDanger', t.mobileDanger);
+      set('ttlStaticDanger', t.staticDanger);
+      set('ttlPanic', t.panic);
+      set('ttlCollectiveDanger', t.collectiveDanger);
+      set('ttlAbsoluteRgpd', t.absoluteRgpd);
+      const p = c.panic || {};
+      set('panicProximityMeters', p.proximityMeters);
+      set('panicTimeWindowMinutes', p.timeWindowMinutes);
+      set('panicThreshold', p.threshold);
+      set('panicAutoZoneRadius', p.autoZoneRadius);
+    }
+
+    function collectForm() {
+      const num = (id) => +document.getElementById(id).value;
+      return {
+        consensusThreshold: num('consensusThreshold'),
+        mergeRadiusMeters: num('mergeRadiusMeters'),
+        crowdDensityRadiusMeters: num('crowdDensityRadiusMeters'),
+        crowdDensityThreshold: num('crowdDensityThreshold'),
+        ttls: {
+          mobileDanger: num('ttlMobileDanger'),
+          staticDanger: num('ttlStaticDanger'),
+          panic: num('ttlPanic'),
+          collectiveDanger: num('ttlCollectiveDanger'),
+          absoluteRgpd: num('ttlAbsoluteRgpd'),
+        },
+        panic: {
+          proximityMeters: num('panicProximityMeters'),
+          timeWindowMinutes: num('panicTimeWindowMinutes'),
+          threshold: num('panicThreshold'),
+          autoZoneRadius: num('panicAutoZoneRadius'),
+        },
+      };
+    }
+
+    async function loadConfig() {
+      if (!adminToken) {
+        document.getElementById('loginNote').style.display = 'block';
+        return;
+      }
+      document.getElementById('content').style.display = 'block';
+      try {
+        const r = await fetch('/api/admin/config', { headers: { 'Authorization': `Bearer ${adminToken}` } });
+        if (r.status === 401 || r.status === 403) {
+          sessionStorage.removeItem('sp_admin_token');
+          adminToken = '';
+          document.getElementById('loginNote').style.display = 'block';
+          document.getElementById('content').style.display = 'none';
+          return;
+        }
+        const c = await r.json();
+        fillForm(c);
+        setStatus('Config chargée.', 'ok');
+      } catch (e) {
+        setStatus('Erreur de chargement : ' + e.message, 'err');
+      }
+    }
+
+    async function saveConfig() {
+      if (!adminToken) return;
+      setStatus('Enregistrement…');
+      try {
+        const r = await fetch('/api/admin/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify(collectForm()),
+        });
+        const data = await r.json();
+        if (!r.ok) { setStatus('Erreur : ' + (data.error || r.status), 'err'); return; }
+        fillForm(data.config);
+        setStatus('✅ Enregistré (clés : ' + (data.applied.join(', ') || 'aucune') + ').', 'ok');
+      } catch (e) {
+        setStatus('Erreur : ' + e.message, 'err');
+      }
+    }
+
+    loadConfig();
+  </script>
+</body>
+</html>
+
+    </div>
+  </div>

@@ -11,8 +11,8 @@
 // `flutter_map` de l'application afin de garantir une identification
 // cohérente et conforme.
 
-/// Version de l'application, synchronisée avec `pubspec.yaml` (version: 2.2.0).
-const String kStreetPhareAppVersion = '2.2';
+/// Version de l'application, synchronisée avec `pubspec.yaml` (version: 0.4.0-alpha).
+const String kStreetPhareAppVersion = '0.4';
 
 /// User-Agent identifiant clairement l'application StreetPhare.
 const String kStreetPhareUserAgent = 'StreetPhareApp/$kStreetPhareAppVersion '

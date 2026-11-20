@@ -27,6 +27,7 @@ import '../../../core/theme/skin_controller.dart';
 import '../../../core/theme/skins/mars_background.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../../core/utils/app_version.dart';
 import '../../../services/apk_downloader_service.dart';
 import '../../../services/app_share_service.dart';
 import '../../../services/github_update_service.dart';
@@ -1526,8 +1527,8 @@ class _AboutSection extends StatelessWidget {
           builder: (context, __, ___) {
             final vc = VersionCheckService.instance;
             final v = vc.isInitialized
-                ? 'v${vc.currentVersion}+${vc.buildNumber}'
-                : 'v2.2.0';
+                ? AppVersion.parse('${vc.currentVersion}+${vc.buildNumber}').label
+                : 'v0.4.0-alpha (Alpha)';
             return Text(
               '${strings.aboutVersion} $v — ${strings.aboutLicense} GNU GPL v3',
               style: TextStyle(
@@ -1631,13 +1632,13 @@ class _AboutSection extends StatelessWidget {
 
 class _AboutRow extends StatelessWidget {
   const _AboutRow({required this.label, required this.value});
-  // Label de version dynamique (ex: v2.2.0+42).
+  // Label de version dynamique (ex: v0.4.0-alpha (Alpha)).
   static String get _versionLabel {
     final vc = VersionCheckService.instance;
     if (vc.isInitialized) {
-      return 'v${vc.currentVersion}+${vc.buildNumber}';
+      return AppVersion.parse('${vc.currentVersion}+${vc.buildNumber}').label;
     }
-    return 'v2.2.0';
+    return 'v0.4.0-alpha (Alpha)';
   }
 
   final String label;
@@ -2116,7 +2117,7 @@ class _ShareApkSection extends StatelessWidget {
                 description:
                     'L\'APK partagé est celui actuellement installé sur votre '
                     'appareil. Assurez-vous de partager une version à jour et de '
-                    'confiance (v2.2.0+).',
+                    'confiance (v0.4.0-alpha+).',
                 color: StreetPhareTheme.primary,
                 onSurface: onSurface,
               ),

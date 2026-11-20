@@ -18,6 +18,7 @@ import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../core/models/alert_model.dart';
+import 'alert_ttl_policy.dart';
 
 /// Gestionnaire singleton de la base locale d'alertes.
 class HiveAlertDatabase {
@@ -26,6 +27,10 @@ class HiveAlertDatabase {
 
   /// Nom de la box Hive où sont stockées les alertes.
   static const String _boxName = 'streetphare_alerts_v1';
+
+  /// Rayon de fusion « rapproché » (mètres) — défaut 10 m, synchronisé depuis
+  /// la config serveur (GET /api/config) à la connexion (ServerConfigService).
+  static double mergeRadiusMeters = 10.0;
 
   Box<Alert>? _box;
 
@@ -92,16 +97,17 @@ class HiveAlertDatabase {
     AlertType type,
     double lat,
     double lon, {
-    double radiusMeters = 10,
+    double? radiusMeters,
     DateTime? now,
   }) {
     _ensureOpen();
     final reference = now ?? DateTime.now().toUtc();
+    final r = radiusMeters ?? mergeRadiusMeters;
     for (final a in _box!.values) {
       if (a.type != type) continue;
       if (a.isExpired(reference)) continue;
       final d = const Distance().distance(a.position, LatLng(lat, lon));
-      if (d <= radiusMeters) return a;
+      if (d <= r) return a;
     }
     return null;
   }
@@ -217,6 +223,23 @@ class HiveAlertDatabase {
     }
     if (expired.isNotEmpty) _emit();
     return expired;
+  }
+
+  /// Purge les signalements dont le TTL métier (ou RGPD 24h) est dépassé,
+  /// et retourne leurs ids afin de les propager comme tombstones au serveur.
+  Future<List<String>> purgeDeadAndCollectTombstones({DateTime? now}) async {
+    _ensureOpen();
+    final reference = now ?? DateTime.now().toUtc();
+    final tombstones = <String>[];
+    for (final a in _box!.values.toList()) {
+      final expired = a.isExpired(reference) ||
+          !AlertTtlPolicy.isAlertAlive(a, now: reference);
+      if (!expired) continue;
+      tombstones.add(a.id);
+      await _box!.delete(a.id);
+    }
+    if (tombstones.isNotEmpty) _emit();
+    return tombstones;
   }
 
   /// Renvoie les alertes marquées `validated` et pas encore

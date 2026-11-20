@@ -9,6 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
 const store = require('../store');
 const sync = require('../sync');
+const runtimeConfig = require('../runtimeConfig');
 const { broadcastToAll } = require('../services/broadcast');
 const { routingEngine } = require('../services/routing');
 const https = require('https');
@@ -254,6 +255,12 @@ router.get('/alerts/validation-requests', (req, res) => {
   res.json({ requests, count: requests.length });
 });
 
+/// GET /api/config — Configuration publique synchronisée par les apps mobiles.
+/// Ne contient AUCUN secret (clés, tokens…). Exposé sans authentification.
+router.get('/config', (req, res) => {
+  res.json(runtimeConfig.publicConfig());
+});
+
 /// GET /api/alerts/active — Alertes valides (≥3 votes, TTL respecté).
 router.get('/alerts/active', (req, res) => {
   const { lat, lng, radius_km } = req.query;
@@ -455,13 +462,14 @@ router.post('/sync/tombstone', (req, res) => {
 /// Protégé par messageLimiter (15 requêtes max / 1 min / IP).
 router.post('/sync-push', messageLimiter, (req, res) => {
   try {
-    const { alerts, peerId, since } = req.body || {};
-    if (!Array.isArray(alerts) || alerts.length === 0) {
-      return res.status(400).json({ error: 'alerts[] requis' });
+    const { alerts, tombstones: clientTombstones, peerId, since } = req.body || {};
+    if ((!Array.isArray(alerts) || alerts.length === 0) &&
+        (!Array.isArray(clientTombstones) || clientTombstones.length === 0)) {
+      return res.status(400).json({ error: 'alerts[] ou tombstones[] requis' });
     }
 
     let upserted = 0;
-    for (const alert of alerts) {
+    for (const alert of (alerts || [])) {
       if (!alert.id || !alert.type || alert.lat == null || alert.lng == null) {
         continue; // skip malformed
       }
@@ -469,11 +477,12 @@ router.post('/sync-push', messageLimiter, (req, res) => {
       if (store.isTombstoned(alert.id)) {
         continue;
       }
-      // Ajouter le peerId aux votes s'il n'y est pas déjà.
-      if (peerId && (!alert.votes || !alert.votes.includes(peerId))) {
-        if (!alert.votes) alert.votes = [];
-        alert.votes.push(peerId);
-      }
+      // ⚠️ Ne PAS ajouter le peerId aux votes ici : le peerId sert uniquement
+      // au quota par appareil (rate-limiting). Un vote ne doit provenir QUE
+      // du tableau `votes` fourni par le client (vote implicite du créateur)
+      // ou de POST /api/alerts/:id/vote (confirmation explicite). Sinon, chaque
+      // push de synchronisation d'un appareil incrémente artificiellement les
+      // votes des alertes qu'il ne fait que relayer / afficher.
       // Anti-doublon : fusionne avec un danger identique à proximité
       // (≤ mergeRadiusMeters) en recentrant au centre des deux points.
       const merged = store.mergeNearbyIdentical(alert);
@@ -481,6 +490,16 @@ router.post('/sync-push', messageLimiter, (req, res) => {
         store.addAlert(alert);
       }
       upserted++;
+    }
+
+    // Applique les tombstones reçus du client (expiration/suppression locale).
+    let tombstonesApplied = 0;
+    if (Array.isArray(clientTombstones)) {
+      for (const t of clientTombstones) {
+        const id = typeof t === 'string' ? t : (t && t.id);
+        const reason = (t && t.reason) || 'expired';
+        if (id) { store.applyTombstone(id, reason); tombstonesApplied++; }
+      }
     }
 
     // Récupérer les deltas plus récents pour le client (push-pull).
@@ -500,7 +519,7 @@ router.post('/sync-push', messageLimiter, (req, res) => {
     }
 
     console.log(
-      `[SYNC-PUSH] peer=${peerId || 'anon'} upserted=${upserted} deltas=${deltas.length} tombstones=${tombstones.length}`
+      `[SYNC-PUSH] peer=${peerId || 'anon'} upserted=${upserted} deltas=${deltas.length} tombstones=${tombstones.length} tombstonesApplied=${tombstonesApplied}`
     );
 
     res.json({

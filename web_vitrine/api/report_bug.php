@@ -12,7 +12,7 @@
  *
  * Corps JSON attendu :
  * {
- *   "app_version": "2.2.0+1",
+ *   "app_version": "0.4.0-alpha",
  *   "platform": "android",
  *   "log": "...",
  *   "description": "...",

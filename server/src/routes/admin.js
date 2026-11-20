@@ -10,6 +10,7 @@ const jwt = require('jsonwebtoken');
 const config = require('../config');
 const store = require('../store');
 const sync = require('../sync');
+const runtimeConfig = require('../runtimeConfig');
 const moderators = require('../services/moderators');
 const { broadcast, broadcastToAll } = require('../services/broadcast');
 const { authenticateToken, requirePermission } = require('../middleware/auth');
@@ -323,6 +324,25 @@ router.delete('/streetmedic-emergencies/:id', authenticateToken, requirePermissi
   if (!ok) return res.status(404).json({ error: 'Alerte non trouvée' });
   broadcast('medic_emergency_removed', { missionId: req.params.id });
   res.json({ success: true });
+});
+
+/// GET /api/admin/config — Configuration runtime (réservé admin/superadmin).
+router.get('/config', authenticateToken, (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+    return res.status(403).json({ error: 'Réservé à l\'administrateur principal' });
+  }
+  res.json(runtimeConfig.publicConfig());
+});
+
+/// PUT /api/admin/config — Met à jour la configuration runtime.
+router.put('/config', authenticateToken, (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+    return res.status(403).json({ error: 'Réservé à l\'administrateur principal' });
+  }
+  const { applied } = runtimeConfig.applyPatch(req.body || {});
+  broadcast('config_updated', runtimeConfig.publicConfig());
+  log('CONFIG', `Configuration mise à jour : ${applied.join(', ') || 'aucune clé valide'}`);
+  res.json({ success: true, applied, config: runtimeConfig.publicConfig() });
 });
 
 module.exports = router;

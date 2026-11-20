@@ -15,6 +15,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/utils/app_version.dart';
 import '../network/network_config.dart';
 
 class VersionCheckService {
@@ -83,17 +84,10 @@ class VersionCheckService {
     }
   }
 
-  /// Compare deux chaînes de version (format X.Y.Z).
-  /// Retourne true si [current] < [required].
+  /// Compare deux chaînes de version (format X.Y.Z[-prerelease]).
+  /// Retourne true si [current] < [required] (alpha < beta < rc < stable).
   bool _isVersionLower(String current, String required) {
-    List<int> currentParts = current.split('.').map(int.parse).toList();
-    List<int> requiredParts = required.split('.').map(int.parse).toList();
-
-    for (int i = 0; i < 3; i++) {
-      if (currentParts[i] < requiredParts[i]) return true;
-      if (currentParts[i] > requiredParts[i]) return false;
-    }
-    return false;
+    return AppVersion.parse(current) < AppVersion.parse(required);
   }
 
   /// Affiche le dialogue modal disruptif (Kill Switch).

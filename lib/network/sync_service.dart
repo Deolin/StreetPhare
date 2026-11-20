@@ -212,8 +212,12 @@ class SyncService {
         return;
       }
 
-      // Phase 1 : PUSH — envoyer les alertes locales modifiées.
-      final pushResult = await _pushLocalAlerts(serverBase);
+      // Phase 0 : purge locale — vérifie les signalements, supprime ceux dont
+      // le TTL est dépassé et collecte leurs ids en tombstones (à propager).
+      final localTombstones = await _db.purgeDeadAndCollectTombstones();
+
+      // Phase 1 : PUSH — envoyer les alertes locales restantes + tombstones.
+      final pushResult = await _pushLocalAlerts(serverBase, localTombstones);
 
       if (pushResult == _SyncResult.success) {
         // Le push a réussi et a déjà fusionné les deltas (push-pull).
@@ -243,7 +247,7 @@ class SyncService {
 
   /// PUSH : Envoie les alertes locales au serveur.
   /// Retourne [_SyncResult] pour indiquer le résultat.
-  Future<_SyncResult> _pushLocalAlerts(String serverBase) async {
+  Future<_SyncResult> _pushLocalAlerts(String serverBase, List<String> tombstones) async {
     try {
       // Récupérer les alertes locales modifiées depuis le dernier push.
       final allLocal = _db.getAll();
@@ -255,14 +259,13 @@ class SyncService {
           .take(maxPushBatchSize)
           .toList();
 
-      if (modified.isEmpty) {
-        // Rien à pousser : on n'envoie PAS de batch vide (le serveur le
-        // rejette en 400, ce qui consomme inutilement le quota de sync).
-        // `_pushAndPull` bascule alors directement en PULL-only.
+      if (modified.isEmpty && tombstones.isEmpty) {
+        // Rien à pousser (ni alertes ni tombstones) : on n'envoie PAS de
+        // batch vide (le serveur le rejette en 400). Bascule en PULL-only.
         return _SyncResult.failed;
       }
 
-      return await _pushBatch(serverBase, modified, allLocal);
+      return await _pushBatch(serverBase, modified, allLocal, tombstones);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[SyncService] Erreur push local: $e');
@@ -276,12 +279,14 @@ class SyncService {
     String serverBase,
     List<Alert> alerts,
     List<Alert> allLocal,
+    List<String> tombstones,
   ) async {
     final now = DateTime.now().toUtc();
     final since = _lastPullTs?.toUtc().toIso8601String() ?? '';
 
     final body = <String, dynamic>{
       'alerts': alerts.map((a) => a.toJson()).toList(),
+      'tombstones': tombstones,
       'peerId': PeerCounterService.instance.localPeerId ?? '',
       'since': since,
     };
@@ -331,9 +336,9 @@ class SyncService {
 
     // Répercuter localement les suppressions/rejets côté serveur
     // (même si le broadcast temps réel a été manqué).
-    final tombstones = respBody['tombstones'] as List<dynamic>?;
-    if (tombstones != null && tombstones.isNotEmpty) {
-      await _processTombstones(tombstones);
+    final serverTombstones = respBody['tombstones'] as List<dynamic>?;
+    if (serverTombstones != null && serverTombstones.isNotEmpty) {
+      await _processTombstones(serverTombstones);
     }
 
     if (kDebugMode) {

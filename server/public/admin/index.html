@@ -63,7 +63,13 @@
 <body>
   <div id="map"></div>
   <div id="panel">
-    <h2>🛡 StreetPhare Admin</h2>
+    <h2 style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <span>🛡 StreetPhare Admin</span>
+      <a href="/admin/config.html" title="Configuration du serveur"
+         style="font-size:18px; color:#8b949e; text-decoration:none; line-height:1; padding:2px 6px; border-radius:6px; flex:0 0 auto;"
+         onmouseover="this.style.background='#21262d'; this.style.color='#e6edf3';"
+         onmouseout="this.style.background='transparent'; this.style.color='#8b949e';">⚙️</a>
+    </h2>
     <div id="status">
       <span id="sync-status">⏳ Connexion...</span> |
       Alertes: <span id="active-count">0</span> |

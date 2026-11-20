@@ -259,7 +259,7 @@ class Store {
   ///
   /// Retourne l'alerte existante si une fusion a eu lieu, sinon `null`.
   mergeNearbyIdentical(alert, radiusMeters) {
-    const r = radiusMeters || config.mergeRadiusMeters || 50;
+    const r = radiusMeters || config.mergeRadiusMeters || 10;
     if (alert.lat == null || alert.lng == null || !alert.type) return null;
 
     const target = this.alerts.find(a => {
@@ -293,7 +293,7 @@ class Store {
   /// Détecte les signalements actifs/validés situés au même endroit (≤ radiusMeters)
   /// mais d'un type DIFFÉRENT / CONTRADICTOIRE (`a.type !== alert.type`).
   findContradictoryNearby(alert, radiusMeters) {
-    const r = radiusMeters || config.mergeRadiusMeters || 50;
+    const r = radiusMeters || config.mergeRadiusMeters || 10;
     if (alert.lat == null || alert.lng == null || !alert.type) return [];
 
     return this.alerts.filter(a => {
@@ -317,6 +317,11 @@ class Store {
       if (this.alertNetScore(a) < 0) continue;
       const ageMinutes = (now - new Date(a.createdAt).getTime()) / 60000;
       if (ageMinutes > config.ttls.absoluteRgpd) continue;
+      // Expiration par type (même logique que getActiveAlerts) : ne jamais
+      // solliciter de confirmation pour un signalement déjà expiré.
+      const staleTtls = { mobile_danger: config.ttls.mobileDanger, police: config.ttls.staticDanger, fire_truck: config.ttls.staticDanger, filter: config.ttls.staticDanger, panic: config.ttls.panic, collective_danger: config.ttls.collectiveDanger, tear_gas: config.ttls.mobileDanger };
+      const staleMaxAge = staleTtls[a.type] || config.ttls.mobileDanger;
+      if (ageMinutes > staleMaxAge) continue;
 
       const lastVoteTs = new Date(a.lastVoteAt || a.updatedAt || a.createdAt).getTime();
       if (isNaN(lastVoteTs) || (now - lastVoteTs) < inactivityMs) continue;

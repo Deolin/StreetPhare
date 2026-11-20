@@ -19,9 +19,9 @@ plugins {
 // (BaseAppModuleExtension toujours fonctionnel en attendant AGP 10.0)
 android {
     namespace = "com.example.flutter_streetphare"
-    // compileSdk 36 = défaut Flutter 3.47 (plugins épinglés sur des versions
-    // stables compatibles compileSdk 36).
-    compileSdk = 36
+    // compileSdk 37 = requis par flutter_local_notifications et androidx.core 1.19+
+    // (Android 17 / API 37). Les plugins sont épinglés sur des versions stables compatibles.
+    compileSdk = 37
     ndkVersion = "28.2.13676358"
 
     compileOptions {

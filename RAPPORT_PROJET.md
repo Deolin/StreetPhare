@@ -195,7 +195,7 @@ StreetPhare/
 |---|---|---|
 | 1 | **`README.md` racine obsolète** : décrit une app basique (3 FAB, map, splash) et référence `INSTALLATION_DEPENDANCES.md` (fichier inexistant). Ne reflète pas les ~15 fonctionnalités réelles. | Onboarding contributeur trompeur. |
 | 2 | **`server/README.md` incohérent** : annonce un « Serveur Dart » (shelf, `bin/server.dart`) alors que le serveur réel est **Node.js/Express**. | Confusion sur la stack serveur. |
-| 3 | **Dérive de version** : `pubspec.yaml` = `2.2.0+1`, `SECURITY.md` = `2.2.0+1`, docs d'audit = `v3.3.3/v3.3.4`, serveur = `3.0.0`, Caddyfile = `v3.3.3`. | Pas de source de vérité de version. |
+| 3 | **Dérive de version** : `pubspec.yaml` = `0.4.0-alpha+4`, `SECURITY.md` = `0.4.0-alpha`, docs d'audit = `v3.3.3/v3.3.4`, serveur = `3.0.0`, Caddyfile = `v3.3.3`. | Pas de source de vérité de version. |
 | 4 | **Artefacts Dart dans `server/`** : `.dart_tool/`, `build/`, `web/`, `web_src/`, `devtools_options.yaml` coexistent avec le serveur Node.js. | Signe d'une migration Node↔Dart non aboutie / non nettoyée. |
 | 5 | **Duplication probable** : `routing/osmand_routing_service.dart` et `routing/infrastructure/osmand_routing_service.dart` (même nom de fichier, deux emplacements). | Risque de divergence de logique. |
 

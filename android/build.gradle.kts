@@ -15,7 +15,7 @@
 // `C:`), car les rediriger provoquait l'erreur Gradle/AGP « this and base files
 // have different roots » sur `:flutter_secure_storage:compileDebugUnitTestSources`.
 
-val targetCompileSdk: Int = 36
+val targetCompileSdk: Int = 37
 val targetSdkVersion: Int = 36
 
 // ── Répertoire de build partagé (Flutter attend l'APK sous build/app/) ──────

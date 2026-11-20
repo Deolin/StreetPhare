@@ -48,6 +48,7 @@ import 'services/app_share_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/github_update_service.dart';
 import 'services/notification_service.dart';
+import 'services/server_config_service.dart';
 import 'services/streetphare_foreground_task.dart';
 import 'services/version_check_service.dart';
 
@@ -281,6 +282,12 @@ void main() async {
   // Lancée après le premier rendu, avec un délai pour ne pas gêner le
   // démarrage. Si une nouvelle release est détectée, une boîte de dialogue
   // informe l'utilisateur (via la clé globale du navigateur).
+  // === Étape 7b : Sync de la config serveur (non bloquante) ===
+  // Récupère GET /api/config et applique les paramètres distants (rayon de
+  // fusion, seuil de consensus, densité, TTLs). En cas d'échec, les valeurs
+  // par défaut locales restent actives.
+  unawaited(ServerConfigService.instance.fetchAndApply());
+
   unawaited(_checkGithubUpdate());
 
   // Écoute les demandes de suivi de position (groupe de confiance) : affiche

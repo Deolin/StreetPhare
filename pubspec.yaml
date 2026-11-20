@@ -51,7 +51,7 @@ publish_to: "none"
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as product and file version while build-number is used as numeric part of file version.
-version: 2.2.0+1
+version: 0.4.0-alpha+4
 
 environment:
   sdk: ">=3.6.0 <4.0.0"
@@ -80,14 +80,14 @@ dependencies:
   url_launcher: ^6.3.2
   cryptography: ^2.9.0
   cupertino_ui: ^1.1.7
-  flutter_reactive_ble: 5.5.0
+  flutter_reactive_ble: ^5.6.0
   flutter_compass: ^0.8.0
-  flutter_foreground_task: ^10.0.0
+  flutter_foreground_task: ^11.0.3
   sensors_plus: ^7.1.1
   wakelock_plus: ^1.8.0
   package_info_plus: ^10.0.0
   share_plus: ^13.1.0
-  flutter_local_notifications: ^22.2.0
+  flutter_local_notifications: ^23.0.3
   mobile_scanner: ^7.2.0
   hive_ce: ^2.19.3
   hive_ce_flutter: ^2.3.4

@@ -7,7 +7,7 @@
 // et prévient l'utilisateur via une boîte de dialogue non bloquante.
 //
 // Le dépôt cible est : https://github.com/Deolin/StreetPhare
-// (les tags de release sont au format `vX.Y.Z`, ex: `v2.2.0`).
+// (les tags de release sont au format `vX.Y.Z`, ex: `v0.4.0-alpha`).
 
 import 'dart:convert';
 
@@ -16,6 +16,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../core/utils/app_version.dart';
 
 // ============================================================================
 // GithubRelease
@@ -74,7 +76,7 @@ class GithubUpdateService {
   String _currentVersion = '';
   bool _isInitialized = false;
 
-  /// Version installée (ex: `2.2.0`).
+  /// Version installée (ex: `0.4.0-alpha`).
   String get currentVersion => _currentVersion;
   bool get isInitialized => _isInitialized;
 
@@ -98,7 +100,12 @@ class GithubUpdateService {
   /// ou si la réponse GitHub est invalide (ne doit jamais faire planter).
   Future<GithubRelease?> checkForUpdate() async {
     try {
-      final uri = Uri.parse('$_apiBase/repos/$owner/$repo/releases/latest');
+      // On interroge la LISTE des releases (et non `/releases/latest`) car
+      // l'endpoint `/latest` exclut les pré-releases (alpha/beta/rc). On veut
+      // donc parcourir toutes les releases publiées et retenir la plus récente
+      // en version sémantique, pré-releases incluses.
+      final uri =
+          Uri.parse('$_apiBase/repos/$owner/$repo/releases?per_page=100');
       final response = await http.get(
         uri,
         headers: const {'Accept': 'application/vnd.github+json'},
@@ -110,32 +117,57 @@ class GithubUpdateService {
       }
 
       final data = jsonDecode(response.body);
-      if (data is! Map<String, dynamic>) return null;
-
-      final tagName = (data['tag_name'] as String?)?.trim() ?? '';
-      if (tagName.isEmpty) return null;
-
-      final name = data['name'] as String?;
-      final release = GithubRelease(
-        tagName: tagName,
-        name: (name != null && name.trim().isNotEmpty) ? name.trim() : tagName,
-        body: (data['body'] as String?) ?? '',
-        htmlUrl: (data['html_url'] as String?) ?? '',
-        publishedAt: (data['published_at'] as String?) ?? '',
-        apkUrl: _extractApkUrl(data),
-      );
+      if (data is! List) return null;
 
       if (!_isInitialized) await init();
       if (_currentVersion.isEmpty) return null;
 
-      if (_isVersionGreater(release.version, _currentVersion)) {
-        return release;
+      final current = AppVersion.parse(_currentVersion);
+
+      // Retient la release publiée (non-draft) au tag sémantique `vX.Y.Z`
+      // le plus élevé (alpha < beta < rc < stable).
+      Map<String, dynamic>? bestData;
+      AppVersion? bestVersion;
+      for (final item in data) {
+        if (item is! Map<String, dynamic>) continue;
+        if (item['draft'] == true) continue;
+
+        final tagName = (item['tag_name'] as String?)?.trim() ?? '';
+        if (!_isSemverTag(tagName)) continue;
+
+        final version = AppVersion.parse(tagName);
+        if (bestVersion == null || version > bestVersion) {
+          bestVersion = version;
+          bestData = item;
+        }
       }
-      return null;
+
+      if (bestData == null || bestVersion == null) return null;
+      if (!(bestVersion > current)) return null;
+
+      final tagName = (bestData['tag_name'] as String?)?.trim() ?? '';
+      final name = bestData['name'] as String?;
+      return GithubRelease(
+        tagName: tagName,
+        name: (name != null && name.trim().isNotEmpty) ? name.trim() : tagName,
+        body: (bestData['body'] as String?) ?? '',
+        htmlUrl: (bestData['html_url'] as String?) ?? '',
+        publishedAt: (bestData['published_at'] as String?) ?? '',
+        apkUrl: _extractApkUrl(bestData),
+      );
     } catch (e) {
       debugPrint('[GithubUpdate] Échec de la vérification GitHub : $e');
       return null;
     }
+  }
+
+  /// Vérifie qu'un tag respecte le format sémantique `vX.Y.Z`
+  /// (optionnellement suivi de `-prerelease`), pour écarter les anciens tags
+  /// non sémantiques (ex: `Alpha2`, `alpha`).
+  bool _isSemverTag(String tag) {
+    final t = tag.trim();
+    final v = (t.startsWith('v') || t.startsWith('V')) ? t.substring(1) : t;
+    return RegExp(r'^\d+\.\d+\.\d+').hasMatch(v);
   }
 
   /// Vérifie les mises à jour et mémorise la version signalée (anti-spam).
@@ -171,32 +203,6 @@ class GithubUpdateService {
       }
     }
     return '';
-  }
-
-  /// Compare deux versions `X.Y.Z` : renvoie `true` si [a] > [b].
-  bool _isVersionGreater(String a, String b) {
-    final pa = _parseVersion(a);
-    final pb = _parseVersion(b);
-    for (int i = 0; i < 3; i++) {
-      if (pa[i] > pb[i]) return true;
-      if (pa[i] < pb[i]) return false;
-    }
-    return false;
-  }
-
-  /// Extrait les 3 premières composantes numériques d'une version
-  /// (ex: `v2.3.0-beta.1` → [2, 3, 0]).
-  List<int> _parseVersion(String input) {
-    final parts = <int>[];
-    final matches = RegExp(r'\d+').allMatches(input);
-    for (final m in matches) {
-      parts.add(int.tryParse(m.group(0)!) ?? 0);
-      if (parts.length == 3) break;
-    }
-    while (parts.length < 3) {
-      parts.add(0);
-    }
-    return parts;
   }
 
   /// Ouvre l'URL de téléchargement (APK direct si dispo, sinon page release).
