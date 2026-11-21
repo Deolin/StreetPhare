@@ -704,7 +704,10 @@ class RbacAdminService extends ChangeNotifier {
           'Erreur lors du chargement des événements en attente');
     }
     final list = (data['pending'] as List<dynamic>?) ?? const [];
-    return list.whereType<Map<String, dynamic>>().map(PendingEvent.fromJson).toList();
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(PendingEvent.fromJson)
+        .toList();
   }
 
   Future<void> acceptPendingEvent(String id) async {
@@ -726,8 +729,7 @@ class RbacAdminService extends ChangeNotifier {
         .timeout(const Duration(seconds: 15));
     if (res.statusCode != 200) {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      throw Exception(
-          data['error'] ?? 'Erreur lors du rejet de l\'événement');
+      throw Exception(data['error'] ?? 'Erreur lors du rejet de l\'événement');
     }
   }
 

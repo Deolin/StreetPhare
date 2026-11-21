@@ -68,8 +68,7 @@ class AppVersion implements Comparable<AppVersion> {
     }
 
     final parts = s.split('.');
-    int part(int i) =>
-        (i < parts.length) ? (int.tryParse(parts[i]) ?? 0) : 0;
+    int part(int i) => (i < parts.length) ? (int.tryParse(parts[i]) ?? 0) : 0;
 
     return AppVersion(
       major: part(0),

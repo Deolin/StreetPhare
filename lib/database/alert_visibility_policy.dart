@@ -69,7 +69,8 @@ class AlertVisibilityPolicy {
     return alerts
         .where((a) => !a.isExpired(now)) // RGPD 24h hard
         .where((a) => AlertTtlPolicy.isAlertAlive(a, now: now))
-        .where((a) => !AlertTtlPolicy.isPendingExpired(a, now: now)) // durée d'affichage pending
+        .where((a) => !AlertTtlPolicy.isPendingExpired(a,
+            now: now)) // durée d'affichage pending
         .where((a) => isVisible(a, now: now))
         .toList();
   }

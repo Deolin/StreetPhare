@@ -23,6 +23,7 @@ import '../../../core/network/osm_tile_headers.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../network/network_config.dart';
 import '../../map/local_first_tile_provider.dart';
+import '../core/models/routing_profile.dart';
 import '../domain/models/route_result.dart';
 import '../infrastructure/osmand_routing_service.dart';
 import 'widgets/route_calculation_overlay.dart';
@@ -31,6 +32,11 @@ import 'widgets/route_calculation_overlay.dart';
 typedef AlternativesLoader = Future<List<RouteResult>> Function();
 
 /// Mode de transport pour le calcul d'itinéraire.
+///
+/// Ce type est le contrat canonique « 3 modes » de l'application :
+/// `pedestrian` (piéton), `car` (voiture), `transit` (transports en commun).
+/// Il projette vers/depuis le [RoutingProfile] interne (qui conserve les
+/// valeurs supplémentaires `bicycle` et `emergency` pour rétro-compatibilité).
 enum TransportMode {
   pedestrian,
   car,
@@ -57,6 +63,43 @@ enum TransportMode {
         return s.transportModeTransit;
     }
   }
+
+  /// Projette ce mode sur le [RoutingProfile] interne correspondant.
+  RoutingProfile toRoutingProfile() => switch (this) {
+        TransportMode.pedestrian => RoutingProfile.pedestrian,
+        TransportMode.car => RoutingProfile.vehicle,
+        TransportMode.transit => RoutingProfile.transit,
+      };
+
+  /// Convertit un [RoutingProfile] interne vers ce mode canonique.
+  ///
+  /// `bicycle` est assimilé au piéton (mode doux) et `emergency` à la voiture
+  /// (mode motorisé).
+  static TransportMode fromRoutingProfile(RoutingProfile p) => switch (p) {
+        RoutingProfile.pedestrian => TransportMode.pedestrian,
+        RoutingProfile.bicycle => TransportMode.pedestrian,
+        RoutingProfile.vehicle => TransportMode.car,
+        RoutingProfile.emergency => TransportMode.car,
+        RoutingProfile.transit => TransportMode.transit,
+      };
+
+  /// Parse un mode depuis sa représentation « fil ».
+  ///
+  /// Toute valeur inconnue retombe sur [pedestrian] (sécurité : ne jamais
+  /// produire un tracé voiture par défaut).
+  static TransportMode fromWire(String value) => switch (value) {
+        'car' => TransportMode.car,
+        'transit' => TransportMode.transit,
+        'pedestrian' => TransportMode.pedestrian,
+        _ => TransportMode.pedestrian,
+      };
+
+  /// Représentation « fil » stable (JSON / logs / paramètres serveur).
+  String get wire => switch (this) {
+        TransportMode.pedestrian => 'pedestrian',
+        TransportMode.car => 'car',
+        TransportMode.transit => 'transit',
+      };
 }
 
 class RouteResultSheet extends StatefulWidget {
@@ -541,8 +584,6 @@ class _MiniRouteMap extends StatefulWidget {
 }
 
 class _MiniRouteMapState extends State<_MiniRouteMap> {
-  final MapController _controller = MapController();
-
   /// Fournisseur de tuiles « local d'abord » (cache disque → serveur
   /// StreetPhare → OSM en dernier recours), identique à la carte principale.
   /// Évite de s'appuyer sur un accès direct à tile.openstreetmap.org, qui peut
@@ -550,10 +591,13 @@ class _MiniRouteMapState extends State<_MiniRouteMap> {
   late final LocalFirstTileProvider _tileProvider =
       LocalFirstTileProvider(headers: kStreetPhareTileHeaders);
 
+  /// Vrai lorsque la carte a terminé son premier rendu. Tant que ce n'est
+  /// pas le cas, un indicateur de chargement est affiché par-dessus l'aperçu.
+  bool _mapReady = false;
+
   @override
   void dispose() {
     _tileProvider.dispose();
-    _controller.dispose();
     super.dispose();
   }
 
@@ -578,13 +622,9 @@ class _MiniRouteMapState extends State<_MiniRouteMap> {
   }
 
   /// Rotation (en degrés) qui aligne la plus grande longueur de l'itinéraire
-  /// à l'horizontale, afin d'exploiter au mieux la fenêtre rectangulaire
-  /// (plus large que haute) de l'aperçu.
-  ///
-  /// L'axe principal (direction de plus grande variance des points projetés)
-  /// est obtenu par ACP (analyse en composantes principales). On calcule
-  /// l'azimut géographique de cet axe puis la rotation de carte qui le rend
-  /// horizontal.
+  /// à l'horizontale, pour exploiter au mieux la fenêtre rectangulaire de
+  /// l'aperçu (plus large que haute). L'axe principal est obtenu par ACP
+  /// (analyse en composantes principales) sur les points projetés.
   static double _bestBearing(List<LatLng> pts) {
     if (pts.length < 2) return 0;
 
@@ -611,94 +651,116 @@ class _MiniRouteMapState extends State<_MiniRouteMap> {
       sxy += dx * dy;
     }
 
-    // Angle de l'axe principal par rapport à l'axe Est (sens trigonométrique,
-    // y vers le nord).
     final theta = 0.5 * math.atan2(2 * sxy, sxx - syy);
-
-    // Azimut géographique (0° = Nord, sens horaire) de cet axe.
     final azimuth =
         math.atan2(math.cos(theta), math.sin(theta)) * 180 / math.pi;
 
-    // Pour que cet axe soit horizontal à l'écran : rotation = azimut - 90°.
     var bearing = azimuth - 90.0;
     bearing = ((bearing % 360) + 360) % 360;
     return bearing;
   }
 
-  /// Recadre la mini-carte pour afficher la totalité de l'itinéraire.
-  void _fitRoute() {
-    final pts = widget.route.points;
-    if (pts.length < 2) return;
-    try {
-      _controller.fitCamera(
-        CameraFit.coordinates(
-          coordinates: pts,
-          padding: const EdgeInsets.all(16),
-          maxZoom: 18,
-        ),
-      );
-    } catch (_) {
-      // La carte n'est pas encore prête : on conserve le cadrage initial.
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final s = AppLocale.instance.strings;
     final pts = widget.route.points;
+    final hasRoute = pts.length >= 2;
+
     return SizedBox(
       height: 160,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: FlutterMap(
-          mapController: _controller,
-          options: MapOptions(
-            initialCenter: _center(pts),
-            initialZoom: 14,
-            initialRotation: _bestBearing(pts),
-            onMapReady: _fitRoute,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.none,
-            ),
-          ),
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            TileLayer(
-              urlTemplate: '${NetworkConfig.baseUrl}/tiles/{z}/{x}/{y}.png',
-              fallbackUrl: kStreetPhareOsmTileUrlTemplate,
-              userAgentPackageName: 'com.streetphare.app',
-              tileProvider: _tileProvider,
-            ),
-            if (pts.length >= 2)
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: pts,
-                    color: StreetPhareTheme.primary,
-                    strokeWidth: 4,
-                  ),
-                ],
+            FlutterMap(
+              options: MapOptions(
+                initialCenter: _center(pts),
+                initialZoom: 14,
+                initialRotation: hasRoute ? _bestBearing(pts) : 0,
+                initialCameraFit: hasRoute
+                    ? CameraFit.coordinates(
+                        coordinates: pts,
+                        padding: const EdgeInsets.all(16),
+                        maxZoom: 18,
+                      )
+                    : null,
+                minZoom: 3,
+                maxZoom: 19,
+                onMapReady: () {
+                  if (mounted) setState(() => _mapReady = true);
+                },
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.none,
+                ),
               ),
-            MarkerLayer(
-              markers: [
-                if (pts.isNotEmpty)
-                  Marker(
-                    point: pts.first,
-                    rotate: true,
-                    width: 16,
-                    height: 16,
-                    child: Icon(Icons.trip_origin,
-                        color: StreetPhareTheme.primary, size: 16),
+              children: [
+                TileLayer(
+                  urlTemplate: '${NetworkConfig.baseUrl}/tiles/{z}/{x}/{y}.png',
+                  fallbackUrl: kStreetPhareOsmTileUrlTemplate,
+                  userAgentPackageName: 'com.streetphare.app',
+                  tileProvider: _tileProvider,
+                ),
+                if (hasRoute)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: pts,
+                        color: StreetPhareTheme.primary,
+                        strokeWidth: 4,
+                      ),
+                    ],
                   ),
-                if (pts.length >= 2)
-                  Marker(
-                    point: pts.last,
-                    rotate: true,
-                    width: 16,
-                    height: 16,
-                    child: Icon(Icons.location_on,
-                        color: StreetPhareTheme.accent, size: 16),
-                  ),
+                MarkerLayer(
+                  markers: [
+                    if (pts.isNotEmpty)
+                      Marker(
+                        point: pts.first,
+                        rotate: true,
+                        width: 16,
+                        height: 16,
+                        child: Icon(Icons.trip_origin,
+                            color: StreetPhareTheme.primary, size: 16),
+                      ),
+                    if (hasRoute)
+                      Marker(
+                        point: pts.last,
+                        rotate: true,
+                        width: 16,
+                        height: 16,
+                        child: Icon(Icons.location_on,
+                            color: StreetPhareTheme.accent, size: 16),
+                      ),
+                  ],
+                ),
               ],
             ),
+            if (!_mapReady)
+              IgnorePointer(
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          StreetPhareTheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        s.mapLoadingTiles,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),

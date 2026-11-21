@@ -68,7 +68,6 @@ npm run dev:backup        # Backup   sur :3001
 | GET | `/api/version/check` | Kill Switch version |
 | GET | `/v1/events` | Catalogue événements |
 | GET | `/v1/events/:id` | Détail événement + QR |
-| POST | `/v1/events/:id/route` | Calcul Safe Route |
 | POST | `/v1/reports` | Signalement danger |
 | GET | `/v1/reports` | Liste signalements |
 | POST | `/v1/panic` | Alerte PANIC |

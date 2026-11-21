@@ -3,18 +3,18 @@
 // Moteur de routage central (Singleton).
 //
 // Point d'entrée unique pour tous les calculs d'itinéraire.
-// Gère le chargement du graphe .spg, la cascade de priorité
+// Gère le chargement du graphe .spg, la cascade de connectivité
 // et l'agrégation des résultats.
 //
-// Cascade de priorité :
-//   0. Graphe .spg + Isolate → A* bidirectionnel → ~50 ms   ← MVP
-//   1. MethodChannel Android (GraphHopper embarqué)  → ~200 ms ← Legacy
-//   2. GraphHopper HTTP local                        → ~500 ms ← Legacy
-//   3. OSRM public                                   → ~2 s    ← Legacy
+// Cascade de connectivité (ordre STRICT) :
+//   1. SERVEUR StreetPhare  → /api/route (Dijkstra embarqué)        ← niveau 1
+//   2. LOCAL (offline)      → SPG A*/Dijkstra / GraphHopper natif   ← niveau 2
+//   3. OSMAND / OSRM public → dernier recours réseau                ← niveau 3
 //
-// NOTE : il n'y a PLUS de fallback « grille Dijkstra / vol d'oiseau ».
-//   Un itinéraire proposé doit suivre la voirie réelle (SPG / GraphHopper
-//   / OSRM). Si tous les moteurs routables échouent, on renvoie un échec.
+// Chaque niveau renseigne `source` : `server` | `local` | `osmand`.
+// NOTE : il n'y a PAS de fallback « grille Dijkstra / vol d'oiseau ».
+//   Un itinéraire proposé doit suivre la voirie réelle. Si tous les moteurs
+//   routables échouent, on renvoie un échec.
 
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
@@ -50,15 +50,16 @@ enum EngineState {
   error,
 }
 
-/// Étape atteinte dans la cascade de routage.
+/// Étape atteinte dans la cascade de connectivité.
 enum CascadeStep {
-  spg, // Nouveau moteur .spg
-  nativeAndroid, // MethodChannel Android
-  graphHopper, // GraphHopper HTTP local
-  osrmPublic, // OSRM public
-  openTripPlanner, // OpenTripPlanner (transports en commun)
-  safePath, // SafePathEngine (grille)
+  transit, // OpenTripPlanner (transports en commun — serveur)
+  server, // serveur StreetPhare (Dijkstra embarqué)
+  local, // moteur local (SPG A*/Dijkstra ou GraphHopper natif)
+  osmand, // OsmAnd / OSRM public (dernier recours)
 }
+
+/// Timeout court pour le niveau 1 (serveur StreetPhare) de la cascade.
+const Duration kServerRouteTimeout = Duration(seconds: 2);
 
 /// Moteur de routage central.
 class RoutingEngine {
@@ -117,7 +118,11 @@ class RoutingEngine {
 
   // ── Calcul d'itinéraire avec cascade ──────────────────────────────────
 
-  /// Calcule un itinéraire avec cascade de priorité.
+  /// Calcule un itinéraire via la cascade de connectivité unifiée :
+  ///
+  ///   1. Serveur StreetPhare → /api/route (Dijkstra embarqué), timeout court.
+  ///   2. Local (offline)      → SPG A*/Dijkstra puis GraphHopper natif.
+  ///   3. OsmAnd / OSRM public → dernier recours réseau.
   ///
   /// [profile] : profil de déplacement.
   /// [flags] : options de routage.
@@ -141,12 +146,10 @@ class RoutingEngine {
         ? avoidPoints
         : _collectDangerPoints(avoidFilters);
 
-    // ── TENTATIVE 0 : OpenTripPlanner (profil transports en commun) ───────
-    // OTP est le moteur dédié aux trajets multi-paliers (marche + TC). Il est
-    // tenté en priorité pour le profil transit ; s'il échoue, on retombe sur
-    // la cascade classique ci-dessous, qui produira un tracé piéton de
-    // rabattement (SPG/OsmAnd/SafePathEngine gèrent le profil transit comme
-    // un profil piéton de marche).
+    // ── TRANSIT : OpenTripPlanner (moteur serveur des transports en commun) ──
+    // OTP est le moteur dédié aux trajets multi-paliers (marche + TC). S'il
+    // échoue, on retombe sur la cascade ci-dessous (repli piéton de
+    // rabattement : le profil transit est alors traité comme un piéton).
     if (profile == RoutingProfile.transit) {
       try {
         final otpRoutes = await OpenTripPlannerService.instance.plan(
@@ -154,7 +157,7 @@ class RoutingEngine {
           end: end,
         );
         if (otpRoutes.isNotEmpty) {
-          onCascadeStep?.call(CascadeStep.openTripPlanner);
+          onCascadeStep?.call(CascadeStep.transit);
           if (kDebugMode) {
             debugPrint(
                 '[RoutingEngine] ✅ OTP → ${otpRoutes.length} itinéraire(s)');
@@ -162,7 +165,7 @@ class RoutingEngine {
           return _applyRiskScore(
             RouteComputeResult(
               routes: otpRoutes,
-              source: 'open_trip_planner',
+              source: 'server',
             ),
             dangerPoints,
           );
@@ -172,7 +175,32 @@ class RoutingEngine {
       }
     }
 
-    // ── TENTATIVE 1 : Graphe .spg (nouveau moteur) ─────────────────────
+    // ── NIVEAU 1 : SERVEUR StreetPhare (Dijkstra embarqué) ────────────────
+    // Timeout court : on ne bloque pas longtemps sur un serveur lent/absent.
+    try {
+      final serverRoutes = await OsmAndRoutingService.instance.computeViaServer(
+        start: start,
+        end: end,
+        profile: profile,
+        avoidPoints: dangerPoints,
+        timeout: kServerRouteTimeout,
+      );
+      if (serverRoutes.isNotEmpty) {
+        onCascadeStep?.call(CascadeStep.server);
+        if (kDebugMode) {
+          debugPrint('[RoutingEngine] ✅ Serveur StreetPhare → '
+              '${serverRoutes.first.points.length} points');
+        }
+        return _applyRiskScore(
+          RouteComputeResult(routes: serverRoutes, source: 'server'),
+          dangerPoints,
+        );
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[RoutingEngine] Serveur StreetPhare: $e');
+    }
+
+    // ── NIVEAU 2 : LOCAL — Graphe .spg (A*/Dijkstra) ─────────────────────
     if (_state == EngineState.ready && _graph != null) {
       try {
         final profileSettings = ProfileSettings.from(profile);
@@ -195,7 +223,7 @@ class RoutingEngine {
           ),
         );
         if (result.success) {
-          onCascadeStep?.call(CascadeStep.spg);
+          onCascadeStep?.call(CascadeStep.local);
           if (kDebugMode) {
             debugPrint('[RoutingEngine] ✅ SPG (${result.nodesExplored} nœuds, '
                 '${result.totalDistanceMeters.round()} m)');
@@ -207,7 +235,7 @@ class RoutingEngine {
       }
     }
 
-    // ── TENTATIVE 1 : MethodChannel Android (GraphHopper embarqué) ─────
+    // ── NIVEAU 2 : LOCAL — GraphHopper natif Android ─────────────────────
     final nativeChannel = OsmAndNativeChannel.instance;
     if (nativeChannel.isSupported) {
       try {
@@ -224,11 +252,11 @@ class RoutingEngine {
               .toList(),
         );
         if (!nativeResult.isEmpty) {
-          onCascadeStep?.call(CascadeStep.nativeAndroid);
+          onCascadeStep?.call(CascadeStep.local);
           return _applyRiskScore(
             RouteComputeResult(
               routes: nativeResult.routes,
-              source: nativeResult.source,
+              source: 'local',
             ),
             dangerPoints,
           );
@@ -238,42 +266,24 @@ class RoutingEngine {
       }
     }
 
-    // ── TENTATIVE 2 : OsmAnd Bridge (embarqué → serveur StreetPhare → OSRM) ──
-    // OsmAndRoutingService gère sa propre cascade interne :
-    //   GraphHopper embarqué → serveur StreetPhare (/api/route) → OSRM public
-    // Le serveur prend désormais en charge l'évitement des dangers : on ne
-    // bascule plus sur SafePathEngine (grille) qui traçait à travers les
-    // bâtiments. SafePathEngine reste le dernier recours (TENTATIVE 4).
+    // ── NIVEAU 3 : OSMAND / OSRM public (dernier recours réseau) ─────────
     try {
-      final osmAndResult = await OsmAndRoutingService.instance.computeRoutes(
+      final osrmRoutes = await OsmAndRoutingService.instance.computeViaOsrm(
         start: start,
         end: end,
         profile: profile,
-        filters: avoidFilters,
         avoidPoints: dangerPoints,
       );
-      if (!osmAndResult.isEmpty) {
-        // Détermine l'étape cascade selon la source retournée
-        final step = osmAndResult.source == 'graphhopper_local'
-            ? CascadeStep.graphHopper
-            : CascadeStep.osrmPublic;
-        onCascadeStep?.call(step);
+      if (osrmRoutes.isNotEmpty) {
+        onCascadeStep?.call(CascadeStep.osmand);
         return _applyRiskScore(
-          RouteComputeResult(
-            routes: osmAndResult.routes,
-            source: osmAndResult.source,
-          ),
+          RouteComputeResult(routes: osrmRoutes, source: 'osmand'),
           dangerPoints,
         );
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('[RoutingEngine] OsmAnd Bridge failed: $e');
+      if (kDebugMode) debugPrint('[RoutingEngine] OSRM failed: $e');
     }
-
-    // ── PLUS de fallback « grille Dijkstra » (SafePathEngine) ─────────────
-    // La grille trace des segments à vol d'oiseau qui traversent des
-    // bâtiments hors voirie. On ne renvoie donc QUE des itinéraires
-    // routables (SPG / GraphHopper / OSRM). Si tout échoue → échec total.
 
     // ── ÉCHEC TOTAL ─────────────────────────────────────────────────────
     return const RouteComputeResult(
@@ -322,6 +332,7 @@ class RoutingEngine {
       routes: scored,
       source: result.source,
       errorMessage: result.errorMessage,
+      warnings: result.warnings,
     );
   }
 
@@ -338,7 +349,7 @@ class RoutingEngine {
 
     return RouteComputeResult(
       routes: [routeResult],
-      source: 'spg_graph',
+      source: 'local',
     );
   }
 
@@ -368,6 +379,7 @@ class RouteComputeResult {
     required this.routes,
     required this.source,
     this.errorMessage,
+    this.warnings = const [],
   });
 
   /// Liste des itinéraires calculés.
@@ -378,6 +390,10 @@ class RouteComputeResult {
 
   /// Message d'erreur (si échec).
   final String? errorMessage;
+
+  /// Avertissements non bloquants (ex: départ/arrivée dans une zone de danger,
+  /// contournement impossible). Vide si aucun.
+  final List<String> warnings;
 
   bool get hasError => errorMessage != null;
   bool get isEmpty => routes.isEmpty;

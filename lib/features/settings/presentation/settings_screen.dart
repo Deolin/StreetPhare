@@ -1527,7 +1527,8 @@ class _AboutSection extends StatelessWidget {
           builder: (context, __, ___) {
             final vc = VersionCheckService.instance;
             final v = vc.isInitialized
-                ? AppVersion.parse('${vc.currentVersion}+${vc.buildNumber}').label
+                ? AppVersion.parse('${vc.currentVersion}+${vc.buildNumber}')
+                    .label
                 : 'v0.4.0-alpha (Alpha)';
             return Text(
               '${strings.aboutVersion} $v — ${strings.aboutLicense} GNU GPL v3',

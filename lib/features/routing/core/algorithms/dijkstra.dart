@@ -16,6 +16,7 @@
 
 import '../graph/spg_graph.dart';
 import '../graph/spg_types.dart';
+import '../models/routing_profile.dart';
 
 /// Résultat d'un calcul Dijkstra/A*.
 class PathResult {
@@ -48,10 +49,14 @@ class Dijkstra {
   /// [maxIterations] limite le nombre de nœuds explorés pour éviter
   /// les boucles infinies (défaut : 50 000).
   /// [maxWeight] est le poids maximum avant d'abandonner (défaut : infini).
+  /// [profile] applique les règles d'accès par mode ([ProfileSettings]) :
+  /// le piéton ignore les sens uniques et emprunte voies piétonnes/cyclables,
+  /// le véhicule les refuse et respecte le code de la route.
   static PathResult compute(
     SpgGraph graph,
     int startNode,
     int endNode, {
+    ProfileSettings profile = ProfileSettings.pedestrian,
     int maxIterations = 50000,
     double maxWeight = double.infinity,
     List<RoutingAvoidPoint> avoidPoints = const [],
@@ -90,6 +95,7 @@ class Dijkstra {
       // Relaxation des arêtes sortantes.
       graph.forEachEdge(u, (to, weightMeters, flags, speedKmh) {
         if (visited[to]) return;
+        if (!_edgeAllowed(flags, profile)) return;
         final alt =
             dist[u] + weightMeters + _avoidPenalty(graph, to, avoidPoints);
         if (alt < dist[to]) {
@@ -132,6 +138,34 @@ class Dijkstra {
       totalDistanceMeters: totalDistance,
       iterations: iterations,
     );
+  }
+
+  /// Indique si une arête (décrite par ses [flags]) est franchissable pour un
+  /// [profile] donné. Règles alignées sur `Astar._edgeAllowed` :
+  ///   - Piéton/vélo : autorise escaliers, pistes cyclables et chemins, et
+  ///     IGNORE les sens interdits ; refuse seulement les autoroutes.
+  ///   - Véhicule/urgence : refuse escaliers, pistes cyclables, chemins et
+  ///     contre-sens (sens uniques RESPECTÉS).
+  static bool _edgeAllowed(int flags, ProfileSettings profile) {
+    final isMotorized = profile.walkSpeedMs <= 0;
+    if (EdgeFlags.has(flags, EdgeFlags.stairs)) {
+      if (isMotorized || profile.avoidStairs) return false;
+    }
+    if (EdgeFlags.has(flags, EdgeFlags.cycleway)) {
+      if (isMotorized) return false;
+    }
+    if (EdgeFlags.has(flags, EdgeFlags.highway)) {
+      if (!isMotorized) return false;
+    }
+    // Contre-sens d'une rue à sens unique : interdit aux motorisés, autorisé
+    // aux piétons (le chargeur .spg marque l'arête inverse du flag `oneway`).
+    if (EdgeFlags.has(flags, EdgeFlags.oneway)) {
+      if (isMotorized) return false;
+    }
+    if (EdgeFlags.has(flags, EdgeFlags.unpaved)) {
+      if (profile.avoidUnpaved) return false;
+    }
+    return true;
   }
 
   /// Pénalité d'évitement appliquée à un nœud proche d'un point à éviter.

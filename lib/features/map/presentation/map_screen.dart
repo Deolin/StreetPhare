@@ -72,7 +72,6 @@ import '../../scout/scout_certified_badge.dart';
 import '../../settings/data/app_preferences_store.dart';
 import '../../settings/data/panic_contact_store.dart';
 import '../../settings/presentation/settings_screen.dart';
-import '../../streetmedic/domain/models/streetmedic_models.dart';
 import '../../streetmedic/presentation/streetmedic_overlay.dart';
 import '../../streetmedic/presentation/streetmedic_service.dart';
 import '../../trust_group/presentation/trust_group_service.dart';
@@ -1434,22 +1433,13 @@ class _MapScreenState extends State<MapScreen>
   }
 
   /// Convertit le mode de transport (String) en profil de routage.
-  RoutingProfile _transportModeToRoutingProfile(String mode) {
-    switch (mode) {
-      case 'pedestrian':
-        return RoutingProfile.pedestrian;
-      case 'car':
-        return RoutingProfile.vehicle;
-      case 'transit':
-        // Les transports en commun sont désormais calculés par OpenTripPlanner
-        // (voir OpenTripPlannerService). Si OTP est indisponible, le
-        // RoutingEngine retombe automatiquement sur un tracé piéton de
-        // rabattement (marche), jamais sur un profil voiture.
-        return RoutingProfile.transit;
-      default:
-        return RoutingProfile.pedestrian;
-    }
-  }
+  ///
+  /// Délègue au type canonique [TransportMode] (3 modes : piéton / voiture /
+  /// transports en commun). Les transports en commun sont calculés par
+  /// OpenTripPlanner ; si OTP est indisponible, le RoutingEngine retombe sur
+  /// un tracé piéton de rabattement, jamais sur un profil voiture.
+  RoutingProfile _transportModeToRoutingProfile(String mode) =>
+      TransportMode.fromWire(mode).toRoutingProfile();
 
   /// Affiche un popup bloquant demandant le mode de transport.
   /// Retourne le mode choisi sous forme de String ('pedestrian', 'car', 'transit').
@@ -3046,70 +3036,96 @@ class _MapScreenState extends State<MapScreen>
                                 },
                               ),
 
-                            // ── Bouton GPS Recentrer + Stop Tracking + effacer Route Safe
-                            // Remontés aussi lors d'une intervention street-medic
-                            // pour ne pas être masqués par le panneau « En intervention ».
-                            ValueListenableBuilder<MedicMission?>(
-                              valueListenable:
-                                  StreetMedicService.instance.medicMission,
-                              builder: (context, mission, _) => Positioned(
-                                left: 16,
-                                bottom: (mission != null &&
-                                        (mission.status ==
-                                                MedicMissionStatus.pending ||
-                                            mission.status ==
-                                                MedicMissionStatus.accepted))
-                                    ? 300.0
-                                    : 120.0,
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // Orientation auto selon le cap (heading-up)
-                                    Material(
-                                      elevation: 4,
-                                      shape: const CircleBorder(),
-                                      color: _followHeading
-                                          ? StreetPhareTheme.primary
-                                          : StreetPhareTheme.surface
-                                              .withValues(alpha: 0.9),
-                                      child: InkWell(
-                                        customBorder: const CircleBorder(),
-                                        onTap: () {
-                                          setState(() =>
-                                              _followHeading = !_followHeading);
-                                          if (_followHeading) {
-                                            // Oriente immédiatement + active le
-                                            // suivi pour rester centré.
-                                            _rotateMapToHeading();
-                                            if (!_followUser) {
-                                              setState(
-                                                  () => _followUser = true);
-                                              _animateToUser();
-                                            }
-                                          } else {
-                                            // Rétablit le nord vers le haut.
-                                            try {
-                                              _mapController.rotate(0);
-                                            } catch (_) {}
+                            // ── Tiroir « nav » (cap / recentrer / effacer route) ─────────────────
+                            _EdgeDrawer(
+                              edge: _DrawerEdge.left,
+                              label: 'nav',
+                              panelWidth: 48,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Orientation auto selon le cap (heading-up)
+                                  Material(
+                                    elevation: 4,
+                                    shape: const CircleBorder(),
+                                    color: _followHeading
+                                        ? StreetPhareTheme.primary
+                                        : StreetPhareTheme.surface
+                                            .withValues(alpha: 0.9),
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      onTap: () {
+                                        setState(() =>
+                                            _followHeading = !_followHeading);
+                                        if (_followHeading) {
+                                          // Oriente immédiatement + active le
+                                          // suivi pour rester centré.
+                                          _rotateMapToHeading();
+                                          if (!_followUser) {
+                                            setState(() => _followUser = true);
+                                            _animateToUser();
                                           }
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(12),
-                                          child: Icon(
-                                            _followHeading
-                                                ? Icons.navigation
-                                                : Icons.explore_outlined,
-                                            color: _followHeading
-                                                ? Colors.white
-                                                : StreetPhareTheme
-                                                    .textSecondary,
-                                            size: 24,
-                                          ),
+                                        } else {
+                                          // Rétablit le nord vers le haut.
+                                          try {
+                                            _mapController.rotate(0);
+                                          } catch (_) {}
+                                        }
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Icon(
+                                          _followHeading
+                                              ? Icons.navigation
+                                              : Icons.explore_outlined,
+                                          color: _followHeading
+                                              ? Colors.white
+                                              : StreetPhareTheme.textSecondary,
+                                          size: 24,
                                         ),
                                       ),
                                     ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  // Recentrer / suivre la position GPS
+                                  Material(
+                                    elevation: 4,
+                                    shape: const CircleBorder(),
+                                    color: StreetPhareTheme.surface
+                                        .withValues(alpha: 0.9),
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      onTap: () {
+                                        if (!_isTracking) {
+                                          _initUserLocation();
+                                          return;
+                                        }
+                                        // Bascule le mode « suivre » et
+                                        // recentre immédiatement si activé.
+                                        setState(() {
+                                          _followUser = !_followUser;
+                                        });
+                                        if (_followUser) _animateToUser();
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Icon(
+                                          !_isTracking
+                                              ? Icons.gps_not_fixed
+                                              : _followUser
+                                                  ? Icons.my_location
+                                                  : Icons.gps_fixed,
+                                          color: _followUser
+                                              ? StreetPhareTheme.primary
+                                              : StreetPhareTheme.textSecondary,
+                                          size: 24,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  // Effacer la Route Safe
+                                  if (_safeRoutePoints != null) ...[
                                     const SizedBox(height: 8),
-                                    // Recentrer / suivre la position GPS
                                     Material(
                                       elevation: 4,
                                       shape: const CircleBorder(),
@@ -3118,64 +3134,24 @@ class _MapScreenState extends State<MapScreen>
                                       child: InkWell(
                                         customBorder: const CircleBorder(),
                                         onTap: () {
-                                          if (!_isTracking) {
-                                            _initUserLocation();
-                                            return;
-                                          }
-                                          // Bascule le mode « suivre » et
-                                          // recentre immédiatement si activé.
                                           setState(() {
-                                            _followUser = !_followUser;
+                                            _safeRoutePoints = null;
+                                            _passedRoutePoints = null;
                                           });
-                                          if (_followUser) _animateToUser();
+                                          _applyWakelock();
                                         },
                                         child: Padding(
                                           padding: const EdgeInsets.all(12),
                                           child: Icon(
-                                            !_isTracking
-                                                ? Icons.gps_not_fixed
-                                                : _followUser
-                                                    ? Icons.my_location
-                                                    : Icons.gps_fixed,
-                                            color: _followUser
-                                                ? StreetPhareTheme.primary
-                                                : StreetPhareTheme
-                                                    .textSecondary,
+                                            Icons.clear,
+                                            color: StreetPhareTheme.danger,
                                             size: 24,
                                           ),
                                         ),
                                       ),
                                     ),
-                                    // Effacer la Route Safe
-                                    if (_safeRoutePoints != null) ...[
-                                      const SizedBox(height: 8),
-                                      Material(
-                                        elevation: 4,
-                                        shape: const CircleBorder(),
-                                        color: StreetPhareTheme.surface
-                                            .withValues(alpha: 0.9),
-                                        child: InkWell(
-                                          customBorder: const CircleBorder(),
-                                          onTap: () {
-                                            setState(() {
-                                              _safeRoutePoints = null;
-                                              _passedRoutePoints = null;
-                                            });
-                                            _applyWakelock();
-                                          },
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(12),
-                                            child: Icon(
-                                              Icons.clear,
-                                              color: StreetPhareTheme.danger,
-                                              size: 24,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
                                   ],
-                                ),
+                                ],
                               ),
                             ),
 
@@ -3231,56 +3207,38 @@ class _MapScreenState extends State<MapScreen>
                               },
                             ),
 
-                            // ── FABs actions ────────────────────────────────────────
-                            ValueListenableBuilder<MedicMission?>(
-                              valueListenable:
-                                  StreetMedicService.instance.medicMission,
-                              builder: (context, mission, _) {
-                                // Remonte les FABs quand le panneau
-                                // « En intervention » (pleine largeur, en bas)
-                                // masquerait la colonne de boutons.
-                                final interventionActive = mission != null &&
-                                    (mission.status ==
-                                            MedicMissionStatus.pending ||
-                                        mission.status ==
-                                            MedicMissionStatus.accepted);
-                                return Positioned(
-                                  right: 16,
-                                  bottom: interventionActive ? 300.0 : 32.0,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      _ActionFab(
-                                        icon: Icons.add_alert,
-                                        backgroundColor:
-                                            StreetPhareTheme.primary,
-                                        foregroundColor: Colors.black,
-                                        onPressed: _openReportSheet,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _ActionFab(
-                                        icon: Icons.shield_outlined,
-                                        backgroundColor:
-                                            StreetPhareTheme.surface,
-                                        foregroundColor:
-                                            StreetPhareTheme.primary,
-                                        borderColor: StreetPhareTheme.primary,
-                                        onPressed: () => _triggerRouteSafe(),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _ActionFab(
-                                        icon: Icons.forum_outlined,
-                                        backgroundColor:
-                                            StreetPhareTheme.surface,
-                                        foregroundColor:
-                                            StreetPhareTheme.primary,
-                                        borderColor: StreetPhareTheme.primary,
-                                        onPressed: _openMessaging,
-                                      ),
-                                    ],
+                            // ── Tiroir « utilitaires » (signalement / route safe / p2p) ──────────
+                            _EdgeDrawer(
+                              edge: _DrawerEdge.right,
+                              label: 'utilitaires',
+                              panelWidth: 56,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _ActionFab(
+                                    icon: Icons.add_alert,
+                                    backgroundColor: StreetPhareTheme.primary,
+                                    foregroundColor: Colors.black,
+                                    onPressed: _openReportSheet,
                                   ),
-                                );
-                              },
+                                  const SizedBox(height: 12),
+                                  _ActionFab(
+                                    icon: Icons.shield_outlined,
+                                    backgroundColor: StreetPhareTheme.surface,
+                                    foregroundColor: StreetPhareTheme.primary,
+                                    borderColor: StreetPhareTheme.primary,
+                                    onPressed: () => _triggerRouteSafe(),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _ActionFab(
+                                    icon: Icons.forum_outlined,
+                                    backgroundColor: StreetPhareTheme.surface,
+                                    foregroundColor: StreetPhareTheme.primary,
+                                    borderColor: StreetPhareTheme.primary,
+                                    onPressed: _openMessaging,
+                                  ),
+                                ],
+                              ),
                             ),
 
                             // ── Mode placement de signalement ─────────────────
@@ -4372,6 +4330,159 @@ class _TransportOption extends StatelessWidget {
         icon: Icon(icon, size: 20),
         label: Text(label),
         onPressed: onTap,
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// Tiroir latéral escamotable (« nav » / « utilitaires »)
+// ============================================================================
+
+/// Bord sur lequel le tiroir se replie.
+enum _DrawerEdge { left, right }
+
+/// Tiroir escamotable : un panneau de boutons qui se range automatiquement
+/// hors écran sur un bord pour dégager la carte. Seule l'étiquette verticale
+/// ([label]) reste visible au bord ; un appui ou un glissement la ramène, et il
+/// se replie tout seul après quelques secondes.
+class _EdgeDrawer extends StatefulWidget {
+  const _EdgeDrawer({
+    required this.edge,
+    required this.label,
+    required this.panelWidth,
+    required this.child,
+  });
+
+  final _DrawerEdge edge;
+  final String label;
+  final double panelWidth;
+  final Widget child;
+
+  @override
+  State<_EdgeDrawer> createState() => _EdgeDrawerState();
+}
+
+class _EdgeDrawerState extends State<_EdgeDrawer>
+    with SingleTickerProviderStateMixin {
+  bool _open = false;
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 240),
+  );
+  late final Animation<double> _slide =
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+  Timer? _autoHide;
+
+  bool get _isRight => widget.edge == _DrawerEdge.right;
+
+  @override
+  void dispose() {
+    _autoHide?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggle() => _open ? _hide() : _show();
+
+  void _show() {
+    _autoHide?.cancel();
+    setState(() => _open = true);
+    _controller.forward();
+    _autoHide = Timer(const Duration(seconds: 5), _hide);
+  }
+
+  void _hide() {
+    _autoHide?.cancel();
+    if (!_open) return;
+    setState(() => _open = false);
+    _controller.reverse();
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    final v = details.primaryVelocity ?? 0;
+    // Tirer vers l'intérieur de l'écran → ouvrir ; pousser dehors → ranger.
+    if ((_isRight && v < -200) || (!_isRight && v > 200)) {
+      _show();
+    } else if ((_isRight && v > 200) || (!_isRight && v < -200)) {
+      _hide();
+    }
+  }
+
+  Widget _buildHandle() {
+    return Material(
+      color: StreetPhareTheme.surface.withValues(alpha: 0.9),
+      borderRadius: BorderRadius.horizontal(
+        left: _isRight ? const Radius.circular(10) : Radius.zero,
+        right: _isRight ? Radius.zero : const Radius.circular(10),
+      ),
+      child: SizedBox(
+        width: 30,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RotatedBox(
+                quarterTurns: _isRight ? 1 : 3,
+                child: Text(
+                  widget.label.toUpperCase(),
+                  style: TextStyle(
+                    color: StreetPhareTheme.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Icon(
+                _open
+                    ? (_isRight ? Icons.chevron_right : Icons.chevron_left)
+                    : (_isRight ? Icons.chevron_left : Icons.chevron_right),
+                size: 16,
+                color: StreetPhareTheme.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final handle = _buildHandle();
+    final panel = SizedBox(width: widget.panelWidth, child: widget.child);
+
+    return Positioned(
+      top: 0,
+      bottom: 0,
+      left: _isRight ? null : 0,
+      right: _isRight ? 0 : null,
+      child: Align(
+        alignment: _isRight ? Alignment.centerRight : Alignment.centerLeft,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _toggle,
+          onHorizontalDragEnd: _onDragEnd,
+          child: AnimatedBuilder(
+            animation: _slide,
+            builder: (context, _) {
+              // 0 (fermé) → 1 (ouvert) : le panneau sort de l'écran.
+              final dx = (_isRight ? widget.panelWidth : -widget.panelWidth) *
+                  (1 - _slide.value);
+              return Transform.translate(
+                offset: Offset(dx, 0),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: _isRight ? [handle, panel] : [panel, handle],
+                ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }

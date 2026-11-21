@@ -73,10 +73,15 @@ class SafeRoutePlanner {
       routes = routes.sublist(0, maxRoutes);
     }
 
+    // Avertissements non bloquants : origine/destination dans une zone de
+    // danger, ou absence de contournement sans danger.
+    final warnings = _computeWarnings(start, end, dangers, routes);
+
     return RouteComputeResult(
       routes: routes,
       source: result.source,
       errorMessage: result.errorMessage,
+      warnings: warnings,
     );
   }
 
@@ -185,6 +190,56 @@ class SafeRoutePlanner {
       default:
         return 'Zone restreinte';
     }
+  }
+
+  /// Construit les avertissements non bloquants du plan d'itinéraire :
+  /// origine/destination située dans une zone de danger, ou absence de
+  /// contournement sans danger (toutes les routes traversent une zone bloquante).
+  List<String> _computeWarnings(
+    LatLng start,
+    LatLng end,
+    List<DangerPoint> dangers,
+    List<RouteResult> routes,
+  ) {
+    final warnings = <String>[];
+    final blocking = dangers.where((d) => d.isBlocking).toList();
+    if (blocking.isEmpty) return warnings;
+
+    const distance = Distance();
+    final startBlocked = blocking.any(
+      (d) => distance.distance(start, d.latLng) <= d.radiusMeters,
+    );
+    final endBlocked = blocking.any(
+      (d) => distance.distance(end, d.latLng) <= d.radiusMeters,
+    );
+    if (startBlocked) {
+      warnings.add('Point de départ situé dans une zone de danger.');
+    }
+    if (endBlocked) {
+      warnings.add("Point d'arrivée situé dans une zone de danger.");
+    }
+
+    // Contournement impossible : toutes les routes traversent une zone
+    // bloquante (aucune alternative « 0 risque » n'existe).
+    if (routes.isNotEmpty &&
+        routes.every((r) => _routeCrossesBlocking(r, blocking))) {
+      warnings.add(
+        'Aucun itinéraire sans danger trouvé : le tracé traverse des zones '
+        'bloquées.',
+      );
+    }
+    return warnings;
+  }
+
+  /// Vrai si au moins un point du [route] tombe dans une zone bloquante.
+  bool _routeCrossesBlocking(RouteResult route, List<DangerPoint> blocking) {
+    const distance = Distance();
+    for (final p in route.points) {
+      for (final d in blocking) {
+        if (distance.distance(p, d.latLng) <= d.radiusMeters) return true;
+      }
+    }
+    return false;
   }
 
   List<RouteResult> _dedupeAndSort(List<RouteResult> routes) {

@@ -224,4 +224,3 @@ class MeshOutbox {
 
   String _key(String id) => '$_keyPrefix$id';
 }
-
