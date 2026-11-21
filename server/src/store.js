@@ -33,6 +33,7 @@ const STORE_PATH = config.storePath || path.join(__dirname, '..', 'data', 'store
 const STORE_TMP_PATH = STORE_PATH + '.tmp';
 const SAVE_DEBOUNCE_MS = 2000; // throttle d'écriture disque
 const MEDIC_MISSION_TIMEOUT_MS = 30 * 1000; // délai de réponse street-medic
+const PEER_WINDOW_MS = 5 * 60 * 1000; // fenêtre glissante du compteur de pairs (5 min)
 
 class Store {
   constructor() {
@@ -46,6 +47,7 @@ class Store {
     this.meshMessages = [];      // Backlog de messages mesh (store-and-forward)
     this.meshClients = new Set();
     this.adminClients = new Set();
+    this.peerActivity = new Map(); // peerId -> timestamp (ms) de dernière activité (transitoire)
     this.bannedUsers = new Set();     // UUIDs d'émetteurs bannis (modération tchat)
     this.geofencingZones = [];        // Zones de géorepérage administrées
     this.tombstones = [];             // Tombstones (suppressions/rejets) pour sync différentielle
@@ -616,6 +618,7 @@ class Store {
       senderId: payload.sender_id || 'unknown',
     };
     if (payload.simulated) msg.simulated = true;
+    this.recordPeerActivity(msg.senderId);
     this.meshMessages.push(msg);
     if (this.meshMessages.length > 5000) this.meshMessages = this.meshMessages.slice(-5000);
     this._msgTimestamps.push(Date.now());
@@ -638,6 +641,45 @@ class Store {
     this.meshMessages = this.meshMessages.filter(m => new Date(m.receivedAt) > cutoff);
     const removed = before - this.meshMessages.length;
     if (removed > 0) { this._scheduleSave(); log('MESH', `Purge backlog : ${removed} messages > 48h`); }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // PAIRS ACTIFS (fenêtre glissante 5 min)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /// Enregistre l'activité d'un pair (identifiant unique) à l'instant présent.
+  ///
+  /// Les identifiants non pertinents (inconnu, anonyme, admin, bots de
+  /// simulation) sont ignorés afin de ne pas fausser le compteur.
+  recordPeerActivity(peerId) {
+    if (!peerId || typeof peerId !== 'string') return;
+    const id = peerId.trim();
+    if (!id) return;
+    if (id === 'unknown' || id === 'anonymous' || id === 'admin') return;
+    if (id.startsWith('sim_')) return;
+    this.peerActivity.set(id, Date.now());
+  }
+
+  /// Purge les pairs inactifs depuis plus de 5 minutes et retourne les IDs
+  /// encore actifs.
+  _activePeerIds(now = Date.now()) {
+    const cutoff = now - PEER_WINDOW_MS;
+    const active = [];
+    for (const [id, ts] of this.peerActivity) {
+      if (ts >= cutoff) active.push(id);
+      else this.peerActivity.delete(id);
+    }
+    return active;
+  }
+
+  /// Nombre de pairs uniques ayant interagi dans les 5 dernières minutes.
+  getActivePeerCount() {
+    return this._activePeerIds().length;
+  }
+
+  /// Identifiants uniques actifs dans la fenêtre (diagnostic / debug).
+  getActivePeerIds() {
+    return this._activePeerIds();
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -1137,6 +1179,7 @@ class Store {
     return {
       meshClients: this.meshClients.size,
       adminClients: this.adminClients.size,
+      activePeers: this.getActivePeerCount(),
       alertsTotal: this.alerts.length,
       alertsActive: this.getActiveAlerts().length,
       events: this.events.length,
@@ -1260,6 +1303,7 @@ class Store {
     return {
       meshClients: this.meshClients.size,
       adminClients: this.adminClients.size,
+      activePeers: this.getActivePeerCount(),
       alertsActive: this.getActiveAlerts().length,
       alertsTotal: this.alerts.length,
       events: this.events.length,

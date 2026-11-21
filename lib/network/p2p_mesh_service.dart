@@ -458,6 +458,13 @@ class P2PMeshService {
       final json = jsonDecode(raw);
       if (json is! Map<String, dynamic>) return;
 
+      // Cas 0 : `welcome` du relay (handshake) → rattrapage des messages
+      // manqués pendant une déconnexion (backlog serveur).
+      if (json['kind'] == 'welcome') {
+        _onWelcomeReceived(json);
+        return;
+      }
+
       // Cas 1 : paquet d'alerte simple.
       if (json.containsKey('id') && json.containsKey('euid')) {
         final alert = Alert.fromJson(json);
@@ -517,6 +524,12 @@ class P2PMeshService {
           final alert = Alert.fromJson(alertJson);
           _onServerAlertReceived(alert);
         }
+        return;
+      }
+
+      // Cas 5b : demande de payloads d'alertes manquantes (gossip pull).
+      if (json['kind'] == 'alert_request' && json['ids'] is List) {
+        _onAlertRequestReceived((json['ids'] as List).cast<String>());
         return;
       }
 
@@ -621,7 +634,66 @@ class P2PMeshService {
 
     if (kDebugMode) {
       debugPrint(
-          '[P2PMeshService] gossip: ${missing.length} alertes inconnues');
+          '[P2PMeshService] gossip: ${missing.length} alerte(s) inconnue(s), demande des payloads');
+    }
+
+    // Pull-based gossip : au lieu d'ignorer les alertes manquantes, on
+    // demande leur payload complet à tous les pairs à portée. Ceux qui les
+    // possèdent répondront en les (re)broadcastant.
+    final requested = missing.take(20).toList();
+    unawaited(broadcastRawJson({
+      'kind': 'alert_request',
+      'ids': requested,
+      'ts': DateTime.now().toUtc().toIso8601String(),
+    }));
+  }
+
+  /// Rejoue les messages `missed` reçus dans le paquet `welcome` du relay,
+  /// afin de rattraper les messages perdus pendant une déconnexion.
+  void _onWelcomeReceived(Map<String, dynamic> json) {
+    final missed = json['missed'];
+    if (missed is! List || missed.isEmpty) return;
+
+    if (kDebugMode) {
+      debugPrint(
+          '[P2PMeshService] welcome : ${missed.length} message(s) manqué(s) à rattraper');
+    }
+
+    for (final entry in missed) {
+      if (entry is! Map) continue;
+      final data = entry['data'];
+      if (data is! Map<String, dynamic>) continue;
+      // Évite toute boucle infinie (un `welcome` en backlog est ignoré).
+      if (data['kind'] == 'welcome') continue;
+      try {
+        _processIncomingMessage(jsonEncode(data));
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[P2PMeshService] welcome replay error: $e');
+        }
+      }
+    }
+  }
+
+  /// Répond à une demande de payloads (`alert_request`) en (re)broadcastant
+  /// les alertes locales demandées. Léger délai aléatoire pour éviter les
+  /// collisions de réponses simultanées.
+  void _onAlertRequestReceived(List<String> ids) {
+    final requested = ids.toSet();
+    final owned =
+        database.getAllValid().where((a) => requested.contains(a.id)).toList();
+    if (owned.isEmpty) return;
+
+    if (kDebugMode) {
+      debugPrint(
+          '[P2PMeshService] réponse demande payloads : ${owned.length} alerte(s)');
+    }
+
+    for (final alert in owned) {
+      if (alert.isExpired()) continue;
+      Future.delayed(Duration(milliseconds: Random().nextInt(1500)), () {
+        if (!alert.isExpired()) broadcastAlert(alert);
+      });
     }
   }
 }

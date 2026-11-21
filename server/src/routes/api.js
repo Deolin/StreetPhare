@@ -16,6 +16,9 @@ const https = require('https');
 const { authenticateToken, requireRole, requireScout, requireSuperAdmin, canManageRoleMiddleware } = require('../middleware/auth');
 const scoutService = require('../auth/scoutService');
 const eventAdminService = require('../auth/eventAdminService');
+const adminService = require('../services/adminService');
+const pendingEventService = require('../services/pendingEventService');
+const { sendMail } = require('../services/mailer');
 
 const router = express.Router();
 
@@ -50,6 +53,19 @@ const reportLimiter = rateLimit({
   legacyHeaders: false,   // désactive X-RateLimit-* (obsolètes)
   message: {
     error: 'Trop de signalements émis. Veuillez patienter avant de déclarer un nouvel événement.',
+  },
+  keyGenerator: userKeyGenerator,
+});
+
+/// Limiteur pour la soumission d'événements depuis le site vitrine.
+/// 5 soumissions max / 15 min / IP — anti-spam du formulaire public.
+const eventSubmitLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Trop de soumissions. Veuillez patienter avant de proposer un nouvel événement.',
   },
   keyGenerator: userKeyGenerator,
 });
@@ -835,6 +851,7 @@ router.get('/status', (req, res) => {
     events: store.events.length,
     meshClients: store.meshClients.size,
     adminClients: store.adminClients.size,
+    activePeers: store.getActivePeerCount(),
     uptime: process.uptime(),
   });
 });
@@ -877,7 +894,7 @@ router.post('/auth/login', async (req, res) => {
       }
 
       const tokenPayload = {
-        role: 'admin',
+        role: 'superadmin',
         username: config.adminUsername,
       };
 
@@ -886,8 +903,33 @@ router.post('/auth/login', async (req, res) => {
         expiresIn: config.jwtExpiresIn,
       });
 
-      console.log(`[AUTH] Connexion admin réussie — "${username}" — token valide ${config.jwtExpiresIn}`);
+      console.log(`[AUTH] Connexion Superadmin réussie — "${username}" — token valide ${config.jwtExpiresIn}`);
 
+      return res.json({
+        success: true,
+        token,
+        expiresIn: config.jwtExpiresIn,
+        role: 'superadmin',
+      });
+    }
+
+    // ── 1b. Administrateur Global (compte géré, non anonyme)
+    const globalAdmin = await adminService.verify(username, password);
+    if (globalAdmin) {
+      if (!globalAdmin.emailConfirmed) {
+        console.log(`[AUTH] Connexion admin global refusée (email non confirmé) — "${username}"`);
+        return res.status(403).json({ error: 'Compte non activé : validez le lien reçu par email.' });
+      }
+      const tokenPayload = {
+        role: 'admin',
+        username: globalAdmin.username,
+        permissions: globalAdmin.permissions || [],
+      };
+      const token = jwt.sign(tokenPayload, config.jwtSecret, {
+        algorithm: 'HS256',
+        expiresIn: config.jwtExpiresIn,
+      });
+      console.log(`[AUTH] Connexion Administrateur Global réussie — "${username}"`);
       return res.json({
         success: true,
         token,
@@ -923,6 +965,10 @@ router.post('/auth/login', async (req, res) => {
     // ── 3. Compte admin d'événement
     const eventAdmin = await eventAdminService.verify(username, password);
     if (eventAdmin) {
+      if (!eventAdmin.emailConfirmed) {
+        console.log(`[AUTH] Connexion admin événement refusée (email non confirmé) — "${username}"`);
+        return res.status(403).json({ error: 'Compte non activé : validez le lien reçu par email.' });
+      }
       const tokenPayload = {
         role: 'event_admin',
         username: eventAdmin.username,
@@ -1028,18 +1074,46 @@ router.delete('/admin/scouts/:id', authenticateToken, requireSuperAdmin, (req, r
   res.json({ success: true });
 });
 
-/// GET /api/admin/event-admins — Liste des admins d'événements (réservé Superadmin).
+/// Construit le lien de confirmation d'email envoyé aux nouveaux admins.
+function confirmationLink(role, token) {
+  return `${config.publicBaseUrl}/api/admin/confirm-email?role=${encodeURIComponent(role)}&token=${encodeURIComponent(token)}`;
+}
+
+/// Envoie l'email de confirmation d'un compte admin (global ou événement).
+async function sendConfirmationEmail(role, email, username, token, temporaryPassword) {
+  const link = confirmationLink(role, token);
+  const subject = 'StreetPhare — Confirmez votre compte administrateur';
+  const text = [
+    `Bonjour ${username},`,
+    '',
+    'Un compte administrateur StreetPhare vient de vous être attribué.',
+    'Pour l\'activer, merci de confirmer votre adresse email en ouvrant ce lien :',
+    '',
+    link,
+    '',
+    ...(temporaryPassword
+      ? [`Votre mot de passe temporaire est : ${temporaryPassword}`, 'Veuillez le modifier après connexion auprès d\'un administrateur.', '']
+      : ['Connectez-vous ensuite avec l\'identifiant et le mot de passe qui vous ont été communiqués.', '']),
+    '— L\'équipe StreetPhare',
+  ].join('\n');
+  return sendMail({ to: email, subject, text });
+}
+
+/// GET /api/admin/event-admins — Liste des admins d'événements.
 router.get('/admin/event-admins', authenticateToken, requireSuperAdmin, (req, res) => {
   res.json({ admins: eventAdminService.list() });
 });
 
-/// POST /api/admin/event-admins — Créer un admin d'événement (réservé Superadmin).
-/// Body: { username, displayName?, permissions?, managedEventCodes?, password? }
-router.post('/admin/event-admins', authenticateToken, requireSuperAdmin, async (req, res) => {
+/// POST /api/admin/event-admins — Créer un admin d'événement (non anonyme).
+/// Body: { username, email, phone, displayName?, permissions?, managedEventCodes?, password }
+router.post('/admin/event-admins', authenticateToken, requireSuperAdmin, canManageRoleMiddleware('event_admin'), async (req, res) => {
   try {
-    const { username, displayName, permissions, managedEventCodes, password } = req.body || {};
-    const result = await eventAdminService.create(username, { displayName, permissions, managedEventCodes, password });
+    const { username, displayName, email, phone, permissions, managedEventCodes, password } = req.body || {};
+    const result = await eventAdminService.create(username, { displayName, email, phone, permissions, managedEventCodes, password });
     if (result.error) return res.status(400).json({ error: result.error });
+    if (result.confirmationToken) {
+      await sendConfirmationEmail('event_admin', email, username, result.confirmationToken);
+    }
     res.status(201).json({ success: true, admin: result.admin });
   } catch (err) {
     console.error('[ADMIN] Erreur création admin événement:', err.message);
@@ -1047,12 +1121,12 @@ router.post('/admin/event-admins', authenticateToken, requireSuperAdmin, async (
   }
 });
 
-/// PUT /api/admin/event-admins/:id — Modifier un admin d'événement (réservé Superadmin).
-/// Body: { displayName?, permissions?, managedEventCodes? }
+/// PUT /api/admin/event-admins/:id — Modifier un admin d'événement.
+/// Body: { displayName?, email?, phone?, permissions?, managedEventCodes?, password? }
 router.put('/admin/event-admins/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
-    const { displayName, permissions, managedEventCodes } = req.body || {};
-    const result = await eventAdminService.update(req.params.id, { displayName, permissions, managedEventCodes });
+    const { displayName, email, phone, permissions, managedEventCodes, password } = req.body || {};
+    const result = await eventAdminService.update(req.params.id, { displayName, email, phone, permissions, managedEventCodes, password });
     if (result.error) return res.status(404).json({ error: result.error });
     res.json({ success: true, admin: result.admin });
   } catch (err) {
@@ -1061,11 +1135,109 @@ router.put('/admin/event-admins/:id', authenticateToken, requireSuperAdmin, asyn
   }
 });
 
-/// DELETE /api/admin/event-admins/:id — Supprimer un admin d'événement (réservé Superadmin).
+/// DELETE /api/admin/event-admins/:id — Supprimer un admin d'événement.
 router.delete('/admin/event-admins/:id', authenticateToken, requireSuperAdmin, (req, res) => {
   const ok = eventAdminService.remove(req.params.id);
   if (!ok) return res.status(404).json({ error: 'Admin d\'événement non trouvé' });
   res.json({ success: true });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// ADMINISTRATEURS GLOBAUX (comptes gérés, non anonymes)
+// ═══════════════════════════════════════════════════════════════════════
+
+/// GET /api/admin/admins — Liste des administrateurs globaux.
+router.get('/admin/admins', authenticateToken, requireSuperAdmin, (req, res) => {
+  res.json({ admins: adminService.list() });
+});
+
+/// POST /api/admin/admins — Créer un administrateur global (non anonyme).
+/// Body: { username, email, phone, displayName?, password }
+router.post('/admin/admins', authenticateToken, requireSuperAdmin, canManageRoleMiddleware('admin'), async (req, res) => {
+  try {
+    const { username, displayName, email, phone, password } = req.body || {};
+    const result = await adminService.create(username, { displayName, email, phone, password });
+    if (result.error) return res.status(400).json({ error: result.error });
+    if (result.confirmationToken) {
+      await sendConfirmationEmail('admin', email, username, result.confirmationToken);
+    }
+    res.status(201).json({ success: true, admin: result.admin });
+  } catch (err) {
+    console.error('[ADMIN] Erreur création admin global:', err.message);
+    res.status(500).json({ error: 'Erreur interne lors de la création de l\'administrateur global' });
+  }
+});
+
+/// PUT /api/admin/admins/:id — Modifier un administrateur global.
+router.put('/admin/admins/:id', authenticateToken, requireSuperAdmin, canManageRoleMiddleware('admin'), async (req, res) => {
+  try {
+    const { displayName, email, phone, password } = req.body || {};
+    const result = await adminService.update(req.params.id, { displayName, email, phone, password });
+    if (result.error) return res.status(404).json({ error: result.error });
+    res.json({ success: true, admin: result.admin });
+  } catch (err) {
+    console.error('[ADMIN] Erreur modification admin global:', err.message);
+    res.status(500).json({ error: 'Erreur interne lors de la modification de l\'administrateur global' });
+  }
+});
+
+/// DELETE /api/admin/admins/:id — Supprimer un administrateur global.
+router.delete('/admin/admins/:id', authenticateToken, requireSuperAdmin, canManageRoleMiddleware('admin'), (req, res) => {
+  const ok = adminService.remove(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Administrateur global non trouvé' });
+  res.json({ success: true });
+});
+
+/// POST /api/admin/admins/:id/resend-confirmation — Renvoie l'email de confirmation.
+router.post('/admin/admins/:id/resend-confirmation', authenticateToken, requireSuperAdmin, async (req, res) => {
+  const admin = adminService.regenerateConfirmationToken(req.params.id);
+  if (!admin) return res.status(404).json({ error: 'Administrateur global non trouvé' });
+  if (!admin.emailConfirmed && admin.confirmationToken) {
+    await sendConfirmationEmail('admin', admin.email, admin.username, admin.confirmationToken);
+  }
+  res.json({ success: true });
+});
+
+/// GET /api/admin/confirm-email — Confirme l'email d'un compte admin (public).
+/// Query: { role: 'admin' | 'event_admin', token }
+router.get('/admin/confirm-email', (req, res) => {
+  const role = String(req.query.role || '');
+  const token = String(req.query.token || '');
+
+  const confirmed = role === 'event_admin'
+    ? eventAdminService.confirmEmailByToken(token)
+    : role === 'admin'
+      ? adminService.confirmEmailByToken(token)
+      : null;
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  if (!confirmed) {
+    return res.status(400).send('<html><body style="font-family:sans-serif;text-align:center;padding:40px"><h2>Lien invalide ou expiré</h2><p>Ce lien de confirmation n\'est pas valide.</p></body></html>');
+  }
+  res.send('<html><body style="font-family:sans-serif;text-align:center;padding:40px;color:#123"><h2>✅ Email confirmé</h2><p>Votre compte administrateur StreetPhare est maintenant actif.</p></body></html>');
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// SOUMISSION D'ÉVÉNEMENT DEPUIS LE SITE VITRINE (en attente de validation)
+// ═══════════════════════════════════════════════════════════════════════
+
+/// POST /api/events/submit — Soumet un événement (en attente de validation).
+/// Body: { email, phone, pseudo, name, startDate, city, summary }
+/// Le téléphone est OBLIGATOIRE : l'organisateur (futur admin d'événement)
+/// n'est pas anonyme, afin de garantir un responsable joignable et de prévenir
+/// les usages malhonnêtes ou illégaux.
+router.post('/events/submit', eventSubmitLimiter, (req, res) => {
+  try {
+    const { email, phone, pseudo, name, startDate, city, summary } = req.body || {};
+    if (!email || !phone || !name || !startDate || !city) {
+      return res.status(400).json({ error: 'email, phone, name, startDate et city sont requis' });
+    }
+    const pending = pendingEventService.create({ email, phone, pseudo, name, startDate, city, summary });
+    res.status(201).json({ success: true, pending });
+  } catch (err) {
+    console.error('[EVENTS] Erreur soumission événement:', err.message);
+    res.status(500).json({ error: 'Erreur interne lors de la soumission de l\'événement' });
+  }
 });
 
 // BUG REPORT (Signalement de bug depuis l'application Flutter)

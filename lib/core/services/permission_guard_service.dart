@@ -97,6 +97,25 @@ class PermissionGuardService {
   /// de chaque permission. N'effectue aucune demande — uniquement
   /// une vérification passive.
   Future<PermissionGuardResult> checkAll() async {
+    // Sur le web, les permissions NATIVES gérées par permission_handler
+    // (locationWhenInUse, bluetoothScan, bluetoothConnect, nearbyWifiDevices)
+    // ne sont ni vérifiables ni demandables (`checkPermissionStatus()` /
+    // `request()` lèvent UnimplementedError / Unsupported operation).
+    //
+    // On n'affiche donc PAS l'écran de demande de permissions sur le web.
+    // La LOCALISATION du navigateur reste néanmoins autorisée et fonctionnelle :
+    // elle est fournie par l'API de géolocalisation du navigateur
+    // (navigator.geolocation) via le package `geolocator` — déclenchée à
+    // l'étape 4 du splash (`_getInitialPosition`) et sur la carte
+    // (`_initUserLocation`), PAS via permission_handler.
+    if (kIsWeb) {
+      return const PermissionGuardResult(
+        allGranted: true,
+        missingPermissions: [],
+        permanentlyDeniedPermissions: [],
+      );
+    }
+
     final missing = <Permission>[];
     final permanentlyDenied = <Permission>[];
 

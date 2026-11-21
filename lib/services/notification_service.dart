@@ -23,6 +23,7 @@ import '../features/messaging/domain/models/hive_message.dart';
 // ============================================================================
 
 const int _kPersistentNotifId = 1001;
+const int _kIsolationNotifId = 1002;
 const int _kAlertNotifBaseId = 2000;
 const int _kMessageNotifBaseId = 3000;
 
@@ -33,6 +34,7 @@ const int _kMessageNotifBaseId = 3000;
 const String _kAlertChannelId = 'streetphare_alerts';
 const String _kPersistentChannelId = 'streetphare_persistent';
 const String _kMessagesChannelId = 'messages_channel';
+const String _kIsolationChannelId = 'streetphare_isolation';
 
 // ============================================================================
 // NotificationService
@@ -373,6 +375,58 @@ class NotificationService {
 
   Future<void> dismissPersistentNotification() async {
     await _plugin.cancel(id: _kPersistentNotifId);
+  }
+
+  // --------------------------------------------------------------------------
+  // Notification persistante d'isolement réseau
+  // --------------------------------------------------------------------------
+
+  /// Affiche une notification persistante (ongoing) tant que l'appareil est
+  /// isolé (aucun pair Hive ET aucun serveur joignable).
+  Future<void> showIsolationNotification() async {
+    if (!_initialized) await init();
+    if (kIsWeb || !(io.Platform.isAndroid || io.Platform.isIOS)) return;
+
+    const androidDetails = AndroidNotificationDetails(
+      _kIsolationChannelId,
+      'Isolement réseau',
+      channelDescription:
+          "Vous avertit quand vous n'êtes plus connecté au réseau StreetPhare "
+          '(Hive ou serveur).',
+      importance: Importance.high,
+      priority: Priority.high,
+      ongoing: true,
+      autoCancel: false,
+      showWhen: false,
+      color: Color(0xFFF85149),
+    );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _plugin.show(
+      id: _kIsolationNotifId,
+      title: 'Attention, vous êtes isolé',
+      body: "Vous n'êtes plus connecté aux autres.",
+      notificationDetails: details,
+      payload: 'isolation',
+    );
+
+    if (kDebugMode) {
+      debugPrint("[NotificationService] notification d'isolement affichée");
+    }
+  }
+
+  /// Retire la notification d'isolement (au rétablissement du réseau).
+  Future<void> dismissIsolationNotification() async {
+    if (!_initialized) await init();
+    await _plugin.cancel(id: _kIsolationNotifId);
   }
 
   // --------------------------------------------------------------------------

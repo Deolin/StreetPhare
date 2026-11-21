@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Proposez un nouvel événement au serveur StreetPhare." />
+    <title>Créer un événement — StreetPhare</title>
+    <link rel="icon" href="favicon.ico" type="image/x-icon" />
+    <link rel="icon" href="favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <style>
+      :root {
+        --bg: #0a0e1a; --surface: #131929; --border: #1e2d45;
+        --primary: #ffb300; --accent: #00e676; --text: #e8eaf6;
+        --muted: #90a4ae; --danger: #ff1744; --radius: 12px;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: var(--bg); color: var(--text);
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+        line-height: 1.7; min-height: 100vh;
+      }
+      .nav {
+        background: var(--surface); border-bottom: 1px solid var(--border);
+        padding: 14px 24px; display: flex; align-items: center;
+        justify-content: space-between; position: sticky; top: 0; z-index: 100;
+      }
+      .nav .logo { font-size: 20px; font-weight: 700; color: var(--primary); text-decoration: none; }
+      .nav .logo span { color: var(--text); }
+      .nav-links { display: flex; gap: 20px; align-items: center; }
+      .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; }
+      .nav-links a:hover { color: var(--primary); }
+      .container { max-width: 720px; margin: 0 auto; padding: 48px 24px 80px; }
+      h1 { font-size: 2rem; color: var(--primary); margin-bottom: 8px; }
+      .lead { color: var(--muted); margin-bottom: 32px; font-size: 15px; }
+      .notice {
+        background: #1a1208; border: 1px solid #5c4300; color: #ffd58a;
+        border-radius: var(--radius); padding: 14px 16px; margin-bottom: 20px;
+        font-size: 14px;
+      }
+      .notice strong { color: #ffb300; }
+      .card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 28px;
+      }
+      label { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin: 16px 0 6px; }
+      label small { color: var(--muted); font-weight: 400; }
+      input, textarea {
+        width: 100%; background: #0d1322; border: 1px solid var(--border);
+        color: var(--text); border-radius: 8px; padding: 11px 12px;
+        font-size: 14px; font-family: inherit;
+      }
+      input:focus, textarea:focus { outline: none; border-color: var(--primary); }
+      textarea { resize: vertical; min-height: 120px; }
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+      @media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } }
+      button[type="submit"] {
+        margin-top: 24px; width: 100%; background: var(--primary); color: #000;
+        border: none; border-radius: 8px; padding: 13px; font-size: 15px;
+        font-weight: 700; cursor: pointer;
+      }
+      button[type="submit"]:disabled { opacity: 0.6; cursor: not-allowed; }
+      .status { margin-top: 16px; font-size: 14px; border-radius: 8px; padding: 12px 14px; display: none; }
+      .status.ok { display: block; background: #0f2b1c; border: 1px solid #1f6b3a; color: #7ee2a8; }
+      .status.err { display: block; background: #2b1216; border: 1px solid #7a2430; color: #ff8a94; }
+      footer {
+        border-top: 1px solid var(--border); padding: 24px; text-align: center;
+        color: var(--muted); font-size: 13px;
+      }
+      footer a { color: var(--primary); text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <nav class="nav">
+      <a class="logo" href="index.html">💡 <span>StreetPhare</span></a>
+      <div class="nav-links">
+        <a href="index.html">← Accueil</a>
+        <a href="index.html#download">Télécharger</a>
+      </div>
+    </nav>
+
+    <main class="container">
+      <h1>Créer un événement</h1>
+      <p class="lead">
+        Proposez un nouvel événement au serveur StreetPhare. Votre demande sera
+        examinée puis placée « en attente de validation » avant publication.
+      </p>
+
+      <p class="notice">
+        <strong>Organisateurs non anonymes.</strong> Contrairement aux
+        participants à un événement, qui restent anonymes, l'administrateur
+        déclaré d'un événement doit être identifiable : son <strong>adresse
+        email</strong> et son <strong>numéro de téléphone</strong> réels sont
+        collectés, vérifiés (confirmation par email) et conservés. Cette
+        traçabilité permet de désigner un responsable joignable et vise à
+        prévenir toute utilisation de StreetPhare à des fins malhonnêtes ou
+        illégales.
+      </p>
+
+      <form id="event-form" class="card" novalidate>
+        <div class="grid2">
+          <div>
+            <label for="name">Nom de l'événement <small>*</small></label>
+            <input id="name" name="name" type="text" placeholder="ex: Manifestation du 1er mai" required />
+          </div>
+          <div>
+            <label for="startDate">Date de début <small>*</small></label>
+            <input id="startDate" name="startDate" type="datetime-local" required />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label for="city">Ville <small>*</small></label>
+            <input id="city" name="city" type="text" placeholder="ex: Bruxelles" required />
+          </div>
+          <div>
+            <label for="pseudo">Pseudo</label>
+            <input id="pseudo" name="pseudo" type="text" placeholder="Votre pseudo / nom d'organisateur" />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label for="email">Adresse email de l'administrateur <small>*</small></label>
+            <input id="email" name="email" type="email" placeholder="vous@exemple.be" required />
+          </div>
+          <div>
+            <label for="phone">Numéro de contact <small>*</small></label>
+            <input id="phone" name="phone" type="tel" placeholder="+32 470 12 34 56" required />
+          </div>
+        </div>
+
+        <label for="summary">Résumé</label>
+        <textarea id="summary" name="summary" placeholder="Décrivez brièvement l'événement (parcours, horaires, points de rassemblement…)"></textarea>
+
+        <button type="submit" id="submit-btn">Envoyer la demande</button>
+        <div id="status" class="status" role="status"></div>
+      </form>
+    </main>
+
+    <footer>
+      © StreetPhare — Votre demande est transmise au serveur
+      <code>streetphare.ddns.net</code>. L'administrateur du site est prévenu à
+      <a href="mailto:contact@streetphare.be">contact@streetphare.be</a>.
+    </footer>
+
+    <script>
+      (function () {
+        var form = document.getElementById('event-form');
+        var btn = document.getElementById('submit-btn');
+        var statusEl = document.getElementById('status');
+
+        function setStatus(kind, message) {
+          statusEl.className = 'status ' + kind;
+          statusEl.textContent = message;
+        }
+
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          setStatus('err', '');
+
+          var payload = {
+            email: document.getElementById('email').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            pseudo: document.getElementById('pseudo').value.trim(),
+            name: document.getElementById('name').value.trim(),
+            startDate: document.getElementById('startDate').value.trim(),
+            city: document.getElementById('city').value.trim(),
+            summary: document.getElementById('summary').value.trim(),
+          };
+
+          if (!payload.email || !payload.phone || !payload.name || !payload.startDate || !payload.city) {
+            setStatus('err', 'Merci de renseigner au minimum l\'email, le téléphone, le nom, la date de début et la ville (l\'organisateur doit être identifiable).');
+            return;
+          }
+
+          btn.disabled = true;
+          btn.textContent = 'Envoi en cours…';
+
+          fetch('api/submit_event.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+            .then(function (res) {
+              if (res.ok) {
+                setStatus('ok', '✅ Votre événement a bien été soumis. Il est en attente de validation par l\'administration StreetPhare.');
+                form.reset();
+              } else {
+                setStatus('err', '❌ ' + ((res.data && res.data.error) || 'Erreur lors de la soumission.'));
+              }
+            })
+            .catch(function () {
+              setStatus('err', '❌ Impossible de contacter le serveur. Veuillez réessayer plus tard.');
+            })
+            .finally(function () {
+              btn.disabled = false;
+              btn.textContent = 'Envoyer la demande';
+            });
+        });
+      })();
+    </script>
+  </body>
+</html>

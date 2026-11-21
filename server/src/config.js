@@ -101,6 +101,22 @@ const config = {
   // Identifiant admin (utilisé uniquement pour l'affichage du dashboard).
   adminUsername: process.env.ADMIN_USERNAME || 'admin',
 
+  // ── Email (notifications, confirmations de comptes admins) ──────────
+  // SMTP optionnel : si non configuré, les emails sont consignés dans
+  // data/mail-outbox.log (mode dev/test sans serveur de messagerie).
+  smtpHost: process.env.SMTP_HOST || '',
+  smtpPort: parseInt(process.env.SMTP_PORT || '587', 10),
+  smtpUser: process.env.SMTP_USER || '',
+  smtpPass: process.env.SMTP_PASS || '',
+  smtpFrom: process.env.SMTP_FROM || 'no-reply@streetphare.be',
+
+  // Adresse de contact des administrateurs du site (notifications vitrine).
+  contactEmail: process.env.CONTACT_EMAIL || 'contact@streetphare.be',
+
+  // Base URL publique du serveur (utilisée pour générer les liens de
+  // confirmation d'email envoyés aux administrateurs).
+  publicBaseUrl: process.env.PUBLIC_BASE_URL || 'http://streetphare.ddns.net:3000',
+
   // ── Rate Limiting ──────────────────────────────────────────────────
   // Fenêtre de rate limiting (ms) pour toutes les routes publiques.
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),

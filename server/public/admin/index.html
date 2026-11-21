@@ -73,6 +73,7 @@
     <div id="status">
       <span id="sync-status">⏳ Connexion...</span> |
       Alertes: <span id="active-count">0</span> |
+      Pairs: <span id="peer-count">0</span> |
       Mesh: <span id="mesh-count">0</span>
     </div>
 
@@ -147,6 +148,12 @@
       </div>
 
       <div class="card">
+        <h3>🕓 Événements en attente de validation</h3>
+        <div style="font-size:10px;color:#8b949e;margin-bottom:6px">Soumissions reçues depuis le site vitrine. L'organisateur est <b style="color:#ffd58a">identifiable</b> (email + téléphone obligatoires) pour des raisons de responsabilité. Accepter génère l'événement + son admin.</div>
+        <div class="list" id="pending-events-list">Chargement…</div>
+      </div>
+
+      <div class="card">
         <h3>⚙️ Paramètres de l'événement</h3>
         <label>Titre</label><input id="ev-edit-title">
         <label>Début</label><input id="ev-edit-start" type="datetime-local">
@@ -207,6 +214,17 @@
         <div id="perm-list"></div>
         <button onclick="createModerator()">➕ Créer modérateur</button>
         <div class="list" id="mods-list">Chargement…</div>
+      </div>
+
+      <div class="card">
+        <h3>👑 Administrateurs globaux</h3>
+        <label>Identifiant</label><input id="adm-username" placeholder="ex: admin-events">
+        <label>Nom affiché</label><input id="adm-display" placeholder="ex: Resp. événements">
+        <label>Email (obligatoire)</label><input id="adm-email" type="email" placeholder="admin@exemple.be">
+        <label>Téléphone (obligatoire)</label><input id="adm-phone" type="tel" placeholder="+32 470 12 34 56">
+        <label>Mot de passe (min. 8)</label><input id="adm-password" type="password">
+        <button onclick="createAdmin()">➕ Créer administrateur</button>
+        <div class="list" id="admins-list">Chargement…</div>
       </div>
 
       <div class="card" style="display:none" id="streetmedics-card">
@@ -399,6 +417,15 @@
     }
     document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
+    /* ── FILET DE SÉCURITÉ : rafraîchissement périodique ──────────────── */
+    // Même si un push WebSocket temps réel est manqué (reconnexion, proxy,
+    // onglet en veille, etc.), la surveillance (liste + carte) se rafraîchit
+    // toute seule toutes les 4 s : plus besoin de recharger la page pour
+    // voir apparaître un nouveau signalement.
+    setInterval(() => {
+      if (adminToken) refreshSnapshot();
+    }, 4000);
+
     /* ── WEBSOCKET ───────────────────────────────────────────────────── */
     function connect() {
       if (!adminToken) return;
@@ -411,9 +438,11 @@
           currentPermissions = d.permissions || [];
           renderAlerts(d.alerts || []);
           renderEvents(d.events || []);
-          updateStatus(d.syncState);
+          updateStatus(d);
           loadZones();
           loadModerators();
+          loadAdmins();
+          loadPendingEvents();
           loadStreetMedics();
           loadMedicMissions();
           loadMedicEmergencies();
@@ -463,7 +492,7 @@
       };
       ws.onopen = () => {
         document.getElementById('sync-status').innerHTML = '<span class="ok">● Connecté (Live)</span>';
-        loadZones(); loadModerators(); loadSimTypes(); loadStreetMedics(); loadMedicMissions(); loadMedicEmergencies();
+        loadZones(); loadModerators(); loadAdmins(); loadPendingEvents(); loadSimTypes(); loadStreetMedics(); loadMedicMissions(); loadMedicEmergencies();
       };
       ws.onclose = async () => {
         document.getElementById('sync-status').innerHTML = '<span class="ko">● Déconnecté — reconnexion…</span>';
@@ -611,9 +640,12 @@
         else { if (map.hasLayer(layerGroups[k])) map.removeLayer(layerGroups[k]); }
       });
     }
-    function updateStatus(syncState) {
+    function updateStatus(snapshot) {
       document.getElementById('sync-status').innerHTML = '<span class="ok">● Connecté (Live)</span>';
-      if (syncState) document.getElementById('mesh-count').textContent = syncState.meshClients || 0;
+      if (snapshot) {
+        document.getElementById('mesh-count').textContent = snapshot.meshClients || 0;
+        document.getElementById('peer-count').textContent = snapshot.activePeers || 0;
+      }
     }
 
     /* ── MODÉRATION SIGNALEMENTS ─────────────────────────────────────── */
@@ -739,6 +771,48 @@
     async function deleteModerator(id) {
       await fetch(`/api/admin/moderators/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } });
       loadModerators();
+    }
+
+    /* ── ADMINISTRATEURS GLOBAUX ─────────────────────────────────────── */
+    async function loadAdmins() {
+      if (currentRole !== 'admin' && currentRole !== 'superadmin') return;
+      const r = await fetch('/api/admin/admins', { headers: { 'Authorization': `Bearer ${adminToken}` } });
+      if (!r.ok) return;
+      const d = await r.json();
+      const list = document.getElementById('admins-list');
+      if (!d.admins.length) { list.innerHTML = 'Aucun administrateur global'; return; }
+      list.innerHTML = d.admins.map(a => `<div class="item"><b>${escapeHtml(a.username)}</b> <span class="meta">(${escapeHtml(a.email)} · ${escapeHtml(a.phone)})</span>${a.emailConfirmed ? ' ✅' : ' ⏳ non confirmé'}<br><button onclick="deleteAdmin('${a.id}')">Supprimer</button></div>`).join('');
+    }
+    async function createAdmin() {
+      const username = document.getElementById('adm-username').value;
+      const displayName = document.getElementById('adm-display').value;
+      const email = document.getElementById('adm-email').value;
+      const phone = document.getElementById('adm-phone').value;
+      const password = document.getElementById('adm-password').value;
+      await fetch('/api/admin/admins', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` }, body: JSON.stringify({ username, displayName, email, phone, password }) });
+      loadAdmins();
+    }
+    async function deleteAdmin(id) {
+      await fetch(`/api/admin/admins/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } });
+      loadAdmins();
+    }
+
+    /* ── ÉVÉNEMENTS EN ATTENTE ───────────────────────────────────────── */
+    async function loadPendingEvents() {
+      const r = await fetch('/api/admin/events/pending', { headers: { 'Authorization': `Bearer ${adminToken}` } });
+      if (!r.ok) return;
+      const d = await r.json();
+      const list = document.getElementById('pending-events-list');
+      if (!d.pending.length) { list.innerHTML = 'Aucun événement en attente'; return; }
+      list.innerHTML = d.pending.map(p => `<div class="item"><b>${escapeHtml(p.name)}</b><br><span class="meta">${escapeHtml(p.city)} · ${escapeHtml(p.startDate)}</span><br><span class="meta">${escapeHtml(p.pseudo)} (${escapeHtml(p.email)} · ${escapeHtml(p.phone)})</span><br><span class="meta">${escapeHtml(p.summary || '')}</span><br><button onclick="acceptPendingEvent('${p.id}')">✅ Accepter</button> <button onclick="rejectPendingEvent('${p.id}')">❌ Rejeter</button></div>`).join('');
+    }
+    async function acceptPendingEvent(id) {
+      await fetch(`/api/admin/events/pending/${id}/accept`, { method: 'POST', headers: { 'Authorization': `Bearer ${adminToken}` } });
+      loadPendingEvents();
+    }
+    async function rejectPendingEvent(id) {
+      await fetch(`/api/admin/events/pending/${id}/reject`, { method: 'POST', headers: { 'Authorization': `Bearer ${adminToken}` } });
+      loadPendingEvents();
     }
 
     /* ── STREET-MEDICS ───────────────────────────────────────────────── */
@@ -1091,8 +1165,14 @@
       loadHistory.push({ t: Date.now(), alerts: metrics.alertsActive, msgs: metrics.messagesPerSec, mem: metrics.memoryMB, mesh: metrics.meshClients });
       if (loadHistory.length > 60) loadHistory.shift();
       drawLoadChart();
+      // Les métriques (diffusées toutes les 3 s) rafraîchissent aussi les
+      // compteurs du header : Pairs (fenêtre 5 min) et Mesh (sockets relay).
+      const meshEl = document.getElementById('mesh-count');
+      const peerEl = document.getElementById('peer-count');
+      if (meshEl) meshEl.textContent = metrics.meshClients || 0;
+      if (peerEl) peerEl.textContent = metrics.activePeers || 0;
       document.getElementById('load-stats').textContent =
-        `Mesh: ${metrics.meshClients} | Admin: ${metrics.adminClients} | Alertes actives: ${metrics.alertsActive} | msg/s: ${metrics.messagesPerSec} | Mémoire: ${metrics.memoryMB} MB | Uptime: ${metrics.uptimeSeconds}s`;
+        `Pairs: ${metrics.activePeers} | Mesh: ${metrics.meshClients} | Admin: ${metrics.adminClients} | Alertes actives: ${metrics.alertsActive} | msg/s: ${metrics.messagesPerSec} | Mémoire: ${metrics.memoryMB} MB | Uptime: ${metrics.uptimeSeconds}s`;
     }
     function drawLoadChart() {
       const canvas = document.getElementById('load-chart');

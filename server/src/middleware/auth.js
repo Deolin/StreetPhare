@@ -24,6 +24,7 @@ module.exports = {
   // Nouveaux middlewares RBAC
   requireMinRole: rbac.requireMinRole,
   requireSuperAdmin: rbac.requireSuperAdmin,
+  requireOwner: rbac.requireOwner,
   requireEventAdmin: rbac.requireEventAdmin,
   requireScout: rbac.requireScout,
   canManageRoleMiddleware: rbac.canManageRoleMiddleware,

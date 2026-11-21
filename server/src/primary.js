@@ -571,6 +571,8 @@ adminWss.on('connection', (ws, req) => {
       alerts: store.getAllAlerts().map(a => ({ ...a, votes: a.votes || [] })),
       events: store.getAllEvents(),
       syncState: store.syncState,
+      meshClients: store.meshClients.size,
+      activePeers: store.getActivePeerCount(),
     }));
   } catch (e) {
     log('ADMIN', `Erreur envoi snapshot: ${e.message}`);

@@ -20,9 +20,13 @@
 
 const express = require('express');
 const { authenticateToken, requirePermission } = require('../middleware/auth');
+const config = require('../config');
 const store = require('../store');
 const sync = require('../sync');
 const { broadcast } = require('../services/broadcast');
+const pendingEventService = require('../services/pendingEventService');
+const eventAdminService = require('../auth/eventAdminService');
+const { sendMail } = require('../services/mailer');
 
 const router = express.Router();
 
@@ -202,6 +206,112 @@ router.get('/', authenticateToken, requirePermission('manageEvents'), (req, res)
     events = events.filter(e => managed.includes(String(e.code).toUpperCase().trim()));
   }
   res.json({ events: events.map(withClientAliases) });
+});
+
+/// GET /api/admin/events/pending : Événements en attente de validation.
+router.get('/pending', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+  res.json({ pending: pendingEventService.listByStatus('pending') });
+});
+
+/// POST /api/admin/events/pending/:id/accept : Accepte une soumission,
+/// crée l'événement réel ET génère l'Admin d'Événement associé.
+router.post('/pending/:id/accept', authenticateToken, requirePermission('manageEvents'), async (req, res) => {
+  try {
+    const pending = pendingEventService.getById(req.params.id);
+    if (!pending || pending.status !== 'pending') {
+      return res.status(404).json({ error: 'Soumission non trouvée ou déjà traitée' });
+    }
+
+    // 1. Générer un code d'événement unique.
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    let code;
+    let attempt = 0;
+    do {
+      code = `EVT-${datePart}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      attempt += 1;
+    } while (store.getEventByCode(code) && attempt < 20);
+
+    // 2. Créer l'événement réel.
+    const effectiveStartAt = pending.startDate && !isNaN(new Date(pending.startDate).getTime())
+      ? new Date(pending.startDate).toISOString()
+      : new Date().toISOString();
+    const event = {
+      code,
+      title: pending.name,
+      startAt: effectiveStartAt,
+      endAt: null,
+      visibleAt: effectiveStartAt,
+      generalZone: pending.city || null,
+      routeGeoJson: '',
+      waypoints: [], pois: [], careCenters: [], exitPoints: [], safeZones: [],
+      destinationLatitude: null,
+      destinationLongitude: null,
+      summary: pending.summary || '',
+      organizerEmail: pending.email || '',
+      organizerPhone: pending.phone || '',
+      organizerPseudo: pending.pseudo || '',
+    };
+    const saved = store.addEvent(event);
+    sync.enqueueEvent(saved);
+
+    // 3. Générer l'Admin d'Événement associé (non anonyme).
+    const adminResult = await eventAdminService.createForEvent({
+      email: pending.email,
+      phone: pending.phone,
+      pseudo: pending.pseudo,
+      eventCode: code,
+    });
+
+    // 4. Marquer la soumission comme acceptée.
+    pendingEventService.accept(pending.id, code);
+
+    // 5. Notifier l'organisateur (activation du compte + code d'événement).
+    if (!adminResult.error && adminResult.confirmationToken) {
+      const link = `${config.publicBaseUrl}/api/admin/confirm-email?role=event_admin&token=${encodeURIComponent(adminResult.confirmationToken)}`;
+      await sendMail({
+        to: pending.email,
+        subject: 'StreetPhare — Votre événement est accepté',
+        text: [
+          `Bonjour ${pending.pseudo || pending.email},`,
+          '',
+          `Votre événement « ${pending.name} » a été accepté.`,
+          `Code d'événement : ${code}`,
+          '',
+          'Vous êtes maintenant Administrateur/trice d\'événement. Pour activer votre compte, confirmez votre email :',
+          link,
+          '',
+          `Votre mot de passe temporaire est : ${adminResult.temporaryPassword}`,
+          '',
+          '— L\'équipe StreetPhare',
+        ].join('\n'),
+      });
+    }
+
+    broadcast('events_changed', { events: store.getAllEvents().map(withClientAliases) });
+    res.json({
+      success: true,
+      accepted: pendingEventService.getById(pending.id),
+      admin: adminResult.error ? null : adminResult.admin,
+      event: withClientAliases(saved),
+    });
+  } catch (err) {
+    log('PENDING', `Erreur acceptation : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors de l\'acceptation de l\'événement' });
+  }
+});
+
+/// POST /api/admin/events/pending/:id/reject : Rejette une soumission.
+router.post('/pending/:id/reject', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+  const rejected = pendingEventService.reject(req.params.id);
+  if (!rejected) return res.status(404).json({ error: 'Soumission non trouvée ou déjà traitée' });
+  res.json({ success: true, rejected });
+});
+
+/// DELETE /api/admin/events/pending/:id : Supprime une soumission.
+router.delete('/pending/:id', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+  const ok = pendingEventService.remove(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Soumission non trouvée' });
+  res.json({ success: true });
 });
 
 /// GET /api/admin/events/:code : Detail d'un evenement.

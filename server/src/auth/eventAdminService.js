@@ -6,15 +6,28 @@
 // cantonnés à ses propres événements, points d'événements et signalements
 // associés.
 //
+// ⚠️ NON-ANONYMAT OBLIGATOIRE :
+// Contrairement aux participants (citoyens) qui restent anonymes, un
+// administrateur d'événement est TOUJOURS identifiable : il doit fournir une
+// adresse email réelle, un numéro de téléphone valide et confirmer son email.
+// Cette traçabilité permet de disposer d'un responsable joignable en cas de
+// problème et vise à prévenir toute utilisation de StreetPhare à des fins
+// malhonnêtes ou illégales (organisation de débordements sous couvert
+// d'anonymat, etc.).
+//
 // Persistance : fichier data/eventAdmins.json
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { ROLE_EVENT_ADMIN, defaultPermissions } = require('./roles');
 
 const EVENT_ADMINS_PATH = path.join(__dirname, '..', '..', 'data', 'eventAdmins.json');
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^\+?[0-9][0-9()\s.-]{6,20}$/;
 
 const log = (category, message) => {
   const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
@@ -57,9 +70,12 @@ class EventAdminService {
       id: admin.id,
       username: admin.username,
       displayName: admin.displayName || admin.username,
+      email: admin.email,
+      phone: admin.phone,
       role: admin.role,
       permissions: admin.permissions || [],
       managedEventCodes: admin.managedEventCodes || [],
+      emailConfirmed: !!admin.emailConfirmed,
       createdAt: admin.createdAt,
       updatedAt: admin.updatedAt,
     };
@@ -78,6 +94,15 @@ class EventAdminService {
     return this.admins.find(a => a.username === username) || null;
   }
 
+  getByEmail(email) {
+    const clean = String(email || '').toLowerCase().trim();
+    return this.admins.find(a => String(a.email || '').toLowerCase().trim() === clean) || null;
+  }
+
+  getByConfirmationToken(token) {
+    return this.admins.find(a => a.confirmationToken === token) || null;
+  }
+
   /// Retourne les admins d'un événement donné (par code).
   getByEventCode(eventCode) {
     return this.admins.filter(a => (a.managedEventCodes || []).includes(eventCode));
@@ -90,21 +115,28 @@ class EventAdminService {
     return (admin.managedEventCodes || []).includes(eventCode);
   }
 
-  async create(username, { displayName, permissions, managedEventCodes, password } = {}) {
+  async create(username, { displayName, email, phone, permissions, managedEventCodes, password } = {}) {
     if (!username) return { error: 'username requis' };
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanPhone = String(phone || '').trim();
+    if (!EMAIL_RE.test(cleanEmail)) return { error: 'Adresse email valide requise' };
+    if (!PHONE_RE.test(cleanPhone)) return { error: 'Numéro de téléphone valide requis' };
+    if (!password || password.length < 8) return { error: 'Mot de passe requis (8 caractères minimum)' };
     if (this.getByUsername(username)) return { error: 'Nom d\'utilisateur déjà utilisé' };
+    if (this.getByEmail(cleanEmail)) return { error: 'Adresse email déjà utilisée' };
 
-    let passwordHash = null;
-    if (password) {
-      passwordHash = await bcrypt.hash(password, 12);
-    }
+    const passwordHash = await bcrypt.hash(password, 12);
 
     const admin = {
       id: uuidv4(),
       username,
       displayName: displayName || username,
+      email: cleanEmail,
+      phone: cleanPhone,
       role: ROLE_EVENT_ADMIN,
       passwordHash,
+      emailConfirmed: false,
+      confirmationToken: uuidv4(),
       permissions: Array.isArray(permissions)
         ? permissions.filter(p => defaultPermissions(ROLE_EVENT_ADMIN).includes(p))
         : defaultPermissions(ROLE_EVENT_ADMIN),
@@ -114,7 +146,39 @@ class EventAdminService {
     this.admins.push(admin);
     this._save();
     log('EVENT_ADMINS', `Admin d'événement créé : ${username} (événements: ${admin.managedEventCodes.join(',') || 'aucun'})`);
-    return { admin: this._public(admin) };
+    return { admin: this._public(admin), confirmationToken: admin.confirmationToken };
+  }
+
+  /// Génère un Admin d'Événement à partir d'une soumission acceptée.
+  /// L'identifiant est l'email ; le pseudo sert de nom affiché. Un mot de passe
+  /// temporaire aléatoire est généré et transmis dans l'email de confirmation
+  /// (l'admin pouvant ensuite demander une réinitialisation via un admin).
+  async createForEvent({ email, phone, pseudo, eventCode, password }) {
+    const username = String(email || '').toLowerCase().trim();
+    if (this.getByEmail(username)) return { error: 'Un admin existe déjà pour cette adresse email' };
+
+    const temporaryPassword = password || crypto.randomBytes(6).toString('hex');
+    const result = await this.create(username, {
+      displayName: pseudo || username,
+      email,
+      phone,
+      password: temporaryPassword,
+      managedEventCodes: eventCode ? [String(eventCode).toUpperCase()] : [],
+    });
+    if (result.error) return result;
+    result.temporaryPassword = temporaryPassword;
+    return result;
+  }
+
+  confirmEmailByToken(token) {
+    const admin = this.getByConfirmationToken(token);
+    if (!admin) return null;
+    admin.emailConfirmed = true;
+    admin.confirmationToken = null;
+    admin.updatedAt = new Date().toISOString();
+    this._save();
+    log('EVENT_ADMINS', `Email confirmé : ${admin.email}`);
+    return this._public(admin);
   }
 
   /// Vérifie les identifiants d'un admin d'événement (username + password).
@@ -125,10 +189,34 @@ class EventAdminService {
     return ok ? this._public(admin) : null;
   }
 
-  async update(id, { displayName, permissions, managedEventCodes } = {}) {
+  async update(id, { displayName, email, phone, permissions, managedEventCodes, password } = {}) {
     const admin = this.getById(id);
     if (!admin) return { error: 'Admin d\'événement non trouvé' };
     if (displayName !== undefined) admin.displayName = displayName;
+
+    if (email !== undefined) {
+      const cleanEmail = String(email).trim().toLowerCase();
+      if (!EMAIL_RE.test(cleanEmail)) return { error: 'Adresse email valide requise' };
+      const other = this.getByEmail(cleanEmail);
+      if (other && other.id !== id) return { error: 'Adresse email déjà utilisée' };
+      if (cleanEmail !== admin.email) {
+        admin.email = cleanEmail;
+        admin.emailConfirmed = false;
+        admin.confirmationToken = uuidv4();
+      }
+    }
+
+    if (phone !== undefined) {
+      const cleanPhone = String(phone).trim();
+      if (!PHONE_RE.test(cleanPhone)) return { error: 'Numéro de téléphone valide requis' };
+      admin.phone = cleanPhone;
+    }
+
+    if (password) {
+      if (password.length < 8) return { error: 'Mot de passe requis (8 caractères minimum)' };
+      admin.passwordHash = await bcrypt.hash(password, 12);
+    }
+
     if (Array.isArray(permissions)) {
       admin.permissions = permissions.filter(p => defaultPermissions(ROLE_EVENT_ADMIN).includes(p));
     }

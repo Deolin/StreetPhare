@@ -168,6 +168,10 @@ wss.on('connection', (ws) => {
     try {
       const msg = data.toString();
       log('MESH', `Message reçu: ${msg.substring(0, 200)}`);
+      try {
+        const parsed = JSON.parse(msg);
+        store.recordPeerActivity(parsed.sender_id || parsed.peerId || parsed.id);
+      } catch (_) {}
       store.meshClients.forEach(client => {
         if (client !== ws && client.readyState === 1) {
           try { client.send(msg); } catch (_) {}
@@ -215,6 +219,8 @@ adminWss.on('connection', (ws, req) => {
       alerts: store.getAllAlerts().map(a => ({ ...a, votes: a.votes || [] })),
       events: store.getAllEvents(),
       syncState: store.syncState,
+      meshClients: store.meshClients.size,
+      activePeers: store.getActivePeerCount(),
     }));
   } catch (e) {
     log('ADMIN', `Erreur envoi snapshot: ${e.message}`);

@@ -3,18 +3,26 @@
 // Définition de la hiérarchie des rôles et des permissions pour StreetPhare.
 //
 // Rôles supportés :
-//   - superadmin  : Admin Principal. Exclusivité absolue sur la création/gestion
-//                   des autres comptes admins, modérateurs et éclaireurs.
-//   - admin       : Administrateur principal (compte unique, ADMIN_HASH). Gardé
-//                   pour rétrocompatibilité avec le login existant.
-//   - event_admin : Admin d'Événement. Droits d'édition/modération cantonnés
-//                   à ses propres événements, points d'événements et signalements
-//                   associés.
+//   - superadmin  : SUPER ADMIN — détenteur du serveur (compte unique défini par
+//                   ADMIN_USERNAME / ADMIN_HASH). Tous les droits, y compris la
+//                   création/gestion des autres comptes admins.
+//   - admin       : ADMIN GLOBAL — compte géré (multiple), NON anonyme (email +
+//                   téléphone + confirmation email). Gère tous les autres comptes
+//                   mais PAS le superadmin.
+//   - event_admin : ADMIN D'ÉVÉNEMENT (temporaire) — généré automatiquement à
+//                   l'acceptation d'un événement. Droits d'édition/modération
+//                   cantonnés à ses propres événements. NON anonyme (email +
+//                   téléphone + confirmation email).
 //   - scout       : Éclaireur (Trusted User). Signalements validés instantanément
 //                   (bypass consensus 3 votes). Option de suppression directe des
 //                   faux signalements constatés.
 //   - moderator   : Modérateur secondaire (permissions granulaires existantes).
 //   - user        : Utilisateur citoyen standard (aucune permission admin).
+//
+// ⚠️ ANONYMAT : les participants (user, scout) restent ANONYMES. En revanche, les
+// comptes administrateurs (admin, event_admin) sont TOUJOURS identifiables
+// (email + téléphone vérifiés). Cette traçabilité désigne un responsable
+// joignable en cas de problème et prévient les usages malhonnêtes ou illégaux.
 
 // ════════════════════════════════════════════════════════════════════════════════
 // 1. HIÉRARCHIE DES RÔLES (poids numérique, plus élevé = plus privilégié)
@@ -45,9 +53,10 @@ function roleGte(userRole, minRole) {
 // ════════════════════════════════════════════════════════════════════════════════
 
 // Matrice : [rôle gestionnaire] => [rôles gérables]
+// Le Superadmin gère tout. L'Admin Global gère tous les rôles SAUF superadmin.
 const ROLE_MANAGEMENT_MATRIX = {
   superadmin: ['admin', 'event_admin', 'moderator', 'scout'],
-  admin: ['event_admin', 'moderator', 'scout'], // Le compte admin principal (ADMIN_HASH) agit comme Superadmin
+  admin: ['admin', 'event_admin', 'moderator', 'scout'], // Admin Global : tout sauf superadmin
   event_admin: [], // Les admins d'événement ne créent pas d'autres comptes
   moderator: [],
   scout: [],

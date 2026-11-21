@@ -213,6 +213,10 @@ class RelayMeshTransport implements MeshTransport {
     }
     _reconnectTimer = Timer(delay, () {
       _reconnectTimer = null;
+      // Réinitialise le flag pour autoriser une prochaine reconnexion en cas
+      // d'échec de celle-ci ; sinon, après UN échec, plus aucune reconnexion
+      // n'est tentée (deadlock de reconnexion).
+      _reconnecting = false;
       _connect();
     });
   }
@@ -258,6 +262,10 @@ class RelayMeshTransport implements MeshTransport {
     }
     _reconnectTimer = Timer(delay, () {
       _reconnectTimer = null;
+      // Réinitialise le flag pour autoriser une prochaine reconnexion en cas
+      // d'échec de celle-ci ; sinon, après UN échec, plus aucune reconnexion
+      // n'est tentée (deadlock de reconnexion).
+      _reconnecting = false;
       _connect();
     });
   }

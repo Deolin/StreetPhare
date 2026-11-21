@@ -51,6 +51,9 @@ class EventAdminAccount {
     required this.displayName,
     required this.permissions,
     required this.managedEventCodes,
+    this.email,
+    this.phone,
+    this.emailConfirmed = false,
     this.createdAt,
   });
 
@@ -67,6 +70,9 @@ class EventAdminAccount {
               ?.map((e) => e.toString().toUpperCase())
               .toList() ??
           const [],
+      email: json['email']?.toString(),
+      phone: json['phone']?.toString(),
+      emailConfirmed: json['emailConfirmed'] == true,
       createdAt: json['createdAt']?.toString(),
     );
   }
@@ -76,7 +82,85 @@ class EventAdminAccount {
   final String displayName;
   final List<String> permissions;
   final List<String> managedEventCodes;
+  final String? email;
+  final String? phone;
+  final bool emailConfirmed;
   final String? createdAt;
+}
+
+/// Modèle représentant un compte Administrateur Global (rôle `admin`).
+class GlobalAdminAccount {
+  const GlobalAdminAccount({
+    required this.id,
+    required this.username,
+    required this.displayName,
+    required this.email,
+    required this.phone,
+    required this.emailConfirmed,
+    this.createdAt,
+  });
+
+  factory GlobalAdminAccount.fromJson(Map<String, dynamic> json) {
+    return GlobalAdminAccount(
+      id: (json['id'] ?? '').toString(),
+      username: (json['username'] ?? '').toString(),
+      displayName: (json['displayName'] ?? json['username'] ?? '').toString(),
+      email: (json['email'] ?? '').toString(),
+      phone: (json['phone'] ?? '').toString(),
+      emailConfirmed: json['emailConfirmed'] == true,
+      createdAt: json['createdAt']?.toString(),
+    );
+  }
+
+  final String id;
+  final String username;
+  final String displayName;
+  final String email;
+  final String phone;
+  final bool emailConfirmed;
+  final String? createdAt;
+}
+
+/// Événement en attente de validation (soumis depuis le site vitrine).
+class PendingEvent {
+  const PendingEvent({
+    required this.id,
+    required this.email,
+    required this.phone,
+    required this.pseudo,
+    required this.name,
+    required this.startDate,
+    required this.city,
+    required this.summary,
+    required this.status,
+    this.eventCode,
+  });
+
+  factory PendingEvent.fromJson(Map<String, dynamic> json) {
+    return PendingEvent(
+      id: (json['id'] ?? '').toString(),
+      email: (json['email'] ?? '').toString(),
+      phone: (json['phone'] ?? '').toString(),
+      pseudo: (json['pseudo'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      startDate: (json['startDate'] ?? '').toString(),
+      city: (json['city'] ?? '').toString(),
+      summary: (json['summary'] ?? '').toString(),
+      status: (json['status'] ?? 'pending').toString(),
+      eventCode: json['eventCode']?.toString(),
+    );
+  }
+
+  final String id;
+  final String email;
+  final String phone;
+  final String pseudo;
+  final String name;
+  final String startDate;
+  final String city;
+  final String summary;
+  final String status;
+  final String? eventCode;
 }
 
 /// Résultat d'une authentification RBAC.
@@ -437,6 +521,8 @@ class RbacAdminService {
     required String username,
     required String password,
     String? displayName,
+    String? email,
+    String? phone,
     List<String>? managedEventCodes,
     List<String>? permissions,
   }) async {
@@ -450,6 +536,8 @@ class RbacAdminService {
             'password': password,
             if (displayName != null && displayName.isNotEmpty)
               'displayName': displayName,
+            if (email != null && email.isNotEmpty) 'email': email,
+            if (phone != null && phone.isNotEmpty) 'phone': phone,
             if (managedEventCodes != null)
               'managedEventCodes': managedEventCodes,
             if (permissions != null) 'permissions': permissions,
@@ -467,6 +555,8 @@ class RbacAdminService {
   Future<EventAdminAccount> updateEventAdmin({
     required String id,
     String? displayName,
+    String? email,
+    String? phone,
     List<String>? managedEventCodes,
     List<String>? permissions,
   }) async {
@@ -477,6 +567,8 @@ class RbacAdminService {
           headers: _authHeaders,
           body: jsonEncode({
             if (displayName != null) 'displayName': displayName,
+            if (email != null) 'email': email,
+            if (phone != null) 'phone': phone,
             if (managedEventCodes != null)
               'managedEventCodes': managedEventCodes,
             if (permissions != null) 'permissions': permissions,
@@ -500,6 +592,135 @@ class RbacAdminService {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       throw Exception(data['error'] ??
           'Erreur lors de la suppression de l\'admin d\'événement');
+    }
+  }
+
+  // ── ADMINISTRATEURS GLOBAUX (/api/admin/admins) ──────────────────────────
+
+  Future<List<GlobalAdminAccount>> listAdmins() async {
+    final uri = Uri.parse('$_baseUrl/api/admin/admins');
+    final res = await http
+        .get(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 200) {
+      throw Exception(data['error'] ??
+          'Erreur lors du chargement des administrateurs globaux');
+    }
+    final list = (data['admins'] as List<dynamic>?) ?? const [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(GlobalAdminAccount.fromJson)
+        .toList();
+  }
+
+  Future<GlobalAdminAccount> createAdmin({
+    required String username,
+    required String email,
+    required String phone,
+    required String password,
+    String? displayName,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/api/admin/admins');
+    final res = await http
+        .post(
+          uri,
+          headers: _authHeaders,
+          body: jsonEncode({
+            'username': username,
+            'email': email,
+            'phone': phone,
+            'password': password,
+            if (displayName != null && displayName.isNotEmpty)
+              'displayName': displayName,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 201 && res.statusCode != 200) {
+      throw Exception(data['error'] ??
+          'Erreur lors de la création de l\'administrateur global');
+    }
+    return GlobalAdminAccount.fromJson(data['admin'] as Map<String, dynamic>);
+  }
+
+  Future<GlobalAdminAccount> updateAdmin({
+    required String id,
+    String? displayName,
+    String? email,
+    String? phone,
+    String? password,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/api/admin/admins/$id');
+    final res = await http
+        .put(
+          uri,
+          headers: _authHeaders,
+          body: jsonEncode({
+            if (displayName != null) 'displayName': displayName,
+            if (email != null) 'email': email,
+            if (phone != null) 'phone': phone,
+            if (password != null && password.isNotEmpty) 'password': password,
+          }),
+        )
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 200) {
+      throw Exception(data['error'] ??
+          'Erreur lors de la modification de l\'administrateur global');
+    }
+    return GlobalAdminAccount.fromJson(data['admin'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteAdmin(String id) async {
+    final uri = Uri.parse('$_baseUrl/api/admin/admins/$id');
+    final res = await http
+        .delete(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(data['error'] ??
+          'Erreur lors de la suppression de l\'administrateur global');
+    }
+  }
+
+  // ── ÉVÉNEMENTS EN ATTENTE DE VALIDATION (/api/admin/events/pending) ──────
+
+  Future<List<PendingEvent>> listPendingEvents() async {
+    final uri = Uri.parse('$_baseUrl/api/admin/events/pending');
+    final res = await http
+        .get(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 200) {
+      throw Exception(data['error'] ??
+          'Erreur lors du chargement des événements en attente');
+    }
+    final list = (data['pending'] as List<dynamic>?) ?? const [];
+    return list.whereType<Map<String, dynamic>>().map(PendingEvent.fromJson).toList();
+  }
+
+  Future<void> acceptPendingEvent(String id) async {
+    final uri = Uri.parse('$_baseUrl/api/admin/events/pending/$id/accept');
+    final res = await http
+        .post(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(
+          data['error'] ?? 'Erreur lors de l\'acceptation de l\'événement');
+    }
+  }
+
+  Future<void> rejectPendingEvent(String id) async {
+    final uri = Uri.parse('$_baseUrl/api/admin/events/pending/$id/reject');
+    final res = await http
+        .post(uri, headers: _authHeaders)
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(
+          data['error'] ?? 'Erreur lors du rejet de l\'événement');
     }
   }
 

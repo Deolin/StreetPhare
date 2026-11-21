@@ -15,6 +15,7 @@ import 'package:flutter/foundation.dart';
 
 import '../core/network/peer_counter_service.dart';
 import '../network/failover_manager.dart';
+import 'notification_service.dart';
 
 /// État d'une couche de transport réseau.
 enum TransportLayerState {
@@ -216,6 +217,7 @@ class ConnectivityService extends ChangeNotifier {
               missingLayers: _state.missingLayers,
             );
             notifyListeners();
+            unawaited(NotificationService.instance.showIsolationNotification());
             if (kDebugMode) {
               debugPrint('[Connectivity] ⚠ MODE ISOLÉ TOTAL ACTIVÉ '
                   '(serveurs down + 0 pairs BLE depuis ${duration.inSeconds}s)');
@@ -242,6 +244,7 @@ class ConnectivityService extends ChangeNotifier {
         );
         _isolationStartTime = null;
         notifyListeners();
+        unawaited(NotificationService.instance.dismissIsolationNotification());
         debugPrint(
             '[Connectivity] Retour à un état connecté (Serveur ou Hive)');
       }

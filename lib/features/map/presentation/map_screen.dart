@@ -755,44 +755,108 @@ class _MapScreenState extends State<MapScreen>
   }
 
   /// Icône glissable/déposable affichée pendant le mode « placement ».
+  ///
+  /// La POINTE (bas du widget) doit coïncider exactement avec [point], la
+  /// coordonnée du signalement. Pour cela :
+  ///   - `alignment: Alignment.topCenter` place le bord bas du marqueur sur
+  ///     [point] (au lieu du centre par défaut) ;
+  ///   - le contenu est ancré en bas afin que la pointe de `arrow_drop_down`
+  ///     soit au bord bas ;
+  ///   - une petite cible semi-transparente est dessinée exactement sous la
+  ///     flèche, centrée sur la position de dépôt.
   Marker? _buildPlacementMarker() {
     final type = _pendingReportType;
     final point = _placementPoint;
     if (type == null || point == null) return null;
+
+    const double targetSize = 14;
+
     return Marker(
       point: point,
       // Garde l'icône droite quand la carte tourne (garde le nord).
       rotate: true,
+      // Ancrage : la pointe (bas) coïncide avec la coordonnée exacte.
+      alignment: Alignment.topCenter,
       width: 64,
-      height: 64,
-      child: Listener(
-        behavior: HitTestBehavior.opaque,
-        onPointerDown: _onPlacementDragStart,
-        onPointerMove: _onPlacementDragMove,
-        onPointerUp: (_) => _onPlacementDragEnd(),
-        onPointerCancel: (_) => _onPlacementDragEnd(),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: type.color,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: type.color.withValues(alpha: 0.5),
-                    blurRadius: 12,
-                    spreadRadius: 3,
+      // Hauteur confortable : cercle (~46) + flèche (28). Le contenu est
+      // ancré en bas ; la cible dépasse légèrement sous la pointe
+      // (clipBehavior: none l'autorise).
+      height: 96,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.bottomCenter,
+        children: [
+          // Pin (cercle + flèche) : draggable, pointe alignée sur le point.
+          Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerDown: _onPlacementDragStart,
+            onPointerMove: _onPlacementDragMove,
+            onPointerUp: (_) => _onPlacementDragEnd(),
+            onPointerCancel: (_) => _onPlacementDragEnd(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: type.color,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: type.color.withValues(alpha: 0.5),
+                        blurRadius: 12,
+                        spreadRadius: 3,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Icon(type.icon, color: Colors.white, size: 30),
+                  child: Icon(type.icon, color: Colors.white, size: 30),
+                ),
+                // Pointe visuelle indiquant le point exact de dépôt.
+                Icon(Icons.arrow_drop_down, color: type.color, size: 28),
+              ],
             ),
-            // Pointe visuelle indiquant le point exact de dépôt.
-            Icon(Icons.arrow_drop_down, color: type.color, size: 28),
-          ],
+          ),
+          // Petite cible fine, centrée exactement sous la flèche.
+          // Décale de la moitié de la taille (targetSize / 2) pour que le
+          // centre de la cible coïncide avec la pointe (= position exacte).
+          Transform.translate(
+            offset: const Offset(0.0, 7.0),
+            child: IgnorePointer(child: _buildPlacementTarget(targetSize)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Petite cible fine et semi-transparente (anneau + point central) qui
+  /// matérialise le point EXACT où le signalement sera posé.
+  Widget _buildPlacementTarget(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.9),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 2,
+            spreadRadius: 0.5,
+          ),
+        ],
+      ),
+      child: Center(
+        child: Container(
+          width: size * 0.3,
+          height: size * 0.3,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.95),
+          ),
         ),
       ),
     );
@@ -4115,6 +4179,30 @@ class _ConnectivityBanner extends StatefulWidget {
 class _ConnectivityBannerState extends State<_ConnectivityBanner> {
   bool _wasIsolated = false;
 
+  /// Affiche la popup « vous êtes isolé » (une seule fois par isolement).
+  Future<void> _showIsolationDialog() async {
+    final s = widget.strings;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Color(0xFFF85149)),
+            const SizedBox(width: 10),
+            Expanded(child: Text(s.mapIsolatedTitle)),
+          ],
+        ),
+        content: Text(s.mapIsolatedMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -4128,6 +4216,11 @@ class _ConnectivityBannerState extends State<_ConnectivityBanner> {
             _wasIsolated = true;
             // Sauvegarde non-bloquante des alertes critiques en mémoire.
             unawaited(_saveCriticalDataToHive());
+            // Popup d'isolement affichée une seule fois (post-frame pour ne
+            // pas modifier l'état pendant la phase de build).
+            SchedulerBinding.instance.addPostFrameCallback((_) {
+              if (mounted) unawaited(_showIsolationDialog());
+            });
           }
           if (!isIsolated) {
             _wasIsolated = false;

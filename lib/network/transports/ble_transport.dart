@@ -444,15 +444,11 @@ class BleMeshTransport implements MeshTransport {
     }
     _lastDeviceSeen[device.id] = now;
 
-    // Comptage HIVE (fenêtre glissante 5 min).
-    // Utilise device.id comme peerId stable et metadata SP_HIVE_ pour
-    // passer le filtre isStreetPharePeer(). device.name est souvent vide
-    // → on utilise toujours device.id comme fallback dans le metadata.
-    PeerCounterService.instance.recordPeer(
-      device.id,
-      serviceUuid: serviceUuid.toString(),
-      metadata: 'SP_HIVE_${device.id}',
-    );
+    // Comptage HIVE : on ne compte PAS l'adresse MAC (device.id) ici.
+    // L'identité canonique d'un pair est son `peerId` stable (sp-<hex>),
+    // échangé via les frames GATT (`p`) et le relay. Le comptage unifié se
+    // fait dans _onDataReceived / _processIncomingMessage, ce qui garantit
+    // l'exclusion de soi et un décompte exact (N-1 pour N appareils).
 
     if (kDebugMode) {
       debugPrint(
@@ -685,28 +681,21 @@ class BleMeshTransport implements MeshTransport {
       String payload;
       try {
         final frame = jsonDecode(raw) as Map<String, dynamic>;
-        final p = frame['p'] as String?; // peerId émetteur
+        final p = frame['p'] as String?; // peerId émetteur (sp-<hex>)
         payload = frame['d'] as String? ?? raw;
-        if (p != null && p != _peerId) {
-          // Enregistre l'émetteur dans le comptage HIVE.
+        // Comptage HIVE : on ne compte QUE l'identifiant canonique `sp-<hex>`
+        // (jamais l'adresse MAC `deviceId`), pour garantir une identité unique
+        // par appareil et permettre l'exclusion de soi via setLocalPeerId.
+        if (p != null && p.isNotEmpty && p != _peerId) {
           PeerCounterService.instance.recordPeer(
             p,
             serviceUuid: serviceUuid.toString(),
           );
-        } else {
-          // Fallback : utilise le deviceId BLE.
-          PeerCounterService.instance.recordPeer(
-            deviceId,
-            serviceUuid: serviceUuid.toString(),
-          );
         }
+        // p == _peerId → c'est notre propre frame (écho/boucle) : on ignore.
       } catch (_) {
-        // Frame non-JSON → passe le raw tel quel.
+        // Frame non-JSON → on passe le raw tel quel (émetteur non identifié).
         payload = raw;
-        PeerCounterService.instance.recordPeer(
-          deviceId,
-          serviceUuid: serviceUuid.toString(),
-        );
       }
 
       // Pousse le payload applicatif (non le frame) dans incoming.

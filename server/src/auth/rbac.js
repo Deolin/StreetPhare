@@ -168,6 +168,19 @@ function requireSuperAdmin(req, res, next) {
   next();
 }
 
+/// Middleware strict : réserve l'accès au Superadmin (détenteur du serveur).
+/// L'Admin Global n'est PAS autorisé ici.
+function requireOwner(req, res, next) {
+  if (!req.user) {
+    return res.status(500).json({ error: 'Erreur de configuration du serveur' });
+  }
+  if (req.user.role !== ROLE_SUPERADMIN) {
+    log('AUTH', `Accès refusé (détenteur du serveur requis) — rôle=${req.user.role}`);
+    return res.status(403).json({ error: 'Réservé au Superadmin (détenteur du serveur)' });
+  }
+  next();
+}
+
 function requireEventAdmin(req, res, next) {
   if (!req.user) {
     return res.status(500).json({ error: 'Erreur de configuration du serveur' });
@@ -251,6 +264,7 @@ module.exports = {
   requireMinRole,
   requirePermission,
   requireSuperAdmin,
+  requireOwner,
   requireEventAdmin,
   requireScout,
   canManageRoleMiddleware,

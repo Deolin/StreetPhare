@@ -93,13 +93,17 @@ class StreetPhareForegroundTask {
   /// port de communication isolat principal ⇄ isolat de service + enregistre
   /// les options.
   static void initCommunication() {
+    // Le plugin flutter_foreground_task n'existe que sur Android/iOS.
+    // Sur web (et desktop), il n'y a pas de méthode channel enregistré :
+    // tout appel lèverait une MissingPluginException au démarrage.
+    if (!_isSupported) return;
     FlutterForegroundTask.initCommunicationPort();
     init();
   }
 
   /// Enregistre les options (notification + service) du service avant-plan.
   static void init() {
-    if (_initialized) return;
+    if (_initialized || !_isSupported) return;
     _initialized = true;
 
     FlutterForegroundTask.init(

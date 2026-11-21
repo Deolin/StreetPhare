@@ -11,6 +11,8 @@
 //   * Les alternatives calculées remplacent le bouton et affichent
 //     la liste des 2 autres itinéraires.
 
+import 'dart:math' as math;
+
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
@@ -528,9 +530,24 @@ class _OsmAndLaunchButton extends StatelessWidget {
 // _MiniRouteMap
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _MiniRouteMap extends StatelessWidget {
+class _MiniRouteMap extends StatefulWidget {
   const _MiniRouteMap({required this.route});
   final RouteResult route;
+
+  @override
+  State<_MiniRouteMap> createState() => _MiniRouteMapState();
+}
+
+class _MiniRouteMapState extends State<_MiniRouteMap> {
+  final MapController _controller = MapController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  static const double _earthRadiusM = 6378137.0;
 
   static LatLng _center(List<LatLng> pts) {
     if (pts.isEmpty) return const LatLng(48.8566, 2.3522);
@@ -542,17 +559,93 @@ class _MiniRouteMap extends StatelessWidget {
     return LatLng(lat / pts.length, lng / pts.length);
   }
 
+  /// Projection Mercator (x est, y nord, en mètres), cohérente avec la
+  /// projection de la carte, pour calculer un angle sans distorsion.
+  static double _mercatorY(double latDeg) {
+    final latRad = latDeg * math.pi / 180;
+    final sinLat = math.sin(latRad);
+    return _earthRadiusM / 2 * math.log((1 + sinLat) / (1 - sinLat));
+  }
+
+  /// Rotation (en degrés) qui aligne la plus grande longueur de l'itinéraire
+  /// à l'horizontale, afin d'exploiter au mieux la fenêtre rectangulaire
+  /// (plus large que haute) de l'aperçu.
+  ///
+  /// L'axe principal (direction de plus grande variance des points projetés)
+  /// est obtenu par ACP (analyse en composantes principales). On calcule
+  /// l'azimut géographique de cet axe puis la rotation de carte qui le rend
+  /// horizontal.
+  static double _bestBearing(List<LatLng> pts) {
+    if (pts.length < 2) return 0;
+
+    var meanX = 0.0, meanY = 0.0;
+    final xs = <double>[];
+    final ys = <double>[];
+    for (final p in pts) {
+      final x = _earthRadiusM * p.longitude * math.pi / 180;
+      final y = _mercatorY(p.latitude);
+      xs.add(x);
+      ys.add(y);
+      meanX += x;
+      meanY += y;
+    }
+    meanX /= pts.length;
+    meanY /= pts.length;
+
+    var sxx = 0.0, syy = 0.0, sxy = 0.0;
+    for (var i = 0; i < pts.length; i++) {
+      final dx = xs[i] - meanX;
+      final dy = ys[i] - meanY;
+      sxx += dx * dx;
+      syy += dy * dy;
+      sxy += dx * dy;
+    }
+
+    // Angle de l'axe principal par rapport à l'axe Est (sens trigonométrique,
+    // y vers le nord).
+    final theta = 0.5 * math.atan2(2 * sxy, sxx - syy);
+
+    // Azimut géographique (0° = Nord, sens horaire) de cet axe.
+    final azimuth =
+        math.atan2(math.cos(theta), math.sin(theta)) * 180 / math.pi;
+
+    // Pour que cet axe soit horizontal à l'écran : rotation = azimut - 90°.
+    var bearing = azimuth - 90.0;
+    bearing = ((bearing % 360) + 360) % 360;
+    return bearing;
+  }
+
+  /// Recadre la mini-carte pour afficher la totalité de l'itinéraire.
+  void _fitRoute() {
+    final pts = widget.route.points;
+    if (pts.length < 2) return;
+    try {
+      _controller.fitCamera(
+        CameraFit.coordinates(
+          coordinates: pts,
+          padding: const EdgeInsets.all(16),
+          maxZoom: 18,
+        ),
+      );
+    } catch (_) {
+      // La carte n'est pas encore prête : on conserve le cadrage initial.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final pts = route.points;
+    final pts = widget.route.points;
     return SizedBox(
       height: 160,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: FlutterMap(
+          mapController: _controller,
           options: MapOptions(
             initialCenter: _center(pts),
             initialZoom: 14,
+            initialRotation: _bestBearing(pts),
+            onMapReady: _fitRoute,
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.none,
             ),
