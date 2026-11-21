@@ -4,8 +4,8 @@
 // du moteur de routage). Sauvegardés en `SharedPreferences`.
 //
 // L'UI des Paramètres écoute ce store via `ValueListenableBuilder`
-// pour refléter les changements en temps réel. Le moteur de
-// routage `SafePathEngine` lit la valeur courante via `value` au
+// pour refléter les changements en temps réel. Le moteur de routage
+// (via `SafeRoutePlanner`) lit la valeur courante via `value` au
 // moment du calcul.
 
 import 'dart:convert';

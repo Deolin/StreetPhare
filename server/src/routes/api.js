@@ -12,7 +12,6 @@ const sync = require('../sync');
 const runtimeConfig = require('../runtimeConfig');
 const { broadcast, broadcastToAll } = require('../services/broadcast');
 const { routingEngine } = require('../services/routing');
-const https = require('https');
 const { authenticateToken, requireRole, requireScout, requireSuperAdmin, canManageRoleMiddleware } = require('../middleware/auth');
 const scoutService = require('../auth/scoutService');
 const eventAdminService = require('../auth/eventAdminService');
@@ -617,96 +616,15 @@ router.post('/sync/full', (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════
 // ROUTING (Calcul d'itinéraire)
 // ═══════════════════════════════════════════════════════════════════════
-
-/// GET|POST /api/route — Calcul d'itinéraire via OSRM public (proxy serveur).
-/// Accepte indifféremment :
-///   - POST body : { from: { lat, lon }, to: { lat, lon }, profile?: "car"|"foot" }
-///   - GET/query : ?fromLat=&fromLon=&toLat=&toLon=&profile=car|foot
-///
-/// Contrairement à l'ancien fallback « ligne droite », cette route appelle le
-/// démo public OSRM (router.project-osrm.org) pour obtenir un tracé qui suit
-/// la voirie réelle. Réponse au format attendu par le client :
-///   { source, routes: [{ points: [[lat,lon],…], distanceMeters, durationSeconds }] }
-function osrmRoute(fromLat, fromLon, toLat, toLon, { vehicle }) {
-  return new Promise((resolve, reject) => {
-    const profile = vehicle ? 'driving' : 'foot';
-    const url =
-      `https://router.project-osrm.org/route/v1/${profile}/` +
-      `${fromLon},${fromLat};${toLon},${toLat}` +
-      '?overview=full&geometries=geojson&alternatives=true';
-
-    const req = https.get(
-      url,
-      { headers: { 'User-Agent': 'StreetPhare-server/1.0' } },
-      (r) => {
-        let buf = '';
-        r.on('data', (c) => (buf += c));
-        r.on('end', () => {
-          if (r.statusCode !== 200) return reject(new Error(`OSRM HTTP ${r.statusCode}`));
-          try {
-            const j = JSON.parse(buf);
-            const routes = (j.routes || []).map((rt, i) => ({
-              id: i === 0 ? 'osrm_primary' : `osrm_alt${i}`,
-              points: (rt.geometry && rt.geometry.coordinates || []).map(
-                (c) => [Number(c[1]), Number(c[0])],
-              ),
-              distanceMeters: Number(rt.distance) || 0,
-              durationSeconds: Number(rt.duration) || 0,
-            })).filter((rt) => rt.points.length >= 2);
-            resolve(routes);
-          } catch (e) {
-            reject(e);
-          }
-        });
-      },
-    );
-    req.on('error', reject);
-    req.setTimeout(15000, () => req.destroy(new Error('OSRM timeout')));
-  });
-}
-
-async function handleRouteRequest(req, res) {
-  const body = req.body || {};
-  const query = req.query || {};
-  const fromLat = Number(body.from && body.from.lat != null ? body.from.lat : query.fromLat);
-  const fromLon = Number(body.from && body.from.lon != null ? body.from.lon : query.fromLon);
-  const toLat = Number(body.to && body.to.lat != null ? body.to.lat : query.toLat);
-  const toLon = Number(body.to && body.to.lon != null ? body.to.lon : query.toLon);
-
-  if ([fromLat, fromLon, toLat, toLon].some((v) => Number.isNaN(v))) {
-    return res.status(400).json({ error: 'from/to avec lat/lon requis' });
-  }
-
-  const profileRaw =
-    (body.profile) || (req.headers['x-streetphare-route']) || (query.profile) || 'foot';
-  const isVehicle = ['car', 'voiture', 'vehicle', 'driving'].includes(profileRaw);
-  const profileLabel = isVehicle ? 'voiture' : 'piéton';
-  const now = new Date();
-  const ts = [
-    String(now.getHours()).padStart(2, '0'),
-    String(now.getMinutes()).padStart(2, '0'),
-    String(now.getSeconds()).padStart(2, '0'),
-  ].join(':');
-  console.log(`[${ts}] [Routing] Proxy OSRM ${profileLabel} (${fromLat},${fromLon}) → (${toLat},${toLon})`);
-
-  try {
-    const routes = await osrmRoute(fromLat, fromLon, toLat, toLon, { vehicle: isVehicle });
-    if (!routes.length) {
-      return res.status(422).json({ error: 'no_route', message: 'Aucun itinéraire trouvé.' });
-    }
-    res.json({ source: 'osrm_public', profile: profileLabel, routes });
-  } catch (err) {
-    console.log(`[${ts}] [Routing] ❌ OSRM indisponible: ${err.message}`);
-    res.status(502).json({
-      error: 'routing_unavailable',
-      message: 'Moteur de routage indisponible. Réessayez plus tard.',
-    });
-  }
-}
-
-router.post('/route', handleRouteRequest);
-router.get('/route', handleRouteRequest);
-
+//
+// Le calcul d'itinéraire serveur est centralisé dans l'unique handler
+// GET /api/route ci-dessous (moteur Dijkstra embarqué, voir section
+// « GET /api/route — moteur local Dijkstra » plus bas dans ce fichier).
+//
+// L'ancien proxy OSRM public (osrmRoute / handleRouteRequest) a été retiré :
+// il masquait le calcul serveur en GET et dupliquait le dernier recours
+// réseau déjà géré côté client par OsmAndRoutingService.
+//
 // ═══════════════════════════════════════════════════════════════════════
 // EVENTS (Manifestations / Événements)
 // ═══════════════════════════════════════════════════════════════════════

@@ -48,9 +48,7 @@ import '../../../network/network_config.dart';
 import '../core/danger_point.dart';
 import '../core/models/routing_profile.dart';
 import '../core/risk_score.dart';
-import '../domain/models/avoidance_filters.dart';
 import '../domain/models/route_result.dart';
-import 'osmand_native_channel.dart';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Enums & constantes
@@ -65,47 +63,18 @@ enum OsmAndMode {
   internalPolyline,
 }
 
-/// Résultat du calcul OsmAnd interne.
-class OsmAndResult {
-  const OsmAndResult({
-    required this.routes,
-    required this.source,
-    this.errorMessage,
-  });
-
-  /// Liste d'itinéraires calculés (points strictement sur rue).
-  final List<RouteResult> routes;
-
-  /// Source utilisée : 'graphhopper_local', 'osrm_public', ou 'fallback'.
-  final String source;
-
-  /// Message d'erreur si le calcul a échoué (null si succès).
-  final String? errorMessage;
-
-  bool get hasError => errorMessage != null;
-  bool get isEmpty => routes.isEmpty;
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
 // OsmAndRoutingService
 // ══════════════════════════════════════════════════════════════════════════════
 
-/// Service de routage piéton via OsmAnd.
+/// Connecteurs réseau du routage (serveur StreetPhare + OsmAnd/OSRM).
 ///
 /// Singleton accessible via [OsmAndRoutingService.instance].
 ///
-/// Usage typique (Mode Interne) :
-/// ```dart
-/// final result = await OsmAndRoutingService.instance.computeRoutes(
-///   start: userPosition,
-///   end: eventPosition,
-///   filters: avoidanceFilters,
-///   avoidPoints: validatedDangers,
-/// );
-/// if (!result.isEmpty) {
-///   // Afficher result.routes dans SafeRouteLayer
-/// }
-/// ```
+/// Ces méthodes constituent les « tiers » réseau de la cascade de
+/// connectivité orchestrée par le moteur central :
+///   - [computeViaServer] : niveau 1 — Serveur StreetPhare (`/api/route`).
+///   - [computeViaOsrm]   : dernier recours — OsmAnd / OSRM public.
 ///
 /// Usage typique (Mode Externe) :
 /// ```dart
@@ -252,132 +221,21 @@ class OsmAndRoutingService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // MODE B — INTERNAL POLYLINE (HTTP → LatLng list → SafeRouteLayer)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  /// Calcule un itinéraire piéton strict sur rue.
-  ///
-  /// Ordre de priorité :
-  ///   0. MethodChannel Android (GraphHopper embarqué + OSM offline) — PRIORITAIRE
-  ///   1. Serveur StreetPhare (`/api/route`, moteur Dijkstra serveur) — piéton
-  ///   2. OSRM public (dernier recours) — foot
-  ///   3. Retourne [OsmAndResult] vide (erreur remontée à l'appelant)
-  ///
-  /// [avoidPoints] : liste de LatLng à éviter (dangers validés ≥3 votes).
-  Future<OsmAndResult> computeRoutes({
-    required LatLng start,
-    required LatLng end,
-    RoutingProfile profile = RoutingProfile.pedestrian,
-    required AvoidanceFilters filters,
-    List<DangerPoint> avoidPoints = const [],
-    String? eventId,
-  }) async {
-    // ── Tentative 0 (PRIORITAIRE) : MethodChannel Android (GraphHopper embarqué)
-    final native = OsmAndNativeChannel.instance;
-    if (native.isSupported) {
-      try {
-        final avoidPointsNative = avoidPoints
-            .map((p) => AvoidPoint(
-                lat: p.lat,
-                lon: p.lon,
-                radiusMeters: p.radiusMeters,
-                weight: p.weight))
-            .toList();
-
-        final nativeResult = await native.computeRoute(
-          start: start,
-          end: end,
-          profile: profile,
-          avoidPoints: avoidPointsNative,
-        );
-
-        if (!nativeResult.isEmpty) {
-          if (kDebugMode) {
-            debugPrint(
-                '[OsmAnd] ✅ GraphHopper EMBARQUÉ (${nativeResult.source}) → '
-                '${nativeResult.routes.first.points.length} points');
-          }
-          return OsmAndResult(
-            routes: nativeResult.routes,
-            source: nativeResult.source,
-          );
-        }
-      } catch (e) {
-        if (kDebugMode) debugPrint('[OsmAnd] Native channel failed: $e');
-      }
-    }
-
-    // ── Tentative 1 : Serveur StreetPhare (priorité sur OSRM externe) ────────
-    try {
-      final serverRoutes = await _computeViaServer(
-        start: start,
-        end: end,
-        profile: profile,
-        avoidPoints: avoidPoints,
-      );
-      if (serverRoutes.isNotEmpty) {
-        if (kDebugMode) {
-          debugPrint('[OsmAnd] ✅ Serveur StreetPhare → '
-              '${serverRoutes.first.points.length} points');
-        }
-        return OsmAndResult(routes: serverRoutes, source: 'streetphare_server');
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('[OsmAnd] Serveur StreetPhare failed: $e');
-    }
-
-    // ── Tentative 2 : OSRM public ─────────────────────────────────────────
-    try {
-      final osrmRoutes = await _computeViaOsrmPublic(
-        start: start,
-        end: end,
-        profile: profile,
-      );
-      if (osrmRoutes.isNotEmpty) {
-        // OSRM public ne peut PAS éviter les zones de danger : on vérifie
-        // côté client qu'aucune route ne traverse un danger. Si c'est le cas,
-        // on ne propose pas un itinéraire dangereux (on remonte l'échec).
-        final dangerLatLngs = avoidPoints.map((p) => p.latLng).toList();
-        final safeRoutes = osrmRoutes
-            .where((r) => !routeCrossesDanger(r.points, dangerLatLngs))
-            .toList();
-        if (safeRoutes.isEmpty) {
-          if (kDebugMode) {
-            debugPrint(
-                '[OsmAnd] ⚠ OSRM traverse un danger — itinéraire rejeté');
-          }
-        } else {
-          if (kDebugMode) {
-            debugPrint('[OsmAnd] ✅ OSRM public → '
-                '${safeRoutes.first.points.length} points');
-          }
-          return OsmAndResult(routes: safeRoutes, source: 'osrm_public');
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('[OsmAnd] OSRM failed: $e');
-    }
-
-    // ── Échec total ──────────────────────────────────────────────────────────
-    return const OsmAndResult(
-      routes: [],
-      source: 'fallback',
-      errorMessage: 'Moteur de routage inaccessible. '
-          'Vérifiez la connexion réseau ou activez le mode hors-ligne.',
-    );
-  }
-
   // ── Serveur StreetPhare ───────────────────────────────────────────────────
 
   /// Appel HTTP vers le moteur de routage du serveur StreetPhare.
   ///
   /// API : GET {apiUrl}/route?fromLat=..&fromLon=..&toLat=..&toLon=..
-  /// Prioritaire sur OSRM : le client ne sollicite OSM qu'en dernier recours.
-  Future<List<RouteResult>> _computeViaServer({
+  ///
+  /// Niveau 1 de la cascade de connectivité (avant le calcul local et OSRM).
+  /// [timeout] (défaut : [_kHttpTimeout]) permet d'abaisser le délai en mode
+  /// cascade rapide (ex: 2 s).
+  Future<List<RouteResult>> computeViaServer({
     required LatLng start,
     required LatLng end,
     RoutingProfile profile = RoutingProfile.pedestrian,
     List<DangerPoint> avoidPoints = const [],
+    Duration? timeout,
   }) async {
     final params = <String, String>{
       'fromLat': start.latitude.toString(),
@@ -406,7 +264,7 @@ class OsmAndRoutingService {
     try {
       final resp = await http.get(uri, headers: {
         'X-StreetPhare-Client': 'OsmAndBridge/1.3',
-      }).timeout(_kHttpTimeout);
+      }).timeout(timeout ?? _kHttpTimeout);
 
       if (resp.statusCode != 200) {
         debugPrint('[OsmAnd] ⚠ Serveur StreetPhare HTTP ${resp.statusCode}');
@@ -475,10 +333,14 @@ class OsmAndRoutingService {
   /// Le démo public Project OSRM expose un graphe européen pour les profils
   /// 'driving' **et** 'foot'. L'ancienne instance
   /// `routing.openstreetmap.de/routed-foot` est fermée depuis 2020.
-  Future<List<RouteResult>> _computeViaOsrmPublic({
+  ///
+  /// Dernier recours de la cascade (OsmAnd) : OSRM ne peut PAS éviter les
+  /// zones de danger, on filtre donc ici les itinéraires qui en traversent une.
+  Future<List<RouteResult>> computeViaOsrm({
     required LatLng start,
     required LatLng end,
     RoutingProfile profile = RoutingProfile.pedestrian,
+    List<DangerPoint> avoidPoints = const [],
   }) async {
     final isVehicle = profile == RoutingProfile.vehicle ||
         profile == RoutingProfile.emergency;
@@ -513,6 +375,20 @@ class OsmAndRoutingService {
       }
 
       final routes = _parseOsrmResponse(resp.body, profile);
+      // OSRM ne sait pas éviter les zones de danger : on rejette ici les
+      // itinéraires qui en traversent une (sinon on proposerait un tracé
+      // dangereux). Si tout est rejeté, l'appelant retombe sur l'échec.
+      if (avoidPoints.isNotEmpty) {
+        final dangerLatLngs = avoidPoints.map((p) => p.latLng).toList();
+        final safeRoutes = routes
+            .where((r) => !routeCrossesDanger(r.points, dangerLatLngs))
+            .toList();
+        if (kDebugMode) {
+          debugPrint('[OsmAnd] ✅ OSRM $profileLabel → ${safeRoutes.length} '
+              'route(s) sûre(s) sur ${routes.length}');
+        }
+        return safeRoutes;
+      }
       if (kDebugMode) {
         debugPrint('[OsmAnd] ✅ OSRM $profileLabel → ${routes.length} route(s)');
       }
@@ -599,59 +475,5 @@ class OsmAndRoutingService {
       }
     }
     return result;
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // SCÉNARIOS FLEURUS (coordonnées de test)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  /// Points de référence pour les tests à Fleurus, Belgique (6220).
-  static const Map<String, LatLng> fleurusWaypoints = {
-    // Scénario 1 : Tour de Fleurus
-    'place_communale': LatLng(50.4818, 4.5492),
-    'chateau_namur': LatLng(50.4802, 4.5448),
-
-    // Scénario 2 : Traversée des écoles
-    'institut_notre_dame': LatLng(50.4835, 4.5512),
-    'athenee_jourdan': LatLng(50.4849, 4.5468),
-
-    // Scénario 3 : Cortège de la police
-    'hotel_de_ville': LatLng(50.4820, 4.5490),
-    'place_albert': LatLng(50.4831, 4.5502),
-  };
-
-  /// Calcule l'itinéraire pour un scénario de test Fleurus.
-  ///
-  /// [scenarioKey] : clé dans [fleurusWaypoints] (ex: 'traversee_ecoles').
-  Future<OsmAndResult> computeFleurusScenario(String scenarioKey) async {
-    final scenarios = {
-      'tour_fleurus': ('place_communale', 'chateau_namur'),
-      'traversee_ecoles': ('institut_notre_dame', 'athenee_jourdan'),
-      'cortege_police': ('hotel_de_ville', 'place_albert'),
-    };
-
-    final pair = scenarios[scenarioKey];
-    if (pair == null) {
-      return OsmAndResult(
-        routes: const [],
-        source: 'error',
-        errorMessage: 'Scénario inconnu : $scenarioKey',
-      );
-    }
-
-    final start = fleurusWaypoints[pair.$1]!;
-    final end = fleurusWaypoints[pair.$2]!;
-
-    if (kDebugMode) {
-      debugPrint('[OsmAnd] 🗺 Test Fleurus "$scenarioKey": '
-          '${start.latitude},${start.longitude} → '
-          '${end.latitude},${end.longitude}');
-    }
-
-    return computeRoutes(
-      start: start,
-      end: end,
-      filters: const AvoidanceFilters(),
-    );
   }
 }

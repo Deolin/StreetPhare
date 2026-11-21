@@ -198,7 +198,8 @@ class _RbacManagementScreenState extends State<RbacManagementScreen>
             ],
             TextField(
               controller: displayCtrl,
-              decoration: const InputDecoration(labelText: 'Nom affiché / pseudo'),
+              decoration:
+                  const InputDecoration(labelText: 'Nom affiché / pseudo'),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -519,8 +520,7 @@ class _RbacManagementScreenState extends State<RbacManagementScreen>
 
   Future<void> _showCreateOrEditAdminDialog(
       {GlobalAdminAccount? existing}) async {
-    final usernameCtrl =
-        TextEditingController(text: existing?.username ?? '');
+    final usernameCtrl = TextEditingController(text: existing?.username ?? '');
     final displayCtrl =
         TextEditingController(text: existing?.displayName ?? '');
     final emailCtrl = TextEditingController(text: existing?.email ?? '');
@@ -732,7 +732,8 @@ class _RbacManagementScreenState extends State<RbacManagementScreen>
                   Text(
                     pending.summary,
                     style: const TextStyle(
-                        color: StreetPhareTheme.darkTextSecondary, fontSize: 13),
+                        color: StreetPhareTheme.darkTextSecondary,
+                        fontSize: 13),
                   ),
                 ],
                 const SizedBox(height: 10),

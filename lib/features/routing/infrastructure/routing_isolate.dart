@@ -216,6 +216,7 @@ class RoutingIsolate {
           graph,
           startIdx,
           endIdx,
+          profile: msg.profile,
           maxIterations: 50000,
           avoidPoints: msg.flags.avoidPoints,
         );

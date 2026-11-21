@@ -251,7 +251,8 @@ class SyncService {
 
   /// PUSH : Envoie les alertes locales au serveur.
   /// Retourne [_SyncResult] pour indiquer le résultat.
-  Future<_SyncResult> _pushLocalAlerts(String serverBase, List<String> tombstones) async {
+  Future<_SyncResult> _pushLocalAlerts(
+      String serverBase, List<String> tombstones) async {
     try {
       // Récupérer les alertes locales modifiées depuis le dernier push.
       final allLocal = _db.getAll();

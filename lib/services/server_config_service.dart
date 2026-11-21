@@ -64,8 +64,8 @@ class ServerConfigService {
           _int(ttls['mobileDanger'], AlertTtlPolicy.mobileTtl.inMinutes);
       final stat =
           _int(ttls['staticDanger'], AlertTtlPolicy.staticTtl.inMinutes);
-      final pending = _int(
-          ttls['pendingDisplayMinutes'], AlertTtlPolicy.pendingDisplay.inMinutes);
+      final pending = _int(ttls['pendingDisplayMinutes'],
+          AlertTtlPolicy.pendingDisplay.inMinutes);
       AlertTtlPolicy.mobileTtl = Duration(minutes: mobile);
       AlertTtlPolicy.staticTtl = Duration(minutes: stat);
       AlertTtlPolicy.pendingDisplay = Duration(minutes: pending);

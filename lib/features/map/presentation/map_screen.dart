@@ -1434,22 +1434,13 @@ class _MapScreenState extends State<MapScreen>
   }
 
   /// Convertit le mode de transport (String) en profil de routage.
-  RoutingProfile _transportModeToRoutingProfile(String mode) {
-    switch (mode) {
-      case 'pedestrian':
-        return RoutingProfile.pedestrian;
-      case 'car':
-        return RoutingProfile.vehicle;
-      case 'transit':
-        // Les transports en commun sont désormais calculés par OpenTripPlanner
-        // (voir OpenTripPlannerService). Si OTP est indisponible, le
-        // RoutingEngine retombe automatiquement sur un tracé piéton de
-        // rabattement (marche), jamais sur un profil voiture.
-        return RoutingProfile.transit;
-      default:
-        return RoutingProfile.pedestrian;
-    }
-  }
+  ///
+  /// Délègue au type canonique [TransportMode] (3 modes : piéton / voiture /
+  /// transports en commun). Les transports en commun sont calculés par
+  /// OpenTripPlanner ; si OTP est indisponible, le RoutingEngine retombe sur
+  /// un tracé piéton de rabattement, jamais sur un profil voiture.
+  RoutingProfile _transportModeToRoutingProfile(String mode) =>
+      TransportMode.fromWire(mode).toRoutingProfile();
 
   /// Affiche un popup bloquant demandant le mode de transport.
   /// Retourne le mode choisi sous forme de String ('pedestrian', 'car', 'transit').

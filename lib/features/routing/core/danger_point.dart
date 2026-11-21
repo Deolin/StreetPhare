@@ -12,7 +12,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/models/alert_model.dart';
 
 /// Rayon d'évitement par défaut d'un danger (mètres), cohérent avec
-/// `SafePathEngine.dangerRadiusMeters` et `restrictionThresholdMeters`.
+/// `SafeRoutePlanner.restrictionThresholdMeters`.
 const double kDefaultDangerRadiusMeters = 25.0;
 
 /// Poids (multiplicateur de coût) d'un danger « soft » : fortement évité

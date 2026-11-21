@@ -23,6 +23,7 @@ import '../../../core/network/osm_tile_headers.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../network/network_config.dart';
 import '../../map/local_first_tile_provider.dart';
+import '../core/models/routing_profile.dart';
 import '../domain/models/route_result.dart';
 import '../infrastructure/osmand_routing_service.dart';
 import 'widgets/route_calculation_overlay.dart';
@@ -31,6 +32,11 @@ import 'widgets/route_calculation_overlay.dart';
 typedef AlternativesLoader = Future<List<RouteResult>> Function();
 
 /// Mode de transport pour le calcul d'itinéraire.
+///
+/// Ce type est le contrat canonique « 3 modes » de l'application :
+/// `pedestrian` (piéton), `car` (voiture), `transit` (transports en commun).
+/// Il projette vers/depuis le [RoutingProfile] interne (qui conserve les
+/// valeurs supplémentaires `bicycle` et `emergency` pour rétro-compatibilité).
 enum TransportMode {
   pedestrian,
   car,
@@ -57,6 +63,43 @@ enum TransportMode {
         return s.transportModeTransit;
     }
   }
+
+  /// Projette ce mode sur le [RoutingProfile] interne correspondant.
+  RoutingProfile toRoutingProfile() => switch (this) {
+        TransportMode.pedestrian => RoutingProfile.pedestrian,
+        TransportMode.car => RoutingProfile.vehicle,
+        TransportMode.transit => RoutingProfile.transit,
+      };
+
+  /// Convertit un [RoutingProfile] interne vers ce mode canonique.
+  ///
+  /// `bicycle` est assimilé au piéton (mode doux) et `emergency` à la voiture
+  /// (mode motorisé).
+  static TransportMode fromRoutingProfile(RoutingProfile p) => switch (p) {
+        RoutingProfile.pedestrian => TransportMode.pedestrian,
+        RoutingProfile.bicycle => TransportMode.pedestrian,
+        RoutingProfile.vehicle => TransportMode.car,
+        RoutingProfile.emergency => TransportMode.car,
+        RoutingProfile.transit => TransportMode.transit,
+      };
+
+  /// Parse un mode depuis sa représentation « fil ».
+  ///
+  /// Toute valeur inconnue retombe sur [pedestrian] (sécurité : ne jamais
+  /// produire un tracé voiture par défaut).
+  static TransportMode fromWire(String value) => switch (value) {
+        'car' => TransportMode.car,
+        'transit' => TransportMode.transit,
+        'pedestrian' => TransportMode.pedestrian,
+        _ => TransportMode.pedestrian,
+      };
+
+  /// Représentation « fil » stable (JSON / logs / paramètres serveur).
+  String get wire => switch (this) {
+        TransportMode.pedestrian => 'pedestrian',
+        TransportMode.car => 'car',
+        TransportMode.transit => 'transit',
+      };
 }
 
 class RouteResultSheet extends StatefulWidget {
