@@ -152,7 +152,7 @@
         <div id="ev-status" style="font-size:10px;color:#8b949e;margin-top:4px"></div>
       </div>
 
-      <div class="card">
+      <div class="card" id="pending-events-card">
         <h3>🕓 Événements en attente de validation</h3>
         <div style="font-size:10px;color:#8b949e;margin-bottom:6px">Soumissions reçues depuis le site vitrine. L'organisateur est <b style="color:#ffd58a">identifiable</b> (email + téléphone obligatoires) pour des raisons de responsabilité. Accepter génère l'événement + son admin.</div>
         <div class="list" id="pending-events-list">Chargement…</div>
@@ -211,7 +211,7 @@
 
     <!-- ── CONTRÔLE ── -->
     <div id="tab-controle" class="tab-content" style="display:none">
-      <div class="card">
+      <div class="card" id="mods-card">
         <h3>👥 Comptes modérateurs</h3>
         <label>Nom d'utilisateur</label><input id="mod-username">
         <label>Mot de passe</label><input id="mod-password" type="password">
@@ -221,7 +221,7 @@
         <div class="list" id="mods-list">Chargement…</div>
       </div>
 
-      <div class="card">
+      <div class="card" id="admins-card">
         <h3>👑 Administrateurs globaux</h3>
         <label>Identifiant</label><input id="adm-username" placeholder="ex: admin-events">
         <label>Nom affiché</label><input id="adm-display" placeholder="ex: Resp. événements">
@@ -350,6 +350,17 @@
     </div>
   </div>
 
+  <div id="pwchange-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); align-items:center; justify-content:center; z-index:10000;">
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:8px; padding:32px; width:360px; text-align:center;">
+      <h2 style="color:#ff7b72">🔐 Changement de mot de passe</h2>
+      <p style="font-size:12px;color:#8b949e;margin:8px 0">Pour des raisons de sécurité, vous devez remplacer votre mot de passe temporaire avant de continuer.</p>
+      <input id="pwchange-current" type="password" placeholder="Mot de passe actuel" autocomplete="current-password" style="width:100%;background:#21262d;border:1px solid #30363d;border-radius:4px;padding:10px;color:#c9d1d9;font-size:14px;margin-bottom:12px;">
+      <input id="pwchange-new" type="password" placeholder="Nouveau mot de passe (min. 8)" autocomplete="new-password" style="width:100%;background:#21262d;border:1px solid #30363d;border-radius:4px;padding:10px;color:#c9d1d9;font-size:14px;margin-bottom:12px;">
+      <button onclick="submitPasswordChange()" style="background:#238636;color:white;border:none;border-radius:4px;padding:10px 16px;cursor:pointer;font-size:14px;width:100%;">Enregistrer le nouveau mot de passe</button>
+      <div id="pwchange-error" style="color:#f85149;font-size:12px;margin-top:8px;"></div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="/admin/events-editor.js"></script>
   <script>
@@ -422,6 +433,71 @@
       renderUserInfo();
       document.getElementById('sync-status').innerHTML = '<span class="ko">● Déconnecté</span>';
       document.getElementById('login-overlay').style.display = 'flex';
+      const pc = document.getElementById('pwchange-overlay');
+      if (pc) pc.style.display = 'none';
+    }
+
+    /* ── Restrictions de rôle (admin d'événement) ─────────────────────── */
+    function applyRoleRestrictions() {
+      if (currentRole !== 'event_admin') return;
+      // Un admin d'événement n'accède qu'à : Surveillance, Édition, Contrôle.
+      ['console', 'simulation', 'bugs'].forEach(t => {
+        const btn = document.getElementById('tab-btn-' + t);
+        const tab = document.getElementById('tab-' + t);
+        if (btn) btn.style.display = 'none';
+        if (tab) tab.style.display = 'none';
+      });
+      // Dans « Contrôle », il ne gère ni les modérateurs ni les
+      // administrateurs globaux.
+      const modsCard = document.getElementById('mods-card');
+      const adminsCard = document.getElementById('admins-card');
+      if (modsCard) modsCard.style.display = 'none';
+      if (adminsCard) adminsCard.style.display = 'none';
+      // Dans « Édition », il ne traite pas les soumissions en attente
+      // (réservé aux administrateurs globaux / superadmin).
+      const pendingCard = document.getElementById('pending-events-card');
+      if (pendingCard) pendingCard.style.display = 'none';
+    }
+
+    /* ── Changement du mot de passe temporaire (première connexion) ───── */
+    function showPasswordChange() {
+      const overlay = document.getElementById('pwchange-overlay');
+      if (!overlay) return;
+      overlay.style.display = 'flex';
+      document.getElementById('pwchange-error').textContent = '';
+    }
+    async function submitPasswordChange() {
+      const current = document.getElementById('pwchange-current').value;
+      const next = document.getElementById('pwchange-new').value;
+      const errEl = document.getElementById('pwchange-error');
+      errEl.textContent = '';
+      if (!next || next.length < 8) {
+        errEl.textContent = 'Le nouveau mot de passe doit contenir au moins 8 caractères.';
+        return;
+      }
+      try {
+        const r = await fetch('/api/auth/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+          body: JSON.stringify({ currentPassword: current, newPassword: next }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.success) {
+          sessionStorage.removeItem('sp_admin_token');
+          adminToken = '';
+          currentRole = '';
+          currentPermissions = [];
+          renderUserInfo();
+          document.getElementById('pwchange-overlay').style.display = 'none';
+          document.getElementById('login-error').textContent = '✅ Mot de passe mis à jour. Veuillez vous reconnecter.';
+          document.getElementById('login-error').style.color = '#3fb950';
+          document.getElementById('login-overlay').style.display = 'flex';
+        } else {
+          errEl.textContent = d.error || 'Erreur lors du changement de mot de passe.';
+        }
+      } catch (e) {
+        errEl.textContent = 'Erreur réseau.';
+      }
     }
 
     ['police', 'fire_truck', 'filter', 'danger', 'collective', 'panic', 'safe', 'events'].forEach(k => {
@@ -469,7 +545,12 @@
           currentRole = data.role || 'admin';
           currentPermissions = data.permissions || [];
           sessionStorage.setItem('sp_admin_token', data.token);
-          window.location.reload();
+          if (data.mustChangePassword) {
+            document.getElementById('login-overlay').style.display = 'none';
+            showPasswordChange();
+          } else {
+            window.location.reload();
+          }
         } else {
           err.textContent = data.error || 'Identifiants invalides';
           btn.disabled = false; btn.textContent = 'Se connecter';
@@ -482,8 +563,16 @@
 
     /* ── INIT ────────────────────────────────────────────────────────── */
     if (adminToken) {
+      const loggedClaims = decodeJwt(adminToken);
       document.getElementById('login-overlay').style.display = 'none';
-      try { connect(); } catch (_) {}
+      applyRoleRestrictions();
+      if (loggedClaims.mustChangePassword) {
+        // Bloque l'accès au dashboard tant que le mot de passe temporaire
+        // n'a pas été remplacé (pas de connexion WebSocket).
+        showPasswordChange();
+      } else {
+        try { connect(); } catch (_) {}
+      }
     }
     document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
@@ -872,6 +961,7 @@
 
     /* ── ÉVÉNEMENTS EN ATTENTE ───────────────────────────────────────── */
     async function loadPendingEvents() {
+      if (currentRole === 'event_admin') return; // réservé admin global / superadmin
       const r = await fetch('/api/admin/events/pending', { headers: { 'Authorization': `Bearer ${adminToken}` } });
       if (!r.ok) return;
       const d = await r.json();

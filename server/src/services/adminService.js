@@ -138,6 +138,23 @@ class AdminService {
     return ok ? admin : null;
   }
 
+  /// Change le mot de passe d'un administrateur global après vérification
+  /// du mot de passe actuel.
+  async changePassword(username, currentPassword, newPassword) {
+    const admin = this.getByUsername(username);
+    if (!admin || !admin.passwordHash) return { error: 'Compte non trouvé' };
+    const ok = await bcrypt.compare(String(currentPassword || ''), admin.passwordHash);
+    if (!ok) return { error: 'Mot de passe actuel incorrect' };
+    if (!newPassword || String(newPassword).length < 8) {
+      return { error: 'Nouveau mot de passe requis (8 caractères minimum)' };
+    }
+    admin.passwordHash = await bcrypt.hash(String(newPassword), 12);
+    admin.updatedAt = new Date().toISOString();
+    this._save();
+    log('PASSWORD', `Mot de passe modifié : ${admin.username}`);
+    return { success: true };
+  }
+
   // ── Mise à jour ─────────────────────────────────────────────────────────
   async update(id, { displayName, email, phone, password } = {}) {
     const admin = this.getById(id);

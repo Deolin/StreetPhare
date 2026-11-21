@@ -115,7 +115,7 @@ const config = {
 
   // Base URL publique du serveur (utilisée pour générer les liens de
   // confirmation d'email envoyés aux administrateurs).
-  publicBaseUrl: process.env.PUBLIC_BASE_URL || 'http://streetphare.ddns.net:3000',
+  publicBaseUrl: process.env.PUBLIC_BASE_URL || 'https://streetphare.ddns.net',
 
   // ── Rate Limiting ──────────────────────────────────────────────────
   // Fenêtre de rate limiting (ms) pour toutes les routes publiques.
@@ -139,7 +139,8 @@ const config = {
     staticDanger: 1,    // policiers, autopompes, filtre statique
     panic: 2,           // panic individuel
     collectiveDanger: 10, // danger collectif
-    absoluteRgpd: 1440,  // 24h — limite RGPD absolue
+    pendingDisplayMinutes: 30, // signalement en attente de consensus (temps d'affichage)
+    absoluteRgpd: 1440,  // 24h — limites RGPD absolue
   },
 
   // ── Panic aggrégation ───────────────────────────────────────────────

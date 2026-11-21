@@ -35,6 +35,7 @@ const SCHEMA = {
       staticDanger: { min: 1, max: 1440 },
       panic: { min: 1, max: 1440 },
       collectiveDanger: { min: 1, max: 1440 },
+      pendingDisplayMinutes: { min: 1, max: 1440 },
       absoluteRgpd: { min: 60, max: 4320 },
     },
   },

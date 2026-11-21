@@ -799,6 +799,12 @@ router.post('/events/create', authenticateToken, requireRole(['admin', 'superadm
   };
 
   const saved = store.addEvent(event);
+
+  // Si créé par un event_admin, rattacher automatiquement le code à son périmètre.
+  if (req.user && req.user.role === 'event_admin') {
+    eventAdminService.addManagedEvent(req.user.username, cleanCode);
+  }
+
   sync.enqueueEvent(saved);
   res.status(201).json({ success: true, event: saved, ...saved });
 });
@@ -976,6 +982,7 @@ router.post('/auth/login', async (req, res) => {
         username: eventAdmin.username,
         permissions: eventAdmin.permissions,
         managedEventCodes: eventAdmin.managedEventCodes,
+        mustChangePassword: !!eventAdmin.mustChangePassword,
       };
 
       const token = jwt.sign(tokenPayload, config.jwtSecret, {
@@ -990,6 +997,7 @@ router.post('/auth/login', async (req, res) => {
         token,
         expiresIn: config.jwtExpiresIn,
         role: 'event_admin',
+        mustChangePassword: !!eventAdmin.mustChangePassword,
       });
     }
 
@@ -1002,6 +1010,33 @@ router.post('/auth/login', async (req, res) => {
   } catch (err) {
     console.error('[AUTH] Erreur login:', err.message);
     res.status(500).json({ error: 'Erreur interne lors de l\'authentification' });
+  }
+});
+
+/// POST /api/auth/change-password — Change le mot de passe du compte connecté.
+/// Body: { currentPassword, newPassword }
+/// Identifie l'utilisateur via son token JWT (role + username). Utilisé pour
+/// remplacer le mot de passe temporaire lors de la première connexion.
+router.post('/auth/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'currentPassword et newPassword requis' });
+    }
+    const username = req.user.username;
+    let result;
+    if (req.user.role === 'event_admin') {
+      result = await eventAdminService.changePassword(username, currentPassword, newPassword);
+    } else if (req.user.role === 'admin') {
+      result = await adminService.changePassword(username, currentPassword, newPassword);
+    } else {
+      return res.status(400).json({ error: 'Changement de mot de passe non pris en charge pour ce rôle' });
+    }
+    if (result.error) return res.status(400).json({ error: result.error });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[AUTH] Erreur changement de mot de passe :', err.message);
+    res.status(500).json({ error: 'Erreur interne lors du changement de mot de passe' });
   }
 });
 

@@ -29,6 +29,21 @@ const EVENT_ADMINS_PATH = path.join(__dirname, '..', '..', 'data', 'eventAdmins.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^\+?[0-9][0-9()\s.-]{6,20}$/;
 
+// Alphabet sans caractères ambigus (0/O, 1/l/I) pour les mots de passe
+// temporaires générés automatiquement.
+const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*-_=+';
+
+/// Génère un mot de passe temporaire fort et aléatoire (~20 caractères,
+/// entropie élevée, mélange lettres / chiffres / symboles).
+function generateStrongPassword(length = 20) {
+  const bytes = crypto.randomBytes(length);
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += PASSWORD_ALPHABET[bytes[i] % PASSWORD_ALPHABET.length];
+  }
+  return out;
+}
+
 const log = (category, message) => {
   const ts = new Date().toISOString().replace('T', ' ').slice(0, 19);
   console.log(`[${ts}] [${category}] ${message}`);
@@ -76,6 +91,7 @@ class EventAdminService {
       permissions: admin.permissions || [],
       managedEventCodes: admin.managedEventCodes || [],
       emailConfirmed: !!admin.emailConfirmed,
+      mustChangePassword: !!admin.mustChangePassword,
       createdAt: admin.createdAt,
       updatedAt: admin.updatedAt,
     };
@@ -115,12 +131,33 @@ class EventAdminService {
     return (admin.managedEventCodes || []).includes(eventCode);
   }
 
-  async create(username, { displayName, email, phone, permissions, managedEventCodes, password } = {}) {
+  /// Rattache un code d'événement au périmètre d'un admin (par username).
+  /// Idempotent et synchrone : idéal pour rattacher un événement fraîchement
+  /// créé par un event_admin, sans écriture asynchrone fire-and-forget.
+  addManagedEvent(username, eventCode) {
+    const admin = this.getByUsername(username);
+    if (!admin) return null;
+    const code = String(eventCode || '').toUpperCase().trim();
+    if (!Array.isArray(admin.managedEventCodes)) admin.managedEventCodes = [];
+    if (!code || admin.managedEventCodes.includes(code)) return admin;
+    admin.managedEventCodes.push(code);
+    admin.updatedAt = new Date().toISOString();
+    this._save();
+    log('EVENT_ADMINS', `Événement ${code} rattaché à ${admin.username}`);
+    return admin;
+  }
+
+  async create(username, {
+    displayName, email, phone, permissions, managedEventCodes, password,
+    mustChangePassword = false,
+    emailConfirmed = false,
+    skipPhoneValidation = false,
+  } = {}) {
     if (!username) return { error: 'username requis' };
     const cleanEmail = String(email || '').trim().toLowerCase();
     const cleanPhone = String(phone || '').trim();
     if (!EMAIL_RE.test(cleanEmail)) return { error: 'Adresse email valide requise' };
-    if (!PHONE_RE.test(cleanPhone)) return { error: 'Numéro de téléphone valide requis' };
+    if (!skipPhoneValidation && !PHONE_RE.test(cleanPhone)) return { error: 'Numéro de téléphone valide requis' };
     if (!password || password.length < 8) return { error: 'Mot de passe requis (8 caractères minimum)' };
     if (this.getByUsername(username)) return { error: 'Nom d\'utilisateur déjà utilisé' };
     if (this.getByEmail(cleanEmail)) return { error: 'Adresse email déjà utilisée' };
@@ -135,8 +172,9 @@ class EventAdminService {
       phone: cleanPhone,
       role: ROLE_EVENT_ADMIN,
       passwordHash,
-      emailConfirmed: false,
-      confirmationToken: uuidv4(),
+      emailConfirmed: !!emailConfirmed,
+      confirmationToken: emailConfirmed ? null : uuidv4(),
+      mustChangePassword: !!mustChangePassword,
       permissions: Array.isArray(permissions)
         ? permissions.filter(p => defaultPermissions(ROLE_EVENT_ADMIN).includes(p))
         : defaultPermissions(ROLE_EVENT_ADMIN),
@@ -151,19 +189,27 @@ class EventAdminService {
 
   /// Génère un Admin d'Événement à partir d'une soumission acceptée.
   /// L'identifiant est l'email ; le pseudo sert de nom affiché. Un mot de passe
-  /// temporaire aléatoire est généré et transmis dans l'email de confirmation
-  /// (l'admin pouvant ensuite demander une réinitialisation via un admin).
+  /// temporaire fort est généré et transmis par email avec le lien vers
+  /// l'administration ; l'admin devra le changer à sa première connexion.
   async createForEvent({ email, phone, pseudo, eventCode, password }) {
     const username = String(email || '').toLowerCase().trim();
     if (this.getByEmail(username)) return { error: 'Un admin existe déjà pour cette adresse email' };
 
-    const temporaryPassword = password || crypto.randomBytes(6).toString('hex');
+    const temporaryPassword = password || generateStrongPassword();
     const result = await this.create(username, {
       displayName: pseudo || username,
       email,
       phone,
       password: temporaryPassword,
       managedEventCodes: eventCode ? [String(eventCode).toUpperCase()] : [],
+      // L'organisateur a fourni un email réel lors de la soumission et reçoit
+      // directement ses identifiants par email : le compte est activé d'office
+      // et devra changer son mot de passe temporaire à la première connexion.
+      emailConfirmed: true,
+      mustChangePassword: true,
+      // Le téléphone est un simple contact (non bloquant) : on ne rejette pas
+      // la création si son format est atypique.
+      skipPhoneValidation: true,
     });
     if (result.error) return result;
     result.temporaryPassword = temporaryPassword;
@@ -187,6 +233,24 @@ class EventAdminService {
     if (!admin || !admin.passwordHash) return null;
     const ok = await bcrypt.compare(password, admin.passwordHash);
     return ok ? this._public(admin) : null;
+  }
+
+  /// Change le mot de passe d'un admin d'événement après vérification du
+  /// mot de passe actuel (utilisé lors de la première connexion temporaire).
+  async changePassword(username, currentPassword, newPassword) {
+    const admin = this.getByUsername(username);
+    if (!admin || !admin.passwordHash) return { error: 'Compte non trouvé' };
+    const ok = await bcrypt.compare(String(currentPassword || ''), admin.passwordHash);
+    if (!ok) return { error: 'Mot de passe actuel incorrect' };
+    if (!newPassword || String(newPassword).length < 8) {
+      return { error: 'Nouveau mot de passe requis (8 caractères minimum)' };
+    }
+    admin.passwordHash = await bcrypt.hash(String(newPassword), 12);
+    admin.mustChangePassword = false;
+    admin.updatedAt = new Date().toISOString();
+    this._save();
+    log('EVENT_ADMINS', `Mot de passe modifié : ${admin.username}`);
+    return { success: true, admin: this._public(admin) };
   }
 
   async update(id, { displayName, email, phone, permissions, managedEventCodes, password } = {}) {

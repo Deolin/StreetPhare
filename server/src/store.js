@@ -1188,6 +1188,33 @@ class Store {
     return removed;
   }
 
+  /// Purge les signalements « en attente de consensus » (status `pending`)
+  /// dont la durée d'affichage configurée (`config.ttls.pendingDisplayMinutes`)
+  /// est dépassée. Chaque suppression émet un tombstone pour que les clients
+  /// retirent leur copie locale (disparition basée sur l'affichage utilisateur).
+  purgeExpiredPendingAlerts() {
+    const maxAgeMs = (config.ttls.pendingDisplayMinutes || 30) * 60 * 1000;
+    const cutoff = Date.now() - maxAgeMs;
+    const before = this.alerts.length;
+    const tombstoned = [];
+
+    this.alerts = this.alerts.filter(a => {
+      const isPending = a && a.status === 'pending';
+      const ts = a ? new Date(a.createdAt || a.lastVoteAt).getTime() : 0;
+      const stale = isPending && ts < cutoff;
+      if (stale) tombstoned.push(a.id);
+      return !stale;
+    });
+
+    const removed = before - this.alerts.length;
+    if (removed > 0) {
+      for (const id of tombstoned) this._addTombstone(id, 'pending_timeout');
+      this._scheduleSave();
+      log('ALERTS', `Purge « en attente » : ${removed} retiré(s) (> ${config.ttls.pendingDisplayMinutes} min)`);
+    }
+    return removed;
+  }
+
   // ═══════════════════════════════════════════════════════════════════════
   // CONSOLE — Informations sur les connexions actives
   // ═══════════════════════════════════════════════════════════════════════

@@ -242,6 +242,20 @@ if (typeof staleValidationInterval.unref === 'function') {
   staleValidationInterval.unref();
 }
 
+// ── Job périodique : purge des signalements « en attente de consensus » ──
+// Supprime (time-out) les signalements pending dont la durée d'affichage
+// configurée (ttls.pendingDisplayMinutes) est dépassée.
+const pendingPurgeInterval = setInterval(() => {
+  try {
+    store.purgeExpiredPendingAlerts();
+  } catch (e) {
+    log('ALERTS', `Erreur purge signalements en attente: ${e.message}`);
+  }
+}, 60 * 1000);
+if (typeof pendingPurgeInterval.unref === 'function') {
+  pendingPurgeInterval.unref();
+}
+
 // ── Page d'accueil ──────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   log('HTTP', `GET / — accueil demandé`);

@@ -19,7 +19,7 @@
 // par l'application mobile.
 
 const express = require('express');
-const { authenticateToken, requirePermission } = require('../middleware/auth');
+const { authenticateToken, requirePermission, requireRole } = require('../middleware/auth');
 const config = require('../config');
 const store = require('../store');
 const sync = require('../sync');
@@ -31,6 +31,29 @@ const { sendMail } = require('../services/mailer');
 const router = express.Router();
 
 const log = (category, message) => console.log(`[ADMIN-EVENTS] [${category}] ${message}`);
+
+/// Middleware de propriété d'événement.
+///
+/// Cantonne un `event_admin` à ses seuls événements : le code demandé
+/// (`req.params.code`) doit figurer dans `managedEventCodes` (issu du JWT).
+/// Les autres rôles (superadmin, admin, éventuels modérateurs) conservent leur
+/// accès existant, déjà encadré par `requirePermission('manageEvents')`.
+function requireEventOwnership(req, res, next) {
+  if (!req.user) {
+    return res.status(500).json({ error: 'Erreur de configuration du serveur' });
+  }
+  // Seul l'admin d'événement est cantonné à son périmètre.
+  if (req.user.role !== 'event_admin') return next();
+
+  const code = String(req.params.code || '').toUpperCase().trim();
+  const managed = (req.user.managedEventCodes || [])
+    .map((c) => String(c).toUpperCase().trim());
+  if (!code || !managed.includes(code)) {
+    log('EVENT', `Accès refusé (hors périmètre) — code=${code} — admin=${req.user.username}`);
+    return res.status(403).json({ error: 'Accès refusé : événement hors de votre périmètre' });
+  }
+  next();
+}
 
 // ===========================================================================
 // CATALOGUE DES TYPES DE POINTS
@@ -209,13 +232,16 @@ router.get('/', authenticateToken, requirePermission('manageEvents'), (req, res)
 });
 
 /// GET /api/admin/events/pending : Événements en attente de validation.
-router.get('/pending', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+/// Réservé aux administrateurs globaux / superadmin : un admin d'événement ne
+/// doit ni consulter ni traiter les soumissions (l'acceptation crée un autre
+/// compte admin et envoie de nouveaux identifiants).
+router.get('/pending', authenticateToken, requireRole(['superadmin', 'admin']), (req, res) => {
   res.json({ pending: pendingEventService.listByStatus('pending') });
 });
 
 /// POST /api/admin/events/pending/:id/accept : Accepte une soumission,
 /// crée l'événement réel ET génère l'Admin d'Événement associé.
-router.post('/pending/:id/accept', authenticateToken, requirePermission('manageEvents'), async (req, res) => {
+router.post('/pending/:id/accept', authenticateToken, requireRole(['superadmin', 'admin']), async (req, res) => {
   try {
     const pending = pendingEventService.getById(req.params.id);
     if (!pending || pending.status !== 'pending') {
@@ -265,9 +291,12 @@ router.post('/pending/:id/accept', authenticateToken, requirePermission('manageE
     // 4. Marquer la soumission comme acceptée.
     pendingEventService.accept(pending.id, code);
 
-    // 5. Notifier l'organisateur (activation du compte + code d'événement).
-    if (!adminResult.error && adminResult.confirmationToken) {
-      const link = `${config.publicBaseUrl}/api/admin/confirm-email?role=event_admin&token=${encodeURIComponent(adminResult.confirmationToken)}`;
+    // 5. Notifier l'organisateur : identifiants + mot de passe temporaire
+    //    + lien vers l'administration + consigne de changement.
+    if (adminResult.error) {
+      log('PENDING', `⚠ Impossible de créer l'admin d'événement pour ${pending.email} : ${adminResult.error}`);
+    } else {
+      const adminUrl = `${config.publicBaseUrl}/admin/index.html`;
       await sendMail({
         to: pending.email,
         subject: 'StreetPhare — Votre événement est accepté',
@@ -277,10 +306,15 @@ router.post('/pending/:id/accept', authenticateToken, requirePermission('manageE
           `Votre événement « ${pending.name} » a été accepté.`,
           `Code d'événement : ${code}`,
           '',
-          'Vous êtes maintenant Administrateur/trice d\'événement. Pour activer votre compte, confirmez votre email :',
-          link,
+          'Vous êtes désormais Administrateur/trice de cet événement.',
           '',
-          `Votre mot de passe temporaire est : ${adminResult.temporaryPassword}`,
+          'Vos identifiants de connexion à l\'administration :',
+          `   Identifiant             : ${pending.email}`,
+          `   Mot de passe temporaire : ${adminResult.temporaryPassword}`,
+          '',
+          'Pour des raisons de sécurité, vous serez invité(e) à changer ce mot de passe lors de votre première connexion.',
+          '',
+          `Accédez à l'administration : ${adminUrl}`,
           '',
           '— L\'équipe StreetPhare',
         ].join('\n'),
@@ -301,21 +335,21 @@ router.post('/pending/:id/accept', authenticateToken, requirePermission('manageE
 });
 
 /// POST /api/admin/events/pending/:id/reject : Rejette une soumission.
-router.post('/pending/:id/reject', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+router.post('/pending/:id/reject', authenticateToken, requireRole(['superadmin', 'admin']), (req, res) => {
   const rejected = pendingEventService.reject(req.params.id);
   if (!rejected) return res.status(404).json({ error: 'Soumission non trouvée ou déjà traitée' });
   res.json({ success: true, rejected });
 });
 
 /// DELETE /api/admin/events/pending/:id : Supprime une soumission.
-router.delete('/pending/:id', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+router.delete('/pending/:id', authenticateToken, requireRole(['superadmin', 'admin']), (req, res) => {
   const ok = pendingEventService.remove(req.params.id);
   if (!ok) return res.status(404).json({ error: 'Soumission non trouvée' });
   res.json({ success: true });
 });
 
 /// GET /api/admin/events/:code : Detail d'un evenement.
-router.get('/:code', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+router.get('/:code', authenticateToken, requirePermission('manageEvents'), requireEventOwnership, (req, res) => {
   const event = store.getEventByCode(req.params.code);
   if (!event) return res.status(404).json({ error: 'Evenement non trouve' });
   res.json(withClientAliases(event));
@@ -374,19 +408,9 @@ router.post('/', authenticateToken, requirePermission('manageEvents'), (req, res
 
     const saved = store.addEvent(event);
 
-    // Si créé par un event_admin, rattacher automatiquement le code à ses managedEventCodes
+    // Si créé par un event_admin, rattacher automatiquement le code à son périmètre.
     if (req.user && req.user.role === 'event_admin') {
-      if (!Array.isArray(req.user.managedEventCodes)) req.user.managedEventCodes = [];
-      if (!req.user.managedEventCodes.includes(cleanCode)) {
-        req.user.managedEventCodes.push(cleanCode);
-      }
-      try {
-        const eventAdminService = require('../auth/eventAdminService');
-        const adm = eventAdminService.getByUsername(req.user.username);
-        if (adm && Array.isArray(adm.managedEventCodes) && !adm.managedEventCodes.includes(cleanCode)) {
-          eventAdminService.update(adm.id, { managedEventCodes: [...adm.managedEventCodes, cleanCode] });
-        }
-      } catch (_) {}
+      eventAdminService.addManagedEvent(req.user.username, cleanCode);
     }
 
     sync.enqueueEvent(saved);
@@ -401,7 +425,7 @@ router.post('/', authenticateToken, requirePermission('manageEvents'), (req, res
 
 /// PUT /api/admin/events/:code : Modifie les metadonnees d'un evenement.
 /// Body: { title?, startAt?, endAt?, visibleAt?, generalZone? }
-router.put('/:code', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+router.put('/:code', authenticateToken, requirePermission('manageEvents'), requireEventOwnership, (req, res) => {
   try {
     const patch = {};
     const body = req.body || {};
@@ -430,7 +454,7 @@ router.put('/:code', authenticateToken, requirePermission('manageEvents'), (req,
 });
 
 /// POST /api/admin/events/:code/close : Clôture un événement (tombstone des signalements liés).
-router.post('/:code/close', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+router.post('/:code/close', authenticateToken, requirePermission('manageEvents'), requireEventOwnership, (req, res) => {
   try {
     const code = String(req.params.code).toUpperCase();
     const updated = store.closeEvent(code);
@@ -450,7 +474,7 @@ router.post('/:code/close', authenticateToken, requirePermission('manageEvents')
 });
 
 /// DELETE /api/admin/events/:code : Supprime un événement (tombstone des signalements liés).
-router.delete('/:code', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+router.delete('/:code', authenticateToken, requirePermission('manageEvents'), requireEventOwnership, (req, res) => {
   try {
     const code = String(req.params.code).toUpperCase();
     const event = store.getEventByCode(code);
@@ -480,7 +504,7 @@ router.delete('/:code', authenticateToken, requirePermission('manageEvents'), (r
 
 /// POST /api/admin/events/:code/points/:typeKey : Ajoute un point.
 /// Body: { lat, lng, ...champs propres au type }
-router.post('/:code/points/:typeKey', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+router.post('/:code/points/:typeKey', authenticateToken, requirePermission('manageEvents'), requireEventOwnership, (req, res) => {
   try {
     const { typeKey } = req.params;
     if (!POINT_TYPE_KEYS.includes(typeKey)) {
@@ -507,7 +531,7 @@ router.post('/:code/points/:typeKey', authenticateToken, requirePermission('mana
 
 /// PUT /api/admin/events/:code/points/:typeKey/:index : Modifie un point.
 /// Body: { lat?, lng?, ...champs propres au type }
-router.put('/:code/points/:typeKey/:index', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+router.put('/:code/points/:typeKey/:index', authenticateToken, requirePermission('manageEvents'), requireEventOwnership, (req, res) => {
   try {
     const { typeKey } = req.params;
     const index = parseInt(req.params.index, 10);
@@ -539,7 +563,7 @@ router.put('/:code/points/:typeKey/:index', authenticateToken, requirePermission
 });
 
 /// DELETE /api/admin/events/:code/points/:typeKey/:index : Supprime un point.
-router.delete('/:code/points/:typeKey/:index', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+router.delete('/:code/points/:typeKey/:index', authenticateToken, requirePermission('manageEvents'), requireEventOwnership, (req, res) => {
   try {
     const { typeKey } = req.params;
     const index = parseInt(req.params.index, 10);
@@ -568,7 +592,7 @@ router.delete('/:code/points/:typeKey/:index', authenticateToken, requirePermiss
 
 /// POST /api/admin/events/:code/points/:typeKey/reorder : Reordonne les points.
 /// Body: { from, to }
-router.post('/:code/points/:typeKey/reorder', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+router.post('/:code/points/:typeKey/reorder', authenticateToken, requirePermission('manageEvents'), requireEventOwnership, (req, res) => {
   try {
     const { typeKey } = req.params;
     if (!POINT_TYPE_KEYS.includes(typeKey)) {
@@ -601,7 +625,7 @@ router.post('/:code/points/:typeKey/reorder', authenticateToken, requirePermissi
 
 /// PUT /api/admin/events/:code/route : Modifie le trajet (polyline) et la destination.
 /// Body: { routeGeoJson?, destinationLatitude?, destinationLongitude? }
-router.put('/:code/route', authenticateToken, requirePermission('manageEvents'), (req, res) => {
+router.put('/:code/route', authenticateToken, requirePermission('manageEvents'), requireEventOwnership, (req, res) => {
   try {
     const event = store.getEventByCode(req.params.code);
     if (!event) return res.status(404).json({ error: 'Evenement non trouve' });

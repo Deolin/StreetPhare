@@ -35,7 +35,9 @@ import '../../../../core/theme/streetphare_theme.dart';
 ///   - des flèches directionnelles espacées régulièrement
 ///   - un marqueur de départ et un marqueur d'arrivée
 // [1] Couleurs contrastées pour la carte sombre (lisibilité forte luminosité)
-/// Couleur de la Route Safe en mode clair (vert vif StreetPhare).
+/// Couleur de la Route Safe en mode clair : thème StreetPhare (ambre par défaut).
+/// ⚠️ Tons RÉSERVÉS : les polylignes d'événements ne doivent jamais utiliser
+/// ces couleurs (voir `_kEventColors` dans map_screen.dart).
 final Color _kRouteColorLight = StreetPhareTheme.primary;
 
 /// Couleur de la Route Safe en mode sombre : jaune néon haute visibilité,

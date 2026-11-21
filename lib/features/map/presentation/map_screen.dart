@@ -84,8 +84,10 @@ import 'widgets/safe_route_layer.dart';
 import 'widgets/user_heading_marker.dart';
 
 // ── Couleurs des 3 événements ─────────────────────────────────────────────────
+// ⚠️ Ne doivent JAMAIS utiliser l'ambre (`StreetPhareTheme.primary`) ni le
+// jaune (`0xFFFFEB3B`) : ces tons sont RÉSERVÉS à la « Route Safe ».
 const _kEventColors = [
-  Color(0xFFFFB300), // Ambre
+  Color(0xFF9C27B0), // Violet
   Color(0xFF2196F3), // Bleu
   Color(0xFF4CAF50), // Vert
 ];
@@ -2770,6 +2772,10 @@ class _MapScreenState extends State<MapScreen>
                                     duration: Duration(milliseconds: 350),
                                   ),
                                 ),
+                                // ── ORDRE DES COUCHES IMPORTANT ─────────────
+                                // La « Route Safe » doit TOUJOURS être déclarée
+                                // APRÈS les polylignes d'événements pour être
+                                // rendue au-dessus de celles-ci.
                                 if (layers.polylines.isNotEmpty)
                                   PolylineLayer(polylines: layers.polylines),
                                 if (_safeRoutePoints != null &&

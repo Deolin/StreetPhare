@@ -35,6 +35,11 @@ class AlertTtlPolicy {
   /// filtrées).
   static Duration staticTtl = const Duration(minutes: 1);
 
+  /// Durée d'affichage d'un signalement « en attente de consensus »
+  /// (status `pending`). Synchronisée depuis la config serveur
+  /// (`ttls.pendingDisplayMinutes`).
+  static Duration pendingDisplay = const Duration(minutes: 30);
+
   /// Indique si un `ReportType` (UI) correspond à un danger MOBILE.
   ///
   /// On se base sur l'identifiant technique (`.id`) du `ReportType`
@@ -98,6 +103,15 @@ class AlertTtlPolicy {
     final reference = now ?? DateTime.now().toUtc();
     final expiry = alert.createdAt.add(ttlForAlertType(alert.type));
     return reference.isBefore(expiry);
+  }
+
+  /// Indique si un signalement PENDING a dépassé sa durée d'affichage
+  /// (disparition basée sur l'affichage de l'utilisateur). N'affecte pas
+  /// les signalements validés, qui conservent leur TTL par type.
+  static bool isPendingExpired(Alert alert, {DateTime? now}) {
+    if (alert.status != AlertStatus.pending) return false;
+    final reference = now ?? DateTime.now().toUtc();
+    return reference.isAfter(alert.createdAt.add(pendingDisplay));
   }
 
   /// Renvoie l'instant exact d'expiration du TTL "Phase 2" pour

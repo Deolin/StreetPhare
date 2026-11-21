@@ -30,8 +30,9 @@ import 'qr_scanner_screen.dart';
 const int _maxAdvanceDays = 30;
 
 /// Couleurs distinctives pour les 3 événements simultanés.
+/// (alignées sur la carte : aucun ambre/jaune — réservés à la « Route Safe »)
 const _kEventColors = [
-  Color(0xFFFFB300), // Ambre (thème primaire)
+  Color(0xFF9C27B0), // Violet
   Color(0xFF2196F3), // Bleu
   Color(0xFF4CAF50), // Vert
 ];
