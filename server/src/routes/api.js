@@ -182,7 +182,10 @@ router.post('/alerts', reportLimiter, (req, res) => {
   //   - Éclaireur : validation immédiate (bypass consensus).
   //   - Citoyen : validation dès atteinte du seuil de consensus.
   const validated = isScout || ((saved.votes || []).length >= config.consensusThreshold);
-  if (validated) {
+  // En cas de fusion (deux utilisateurs au même endroit), on diffuse aussi le
+  // résultat même sous le seuil de consensus : le point vient d'être recentré
+  // et incrémenté d'un vote.
+  if (validated || merged) {
     broadcastToAll('report_validated', { alert: { ...saved, votes: saved.votes || [] } });
   }
 
@@ -486,7 +489,12 @@ router.post('/sync-push', messageLimiter, (req, res) => {
       // Anti-doublon : fusionne avec un danger identique à proximité
       // (≤ mergeRadiusMeters) en recentrant au centre des deux points.
       const merged = store.mergeNearbyIdentical(alert);
-      if (!merged) {
+      if (merged) {
+        // Propagation temps réel : les clients reçoivent le point fusionné
+        // (recentré + votes incrémentés) et suppriment le point absorbé.
+        broadcastToAll('report_validated', { alert: { ...merged, votes: merged.votes || [] } });
+        broadcastToAll('report_deleted', { id: alert.id, alert: { id: alert.id }, reason: 'merged' });
+      } else {
         store.addAlert(alert);
       }
       upserted++;

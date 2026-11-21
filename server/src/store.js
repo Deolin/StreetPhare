@@ -285,6 +285,9 @@ class Store {
     const nowIso = new Date().toISOString();
     target.lastVoteAt = nowIso;
     target.updatedAt = nowIso;
+    // Tombstone le signalement absorbé : les clients supprimeront leur copie
+    // locale (deux utilisateurs ont signalé la même chose → un seul point).
+    this._addTombstone(alert.id, 'merged');
     this._scheduleSave();
     log('ALERT', `Fusion ${alert.type} (${alert.id}) → ${target.id} (${target.votes.length} votes)`);
     return target;

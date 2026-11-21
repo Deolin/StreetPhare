@@ -169,9 +169,72 @@ router.delete('/reports/:id', authenticateToken, requirePermission('reportValida
 // 4. MODÉRATION DU TCHAT P2P / RELAIS
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// GET /api/admin/chat — Liste des messages mesh récents.
+/// GET /api/admin/chat — Liste des messages mesh récents, filtrable par
+/// utilisateur (user), groupe (group) et zone (zone).
 router.get('/chat', authenticateToken, requirePermission('chatModerate'), (req, res) => {
-  res.json({ messages: store.meshMessages.slice(-200).reverse() });
+  const { user, group, zone } = req.query;
+  let messages = store.meshMessages.slice(-500);
+  if (user) {
+    const u = String(user).toLowerCase();
+    messages = messages.filter(m => String(m.senderId || '').toLowerCase().includes(u));
+  }
+  if (group) {
+    const g = String(group).toLowerCase();
+    messages = messages.filter(m => {
+      const d = m.data || {};
+      const gv = d.groupId || d.group || d.groupe || '';
+      return String(gv).toLowerCase().includes(g);
+    });
+  }
+  if (zone) {
+    const z = String(zone).toLowerCase();
+    messages = messages.filter(m => {
+      const d = m.data || {};
+      const zv = d.zone || d.zoneId || d.zoneName || '';
+      return String(zv).toLowerCase().includes(z);
+    });
+  }
+  res.json({ messages: messages.reverse() });
+});
+
+/// POST /api/admin/chat/send — Envoie un message admin vers le réseau (mesh + admins).
+router.post('/chat/send', authenticateToken, requirePermission('chatModerate'), (req, res) => {
+  try {
+    const { text, groupId, zone } = req.body || {};
+    if (!text || !String(text).trim()) return res.status(400).json({ error: 'text requis' });
+    const content = String(text).trim();
+    const msg = store.addMeshMessage({
+      kind: 'admin_message',
+      sender_id: 'admin',
+      data: { text: content, groupId: groupId || null, zone: zone || null, admin: true },
+    });
+
+    // 1) Diffusion aux clients mesh (mobiles) → affichage dans la messagerie
+    //    Hive. On réutilise le kind 'hive_p2p_message' déjà compris par l'app,
+    //    avec un payload au format HiveMessage. `groupId` est mappé sur
+    //    `threadId` ; `zone` est transmis pour un ciblage futur.
+    broadcastToAll('hive_p2p_message', {
+      sender_id: 'admin',
+      payload: {
+        id: msg.id,
+        sender: 'admin',
+        content,
+        type: 'admin',
+        sentAt: new Date().toISOString(),
+        isAdmin: true,
+        threadId: groupId || null,
+        zone: zone || null,
+      },
+    });
+
+    // 2) Diffusion aux panneaux d'administration (Tchat P2P / Relais).
+    broadcastToAll('chat_message', { message: msg });
+    log('CHAT', `Message admin envoyé : ${content.slice(0, 60)}`);
+    res.status(201).json({ success: true, message: msg });
+  } catch (err) {
+    log('CHAT', `Erreur envoi message admin : ${err.message}`);
+    res.status(500).json({ error: 'Erreur interne lors de l\'envoi' });
+  }
 });
 
 /// DELETE /api/admin/chat/:id — Supprimer un message.

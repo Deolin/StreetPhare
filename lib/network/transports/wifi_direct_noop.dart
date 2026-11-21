@@ -8,6 +8,9 @@ class WifiDirectMeshTransport implements MeshTransport {
   String get name => 'wifi_noop';
   @override
   bool get isAvailable => false;
+
+  @override
+  bool get hasActivePeers => false;
   @override
   Future<void> start() async {}
   @override

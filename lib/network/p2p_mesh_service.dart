@@ -82,6 +82,11 @@ abstract class MeshTransport {
   String get name;
   bool get isAvailable;
 
+  /// Vrai si ce transport a au moins un pair connecté à portée.
+  /// Utilisé pour décider si un broadcast local a réellement été délivré ;
+  /// sinon le message est persisté en outbox (résilience cascade BLE/WiFi/5G).
+  bool get hasActivePeers => false;
+
   /// Démarre le transport (scanning, advertising, connexion).
   Future<void> start();
 
@@ -314,6 +319,19 @@ class P2PMeshService {
       // On persiste le message dans l'outbox Hive pour resync ultérieure.
       if (kDebugMode) {
         debugPrint('[P2PMeshService] no local transport available, '
+            'message mis en attente (outbox Hive)');
+      }
+      _outbox.add(jsonEncode(json));
+      return;
+    }
+
+    // Résilience cascade BLE → Wi-Fi → 5G : si aucun transport local n'a de
+    // pair connecté, le broadcast ne touchera personne (ex: BLE actif mais
+    // aucun device connecté). On persiste le message en outbox pour le
+    // re-diffuser dès qu'un pair apparaîtra.
+    if (!localTransports.any((t) => t.hasActivePeers)) {
+      if (kDebugMode) {
+        debugPrint('[P2PMeshService] aucun pair local connecté, '
             'message mis en attente (outbox Hive)');
       }
       _outbox.add(jsonEncode(json));

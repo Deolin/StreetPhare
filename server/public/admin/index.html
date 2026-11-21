@@ -104,6 +104,24 @@
         <h3>📋 Flux de signalements</h3>
         <div class="list" id="alerts-list">Aucun signalement</div>
       </div>
+
+      <div class="card">
+        <h3>💬 Tchat P2P / Relais</h3>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+          <input id="chat-filter-user" placeholder="Filtrer par utilisateur" style="flex:1; min-width:120px;" onchange="loadChat()">
+          <input id="chat-filter-group" placeholder="Filtrer par groupe" style="flex:1; min-width:120px;" onchange="loadChat()">
+          <input id="chat-filter-zone" placeholder="Filtrer par zone" style="flex:1; min-width:120px;" onchange="loadChat()">
+        </div>
+        <div class="list" id="chat-list">Chargement…</div>
+        <button class="small" onclick="loadChat()">Rafraîchir</button>
+        <button class="small danger" onclick="banChatUser()">Ban UUID</button>
+        <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+          <input id="chat-send-text" placeholder="Message admin à diffuser…" style="flex:1; min-width:200px;">
+          <input id="chat-send-group" placeholder="Groupe (opt.)" style="width:130px;">
+          <input id="chat-send-zone" placeholder="Zone (opt.)" style="width:130px;">
+          <button class="small" onclick="sendChat()">📨 Envoyer</button>
+        </div>
+      </div>
     </div>
 
     <!-- ── ÉDITION ── -->
@@ -164,12 +182,6 @@
         <div class="list" id="ev-points-list">Sélectionnez un événement</div>
       </div>
 
-      <div class="card">
-        <h3>💬 Tchat P2P / Relais</h3>
-        <div class="list" id="chat-list">Chargement…</div>
-        <button class="small" onclick="loadChat()">Rafraîchir</button>
-        <button class="small danger" onclick="banChatUser()">Ban UUID</button>
-      </div>
       <div class="card">
         <h3>🎪 Événement & Géorepérage</h3>
         <label>Nom de zone (visible sur la carte)</label><input id="zone-name" placeholder="ex: Zone de repli">
@@ -616,19 +628,44 @@
 
     /* ── TCHAT ───────────────────────────────────────────────────────── */
     async function loadChat() {
-      const r = await fetch('/api/admin/chat', { headers: { 'Authorization': `Bearer ${adminToken}` } });
+      const params = new URLSearchParams();
+      const u = (document.getElementById('chat-filter-user')?.value || '').trim();
+      const g = (document.getElementById('chat-filter-group')?.value || '').trim();
+      const z = (document.getElementById('chat-filter-zone')?.value || '').trim();
+      if (u) params.set('user', u);
+      if (g) params.set('group', g);
+      if (z) params.set('zone', z);
+      const qs = params.toString();
+      const r = await fetch('/api/admin/chat' + (qs ? '?' + qs : ''), { headers: { 'Authorization': `Bearer ${adminToken}` } });
       if (!r.ok) { document.getElementById('chat-list').innerHTML = 'Accès refusé (permission chatModerate)'; return; }
       const d = await r.json();
       const list = document.getElementById('chat-list');
       if (!d.messages.length) { list.innerHTML = 'Aucun message'; return; }
       list.innerHTML = d.messages.map(m => {
-        const body = (m.data && m.data.text) || (m.data && m.data.kind) || JSON.stringify(m.data || {}).slice(0, 80);
+        const dd = m.data || {};
+        const body = dd.text || dd.kind || JSON.stringify(dd).slice(0, 80);
+        const group = dd.groupId || dd.group || dd.groupe || '';
+        const zone = dd.zone || dd.zoneId || dd.zoneName || '';
+        const meta = `${escapeHtml(m.senderId || '?')}${group ? ' · grp ' + escapeHtml(group) : ''}${zone ? ' · zone ' + escapeHtml(zone) : ''}`;
         return `<div class="item">
-          <span class="meta">${escapeHtml(m.senderId || '?')}</span><br>${escapeHtml(body)}<br>
+          <span class="meta">${meta}</span><br>${escapeHtml(body)}<br>
           <button onclick="deleteChat('${m.id}')">Supprimer</button>
           <button onclick="banUuid('${m.senderId || ''}')">Ban</button>
         </div>`;
       }).join('');
+    }
+    async function sendChat() {
+      const text = (document.getElementById('chat-send-text').value || '').trim();
+      if (!text) return;
+      const groupId = (document.getElementById('chat-send-group').value || '').trim() || null;
+      const zone = (document.getElementById('chat-send-zone').value || '').trim() || null;
+      await fetch('/api/admin/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${adminToken}` },
+        body: JSON.stringify({ text, groupId, zone }),
+      });
+      document.getElementById('chat-send-text').value = '';
+      loadChat();
     }
     async function deleteChat(id) {
       await fetch(`/api/admin/chat/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${adminToken}` } });

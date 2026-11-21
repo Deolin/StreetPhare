@@ -97,6 +97,9 @@ class LoopbackMeshTransport implements MeshTransport {
   bool get isAvailable => kDebugMode; // Uniquement en debug.
 
   @override
+  bool get hasActivePeers => true; // boucle locale : toujours « délivré »
+
+  @override
   Future<void> start() async {
     if (kDebugMode) {
       debugPrint('[LoopbackTransport] démarré – prêt pour la sandbox');

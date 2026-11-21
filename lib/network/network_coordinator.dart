@@ -343,6 +343,15 @@ class NetworkCoordinator with WidgetsBindingObserver {
       }),
     );
 
+    // ── Réaction à l'apparition d'un pair BLE ──
+    // Quand un pair apparaît (0 → >0), on re-diffuse immédiatement les
+    // messages persistés en outbox (résilience cascade BLE/WiFi/5G).
+    PeerCounterService.instance.addListener(() {
+      if (PeerCounterService.instance.value > 0) {
+        unawaited(_mesh?.flushOutbox());
+      }
+    });
+
     _initialized = true;
     if (kDebugMode) {
       debugPrint('[NetworkCoordinator] initialisé. euid=$_ephemeralUserId');

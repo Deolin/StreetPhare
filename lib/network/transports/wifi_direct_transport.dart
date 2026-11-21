@@ -67,6 +67,10 @@ class WifiDirectMeshTransport
   }
 
   @override
+  // Diffusion UDP multicast : pas de « connexion » suivie, on diffuse toujours.
+  bool get hasActivePeers => true;
+
+  @override
   Future<void> start() async {
     if (_socket != null) return;
 

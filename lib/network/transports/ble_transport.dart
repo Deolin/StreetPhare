@@ -970,6 +970,9 @@ class BleMeshTransport implements MeshTransport {
   int get activeConnectionCount =>
       _connections.values.where((c) => c.isReady).length;
 
+  @override
+  bool get hasActivePeers => activeConnectionCount > 0;
+
   // ── BLE Advertising natif (MethodChannel) ─────────────────────────
 
   /// Démarre la publicité BLE via le canal platform Android.

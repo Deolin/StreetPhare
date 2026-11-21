@@ -69,6 +69,9 @@ class RelayMeshTransport implements MeshTransport {
   bool get isAvailable => true;
 
   @override
+  bool get hasActivePeers => _channel != null;
+
+  @override
   Future<void> start() async {
     if (_started) return;
     _started = true;
