@@ -99,24 +99,22 @@ void main() {
     );
 
     test('piéton : contre-sens autorisé (1 → 0 en direct)', () {
-      final r = Dijkstra.compute(graph, 1, 0,
-          profile: ProfileSettings.pedestrian);
+      final r =
+          Dijkstra.compute(graph, 1, 0, profile: ProfileSettings.pedestrian);
       expect(r.found, isTrue);
       expect(r.nodeIds, [1, 0]);
       expect(r.totalWeight, 10.0);
     });
 
     test('voiture : contre-sens refusé → contourne par le nœud 2', () {
-      final r = Dijkstra.compute(graph, 1, 0,
-          profile: ProfileSettings.vehicle);
+      final r = Dijkstra.compute(graph, 1, 0, profile: ProfileSettings.vehicle);
       expect(r.found, isTrue);
       expect(r.nodeIds, [1, 2, 0]); // détour légal
       expect(r.totalWeight, 100.0);
     });
 
     test('voiture : sens légal autorisé (0 → 1)', () {
-      final r = Dijkstra.compute(graph, 0, 1,
-          profile: ProfileSettings.vehicle);
+      final r = Dijkstra.compute(graph, 0, 1, profile: ProfileSettings.vehicle);
       expect(r.found, isTrue);
       expect(r.nodeIds, [0, 1]);
       expect(r.totalWeight, 10.0);
@@ -143,8 +141,7 @@ void main() {
       expect(r.totalWeight, 20.0);
     });
 
-    test('danger sur le nœud intermédiaire → contournement par 3 (40 m)',
-        () {
+    test('danger sur le nœud intermédiaire → contournement par 3 (40 m)', () {
       final dangers = [
         const RoutingAvoidPoint(lat: 50.0, lon: 4.001, radiusMeters: 25.0),
       ];
@@ -165,8 +162,7 @@ void main() {
           (1, 0, 10.0, EdgeFlags.oneway),
         ],
       );
-      final r = Dijkstra.compute(graph, 1, 0,
-          profile: ProfileSettings.transit);
+      final r = Dijkstra.compute(graph, 1, 0, profile: ProfileSettings.transit);
       expect(r.found, isTrue);
       expect(r.nodeIds, [1, 0]);
     });
