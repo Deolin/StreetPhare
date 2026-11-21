@@ -26,6 +26,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <!-- Android 14+ : autorise le transfert de données réseau en arrière-plan -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <!-- Android 12+ : maintien des échanges BLE (appareils proches) en avant-plan -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
 
     <!-- Bluetooth Low Energy (maillage P2P local) ───────────────────────── -->
     <uses-permission android:name="android.permission.BLUETOOTH"/>
@@ -126,7 +128,7 @@
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="dataSync|connectedDevice" />
 
         <!-- Flutter Engine — Flutter 3.27+ gère automatiquement AOT,
              assets dir, et Impeller en interne. Aucune métadonnée

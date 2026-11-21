@@ -68,6 +68,7 @@ import '../../routing/core/safe_route_planner.dart';
 import '../../routing/data/avoidance_filter_store.dart';
 import '../../routing/domain/models/route_result.dart';
 import '../../routing/presentation/route_result_sheet.dart';
+import '../../scout/scout_certified_badge.dart';
 import '../../settings/data/app_preferences_store.dart';
 import '../../settings/data/panic_contact_store.dart';
 import '../../settings/presentation/settings_screen.dart';
@@ -424,7 +425,23 @@ class _MapScreenState extends State<MapScreen>
             accuracy: LocationAccuracy.high,
             distanceFilter: 2, // Ecoute fine pour détecter les micro-mouvements
           ),
-        ).listen(_onPositionUpdate);
+        ).listen(
+          _onPositionUpdate,
+          onError: (Object e) {
+            // Localisation coupée / service GPS désactivé : dégradation
+            // propre, SANS crash. (L'absence d'onError ici faisait que
+            // l'erreur non gérée du flux plantait toute l'app.)
+            if (kDebugMode) debugPrint('[MapScreen] Flux GPS en erreur : $e');
+            if (!mounted) return;
+            _isTracking = false;
+            _followUser = false;
+            setState(() {
+              _locating = false;
+              _positionError = '${s.mapGpsError} $e';
+            });
+          },
+          cancelOnError: true,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -2378,6 +2395,7 @@ class _MapScreenState extends State<MapScreen>
       final alias = aliasByFid[p.fixedId] ?? 'Ami';
       markers.add(Marker(
         point: p.point,
+        rotate: true,
         width: 36,
         height: 36,
         child: Tooltip(
@@ -2415,6 +2433,7 @@ class _MapScreenState extends State<MapScreen>
       if (sm.latitude == null || sm.longitude == null || sm.stale) continue;
       markers.add(Marker(
         point: LatLng(sm.latitude!, sm.longitude!),
+        rotate: true,
         width: 40,
         height: 40,
         child: Tooltip(
@@ -2431,6 +2450,7 @@ class _MapScreenState extends State<MapScreen>
       markers.add(Marker(
         point: LatLng(
             activeMission.injuredLatitude, activeMission.injuredLongitude),
+        rotate: true,
         width: 40,
         height: 40,
         child: Tooltip(
@@ -2522,6 +2542,7 @@ class _MapScreenState extends State<MapScreen>
         final currentWp = event.waypoints[activeStep];
         markers.add(Marker(
           point: currentWp.position,
+          rotate: true,
           width: 100,
           height: 72,
           child: LongPressDetector(
@@ -2542,6 +2563,7 @@ class _MapScreenState extends State<MapScreen>
           final nextWp = event.waypoints[activeStep + 1];
           markers.add(Marker(
             point: nextWp.position,
+            rotate: true,
             width: 100,
             height: 72,
             child: LongPressDetector(
@@ -2563,6 +2585,7 @@ class _MapScreenState extends State<MapScreen>
       for (final cc in event.careCenters) {
         markers.add(Marker(
           point: cc.position,
+          rotate: true,
           width: 36,
           height: 36,
           child: LongPressDetector(
@@ -2587,6 +2610,7 @@ class _MapScreenState extends State<MapScreen>
       for (final ep in event.exitPoints) {
         markers.add(Marker(
           point: ep.position,
+          rotate: true,
           width: 36,
           height: 36,
           child: LongPressDetector(
@@ -2611,6 +2635,7 @@ class _MapScreenState extends State<MapScreen>
       for (final sz in event.safeZones) {
         markers.add(Marker(
           point: sz.position,
+          rotate: true,
           width: 40,
           height: 40,
           child: LongPressDetector(
@@ -2635,6 +2660,7 @@ class _MapScreenState extends State<MapScreen>
     if (_userPointMarker != null) {
       markers.add(Marker(
         point: _userPointMarker!,
+        rotate: true,
         width: 44,
         height: 44,
         child: const _UserPointMarker(),
@@ -3308,6 +3334,9 @@ class _MapScreenState extends State<MapScreen>
                               onPanic: _triggerPanic,
                               panicLabel: s.panicButton,
                             ),
+
+                            // ── Badge « Éclaireur certifié » (déplaçable) ──
+                            const ScoutCertifiedBadge(),
                           ],
                         ), // Stack
                       ), // SafeArea

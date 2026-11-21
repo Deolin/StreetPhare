@@ -6,6 +6,7 @@
 //   - Gestion des administrateurs d'événements (/api/admin/event-admins)
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 const String _defaultApiBase = String.fromEnvironment(
@@ -361,8 +362,11 @@ class SimulatedMedicMission {
 }
 
 /// Service d'administration des comptes RBAC (Superadmin).
-class RbacAdminService {
+class RbacAdminService extends ChangeNotifier {
   RbacAdminService({String? baseUrl}) : _baseUrl = baseUrl ?? _defaultApiBase;
+
+  /// Instance partagée de l'authentification unifiée (admin / scout / event_admin).
+  static final RbacAdminService instance = RbacAdminService();
 
   final String _baseUrl;
   String? _token;
@@ -375,11 +379,13 @@ class RbacAdminService {
   void setSession({required String token, String? role}) {
     _token = token;
     _role = role;
+    notifyListeners();
   }
 
   void logout() {
     _token = null;
     _role = null;
+    notifyListeners();
   }
 
   Map<String, String> get _authHeaders => {
@@ -408,6 +414,7 @@ class RbacAdminService {
 
     _token = data['token'].toString();
     _role = (data['role'] ?? 'admin').toString();
+    notifyListeners();
     return AuthLoginResult(
       token: _token!,
       role: _role!,

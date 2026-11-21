@@ -48,6 +48,10 @@ class SyncService {
   /// Les alertes modifiées après cette date seront poussées.
   DateTime? _lastPushTs;
 
+  /// Dernier curseur séquentiel serveur connu (ancrage ordonné/idempotent,
+  /// exposé par le serveur via `serverSeq`).
+  int _lastSeq = 0;
+
   /// Intervalle de synchronisation (3 minutes).
   static const Duration syncInterval = Duration(minutes: 3);
 
@@ -289,6 +293,7 @@ class SyncService {
       'tombstones': tombstones,
       'peerId': PeerCounterService.instance.localPeerId ?? '',
       'since': since,
+      'last_seq': _lastSeq,
     };
 
     final uri = Uri.parse('$serverBase/api/sync-push');
@@ -319,6 +324,12 @@ class SyncService {
     }
 
     final respBody = jsonDecode(response.body) as Map<String, dynamic>;
+
+    // Ancrage curseur séquentiel serveur.
+    final serverSeq = (respBody['serverSeq'] as num?)?.toInt();
+    if (serverSeq != null && serverSeq > _lastSeq) {
+      _lastSeq = serverSeq;
+    }
 
     // Mettre à jour les timestamps de tracking.
     _lastPushTs = now;
@@ -374,6 +385,11 @@ class SyncService {
       if (response.statusCode != 200) return;
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
+
+      final serverSeq = (body['serverSeq'] as num?)?.toInt();
+      if (serverSeq != null && serverSeq > _lastSeq) {
+        _lastSeq = serverSeq;
+      }
 
       final items = body['items'] as List<dynamic>?;
       if (items != null && items.isNotEmpty) {

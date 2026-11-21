@@ -10,7 +10,7 @@ const config = require('../config');
 const store = require('../store');
 const sync = require('../sync');
 const runtimeConfig = require('../runtimeConfig');
-const { broadcastToAll } = require('../services/broadcast');
+const { broadcast, broadcastToAll } = require('../services/broadcast');
 const { routingEngine } = require('../services/routing');
 const https = require('https');
 const { authenticateToken, requireRole, requireScout, requireSuperAdmin, canManageRoleMiddleware } = require('../middleware/auth');
@@ -551,6 +551,7 @@ router.post('/sync-push', messageLimiter, (req, res) => {
       upserted,
       deltas,
       tombstones,
+      serverSeq: store.meshSeq,
       serverTs: new Date().toISOString(),
     });
   } catch (err) {
@@ -581,6 +582,7 @@ router.get('/sync-check', (req, res) => {
     items,
     count: items.length,
     tombstones,
+    serverSeq: store.meshSeq,
     serverTs: new Date().toISOString(),
   });
 });
@@ -1233,6 +1235,34 @@ router.post('/events/submit', eventSubmitLimiter, (req, res) => {
       return res.status(400).json({ error: 'email, phone, name, startDate et city sont requis' });
     }
     const pending = pendingEventService.create({ email, phone, pseudo, name, startDate, city, summary });
+
+    // Notification asynchrone (non bloquante) à l'administration : email via
+    // SMTP authentifié — l'ancien mail() PHP non authentifié était bloqué par
+    // Cloudflare. Sans SMTP configuré → consigné dans data/mail-outbox.log.
+    sendMail({
+      to: config.contactEmail,
+      subject: '[StreetPhare] Nouvel événement soumis — ' + pending.name,
+      text: [
+        'Une nouvelle demande de création d\'événement a été soumise.',
+        '',
+        'Nom         : ' + pending.name,
+        'Date début  : ' + pending.startDate,
+        'Ville       : ' + pending.city,
+        'Pseudo      : ' + pending.pseudo,
+        'Email admin : ' + pending.email,
+        'Téléphone   : ' + pending.phone,
+        '',
+        'Résumé :',
+        (pending.summary || '(aucun)'),
+        '',
+        'Cette demande est en attente de validation dans la section administration « Événements ».',
+      ].join('\n'),
+    }).catch((err) => console.error('[EVENTS] Notification email échouée:', err.message));
+
+    // Rafraîchissement temps réel de la liste « Événements en attente »
+    // sur les dashboards admin connectés.
+    broadcast('pending_events_changed', {});
+
     res.status(201).json({ success: true, pending });
   } catch (err) {
     console.error('[EVENTS] Erreur soumission événement:', err.message);
@@ -1321,12 +1351,16 @@ router.get('/bug-reports/:id', authenticateToken, requireRole(['admin', 'superad
 /// Cette route est le fallback HTTP pour les clients qui subissent
 /// des micro-coupures en 5G et ne peuvent pas maintenir le WebSocket.
 router.get('/mesh/sync', (req, res) => {
-  const { since } = req.query;
-  const messages = store.getMeshMessagesSince(since || null);
+  const { since, after_seq } = req.query;
+  const afterSeq = parseInt(after_seq, 10);
+  const messages = Number.isFinite(afterSeq) && afterSeq >= 0
+    ? store.getMeshMessagesSinceSeq(afterSeq)
+    : store.getMeshMessagesSince(since || null);
   res.json({
     success: true,
     count: messages.length,
     messages,
+    seq: store.meshSeq,
     serverTs: new Date().toISOString(),
   });
 });

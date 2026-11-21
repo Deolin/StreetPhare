@@ -4,12 +4,11 @@
  *
  * Point d'entrée POST pour la page vitrine « Créer un événement ».
  *  1. Valide les champs obligatoires ;
- *  2. Consigne une copie locale ;
- *  3. Envoie un email de notification à l'administrateur du site
- *     (contact@streetphare.be) ;
- *  4. Transfère la soumission au serveur StreetPhare (streetphare.ddns.net)
- *     où elle sera placée « en attente de validation » dans la section
- *     administration « Événements ».
+ *  2. Consigne une copie locale (sauvegarde de secours) ;
+ *  3. Transfère la soumission au serveur StreetPhare en HTTPS
+ *     (streetphare.ddns.net /api/events/submit), lequel :
+ *       - place la demande « en attente de validation » (administration) ;
+ *       - envoie la notification email via SMTP authentifié.
  *
  * ⚠️ NON-ANONYMAT DE L'ORGANISATEUR :
  * Contrairement aux participants qui restent anonymes, l'administrateur d'un
@@ -23,8 +22,6 @@
 // ---------------------------------------------------------------------------
 
 define('PRIMARY_HOST', 'streetphare.ddns.net');
-define('PRIMARY_PORT', 3000);
-define('CONTACT_EMAIL', 'contact@streetphare.be');
 define('SUBMISSIONS_DIR', __DIR__ . '/../event_submissions/');
 define('TRANSFER_TIMEOUT', 10);
 
@@ -123,38 +120,13 @@ $localFile = SUBMISSIONS_DIR . $submissionId . '.txt';
 $savedLocal = @file_put_contents($localFile, $localBody, LOCK_EX);
 
 // ---------------------------------------------------------------------------
-// Étape 2 : Notification mail à l'administrateur du site
+// (Notification email retirée : l'ancien mail() PHP non authentifié était
+// bloqué par Cloudflare. L'email de notification est désormais envoyé par le
+// serveur StreetPhare via SMTP authentifié lors du transfert ci-dessous.)
 // ---------------------------------------------------------------------------
 
-$mailSubject = '[StreetPhare] Nouvel événement soumis — ' . $name;
-$mailBody = <<<TXT
-Une nouvelle demande de création d'événement a été soumise sur le site vitrine.
-
-Nom de l'événement : $name
-Date de début       : $startDate
-Ville               : $city
-Pseudo              : $pseudo
-Email admin         : $email
-Numéro de contact   : $phone
-
-Résumé :
-$summary
-
----
-Cette demande est en attente de validation dans la section administration « Événements ».
-TXT;
-
-$mailHeaders = [
-    'From: StreetPhare <no-reply@streetphare.be>',
-    'Reply-To: ' . $email,
-    'Content-Type: text/plain; charset=UTF-8',
-    'X-Mailer: PHP/' . phpversion(),
-];
-
-$mailSent = @mail(CONTACT_EMAIL, $mailSubject, $mailBody, implode("\r\n", $mailHeaders));
-
 // ---------------------------------------------------------------------------
-// Étape 3 : Transfert au serveur StreetPhare (best-effort)
+// Étape 2 : Transfert au serveur StreetPhare
 // ---------------------------------------------------------------------------
 
 $forwarded    = false;
@@ -172,13 +144,19 @@ $payload = json_encode([
 
 $ch = curl_init();
 curl_setopt_array($ch, [
-    CURLOPT_URL            => 'http://' . PRIMARY_HOST . ':' . PRIMARY_PORT . '/api/events/submit',
+    // Le serveur StreetPhare est exposé UNIQUEMENT en HTTPS (port 443) à
+    // travers Cloudflare/Caddy. L'ancien http://...:3000 (port brut) était
+    // bloqué par Cloudflare → la soumission n'était jamais prise en compte
+    // côté administration.
+    CURLOPT_URL            => 'https://' . PRIMARY_HOST . '/api/events/submit',
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST           => true,
     CURLOPT_POSTFIELDS     => $payload,
     CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
     CURLOPT_CONNECTTIMEOUT => 5,
     CURLOPT_TIMEOUT        => TRANSFER_TIMEOUT,
+    CURLOPT_SSL_VERIFYPEER => true,
+    CURLOPT_SSL_VERIFYHOST => 2,
 ]);
 
 $response = curl_exec($ch);
@@ -196,14 +174,28 @@ if ($response !== false && $httpCode >= 200 && $httpCode < 300) {
 // Réponse
 // ---------------------------------------------------------------------------
 
-http_response_code($savedLocal !== false ? 201 : 500);
+// Réponse HONNÊTE : on ne prétend pas que tout va bien si le transfert vers le
+// serveur StreetPhare a échoué. Une copie locale reste conservée en secours
+// (event_submissions/), mais l'utilisateur est averti de l'échec.
 header('Content-Type: application/json; charset=utf-8');
-echo json_encode([
-    'success'       => true,
-    'submission_id' => $submissionId,
-    'saved_local'   => $savedLocal !== false,
-    'mail_sent'     => $mailSent,
-    'forwarded'     => $forwarded,
-    'forward_error' => $forwarded ? null : $forwardError,
-    'timestamp'     => $timestamp,
-], JSON_UNESCAPED_UNICODE);
+if ($forwarded) {
+    http_response_code(201);
+    echo json_encode([
+        'success'       => true,
+        'submission_id' => $submissionId,
+        'saved_local'   => $savedLocal !== false,
+        'forwarded'     => true,
+        'timestamp'     => $timestamp,
+    ], JSON_UNESCAPED_UNICODE);
+} else {
+    http_response_code(502);
+    echo json_encode([
+        'success'       => false,
+        'error'         => 'La demande a été conservée localement mais n\'a pas pu être transmise au serveur StreetPhare' . ($forwardError ? ' (' . $forwardError . ').' : '.'),
+        'submission_id' => $submissionId,
+        'saved_local'   => $savedLocal !== false,
+        'forwarded'     => false,
+        'forward_error' => $forwardError,
+        'timestamp'     => $timestamp,
+    ], JSON_UNESCAPED_UNICODE);
+}

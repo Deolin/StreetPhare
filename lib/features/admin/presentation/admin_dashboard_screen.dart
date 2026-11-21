@@ -52,7 +52,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _service = widget.service ?? RbacAdminService();
+    _service = widget.service ?? RbacAdminService.instance;
     if (kIsWeb) {
       SandboxController.instance.connect();
     }

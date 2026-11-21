@@ -419,14 +419,27 @@ wss.on('connection', (ws, req) => {
 
     // ── Handshake + synchronisation des messages manqués ──────────
     try {
-      const syncSince = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const missedMessages = store.getMeshMessagesSince(syncSince);
+      // Curseur seq optionnel passé par le client via ?seq=N (rattrapage
+      // idempotent). Sans curseur, repli sur une fenêtre temporelle (24 h).
+      let clientSeq = 0;
+      try {
+        const qs = (req.url || '').split('?')[1];
+        if (qs) {
+          const s = parseInt(new URLSearchParams(qs).get('seq'), 10);
+          if (Number.isFinite(s) && s >= 0) clientSeq = s;
+        }
+      } catch (_) {}
+
+      const missedMessages = clientSeq > 0
+        ? store.getMeshMessagesSinceSeq(clientSeq)
+        : store.getMeshMessagesSince(new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
       const truncated = missedMessages.slice(-MAX_WELCOME_BACKLOG);
       const welcomePayload = JSON.stringify({
         kind: 'welcome',
         server: 'StreetPhare-Primary',
         version: '3.2.1',
         tls: true,
+        seq: store.meshSeq,
         ts: new Date().toISOString(),
         missedCount: truncated.length,
         totalMissed: missedMessages.length,
@@ -441,6 +454,7 @@ wss.on('connection', (ws, req) => {
           server: 'StreetPhare-Primary',
           version: '3.2.1',
           tls: true,
+          seq: store.meshSeq,
           ts: new Date().toISOString(),
           missedCount: 0,
           totalMissed: missedMessages.length,
@@ -470,6 +484,7 @@ wss.on('connection', (ws, req) => {
           server: 'StreetPhare-Primary',
           version: '3.2.1',
           tls: true,
+          seq: store.meshSeq,
           ts: new Date().toISOString(),
           missedCount: 0,
           missed: [],
@@ -510,6 +525,35 @@ wss.on('connection', (ws, req) => {
 
         try {
           const parsed = JSON.parse(msg);
+
+          // ── Contrôle : sync_from (curseur seq) ──────────────────────────
+          // Le client annonce son dernier seq connu ; on lui renvoie le delta
+          // ordonné (idempotent), sans re-broadcast ni stockage.
+          if (parsed && parsed.kind === 'sync_from') {
+            const fromSeq = parseInt(parsed.seq, 10);
+            const missed = Number.isFinite(fromSeq) && fromSeq >= 0
+              ? store.getMeshMessagesSinceSeq(fromSeq)
+              : store.getMeshMessagesSince(null);
+            const truncated = missed.slice(-MAX_WELCOME_BACKLOG);
+            try {
+              ws.send(JSON.stringify({
+                kind: 'welcome',
+                server: 'StreetPhare-Primary',
+                version: '3.2.1',
+                tls: true,
+                seq: store.meshSeq,
+                syncFrom: Number.isFinite(fromSeq) ? fromSeq : null,
+                ts: new Date().toISOString(),
+                missedCount: truncated.length,
+                totalMissed: missed.length,
+                missed: truncated,
+              }));
+            } catch (sendErr) {
+              log('MESH', `[${connId}] Erreur envoi sync_from: ${sendErr.message}`);
+            }
+            return; // message de contrôle : ne pas relayer
+          }
+
           store.addMeshMessage({
             kind: parsed.kind || 'mesh',
             data: parsed,

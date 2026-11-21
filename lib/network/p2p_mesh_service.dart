@@ -50,6 +50,7 @@ import 'package:flutter/foundation.dart';
 import '../core/models/alert_model.dart';
 import '../core/network/peer_counter_service.dart';
 import '../database/hive_alert_database.dart';
+import 'mesh_outbox.dart';
 
 /// Représente un pair (autre appareil) découvert sur le maillage.
 class MeshPeer {
@@ -157,12 +158,10 @@ class P2PMeshService {
   final List<StreamSubscription> _subs = [];
   bool _started = false;
 
-  /// ANR fix : compteur de microtasks en attente pour éviter
-  /// la saturation de l'event loop lors des bursts BLE.
+  /// ANR fix : drapeau de drainage de la file d'entrée (0 = inactif,
+  /// 1 = un drainer actif). Remplace l'ancien compteur + drop : on ne jette
+  /// plus de message, tout est mis en file FIFO.
   int _pendingMicrotasks = 0;
-
-  /// Nombre maximum de microtasks de traitement en file d'attente.
-  static const int _maxPendingMicrotasks = 25;
 
   /// ANR fix : cache des alertes récemment reçues pour éviter
   /// les boucles de re-propagation infinies.
@@ -177,30 +176,45 @@ class P2PMeshService {
   /// Taille maximale du cache des tombstones.
   static const int _maxTombstoneCache = 100;
 
-  /// Outbox persistée (Hive) : messages locaux non broadcastés
-  /// faute de transport disponible. Flushée automatiquement
-  /// quand un transport redevient actif.
-  final List<String> _outbox = [];
+  /// Outbox persistante (Hive) : découple le transport volatile de la donnée.
+  /// Les messages sortants y sont écrits AVANT tout envoi, avec un statut et
+  /// un numéro de séquence, puis réémis jusqu'à acquittement applicatif
+  /// (Store-and-Forward tolérant aux coupures).
+  final MeshOutbox _outbox = MeshOutbox.instance;
 
-  /// Flush l'outbox locale sur tous les transports disponibles.
-  /// Appelé quand le réseau local est restauré.
+  /// Dernier `seq` serveur consommé (rattrapage delta via `sync_from`).
+  int _lastServerSeq = 0;
+
+  /// Timer de réémission des messages en attente (ACK + backoff borné).
+  Timer? _retransmitTimer;
+
+  /// Backoff progressif des réémissions (300 ms → 800 ms → 2 s → 5 s → 10 s).
+  static const List<Duration> _retryDelays = [
+    Duration(milliseconds: 300),
+    Duration(milliseconds: 800),
+    Duration(seconds: 2),
+    Duration(seconds: 5),
+    Duration(seconds: 10),
+  ];
+
+  /// Nombre maximal de tentatives avant abandon radio (la donnée reste en base).
+  static const int _maxReliableAttempts = 10;
+
+  /// Intervalle de la boucle de réémission.
+  static const Duration _retransmitTick = Duration(milliseconds: 500);
+
+  /// Dédup des ACK déjà émis (anti-tempête).
+  final Set<String> _seenEnvelopeIds = {};
+  static const int _maxSeenEnvelopeIds = 200;
+
+  /// File FIFO des messages entrants (plus jamais de « message ignoré »).
+  final List<String> _incomingBacklog = [];
+  static const int _maxIncomingBacklog = 1000;
+
+  /// Flush l'outbox persistante sur le maillage (appelé au retour du réseau
+  /// ou à l'apparition d'un pair).
   Future<void> flushOutbox() async {
-    if (_outbox.isEmpty) return;
-    if (kDebugMode) {
-      debugPrint('[P2PMeshService] flush outbox (${_outbox.length} messages)');
-    }
-    final messages = List<String>.from(_outbox);
-    _outbox.clear();
-    for (final msg in messages) {
-      try {
-        final json = jsonDecode(msg) as Map<String, dynamic>;
-        await broadcastRawJsonLocal(json);
-      } catch (e) {
-        if (kDebugMode) {
-          debugPrint('[P2PMeshService] Erreur flush outbox: $e');
-        }
-      }
-    }
+    await _retransmitDue();
   }
 
   /// Démarre tous les transports et la boucle de gossip.
@@ -235,25 +249,30 @@ class P2PMeshService {
 
     _gossipTimer = Timer.periodic(gossipInterval, (_) => _gossip());
     _discoveryTimer = Timer.periodic(discoveryInterval, (_) => _pingPeers());
+
+    // ── Livraison fiable (Store-and-Forward) ──
+    try {
+      await _outbox.init();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[P2PMeshService] init outbox: $e');
+      }
+    }
+    _retransmitTimer = Timer.periodic(_retransmitTick, (_) {
+      unawaited(_retransmitDue());
+    });
+    unawaited(_outbox.prune());
+
+    // ── Rattrapage seq côté serveur (Log ordonné + Deltas) ──
+    // Le curseur est chargé ici ; la demande de delta (`sync_from`) est
+    // déclenchée à la réception du `welcome` du relay (_onWelcomeReceived).
+    _lastServerSeq = _outbox.getCursor('server_seq');
   }
 
-  /// Diffuse une alerte à tous les pairs sur tous les transports.
+  /// Diffuse une alerte de façon FIABLE : écrite dans l'outbox persistante
+  /// puis émise (avec ACK + retransmission) — aucune perte en cas de coupure.
   Future<void> broadcastAlert(Alert alert) async {
-    final payload = alert.toCompact();
-    // ANR fix : on n'attend pas la complétion pour ne pas bloquer
-    // l'appelant. On utilise unawaited pour éviter le warning de
-    // Future non utilisé, tout en restant fire-and-forget.
-    unawaited(
-      Future.wait(transports.map((t) async {
-        try {
-          await t.broadcast(payload);
-        } catch (e) {
-          if (kDebugMode) {
-            debugPrint('[P2PMeshService] broadcast ${t.name}: $e');
-          }
-        }
-      })),
-    );
+    await _enqueueReliable(alert.toJson(), kind: 'alert');
   }
 
   /// Diffuse un tombstone (signalement supprimé/rejeté) aux pairs locaux.
@@ -264,12 +283,12 @@ class P2PMeshService {
   /// uniquement : les clients déjà reliés au serveur ont reçu le signal
   /// directement via WebSocket.
   void broadcastTombstone(String id, {String reason = 'deleted'}) {
-    unawaited(broadcastRawJsonLocal({
+    unawaited(_enqueueReliable({
       'kind': 'tombstone',
       'id': id,
       'reason': reason,
       'ts': DateTime.now().toUtc().toIso8601String(),
-    }));
+    }, kind: 'tombstone'));
   }
 
   /// Diffuse un payload JSON brut (ex : signal panic) sur tous les transports.
@@ -321,7 +340,10 @@ class P2PMeshService {
         debugPrint('[P2PMeshService] no local transport available, '
             'message mis en attente (outbox Hive)');
       }
-      _outbox.add(jsonEncode(json));
+      unawaited(_enqueueReliable(
+        json,
+        kind: (json['kind'] as String?) ?? 'raw',
+      ));
       return;
     }
 
@@ -334,7 +356,10 @@ class P2PMeshService {
         debugPrint('[P2PMeshService] aucun pair local connecté, '
             'message mis en attente (outbox Hive)');
       }
-      _outbox.add(jsonEncode(json));
+      unawaited(_enqueueReliable(
+        json,
+        kind: (json['kind'] as String?) ?? 'raw',
+      ));
       return;
     }
 
@@ -360,6 +385,9 @@ class P2PMeshService {
   Future<void> stop() async {
     _gossipTimer?.cancel();
     _discoveryTimer?.cancel();
+    _retransmitTimer?.cancel();
+    _retransmitTimer = null;
+    _incomingBacklog.clear();
     for (final sub in _subs) {
       await sub.cancel();
     }
@@ -432,116 +460,148 @@ class P2PMeshService {
   /// Les messages au-delà de cette limite sont ignorés pour préserver
   /// la réactivité de l'UI.
   void _handleIncoming(String raw) {
-    // Backpressure : si trop de messages sont en attente de traitement,
-    // on ignore les nouveaux pour éviter l'ANR.
-    if (_pendingMicrotasks >= _maxPendingMicrotasks) {
-      if (kDebugMode) {
-        debugPrint(
-          '[P2PMeshService] backpressure: $_pendingMicrotasks '
-          'microtasks en attente, message ignoré',
-        );
-      }
-      return;
+    // Anti-perte : tout message est mis en file FIFO, jamais jeté. Un seul
+    // « drainer » tourne à la fois (1 message par microtask) pour préserver
+    // la réactivité de l'UI lors des bursts BLE/RF.
+    if (_incomingBacklog.length < _maxIncomingBacklog) {
+      _incomingBacklog.add(raw);
+    } else if (kDebugMode) {
+      debugPrint(
+        '[P2PMeshService] backlog saturé ($_maxIncomingBacklog) — la DB '
+        'restant idempotente, aucun doublon ne sera créé',
+      );
     }
 
-    _pendingMicrotasks++;
-    scheduleMicrotask(() {
-      _pendingMicrotasks--;
-      _processIncomingMessage(raw);
-    });
+    if (_pendingMicrotasks > 0) return;
+
+    _pendingMicrotasks = 1;
+    scheduleMicrotask(_processQueue);
   }
 
-  /// Traitement effectif d'un message entrant, exécuté dans un
-  /// microtask pour ne pas bloquer le thread Dart principal.
+  /// Traitement effectif d'un message entrant, exécuté dans un microtask.
   void _processIncomingMessage(String raw) {
     try {
       final json = jsonDecode(raw);
       if (json is! Map<String, dynamic>) return;
 
-      // Cas 0 : `welcome` du relay (handshake) → rattrapage des messages
-      // manqués pendant une déconnexion (backlog serveur).
-      if (json['kind'] == 'welcome') {
-        _onWelcomeReceived(json);
-        return;
-      }
-
-      // Cas 1 : paquet d'alerte simple.
-      if (json.containsKey('id') && json.containsKey('euid')) {
-        final alert = Alert.fromJson(json);
-        _onAlertReceived(alert);
-        return;
-      }
-
-      // Cas 2 : paquet de gossip (liste d'IDs).
-      if (json['kind'] == 'gossip' && json['ids'] is List) {
-        _onGossipReceived((json['ids'] as List).cast<String>());
-        return;
-      }
-
-      // Cas 3 : signal panic d'un pair.
-      if (json['kind'] == 'panic' &&
-          json['peerId'] is String &&
-          json['lat'] is num &&
-          json['lng'] is num) {
-        _panicSignalController.add({
-          'peerId': json['peerId'] as String,
-          'lat': (json['lat'] as num).toDouble(),
-          'lng': (json['lng'] as num).toDouble(),
-        });
-        return;
-      }
-
-      // Cas 4 : ping de présence.
-      if (json['kind'] == 'ping' && json['id'] is String) {
-        final peerId = json['id'] as String;
-
-        // Exclure l'hôte local (Requirement #3)
-        if (peerId == localPeerId) return;
-
-        _peers[peerId] = MeshPeer(
-          id: peerId,
-          transport: json['t'] ?? 'unknown',
-          lastSeen: DateTime.now().toUtc(),
-        );
-
-        // Enregistre le pair pour le calcul de densité HIVE
-        PeerCounterService.instance.recordPeer(
-          peerId,
-          serviceUuid: json['svc'] as String?,
-          metadata: json['meta'] as String?,
-        );
-        return;
-      }
-
-      // Cas 5 : signalement reçu du serveur central (diffusion temps réel).
-      // `new_alert` (création) ou `report_validated` (validation) —
-      // payload `{ alert }` au format REST. Le rejet (`report_rejected`) est
-      // traité par le NetworkCoordinator (suppression + tombstone P2P) pour
-      // éviter le conflit upsert/delete.
-      if (json['kind'] == 'report_validated' || json['kind'] == 'new_alert') {
-        final alertJson = json['alert'];
-        if (alertJson is Map<String, dynamic>) {
-          final alert = Alert.fromJson(alertJson);
-          _onServerAlertReceived(alert);
+      // Cas ACK : acquittement applicatif d'un message fiable délivré.
+      // L'identifiant `mid` permet de retirer l'entrée correspondante de
+      // l'outbox de l'émetteur (livraison next-hop confirmée).
+      if (json['kind'] == 'ack' && json['mid'] is String) {
+        final mid = json['mid'] as String;
+        if (_outbox.isReady) {
+          unawaited(_outbox.acknowledge(mid));
         }
         return;
       }
 
-      // Cas 5b : demande de payloads d'alertes manquantes (gossip pull).
-      if (json['kind'] == 'alert_request' && json['ids'] is List) {
-        _onAlertRequestReceived((json['ids'] as List).cast<String>());
+      // Cas enveloppe fiable (Store-and-Forward) : dépaquetage + ACK.
+      // L'émetteur envoie { v, mid, from, seq, kind, d } ; on acquitte, on
+      // dédoublonne puis on traite le contenu applicatif `d` normalement.
+      if (json['v'] == 1 && json['mid'] is String && json['d'] is Map) {
+        final mid = json['mid'] as String;
+        _sendAck(mid);
+        final inner = json['d'];
+        if (inner is Map<String, dynamic>) {
+          _processIncomingMap(inner);
+        }
         return;
       }
 
-      // Cas 6 : tombstone (suppression/rejet) propagé entre pairs P2P.
-      if (json['kind'] == 'tombstone' && json['id'] is String) {
-        _onTombstoneReceived(json);
-        return;
-      }
+      _processIncomingMap(json);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[P2PMeshService] message ignoré (parse error): $e');
       }
+    }
+  }
+
+  /// Traite un message applicatif (après dépaquetage éventuel de l'enveloppe).
+  void _processIncomingMap(Map<String, dynamic> json) {
+    // Cas 0 : `welcome` du relay (handshake) → rattrapage des messages
+    // manqués pendant une déconnexion (backlog serveur).
+    if (json['kind'] == 'welcome') {
+      _onWelcomeReceived(json);
+      return;
+    }
+
+    // Cas 1 : alerte P2P directe. Reconnaît le format réel produit par
+    // `Alert.toJson()` (id + reporter_id / userId / euid + type + position).
+    // (Correction : l'ancienne condition exigeait `euid`, jamais émis → les
+    // alertes diffusées entre pairs étaient silencieusement ignorées.)
+    final isAlert = json['id'] is String &&
+        json['type'] is String &&
+        (json.containsKey('lat') ||
+            json.containsKey('lng') ||
+            json.containsKey('lon')) &&
+        (json['reporter_id'] is String ||
+            json['userId'] is String ||
+            json['euid'] is String);
+    if (isAlert) {
+      _onAlertReceived(Alert.fromJson(json));
+      return;
+    }
+
+    // Cas 2 : paquet de gossip (liste d'IDs).
+    if (json['kind'] == 'gossip' && json['ids'] is List) {
+      _onGossipReceived((json['ids'] as List).cast<String>());
+      return;
+    }
+
+    // Cas 3 : signal panic d'un pair.
+    if (json['kind'] == 'panic' &&
+        json['peerId'] is String &&
+        json['lat'] is num &&
+        json['lng'] is num) {
+      _panicSignalController.add({
+        'peerId': json['peerId'] as String,
+        'lat': (json['lat'] as num).toDouble(),
+        'lng': (json['lng'] as num).toDouble(),
+      });
+      return;
+    }
+
+    // Cas 4 : ping de présence.
+    if (json['kind'] == 'ping' && json['id'] is String) {
+      final peerId = json['id'] as String;
+
+      // Exclure l'hôte local (Requirement #3)
+      if (peerId == localPeerId) return;
+
+      _peers[peerId] = MeshPeer(
+        id: peerId,
+        transport: json['t'] ?? 'unknown',
+        lastSeen: DateTime.now().toUtc(),
+      );
+
+      // Enregistre le pair pour le calcul de densité HIVE
+      PeerCounterService.instance.recordPeer(
+        peerId,
+        serviceUuid: json['svc'] as String?,
+        metadata: json['meta'] as String?,
+      );
+      return;
+    }
+
+    // Cas 5 : signalement reçu du serveur central (diffusion temps réel).
+    if (json['kind'] == 'report_validated' || json['kind'] == 'new_alert') {
+      final alertJson = json['alert'];
+      if (alertJson is Map<String, dynamic>) {
+        _onServerAlertReceived(Alert.fromJson(alertJson));
+      }
+      return;
+    }
+
+    // Cas 5b : demande de payloads d'alertes manquantes (gossip pull).
+    if (json['kind'] == 'alert_request' && json['ids'] is List) {
+      _onAlertRequestReceived((json['ids'] as List).cast<String>());
+      return;
+    }
+
+    // Cas 6 : tombstone (suppression/rejet) propagé entre pairs P2P.
+    if (json['kind'] == 'tombstone' && json['id'] is String) {
+      _onTombstoneReceived(json);
+      return;
     }
   }
 
@@ -648,19 +708,38 @@ class P2PMeshService {
     }));
   }
 
-  /// Rejoue les messages `missed` reçus dans le paquet `welcome` du relay,
-  /// afin de rattraper les messages perdus pendant une déconnexion.
+  /// Rejoue les messages `missed` reçus dans le paquet `welcome`/`sync` du
+  /// relay, afin de rattraper ce qui a été perdu pendant une déconnexion.
+  /// Suit le curseur `seq` serveur (idempotent, insensible à l'horloge).
   void _onWelcomeReceived(Map<String, dynamic> json) {
+    final serverSeq = (json['seq'] as num?)?.toInt() ?? 0;
+    final isSyncResponse = json.containsKey('syncFrom');
+
     final missed = json['missed'];
-    if (missed is! List || missed.isEmpty) return;
+    if (missed is! List || missed.isEmpty) {
+      if (serverSeq > _lastServerSeq) {
+        // Totalement à jour (aucun manque) → le curseur avance.
+        _lastServerSeq = serverSeq;
+        unawaited(_outbox.setCursor('server_seq', serverSeq));
+      }
+      // Une réponse générique (fenêtre 24 h) est moins précise qu'un delta
+      // seq : on confirme une fois via sync_from (idempotent).
+      if (!isSyncResponse) {
+        unawaited(_requestSyncFrom());
+      }
+      return;
+    }
 
     if (kDebugMode) {
       debugPrint(
           '[P2PMeshService] welcome : ${missed.length} message(s) manqué(s) à rattraper');
     }
 
+    int maxConsumed = _lastServerSeq;
     for (final entry in missed) {
       if (entry is! Map) continue;
+      final seq = (entry['seq'] as num?)?.toInt() ?? 0;
+      if (seq > maxConsumed) maxConsumed = seq;
       final data = entry['data'];
       if (data is! Map<String, dynamic>) continue;
       // Évite toute boucle infinie (un `welcome` en backlog est ignoré).
@@ -672,6 +751,15 @@ class P2PMeshService {
           debugPrint('[P2PMeshService] welcome replay error: $e');
         }
       }
+    }
+
+    if (maxConsumed > _lastServerSeq) {
+      _lastServerSeq = maxConsumed;
+      unawaited(_outbox.setCursor('server_seq', maxConsumed));
+    }
+
+    if (!isSyncResponse) {
+      unawaited(_requestSyncFrom());
     }
   }
 
@@ -695,5 +783,185 @@ class P2PMeshService {
         if (!alert.isExpired()) broadcastAlert(alert);
       });
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Livraison fiable (Store-and-Forward) : outbox persistante + ACK + backoff
+  // ═══════════════════════════════════════════════════════════════════
+
+  /// Empile un message sortant dans l'outbox persistante avec un `seq`
+  /// croissant par émetteur. L'émission et les réémissions sont pilotées
+  /// par [_retransmitDue].
+  Future<void> _enqueueReliable(
+    Map<String, dynamic> payload, {
+    required String kind,
+  }) async {
+    try {
+      if (!_outbox.isReady) await _outbox.init();
+    } catch (e) {
+      if (kDebugMode) debugPrint('[P2PMeshService] outbox indisponible: $e');
+      return;
+    }
+    final entry = MeshOutboxEntry(
+      id: _generateMessageId(),
+      kind: kind,
+      seq: _outbox.nextSeq(),
+      from: localPeerId,
+      payload: jsonEncode(payload),
+      createdAt: DateTime.now().toUtc(),
+      attempts: 0,
+      nextAttemptAt: DateTime.now().toUtc(),
+    );
+    await _outbox.enqueue(entry);
+  }
+
+  /// Réémet les messages de l'outbox arrivés à échéance, avec un backoff
+  /// progressif borné. Un message reste en file tant qu'il n'est pas ACK
+  /// (ou qu'il n'a pas épuisé ses tentatives).
+  Future<void> _retransmitDue() async {
+    if (!_outbox.isReady) return;
+    try {
+      await _outbox.prune();
+    } catch (_) {}
+    final due = _outbox.due();
+    if (due.isEmpty) return;
+    final now = DateTime.now().toUtc();
+    for (final e in due) {
+      if (e.attempts >= _maxReliableAttempts) {
+        await _outbox.markFailed(e.id);
+        continue;
+      }
+      await _transmitEntry(e);
+      final idx = e.attempts < _retryDelays.length
+          ? e.attempts
+          : _retryDelays.length - 1;
+      await _outbox.touch(
+        e.id,
+        attempts: e.attempts + 1,
+        nextAttemptAt: now.add(_retryDelays[idx]),
+      );
+    }
+  }
+
+  /// Émet une entrée de l'outbox, enveloppée dans un frame fiable.
+  Future<void> _transmitEntry(MeshOutboxEntry e) async {
+    final envelope = jsonEncode({
+      'v': 1,
+      'mid': e.id,
+      'from': e.from,
+      'seq': e.seq,
+      'kind': e.kind,
+      'ts': DateTime.now().toUtc().toIso8601String(),
+      'd': jsonDecode(e.payload),
+    });
+    await _broadcastEnvelope(envelope);
+  }
+
+  /// Diffuse une enveloppe en évitant la saturation simultanée de la bande
+  /// 2,4 GHz : on choisit UN seul canal local actif (BLE ou Wi-Fi), puis on
+  /// ajoute le relay cellulaire (bande différente) si disponible.
+  Future<void> _broadcastEnvelope(String envelope) async {
+    final local =
+        transports.where((t) => _isLocalTransport(t) && t.isAvailable).toList();
+
+    MeshTransport? chosen;
+    for (final t in local) {
+      if (t.hasActivePeers) {
+        chosen = t;
+        break;
+      }
+    }
+
+    final targets = <MeshTransport>[];
+    if (chosen != null) {
+      targets.add(chosen);
+    } else {
+      targets.addAll(local);
+    }
+    for (final r in transports.where(_isRelayTransport)) {
+      if (r.isAvailable) targets.add(r);
+    }
+
+    if (targets.isEmpty) {
+      // Aucun transport dispo : l'entrée reste en outbox, réessayée au
+      // prochain tick (Store-and-Forward).
+      return;
+    }
+    await Future.wait(targets.map((t) => _safeBroadcast(t, envelope)));
+  }
+
+  Future<void> _safeBroadcast(MeshTransport t, String payload) async {
+    try {
+      await t.broadcast(payload);
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[P2PMeshService] émission fiable ${t.name}: $e');
+      }
+    }
+  }
+
+  bool _isLocalTransport(MeshTransport t) {
+    final n = t.name.toLowerCase();
+    return !n.contains('relay') &&
+        !n.contains('remote') &&
+        !n.contains('server');
+  }
+
+  bool _isRelayTransport(MeshTransport t) =>
+      t.name.toLowerCase().contains('relay');
+
+  /// Émet l'ACK applicatif d'un message fiable reçu (une seule fois par `mid`).
+  void _sendAck(String mid) {
+    if (_seenEnvelopeIds.contains(mid)) return;
+    _seenEnvelopeIds.add(mid);
+    if (_seenEnvelopeIds.length > _maxSeenEnvelopeIds) {
+      _seenEnvelopeIds.remove(_seenEnvelopeIds.first);
+    }
+    // ACK uniquement sur les transports LOCAUX (le relay est déjà fiable via
+    // TCP/WSS et n'a pas besoin d'ACK applicatif).
+    unawaited(broadcastRawJsonLocal({
+      'kind': 'ack',
+      'mid': mid,
+      'ts': DateTime.now().toUtc().toIso8601String(),
+    }));
+  }
+
+  /// Demande au relay serveur le delta de messages mesh postérieurs à
+  /// [_lastServerSeq] (rattrapage idempotent). Sans relay → no-op.
+  Future<void> _requestSyncFrom() async {
+    final relays = transports.where(_isRelayTransport).toList();
+    if (relays.isEmpty) return;
+    final payload = jsonEncode({
+      'kind': 'sync_from',
+      'seq': _lastServerSeq,
+      'peerId': localPeerId,
+      'ts': DateTime.now().toUtc().toIso8601String(),
+    });
+    for (final t in relays) {
+      try {
+        await t.broadcast(payload);
+      } catch (e) {
+        if (kDebugMode) debugPrint('[P2PMeshService] sync_from ${t.name}: $e');
+      }
+    }
+  }
+
+  /// Vide la file FIFO des messages entrants, UN message par microtask, sans
+  /// jamais jeter de paquet.
+  void _processQueue() {
+    if (_incomingBacklog.isEmpty) {
+      _pendingMicrotasks = 0;
+      return;
+    }
+    final raw = _incomingBacklog.removeAt(0);
+    _processIncomingMessage(raw);
+    scheduleMicrotask(_processQueue);
+  }
+
+  static String _generateMessageId() {
+    final rng = Random.secure();
+    final bytes = List<int>.generate(8, (_) => rng.nextInt(256));
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return 'm-$hex';
   }
 }

@@ -21,6 +21,8 @@ import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
 import '../../../core/network/osm_tile_headers.dart';
 import '../../../core/theme/streetphare_theme.dart';
+import '../../../network/network_config.dart';
+import '../../map/local_first_tile_provider.dart';
 import '../domain/models/route_result.dart';
 import '../infrastructure/osmand_routing_service.dart';
 import 'widgets/route_calculation_overlay.dart';
@@ -541,8 +543,16 @@ class _MiniRouteMap extends StatefulWidget {
 class _MiniRouteMapState extends State<_MiniRouteMap> {
   final MapController _controller = MapController();
 
+  /// Fournisseur de tuiles « local d'abord » (cache disque → serveur
+  /// StreetPhare → OSM en dernier recours), identique à la carte principale.
+  /// Évite de s'appuyer sur un accès direct à tile.openstreetmap.org, qui peut
+  /// être bloqué et laisser l'aperçu sur fond gris.
+  late final LocalFirstTileProvider _tileProvider =
+      LocalFirstTileProvider(headers: kStreetPhareTileHeaders);
+
   @override
   void dispose() {
+    _tileProvider.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -652,13 +662,10 @@ class _MiniRouteMapState extends State<_MiniRouteMap> {
           ),
           children: [
             TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              urlTemplate: '${NetworkConfig.baseUrl}/tiles/{z}/{x}/{y}.png',
+              fallbackUrl: kStreetPhareOsmTileUrlTemplate,
               userAgentPackageName: 'com.streetphare.app',
-              tileProvider: NetworkTileProvider(
-                headers: kStreetPhareTileHeaders,
-                // Ne pas rethrow les erreurs réseau (timeout tuiles).
-                silenceExceptions: true,
-              ),
+              tileProvider: _tileProvider,
             ),
             if (pts.length >= 2)
               PolylineLayer(
@@ -675,6 +682,7 @@ class _MiniRouteMapState extends State<_MiniRouteMap> {
                 if (pts.isNotEmpty)
                   Marker(
                     point: pts.first,
+                    rotate: true,
                     width: 16,
                     height: 16,
                     child: Icon(Icons.trip_origin,
@@ -683,6 +691,7 @@ class _MiniRouteMapState extends State<_MiniRouteMap> {
                 if (pts.length >= 2)
                   Marker(
                     point: pts.last,
+                    rotate: true,
                     width: 16,
                     height: 16,
                     child: Icon(Icons.location_on,

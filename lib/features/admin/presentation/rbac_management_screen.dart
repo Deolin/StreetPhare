@@ -38,7 +38,7 @@ class _RbacManagementScreenState extends State<RbacManagementScreen>
   @override
   void initState() {
     super.initState();
-    _service = widget.service ?? RbacAdminService();
+    _service = widget.service ?? RbacAdminService.instance;
     _tabController = TabController(length: 4, vsync: this);
     if (_service.isAuthenticated) {
       _refreshAll();

@@ -141,6 +141,7 @@ class SafeRouteLayer extends StatelessWidget {
       // Départ
       Marker(
         point: routePoints.first,
+        rotate: true,
         width: 32,
         height: 32,
         child: _EndpointDot(
@@ -156,6 +157,7 @@ class SafeRouteLayer extends StatelessWidget {
       markers.add(
         Marker(
           point: routePoints.last,
+          rotate: true,
           width: 38,
           height: 38,
           child: _EndpointDot(

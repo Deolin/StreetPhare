@@ -982,6 +982,15 @@ class NetworkCoordinator with WidgetsBindingObserver {
       body: '${_describeAlertType(alert.type)} signalé à proximité.',
       id: alert.id.hashCode,
     );
+
+    // ── Remontée serveur (relai hybride BLE → Internet) ───────────────────
+    // Un pair qui reçoit un signalement via BLE/Wi-Fi et qui dispose d'une
+    // connexion Internet le pousse vers le serveur central. Celui-ci le
+    // persiste (store.alerts) puis le rediffuse à TOUS les clients via
+    // `new_alert`. Le serveur déduplique par identifiant d'alerte : un second
+    // push du même message (depuis un autre relai) est simplement ignoré —
+    // aucun re-broadcast, aucun doublon.
+    unawaited(_failover.uploadAlerts([alert.toJson()]));
   }
 
   /// Retourne une description lisible du type d'alerte.

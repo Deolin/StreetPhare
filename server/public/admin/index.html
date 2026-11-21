@@ -65,10 +65,15 @@
   <div id="panel">
     <h2 style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
       <span>🛡 StreetPhare Admin</span>
-      <a href="/admin/config.html" title="Configuration du serveur"
-         style="font-size:18px; color:#8b949e; text-decoration:none; line-height:1; padding:2px 6px; border-radius:6px; flex:0 0 auto;"
-         onmouseover="this.style.background='#21262d'; this.style.color='#e6edf3';"
-         onmouseout="this.style.background='transparent'; this.style.color='#8b949e';">⚙️</a>
+      <span style="display:flex; align-items:center; gap:8px; flex:0 0 auto;">
+        <span id="user-info" style="display:none; font-size:13px; color:#8b949e; white-space:nowrap;"></span>
+        <button id="logout-btn" onclick="doLogout()" title="Se déconnecter"
+                style="display:none; font-size:12px; color:#e6edf3; background:#21262d; border:1px solid #30363d; border-radius:6px; padding:3px 8px; cursor:pointer;">Déconnexion</button>
+        <a href="/admin/config.html" title="Configuration du serveur"
+           style="font-size:18px; color:#8b949e; text-decoration:none; line-height:1; padding:2px 6px; border-radius:6px;"
+           onmouseover="this.style.background='#21262d'; this.style.color='#e6edf3';"
+           onmouseout="this.style.background='transparent'; this.style.color='#8b949e';">⚙️</a>
+      </span>
     </h2>
     <div id="status">
       <span id="sync-status">⏳ Connexion...</span> |
@@ -236,6 +241,15 @@
 
         <a href="tel:112" style="display:block;margin-top:10px;text-align:center;background:#e53935;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:600">📞 Appeler les secours (112)</a>
       </div>
+
+      <div class="card" style="display:none" id="scouts-card">
+        <h3>📡 Éclaireurs &amp; validation</h3>
+        <div style="color:#8b949e;font-size:12px;margin-bottom:8px">Aucune demande côté client : ajoutez manuellement l'ID d'un éclaireur pour le valider.</div>
+        <label>ID de l'éclaireur (userId)</label><input id="scout-id" placeholder="ex: sp-1a2b3c4d5e6f7a8b">
+        <label>Nom affiché (optionnel)</label><input id="scout-display" placeholder="ex: Éclaireur quartier Nord">
+        <button onclick="addScout()">➕ Valider l'éclaireur</button>
+        <div class="list" id="scouts-list">Chargement…</div>
+      </div>
     </div>
 
     <!-- ── CONSOLE ── -->
@@ -359,7 +373,56 @@
     const markersById = {};
     let currentRole = '';
     let currentPermissions = [];
+    let currentUsername = '';
     const filters = { police: true, fire_truck: true, filter: true, danger: true, collective: true, panic: true, safe: true, events: true };
+
+    /* ── Utilisateur connecté (nom + statut + déconnexion) ───────────────── */
+    function decodeJwt(token) {
+      try {
+        const part = (token || '').split('.')[1];
+        if (!part) return {};
+        const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+        return JSON.parse(atob(padded));
+      } catch (_) { return {}; }
+    }
+
+    function roleLabel(role) {
+      switch (role) {
+        case 'superadmin': return 'Superadmin';
+        case 'admin': return 'Admin';
+        case 'moderator': return 'Modérateur';
+        case 'event_admin': return 'Admin événement';
+        case 'scout': return 'Éclaireur';
+        default: return role || '—';
+      }
+    }
+
+    function renderUserInfo() {
+      const el = document.getElementById('user-info');
+      const btn = document.getElementById('logout-btn');
+      if (!el || !btn) return;
+      if (adminToken) {
+        el.style.display = '';
+        el.textContent = '👤 ' + (currentUsername || 'inconnu') + ' · ' + roleLabel(currentRole);
+        btn.style.display = '';
+      } else {
+        el.style.display = 'none';
+        btn.style.display = 'none';
+      }
+    }
+
+    function doLogout() {
+      adminToken = '';
+      currentUsername = '';
+      currentRole = '';
+      currentPermissions = [];
+      sessionStorage.removeItem('sp_admin_token');
+      try { if (ws) ws.close(); } catch (_) {}
+      renderUserInfo();
+      document.getElementById('sync-status').innerHTML = '<span class="ko">● Déconnecté</span>';
+      document.getElementById('login-overlay').style.display = 'flex';
+    }
 
     ['police', 'fire_truck', 'filter', 'danger', 'collective', 'panic', 'safe', 'events'].forEach(k => {
       layerGroups[k] = L.layerGroup().addTo(map);
@@ -375,6 +438,13 @@
     const loadHistory = [];
 
     adminToken = sessionStorage.getItem('sp_admin_token') || '';
+    if (adminToken) {
+      const claims = decodeJwt(adminToken);
+      currentUsername = claims.username || '';
+      if (claims.role) currentRole = claims.role;
+      if (claims.permissions) currentPermissions = claims.permissions;
+    }
+    renderUserInfo();
 
     /* ── Éditeur d'événements : initialisation ────────────────────────── */
     if (typeof initEventsEditor === 'function') initEventsEditor();
@@ -446,6 +516,7 @@
           loadStreetMedics();
           loadMedicMissions();
           loadMedicEmergencies();
+          renderUserInfo();
         } else if (d.type === 'new_alert') {
           addAlertMarker(d.alert);
           refreshSnapshot();
@@ -460,6 +531,8 @@
           loadZones();
         } else if (d.type === 'events_changed') {
           onEventsChanged(d.events || []);
+        } else if (d.type === 'pending_events_changed') {
+          loadPendingEvents();
         } else if (d.type === 'global_alert') {
           notify(d.message || 'Alerte globale');
         } else if (d.type === 'console_output') {
@@ -492,7 +565,7 @@
       };
       ws.onopen = () => {
         document.getElementById('sync-status').innerHTML = '<span class="ok">● Connecté (Live)</span>';
-        loadZones(); loadModerators(); loadAdmins(); loadPendingEvents(); loadSimTypes(); loadStreetMedics(); loadMedicMissions(); loadMedicEmergencies();
+        loadZones(); loadModerators(); loadAdmins(); loadPendingEvents(); loadSimTypes(); loadStreetMedics(); loadMedicMissions(); loadMedicEmergencies(); loadScouts();
       };
       ws.onclose = async () => {
         document.getElementById('sync-status').innerHTML = '<span class="ko">● Déconnecté — reconnexion…</span>';
@@ -921,6 +994,59 @@
     async function simSetMissionState(missionId, status) {
       await fetch(`/api/admin/simulation/missions/${encodeURIComponent(missionId)}/state`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ status }) });
       loadStreetMedics(); loadMedicMissions(); loadMedicEmergencies();
+    }
+
+    /* ── ÉCLAIREURS (validation manuelle, pas de demande client) ──────── */
+    function canManageScouts() {
+      return currentRole === 'superadmin';
+    }
+    async function loadScouts() {
+      const card = document.getElementById('scouts-card');
+      if (!canManageScouts()) { card.style.display = 'none'; return; }
+      const r = await fetch('/api/admin/scouts', { headers: { 'Authorization': `Bearer ${adminToken}` } });
+      if (!r.ok) return;
+      const d = await r.json();
+      card.style.display = 'block';
+      renderScouts(d.scouts || []);
+    }
+    function renderScouts(scouts) {
+      const list = document.getElementById('scouts-list');
+      if (!scouts.length) { list.innerHTML = 'Aucun éclaireur validé.'; return; }
+      list.innerHTML = scouts.map(s => {
+        const created = (s.createdAt || '').slice(0, 10);
+        return `<div class="item">
+          <b>📡 ${escapeHtml(s.displayName || s.username)}</b><br>
+          <span class="meta">ID : ${escapeHtml(s.username)}</span>
+          ${created ? `<br><span class="meta">Validé le ${escapeHtml(created)}</span>` : ''}
+          <div style="margin-top:4px">
+            <button class="danger" onclick="deleteScout('${s.id}')">Révoquer / Supprimer</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    async function addScout() {
+      const idInput = document.getElementById('scout-id');
+      const displayInput = document.getElementById('scout-display');
+      const username = (idInput.value || '').trim();
+      if (!username) { notify('⚠ ID de l\'éclaireur requis'); return; }
+      const body = { username };
+      const displayName = (displayInput.value || '').trim();
+      if (displayName) body.displayName = displayName;
+      const r = await fetch('/api/admin/scouts', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        notify('⚠ ' + (err.error || 'Erreur lors de la validation'));
+        return;
+      }
+      notify('✅ Éclaireur validé : ' + username);
+      idInput.value = '';
+      displayInput.value = '';
+      loadScouts();
+    }
+    async function deleteScout(id) {
+      if (!confirm('Révoquer / supprimer cet éclaireur ?')) return;
+      await fetch(`/api/admin/scouts/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
+      loadScouts();
     }
 
     /* ── BLESSÉS (missions d'intervention) ──────────────────────────── */

@@ -45,6 +45,7 @@ class Store {
     this.medicMissions = [];         // Missions d'intervention (appel → soin)
     this.medicMissionTimers = new Map(); // Timers de réponse (30 s) par mission
     this.meshMessages = [];      // Backlog de messages mesh (store-and-forward)
+    this.meshSeq = 0;            // Curseur séquentiel global du log mesh
     this.meshClients = new Set();
     this.adminClients = new Set();
     this.peerActivity = new Map(); // peerId -> timestamp (ms) de dernière activité (transitoire)
@@ -116,6 +117,11 @@ class Store {
 
       if (Array.isArray(data.meshMessages)) {
         this.meshMessages = data.meshMessages.slice(-5000);
+      }
+
+      if (typeof data.meshSeq === 'number') this.meshSeq = data.meshSeq;
+      for (const m of this.meshMessages) {
+        if (typeof m.seq === 'number' && m.seq > this.meshSeq) this.meshSeq = m.seq;
       }
 
       if (Array.isArray(data.bannedUsers)) {
@@ -191,6 +197,7 @@ class Store {
       panicPings: this.panicPings,
       bugReports: this.bugReports.slice(-200),
       meshMessages: this.meshMessages.slice(-1000),
+      meshSeq: this.meshSeq,
       bannedUsers: [...this.bannedUsers],
       geofencingZones: this.geofencingZones,
       streetmedics: this.streetmedics,
@@ -612,6 +619,7 @@ class Store {
   addMeshMessage(payload) {
     const msg = {
       id: require('uuid').v4(),
+      seq: ++this.meshSeq,
       kind: payload.kind || 'mesh',
       data: payload.data || payload,
       receivedAt: new Date().toISOString(),
@@ -633,6 +641,15 @@ class Store {
     const since = new Date(sinceIso);
     if (isNaN(since.getTime())) return [];
     return this.meshMessages.filter(m => new Date(m.receivedAt) > since);
+  }
+
+  /// Messages mesh dont le `seq` est strictement supérieur à [afterSeq].
+  /// Curseur idempotent, insensible aux dérives d'horloge (rattrapage delta).
+  getMeshMessagesSinceSeq(afterSeq) {
+    if (typeof afterSeq !== 'number' || isNaN(afterSeq)) {
+      return this.meshMessages.slice(-1000);
+    }
+    return this.meshMessages.filter(m => typeof m.seq === 'number' && m.seq > afterSeq);
   }
 
   purgeExpiredMeshMessages() {
