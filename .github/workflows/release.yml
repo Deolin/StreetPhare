@@ -236,7 +236,7 @@ jobs:
           echo "Version de release: $TAG"
 
       - name: Télécharger les artefacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           path: dist
 
