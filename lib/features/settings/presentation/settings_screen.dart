@@ -19,15 +19,18 @@ import 'package:app_settings/app_settings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/i18n/app_locale.dart';
 import '../../../core/i18n/strings.dart';
+import '../../../core/network/peer_counter_service.dart';
 import '../../../core/theme/app_skin.dart';
 import '../../../core/theme/skin_controller.dart';
 import '../../../core/theme/skins/mars_background.dart';
 import '../../../core/theme/streetphare_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../core/utils/app_version.dart';
+import '../../../network/bootstrap.dart';
 import '../../../services/apk_downloader_service.dart';
 import '../../../services/app_share_service.dart';
 import '../../../services/github_update_service.dart';
@@ -96,6 +99,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 return Column(
                   children: [
                     _EventsSection(strings: s),
+                    const _MyIdentifierSection(),
                     _LanguageSection(strings: s),
                     _LowVisionSection(strings: s),
                     _MessageFilterSection(strings: s),
@@ -158,6 +162,174 @@ class _EventsSection extends StatelessWidget {
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const EventsScreen()),
         ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// [1a] Section MON IDENTIFIANT (à transmettre à un administrateur)
+// ============================================================================
+
+class _MyIdentifierSection extends StatefulWidget {
+  const _MyIdentifierSection();
+
+  @override
+  State<_MyIdentifierSection> createState() => _MyIdentifierSectionState();
+}
+
+class _MyIdentifierSectionState extends State<_MyIdentifierSection> {
+  String? _localId;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocalId();
+  }
+
+  Future<void> _loadLocalId() async {
+    String? id;
+    try {
+      // 1. Identifiant canonique déjà chargé par le réseau (source de vérité).
+      id = PeerCounterService.instance.localPeerId;
+      // 2. Repli : lit (ou génère) l'identifiant stable persisté sur l'appareil.
+      id ??= await loadOrCreateStablePeerId();
+    } catch (_) {
+      id = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _localId = id;
+      _loading = false;
+    });
+  }
+
+  Future<void> _copyId() async {
+    final id = _localId;
+    if (id == null || id.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: id));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Identifiant copié dans le presse-papiers.'),
+        backgroundColor: StreetPhareTheme.primary,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _shareId() async {
+    final id = _localId;
+    if (id == null || id.isEmpty) return;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          subject: 'Mon identifiant StreetPhare',
+          text: 'Voici mon identifiant StreetPhare : $id',
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible d\'ouvrir la feuille de partage.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final hasId = _localId != null && _localId!.isNotEmpty;
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeader(
+            icon: Icons.badge_outlined,
+            title: 'Mon identifiant',
+            color: Color(0xFF00897B),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 30),
+            child: Text(
+              'Transmettez cet identifiant à un administrateur pour être '
+              'validé en tant qu\'éclaireur (signalements confirmés '
+              'instantanément).',
+              style: TextStyle(
+                color: onSurface.withValues(alpha: 0.65),
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (_loading || !hasId)
+            Padding(
+              padding: const EdgeInsets.only(left: 30),
+              child: Text(
+                _loading ? 'Chargement…' : 'Identifiant indisponible.',
+                style: TextStyle(
+                  color: onSurface.withValues(alpha: 0.5),
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            )
+          else
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF00897B).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFF00897B).withValues(alpha: 0.3),
+                ),
+              ),
+              child: SelectableText(
+                _localId!,
+                style: TextStyle(
+                  color: onSurface,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: hasId ? _copyId : null,
+                  icon: const Icon(Icons.copy, size: 16),
+                  label: const Text('Copier'),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF00897B)),
+                    foregroundColor: const Color(0xFF00897B),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: hasId ? _shareId : null,
+                  icon: const Icon(Icons.share, size: 16),
+                  label: const Text('Partager'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00897B),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
