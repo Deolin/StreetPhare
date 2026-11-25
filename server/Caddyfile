@@ -12,7 +12,7 @@
 	#    par une VRAIE adresse e-mail valide. Sans cela, Let's Encrypt ne
 	#    peut pas vous notifier (expiration / renouvellement imminent) et
 	#    applique des rate-limits plus stricts.
-	email admin@streetphare.local
+	email contact@streetphare.be
 }
 
 # ── MODE DÉVELOPPEMENT (sans ports 80/443 publics) ───────────────────
