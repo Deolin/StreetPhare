@@ -1,4 +1,4 @@
-# 🏮 StreetPhare
+# 💡 StreetPhare
 
 **Application citoyenne de cartographie collaborative en temps réel**, pensée pour **sécuriser les déplacements piétons** lors d'événements et de rassemblements publics (manifestations, festivals, etc.).
 
