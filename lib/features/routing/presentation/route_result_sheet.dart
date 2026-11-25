@@ -25,8 +25,6 @@ import '../../../network/network_config.dart';
 import '../../map/local_first_tile_provider.dart';
 import '../core/models/routing_profile.dart';
 import '../domain/models/route_result.dart';
-import '../infrastructure/osmand_routing_service.dart';
-import 'widgets/route_calculation_overlay.dart';
 
 /// Callback asynchrone pour charger les alternatives à la demande.
 typedef AlternativesLoader = Future<List<RouteResult>> Function();
@@ -316,11 +314,6 @@ class _RouteResultSheetState extends State<RouteResultSheet> {
                 ),
               ),
 
-            const SizedBox(height: 8),
-
-            // ── Bouton "Ouvrir dans OsmAnd" (Mode Externe) ───────────────
-            _OsmAndLaunchButton(route: _selected ?? recommended, strings: s),
-
             const SizedBox(height: 12),
 
             // ── Bouton "Accepter" ─────────────────────────────────────────
@@ -490,84 +483,6 @@ class _RouteTile extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// _OsmAndLaunchButton — Bouton "Ouvrir dans OsmAnd"
-// ══════════════════════════════════════════════════════════════════════════════
-
-class _OsmAndLaunchButton extends StatelessWidget {
-  const _OsmAndLaunchButton({required this.route, required this.strings});
-
-  final RouteResult route;
-  final AppStrings strings;
-
-  @override
-  Widget build(BuildContext context) {
-    // Structure stable (Offstage) pour éviter l'assertion framework
-    // « !semantics.parentDataDirty » (Flutter 3.41+).
-    return Offstage(
-      offstage: route.points.isEmpty,
-      child: OutlinedButton.icon(
-        onPressed: () => _launch(context),
-        icon: const Icon(Icons.map_outlined, size: 18),
-        label: Text(strings.routeOpenInOsmAnd),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: StreetPhareTheme.primary,
-          side: BorderSide(
-            color: StreetPhareTheme.primary.withValues(alpha: 0.6),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _launch(BuildContext context) async {
-    final svc = OsmAndRoutingService.instance;
-    final start = route.points.first;
-    final end = route.points.last;
-    final destName =
-        route.label.isNotEmpty ? route.label : strings.routeDestination;
-
-    final success = await svc.launchExternalNavigation(
-      start: start,
-      end: end,
-      destinationName: destName,
-      onNotInstalled: () {
-        if (context.mounted) {
-          OsmAndNotInstalledDialog.show(
-            context,
-            onInstall: () => svc.openInstallPage(),
-            onUseFallback: () {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(strings.routeOsmAndSuccess),
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 3),
-                  ),
-                );
-              }
-            },
-          );
-        }
-      },
-    );
-
-    if (!success && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(strings.routeOsmAndError),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
   }
 }
 
