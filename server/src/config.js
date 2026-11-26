@@ -131,7 +131,10 @@ const config = {
   tileRateLimitMax: parseInt(process.env.RATE_LIMIT_TILES_MAX || '4000', 10),
 
   // ── Logs ────────────────────────────────────────────────────────────
-  logDir: process.env.LOG_DIR || './logs',
+  // Dossier des logs : par défaut `../logs` (le dossier `logs/` à la
+  // racine du projet), car le serveur est lancé depuis `server/` (cwd).
+  // Surchargeable via la variable d'environnement LOG_DIR.
+  logDir: process.env.LOG_DIR || '../logs',
 
   // ── TTL (en minutes) ────────────────────────────────────────────────
   ttls: {

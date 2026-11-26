@@ -4,7 +4,7 @@
 // Flutter StreetPhare, en mode débogage.
 //
 // Génère et maintient à jour (de façon atomique) un fichier
-// `CLIENT_DEBUG.md` à la racine du projet. Le fichier retrace
+// `logs/CLIENT_DEBUG.md` à la racine du projet. Le fichier retrace
 // en temps réel :
 //   - le serveur courant considéré comme "principal",
 //   - l'évolution de la chaîne de secours (déchiffrée),
@@ -21,8 +21,8 @@
 // des no-op (zéro coût, zéro fuite d'info).
 //
 // Plateforme :
-//   * Windows / Linux / macOS : on écrit dans le répertoire
-//     de travail courant (souvent la racine du projet).
+//   * Windows / Linux / macOS : on écrit dans `logs/` sous le
+//     répertoire de travail courant (souvent la racine du projet).
 //   * Android / iOS / Web : pas d'accès à la racine, le
 //     module bascule en mode "in-memory" (le contenu reste
 //     accessible via `getSnapshot()`).
@@ -339,11 +339,16 @@ class ClientDebugLogger {
   Future<void> _writeNow() async {
     if (!_fileWriteEnabled || _outputDir == null || kIsWeb) return;
     final body = _render();
+    final dir = io.Directory(
+      '${_outputDir!.path}${io.Platform.pathSeparator}logs',
+    );
     final f = io.File(
-      '${_outputDir!.path}${io.Platform.pathSeparator}status${io.Platform.pathSeparator}CLIENT_DEBUG.md',
+      '${dir.path}${io.Platform.pathSeparator}CLIENT_DEBUG.md',
     );
     final tmp = io.File('${f.path}.tmp');
     try {
+      // Le dossier `logs/` est créé s'il n'existe pas encore.
+      await dir.create(recursive: true);
       await tmp.writeAsString(body, flush: true);
       await tmp.rename(f.path);
     } catch (e) {
@@ -454,7 +459,7 @@ class ClientDebugLogger {
     buf.writeln('---');
     buf.writeln();
     buf.writeln(
-      '> ℹ️ Pour suivre en direct : `tail -f status/CLIENT_DEBUG.md` '
+      '> ℹ️ Pour suivre en direct : `tail -f logs/CLIENT_DEBUG.md` '
       '(le fichier est réécrit à chaque évènement).',
     );
     buf.writeln();

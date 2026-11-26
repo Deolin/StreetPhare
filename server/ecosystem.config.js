@@ -10,7 +10,7 @@
 //   - redémarrage automatique en cas de crash (uncaughtException → exit 1) ;
 //   - relance au démarrage de la machine (`pm2 save` + `pm2 startup`) ;
 //   - redémarrage si la mémoire dépasse 512 Mo (fuite mémoire) ;
-//   - logs séparés par processus (dans server/logs/).
+//   - logs séparés par processus (dans logs/ à la racine du projet).
 //
 // Usage (depuis le dossier server/) :
 //   npm run pm2:start    → démarre les deux processus
@@ -44,8 +44,8 @@ module.exports = {
         SERVER_TYPE: 'PRIMARY',
         PARTNER_URL: 'http://127.0.0.1:3001',
       },
-      out_file: './logs/primary-out.log',
-      error_file: './logs/primary-error.log',
+      out_file: '../logs/primary-out.log',
+      error_file: '../logs/primary-error.log',
       time: true,
     },
     {
@@ -64,8 +64,8 @@ module.exports = {
         SERVER_TYPE: 'BACKUP',
         PARTNER_URL: 'http://127.0.0.1:3000',
       },
-      out_file: './logs/backup-out.log',
-      error_file: './logs/backup-error.log',
+      out_file: '../logs/backup-out.log',
+      error_file: '../logs/backup-error.log',
       time: true,
     },
   ],

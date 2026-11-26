@@ -51,7 +51,7 @@ StreetPhare/
 │   ├── network/                 # Couche réseau P2P (bootstrap, failover, sync, transports)
 │   ├── services/                # Services applicatifs (notifications, APK, version, tuiles…)
 │   ├── database/                # Hive + crypto_utils (AES/HMAC) + TTL/visibilité
-│   ├── debug/                   # ClientDebugLogger (génère status/CLIENT_DEBUG.md)
+│   ├── debug/                   # ClientDebugLogger (génère logs/CLIENT_DEBUG.md)
 │   └── l10n/                    # Fichiers ARB générés (4 langues)
 ├── android/                     # Natif Android (Kotlin, GraphHopper embarqué)
 │   ├── app/                     #   MainActivity, OsmAndBridgePlugin (GraphHopper)
